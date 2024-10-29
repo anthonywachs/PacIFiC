@@ -272,7 +272,7 @@ void Matrix::copyMatrix( double *vit, int i ) const
 
 // ----------------------------------------------------------------------
 // Writes the object with a high precision format given by
-// POSITIONFORMAT defined in GrainsExec.hh
+// FORMAT16DIGITS defined in GrainsExec.hh
 void Matrix::writeMatrix( ostream& fileOut ) const
 {
   (*this)[X].writeGroup3( fileOut );
@@ -287,7 +287,7 @@ void Matrix::writeMatrix( ostream& fileOut ) const
 
 // ----------------------------------------------------------------------
 // Writes the object with a high precision format given by
-// POSITIONFORMAT defined in GrainsExec.hh and the 2014 reload format
+// FORMAT16DIGITS defined in GrainsExec.hh and the 2014 reload format
 void Matrix::writeMatrix2014( ostream& fileOut ) const
 {
   (*this)[X].writeGroup3( fileOut );

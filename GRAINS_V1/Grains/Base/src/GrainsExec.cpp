@@ -54,6 +54,7 @@ Point3 GrainsExec::m_defaultInactivePos = Point3( -1.e10 );
 int GrainsExec::m_CompositeObstacleDefaultID = 0;
 int GrainsExec::m_ReferenceParticleDefaultID = 0;
 size_t GrainsExec::m_time_counter = 0;
+double GrainsExec::m_minCrustThickness = 1.e20;
 
 
 
@@ -709,4 +710,24 @@ string GrainsExec::fullResultFileName( string const& rootname, bool addrank )
   fullname += oss.str()+".result";
 
   return ( fullname );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets the minimum crust thickness
+void GrainsExec::setMinCrustThickness( double const& ct )
+{
+  m_minCrustThickness = min( m_minCrustThickness, ct );
+} 
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the minimum crust thickness */
+double GrainsExec::getMinCrustThickness()
+{
+  return ( m_minCrustThickness ); 
 }

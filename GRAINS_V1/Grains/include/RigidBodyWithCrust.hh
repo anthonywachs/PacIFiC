@@ -38,7 +38,7 @@ class RigidBodyWithCrust : public RigidBody
     @param composite true for composite, false for standard 
     @param crust_thickness crust thickness */
     RigidBodyWithCrust( Convex* convex_, Transform const& position_,
-    	bool composite = true, double const& crust_thickness = 0. );
+    	bool composite, double const& crust_thickness );
 
     /** @brief Constructor from an input stream and a convex type
     @param fileIn input stream
@@ -226,7 +226,6 @@ two rigid bodies
 @param rbB 2nd rigid body */
 bool isContactBVolume( RigidBodyWithCrust const& rbA,
                        RigidBodyWithCrust const& rbB );  
-
 
 /** @brief Returns the features of the contact when the 1 rigid body is
 a rectangle

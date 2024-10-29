@@ -247,7 +247,7 @@ void SimpleObstacle::InterAction( Component* voisin,
 		<< " has thrown a ContactError exception" <<  endl;
         erreur_level2.setMessage(
 		"SimpleObstacle::InterAction : choc de croute ! a t="
-		+GrainsExec::doubleToString(time,TIMEFORMAT));
+		+GrainsExec::doubleToString(time,FORMAT10DIGITS));
         erreur_level2.setComponents( this, voisin, time );
         GrainsExec::m_exception_Contact = true;
         throw(erreur_level2);

@@ -1365,7 +1365,7 @@ void LinkedCell::Link( Obstacle* root_obstacle )
 	{
 	  cellBoxRBWC.setOrigin( (*cg)[X], (*cg)[Y], (*cg)[Z] );
 	  cellBoxRBWC.initialize_transformWithCrust_to_notComputed();
-	  add = cellBoxRBWC.isContact( *obstacleRBWC );	
+	  add = cellBoxRBWC.isContact( *obstacleRBWC );
 	}
 	
 	if ( add )
@@ -1640,7 +1640,7 @@ void LinkedCell::DestroyOutOfDomainClones( double time,
       if ( GrainsExec::m_MPI_verbose )
       {
         ostringstream oss;
-        oss << "   t=" << GrainsExec::doubleToString( time, TIMEFORMAT ) <<
+        oss << "   t=" << GrainsExec::doubleToString( time, FORMAT10DIGITS ) <<
       		" Destroy clone               Id = " <<
       		(*particle)->getID() << " " << *(*particle)->getPosition()
 		<< endl;
@@ -1890,7 +1890,7 @@ pair<bool,bool> LinkedCell::insertParticleParallel( double time,
           if ( GrainsExec::m_MPI_verbose )
           {
             ostringstream oss;
-            oss << "   t=" << GrainsExec::doubleToString(time,TIMEFORMAT)
+            oss << "   t=" << GrainsExec::doubleToString(time,FORMAT10DIGITS)
 		<< " Create Clone                Id = " 
 		<< particle->getID()
 		<< " Type = " << particle->getGeometricType() << " " 

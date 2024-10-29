@@ -498,7 +498,7 @@ void Particle::InterAction( Component* voisin,
 	<< ( GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank() : 0 )
 	<< " has thrown an ContactError exception" <<  endl;
       erreur_level2.setMessage( "Particle::InterAction : choc de croute a t="
-      	+ GrainsExec::doubleToString( time, TIMEFORMAT ) );
+      	+ GrainsExec::doubleToString( time, FORMAT10DIGITS ) );
       erreur_level2.setComponents( this, voisin, time );
       GrainsExec::m_exception_Contact = true;
       throw(erreur_level2);
@@ -555,7 +555,7 @@ void Particle::SearchContact( Component* voisin, double dt,
 	<< ( GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank() : 0 )
 	<< " has thrown an ContactError exception" <<  endl;
       erreur_level2.setMessage( "Particle::InterAction : choc de croute a t="
-      	+ GrainsExec::doubleToString( time, TIMEFORMAT ) );
+      	+ GrainsExec::doubleToString( time, FORMAT10DIGITS ) );
       erreur_level2.setComponents( this, voisin, time );
       GrainsExec::m_exception_Contact = true;
       throw(erreur_level2);
@@ -1096,36 +1096,36 @@ void Particle::write( ostream& fileSave ) const
   fileSave << "*Type " << m_GeomType << endl;
   fileSave << "*Tag " << m_tag << endl;
   fileSave << "*Mass "
-	   << GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	   << GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
   		m_mass ) << endl;
   fileSave << "*Density "
-	   << GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	   << GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
   		m_density ) << endl;
   fileSave << "*MomentOfInertiaTensor" << endl
-	<< GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	<< GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
   		m_inertia[0] ) << " "
-	<< GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	<< GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
   		m_inertia[1] ) << " "
-	<< GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	<< GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
   		m_inertia[2] ) << " "
-	<< GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	<< GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
   		m_inertia[3] ) << " "
-	<< GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	<< GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
   		m_inertia[4] ) << " "
-	<< GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	<< GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
   		m_inertia[5] ) << endl;
   fileSave << "*InverseOfMOIT" << endl
-	<< GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	<< GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
   		m_inertia_1[0] ) << " "
-	<< GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	<< GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
   		m_inertia_1[1] ) << " "
-	<< GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	<< GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
   		m_inertia_1[2] ) << " "
-	<< GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	<< GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
   		m_inertia_1[3] ) << " "
-	<< GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	<< GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
   		m_inertia_1[4] ) << " "
-	<< GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	<< GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
   		m_inertia_1[5] ) << endl;
 
   Component::writePosition( fileSave );

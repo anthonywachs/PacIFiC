@@ -79,7 +79,7 @@ namespace solid
       /**@name Methods */
       //@{
       /** @brief Writes the object with a high precision format given by
-      POSITIONFORMAT defined in GrainsExec.hh
+      FORMAT16DIGITS defined in GrainsExec.hh
       @param fileOut output stream */
       void writeGroup3( ostream& fileOut ) const;
 

@@ -71,12 +71,12 @@ class Transform
     void writeShape( ostream& fileOut ) const;
   
     /** @brief Writes the object with a high precision format given by
-    POSITIONFORMAT defined in GrainsExec.hh
+    FORMAT16DIGITS defined in GrainsExec.hh
     @param fileOut output stream */
     void writeTransform( ostream& fileOut ) const;
   
     /** @brief Writes the object with a high precision format given by
-    POSITIONFORMAT defined in GrainsExec.hh and the 2014 reload format
+    FORMAT16DIGITS defined in GrainsExec.hh and the 2014 reload format
     @param fileOut output stream */
     void writeTransform2014( ostream& fileOut ) const;
   

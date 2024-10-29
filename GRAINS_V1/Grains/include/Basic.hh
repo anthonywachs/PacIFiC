@@ -27,11 +27,13 @@ using namespace std;
     const double EPSILON2 = 1.0e-15; /**< high precision approximation 
     	constant */
     const double EPSILON3 = 1.0e-20; /**< very high precision approximation 
-    	constant */
-    const int TIMEFORMAT = 10; /**< number of significant digits after the
-    	decimal point to write time in high precision format */
-    const int POSITIONFORMAT = 16; /**< number of significant digits after the
-    	decimal point to write component position in high precision format */
+    	constant */	
+    const int FORMAT6DIGITS = 6; /**< 6 significant digits after the
+    	decimal point to write numbers in high precision format */
+    const int FORMAT10DIGITS = 10; /**< 10 significant digits after the
+    	decimal point to write numbers in high precision format */
+    const int FORMAT16DIGITS = 16; /**< 16 significant digits after the
+    	decimal point to write numbers in high precision format */
     //@}
 
 

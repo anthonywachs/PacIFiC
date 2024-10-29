@@ -1681,7 +1681,7 @@ void GrainsMPIWrapper::CreateClones(double time,
       if ( GrainsExec::m_MPI_verbose )
       {
         ostringstream oss;
-        oss << "   t=" << GrainsExec::doubleToString(time,TIMEFORMAT)
+        oss << "   t=" << GrainsExec::doubleToString(time,FORMAT10DIGITS)
 		<< " Create Clone                Id = " 
 		<< id
 		<< " Type = " << classe << " " 

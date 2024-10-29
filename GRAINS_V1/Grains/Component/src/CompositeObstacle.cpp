@@ -19,7 +19,8 @@ CompositeObstacle::CompositeObstacle( string const& s )
   m_id = GrainsExec::m_CompositeObstacleDefaultID;
   m_minCompositeObstacleID--;
   m_CompositeObstacle_id = m_minCompositeObstacleID;   
-  m_geoRBWC = new RigidBodyWithCrust( new PointC(), Transform() ); 
+  m_geoRBWC = new RigidBodyWithCrust( new PointC(), Transform(), true,
+  	EPSILON ); 
 }
 
 
@@ -37,7 +38,8 @@ CompositeObstacle::CompositeObstacle( DOMNode* root )
     
   assert( root != NULL );
 
-  m_geoRBWC = new RigidBodyWithCrust( new PointC(), Transform() );
+  m_geoRBWC = new RigidBodyWithCrust( new PointC(), Transform(), true,
+  	EPSILON );
 
   m_name = ReaderXML::getNodeAttr_String( root, "name" );
 

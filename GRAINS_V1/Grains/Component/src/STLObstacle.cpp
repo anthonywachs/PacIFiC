@@ -39,7 +39,8 @@ STLObstacle::STLObstacle( const string &s, string const& filename )
   // of the STL triangles. Hence we defines its shape by a point
   // corresponding to its center of mass position (same as in CompositeObstacle
   // and in CompositeParticle)
-  m_geoRBWC = new RigidBodyWithCrust( new PointC(), Transform() );
+  m_geoRBWC = new RigidBodyWithCrust( new PointC(), Transform(), true,
+  	EPSILON );
     
   // Read STL file and construct the triangulation
   readSTL( filename );
@@ -74,7 +75,8 @@ STLObstacle::STLObstacle( DOMNode *root )
   // of the STL triangles. Hence we defines its shape by a point
   // corresponding to its center of mass position (same as in CompositeObstacle
   // and in CompositeParticle)
-  m_geoRBWC = new RigidBodyWithCrust( new PointC(), Transform() );
+  m_geoRBWC = new RigidBodyWithCrust( new PointC(), Transform(), true,
+  	EPSILON );
   
   m_name = ReaderXML::getNodeAttr_String( root, "name" );
   

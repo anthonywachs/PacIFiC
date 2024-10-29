@@ -375,15 +375,15 @@ ostream& operator << ( ostream& fileOut, Transform const& t )
 
 // --------------------------------------------------------------------------
 // Writes the object with a high precision format given by
-// POSITIONFORMAT defined in GrainsExec.hh
+// FORMAT16DIGITS defined in GrainsExec.hh
 void Transform::writeTransform( ostream& fileOut ) const
 {
   fileOut << "*Position " << m_type << endl;
-  fileOut << GrainsExec::doubleToString(ios::scientific,POSITIONFORMAT,
+  fileOut << GrainsExec::doubleToString(ios::scientific,FORMAT16DIGITS,
   	m_origin[X]) << " " << 
-	GrainsExec::doubleToString(ios::scientific,POSITIONFORMAT,
+	GrainsExec::doubleToString(ios::scientific,FORMAT16DIGITS,
   	m_origin[Y]) << " " << 
-	GrainsExec::doubleToString(ios::scientific,POSITIONFORMAT,
+	GrainsExec::doubleToString(ios::scientific,FORMAT16DIGITS,
   	m_origin[Z]) << endl;	
   m_basis.writeMatrix( fileOut );
 }
@@ -393,14 +393,14 @@ void Transform::writeTransform( ostream& fileOut ) const
 
 // --------------------------------------------------------------------------
 // Writes the object with a high precision format given by
-// POSITIONFORMAT defined in GrainsExec.hh and the 2014 reload format
+// FORMAT16DIGITS defined in GrainsExec.hh and the 2014 reload format
 void Transform::writeTransform2014( ostream& fileOut ) const
 {
-  fileOut << GrainsExec::doubleToString(ios::scientific,POSITIONFORMAT,
+  fileOut << GrainsExec::doubleToString(ios::scientific,FORMAT16DIGITS,
   	m_origin[X]) << " " << 
-	GrainsExec::doubleToString(ios::scientific,POSITIONFORMAT,
+	GrainsExec::doubleToString(ios::scientific,FORMAT16DIGITS,
   	m_origin[Y]) << " " << 
-	GrainsExec::doubleToString(ios::scientific,POSITIONFORMAT,
+	GrainsExec::doubleToString(ios::scientific,FORMAT16DIGITS,
   	m_origin[Z]) << " ";	
   m_basis.writeMatrix2014( fileOut );
   fileOut << " " << m_type;

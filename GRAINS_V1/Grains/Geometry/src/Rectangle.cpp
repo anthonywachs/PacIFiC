@@ -1,5 +1,11 @@
 #include "Rectangle.hh"
+#include "GrainsExec.hh"
 
+
+// NOTE: while the Rectangle is a bounded 2D plane in a 3d space and therefore
+// has 0 width, we represent it as a thin plate in Paraview using an arbitrary
+// width of 2*LOWEPS. This facilitates the 3D visualization of Rectangle in 
+// Paraview
 
 
 // ----------------------------------------------------------------------------
@@ -18,6 +24,7 @@ Rectangle::Rectangle( double LX, double LY )
 Rectangle::Rectangle( istream& fileIn )
 {
   readShape( fileIn );
+  setCorners();  
 }
 
 
@@ -28,7 +35,6 @@ Rectangle::Rectangle( DOMNode* root )
 {
   m_LX =  ReaderXML::getNodeAttr_Double( root, "LX" );
   m_LY =  ReaderXML::getNodeAttr_Double( root, "LY" );
-
   setCorners();
 }
 
@@ -53,9 +59,9 @@ void Rectangle::setCorners()
   m_corners.push_back( pp );
   pp.setValue( m_LX/2., -m_LY/2., 0. );
   m_corners.push_back( pp );
-  pp.setValue( -m_LX/2., m_LY/2., 0. );
-  m_corners.push_back( pp );
   pp.setValue( m_LX/2., m_LY/2., 0. );
+  m_corners.push_back( pp );
+  pp.setValue( -m_LX/2., m_LY/2., 0. );
   m_corners.push_back( pp );
 }
 
@@ -139,7 +145,7 @@ Point3 Rectangle::support( Vector3 const& v ) const
 vector<Point3> Rectangle::getEnvelope() const
 {
   vector<Point3> envelope;
-  Point3 point( 0.,0.,0. );
+  Point3 point( 0., 0., 0. );
   envelope.push_back( point );
   return ( envelope );
 }
@@ -192,7 +198,7 @@ void Rectangle::readShape( istream& fileIn )
 // Returns the number of points to write the rectangle in a Paraview format
 int Rectangle::numberOfPoints_PARAVIEW() const
 {
-  return ( 4 );
+  return ( 8 );
 }
 
 
@@ -228,10 +234,24 @@ void Rectangle::write_polygonsPts_PARAVIEW( ostream& f,
   Point3 pp;
   for ( int i = 0; i < 4; ++i )
   {
-    pp = transform( m_corners[i] );
+    pp = m_corners[i];
+    pp[Z] = - LOWEPS;
+    pp = transform( pp );
     if ( translation ) pp += *translation;
-    f << pp[X] << " " << pp[Y] << " " << pp[Z] << endl;
+    f << pp[X] << " " << pp[Y] << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS, pp[Z] )
+	<< endl;
   }
+  for ( int i = 0; i < 4; ++i )
+  {
+    pp = m_corners[i];
+    pp[Z] = LOWEPS;  
+    pp = transform( pp );
+    if ( translation ) pp += *translation;
+    f << pp[X] << " " << pp[Y] << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS, pp[Z] )
+	<< endl;
+  }  
 }
 
 
@@ -246,10 +266,20 @@ list<Point3> Rectangle::get_polygonsPts_PARAVIEW( Transform const& transform,
   Point3 pp;
   for ( int i = 0; i < 4; ++i )
   {
-    pp = transform( m_corners[i] );
+    pp = m_corners[i];
+    pp[Z] = - LOWEPS;  
+    pp = transform( pp );
     if ( translation ) pp += *translation;
     ParaviewPoints.push_back( pp );
   }
+  for ( int i = 0; i < 4; ++i )
+  {
+    pp = m_corners[i];
+    pp[Z] = LOWEPS;  
+    pp = transform( pp );
+    if ( translation ) pp += *translation;
+    ParaviewPoints.push_back( pp );
+  }  
   return ( ParaviewPoints );
 }
 
@@ -262,17 +292,17 @@ void Rectangle::write_polygonsStr_PARAVIEW( list<int>& connectivity,
     	list<int>& offsets, list<int>& cellstype, int& firstpoint_globalnumber,
 	int& last_offset ) const
 {
-  int count = firstpoint_globalnumber;
-  for ( int i = 0; i < 4; ++i )
+  int count=firstpoint_globalnumber;
+  for (int i=0;i<8;++i)
   {
     connectivity.push_back( count );
     ++count;
   }
-  last_offset += 4;
+  last_offset += 8;
   offsets.push_back( last_offset );
-  cellstype.push_back( 8 );
+  cellstype.push_back( 12 );
 
-  firstpoint_globalnumber += 4;
+  firstpoint_globalnumber += 8;
 }
 
 

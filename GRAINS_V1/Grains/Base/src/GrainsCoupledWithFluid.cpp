@@ -938,57 +938,57 @@ void GrainsCoupledWithFluid::GrainsToFluid( istringstream &is ) const
 
           particles_features << componentIDinFluid << " " << ncorners << endl;
           particles_features << particleType << " " <<
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			(*vtrans)[X] ) << " " << 
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			(*vtrans)[Y] ) << " " << 			
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			(*vtrans)[Z] ) << " " << 			
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			(*vrot)[X] ) << " " << 
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			(*vrot)[Y] ) << " " << 			
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			(*vrot)[Z] ) << " " << 
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			density ) << " " <<
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			mass ) << " " <<			 
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			inertia[0] ) << " " <<
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			inertia[1] ) << " " <<			
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			inertia[2] ) << " " <<
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			inertia[3] ) << " " <<
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			inertia[4] ) << " " <<			
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			inertia[5] ) << " " <<			
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			mr[X][X] ) << " " <<
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			mr[X][Y] ) << " " <<			
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			mr[X][Z] ) << " " <<	
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			mr[Y][X] ) << " " <<
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			mr[Y][Y] ) << " " <<			
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			mr[Y][Z] ) << " " <<			
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			mr[Z][X] ) << " " <<
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			mr[Z][Y] ) << " " <<			
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			mr[Z][Z] ) << " " <<			
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			(*centre)[X] ) << " " <<
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			(*centre)[Y] ) << " " <<				
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			(*centre)[Z] ) << endl;			
 
           if ( particleType == "PP" )
@@ -1000,11 +1000,11 @@ void GrainsCoupledWithFluid::GrainsToFluid( istringstream &is ) const
 	      periodic_clone = imm->second;
               periodicVector = *(periodic_clone->getPosition()) - *centre;
               particles_features << 
-	      	GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	      	GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			periodicVector[X] ) << " " <<
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			periodicVector[Y] ) << " " <<				
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			periodicVector[Z] ) << endl;	      
 	    }
           }
@@ -1044,42 +1044,42 @@ void GrainsCoupledWithFluid::GrainsToFluid( istringstream &is ) const
 
       particles_features << componentIDinFluid << " " << ncorners << endl;
       particles_features << obstacleType << " " <<
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			(*vtrans)[X] ) << " " << 
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			(*vtrans)[Y] ) << " " << 			
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			(*vtrans)[Z] ) << " " << 			
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			(*vrot)[X] ) << " " << 
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			(*vrot)[Y] ) << " " << 			
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			(*vrot)[Z] ) << " " << 
 		"1000. 0. 0. 0. 0. 0. 0. 0. " <<		
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			mr[X][X] ) << " " <<
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			mr[X][Y] ) << " " <<			
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			mr[X][Z] ) << " " <<	
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			mr[Y][X] ) << " " <<
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			mr[Y][Y] ) << " " <<			
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			mr[Y][Z] ) << " " <<			
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			mr[Z][X] ) << " " <<
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			mr[Z][Y] ) << " " <<			
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			mr[Z][Z] ) << " " <<			
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			(*centre)[X] ) << " " <<
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			(*centre)[Y] ) << " " <<				
-		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			(*centre)[Z] ) << endl;			
 
       particles_features << radius ;

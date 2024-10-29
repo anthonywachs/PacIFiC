@@ -520,10 +520,10 @@ istream& operator >> ( istream& fileIn, Quaternion& q )
 
 // ----------------------------------------------------------------------
 // Writes the object with a high precision format given by
-// POSITIONFORMAT defined in GrainsExec.hh
+// FORMAT16DIGITS defined in GrainsExec.hh
 void Quaternion::writeQuaternion( ostream &fileOut ) const
 {
-  fileOut << GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+  fileOut << GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
   	m_w ) << " ";
   m_vqt.writeGroup3( fileOut );
 }

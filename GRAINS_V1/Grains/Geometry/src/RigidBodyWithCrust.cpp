@@ -77,6 +77,7 @@ RigidBodyWithCrust::RigidBodyWithCrust( Convex* convex_,
     m_transformWithCrust = new Transform( position_ );
     m_transformWithCrust_computed = false ;  
   }
+  GrainsExec::setMinCrustThickness( m_crustThickness );
 }
 
 
@@ -102,7 +103,8 @@ RigidBodyWithCrust::RigidBodyWithCrust( istream& fileIn, string type )
 
   // Read the crust thickness
   fileIn >> cle >> m_crustThickness;
-
+  GrainsExec::setMinCrustThickness( m_crustThickness );
+  
   // Circumscribed radius and bounding box
   m_circumscribedRadius = m_convex->computeCircumscribedRadius();
   m_volume = m_convex->getVolume();
@@ -136,6 +138,7 @@ RigidBodyWithCrust::RigidBodyWithCrust( DOMNode* root )
   m_crustThickness = ReaderXML::getNodeAttr_Double( forme, "CrustThickness" );
   m_boundingVolume = m_convex->
                           computeBVolume( GrainsExec::m_colDetBoundingVolume );
+  GrainsExec::setMinCrustThickness( m_crustThickness ); 			  
 
   // Transformation
   m_transform.load( root );
@@ -541,6 +544,7 @@ double RigidBodyWithCrust::getCrustThickness() const
 void RigidBodyWithCrust::setCrustThickness( double cthickness_ )
 {
   m_crustThickness = cthickness_;
+  GrainsExec::setMinCrustThickness( m_crustThickness );  
 }
 
 
@@ -667,24 +671,34 @@ bool RigidBodyWithCrust::isContact( RigidBodyWithCrust& neighbor )
   if ( convexA->getConvexType() == BOX && convexB->getConvexType() == DISC2D )
     return ( isContactSPHEREBOX( *this, neighbor ) );
 
-  // General case
-  // Comment: GJK has consistantly shown accuracy issues when 2 particles
-  // overlap a lot. Instead returning a distance of zero to machine precision,
-  // it returns a small number that scales with the size of the particle
-  // Consequently, some particles are mistakenly inserted in the simulation
-  // This requires a fix in the future
-  Point3 pointA, pointB;
-  int nbIterGJK = 0;
-  Transform const* a2w = this->getTransformWithCrust();
-  Transform const* b2w = neighbor.getTransformWithCrust();  
+  // In case one rigid body is a rectangle
+  if ( convexA->getConvexType() == RECTANGLE2D ||
+	convexB->getConvexType() == RECTANGLE2D )
+  {
+    PointContact pc = ClosestPointRECTANGLE( *this, neighbor );
+    if ( pc.getOverlapDistance() < 0. ) contact = true;
+  } 
+  else
+  {
+    // General case
+    // Comment: GJK has consistantly shown accuracy issues when 2 particles
+    // overlap a lot. Instead returning a distance of zero to machine precision,
+    // it returns a small number that scales with the size of the particle
+    // Consequently, some particles are mistakenly inserted in the simulation
+    // This requires a fix in the future
+    Point3 pointA, pointB;
+    int nbIterGJK = 0;
+    Transform const* a2w = this->getTransformWithCrust();
+    Transform const* b2w = neighbor.getTransformWithCrust();  
    
-  double distanceMin = (*this).m_crustThickness + neighbor.m_crustThickness
+    double distanceMin = (*this).m_crustThickness + neighbor.m_crustThickness
   	- EPSILON;
 
-  double distance = closest_points( *m_convex, *(neighbor.m_convex), *a2w, *b2w,
-	pointA, pointB, nbIterGJK );
+    double distance = closest_points( *m_convex, *(neighbor.m_convex), *a2w, 
+    	*b2w, pointA, pointB, nbIterGJK );
 
-  if ( distance < distanceMin ) contact = true;
+    if ( distance < distanceMin ) contact = true;
+  }
 
   return ( contact );
 }
@@ -851,7 +865,7 @@ PointContact ClosestPointRECTANGLE( RigidBodyWithCrust const& rbA,
   Transform const* a2w = rbA.getTransform();
   Transform const* b2w = rbB.getTransform();
   double overlap = 0.;
-  // cout << "Rectangle Collision Detection: ";
+
   if ( convexA->getConvexType() == RECTANGLE2D )
   {
     Point3 const* rPt = a2w->getOrigin(); // rectangle center
@@ -860,11 +874,11 @@ PointContact ClosestPointRECTANGLE( RigidBodyWithCrust const& rbA,
     rNorm.normalized();
     rNorm = copysign( 1., rNorm * ( cPt - *rPt ) ) * rNorm;
     Point3 pointA = (*b2w)
-                    ( convexB->support( ( -rNorm ) * b2w->getBasis() ) );
-    // if ( ( rNorm * (pointA - *rPt) ) * ( rNorm * (cPt - *rPt) ) < 0. )
+	( convexB->support( ( -rNorm ) * b2w->getBasis() ) );
+
     if ( ( rNorm * ( pointA - *rPt ) ) < 0. )
     {
-      Point3 pointB = pointA - ( rNorm * pointA ) * rNorm;
+      Point3 pointB = ( ( *rPt - pointA ) * rNorm ) * rNorm + pointA;
       // The projection point lies in the rectangle?
       Transform invTransform;
       invTransform.setToInverseTransform( *a2w );      
@@ -872,7 +886,7 @@ PointContact ClosestPointRECTANGLE( RigidBodyWithCrust const& rbA,
       {
         Point3 contact = pointA / 2.0 + pointB / 2.0;
         Vector3 overlap_vector = pointA - pointB;
-        overlap = -Norm( overlap_vector );        
+        overlap = - Norm( overlap_vector );        
         return ( PointContact( contact, overlap_vector, overlap, 0 ) );
       }
     }
@@ -885,8 +899,8 @@ PointContact ClosestPointRECTANGLE( RigidBodyWithCrust const& rbA,
     rNorm.normalized();
     rNorm = copysign( 1., rNorm * ( cPt - *rPt ) ) * rNorm;
     Point3 pointA = (*a2w)
-                    ( convexA->support( ( -rNorm ) * a2w->getBasis() ) );
-    // if ( ( rNorm * (pointA - *rPt) ) * ( rNorm * (cPt - *rPt) ) < 0. )
+	( convexA->support( ( -rNorm ) * a2w->getBasis() ) );
+
     if ( ( rNorm * ( pointA - *rPt ) ) < 0. )
     {
       Point3 pointB = ( ( *rPt - pointA ) * rNorm ) * rNorm + pointA;
@@ -897,7 +911,7 @@ PointContact ClosestPointRECTANGLE( RigidBodyWithCrust const& rbA,
       {
         Point3 contact = pointA / 2.0 + pointB / 2.0;
         Vector3 overlap_vector = pointB - pointA;
-        overlap = -Norm( overlap_vector );
+        overlap = - Norm( overlap_vector );
         return ( PointContact( contact, overlap_vector, overlap, 0 ) );
       }
     }

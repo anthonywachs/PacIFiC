@@ -457,11 +457,11 @@ void RigidBody::writePositionInFluid( ostream& fluid )
     for (point=allPoints.begin(); point!=allPoints.end(); point++)
     {
       pointEnvelope = m_transform(*point);
-      fluid << GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+      fluid << GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 		pointEnvelope[X] ) << " " <<
-	GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 		pointEnvelope[Y] ) << " " <<
-	GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 		pointEnvelope[Z] ) << endl;		
     }
   }
@@ -473,11 +473,11 @@ void RigidBody::writePositionInFluid( ostream& fluid )
     for (point=allPoints.begin(); point!=allPoints.end(); point++)
     {
       pointEnvelope = m_transform(*point);
-      fluid << GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+      fluid << GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 		pointEnvelope[X] ) << " " <<
-	GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 		pointEnvelope[Y] ) << " " <<
-	GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 		pointEnvelope[Z] ) << endl;
     }
 

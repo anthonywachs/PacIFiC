@@ -85,7 +85,7 @@ class Quaternion
     Vector3 multConjugateToVector3( Quaternion const& rhs ) const;
 
     /** @brief Writes the object with a high precision format given by
-    POSITIONFORMAT defined in GrainsExec.hh
+    FORMAT16DIGITS defined in GrainsExec.hh
     @param fileOut output stream */
     void writeQuaternion( ostream &fileOut ) const;
 

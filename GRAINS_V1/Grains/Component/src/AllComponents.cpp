@@ -1310,11 +1310,11 @@ void AllComponents::write( ostream &fileSave, string const& filename,
     {
       list<Point3>::const_iterator il;
       for (il=known_positions->cbegin();il!=known_positions->cend();il++)
-        fileSave << GrainsExec::doubleToString(ios::scientific,POSITIONFORMAT,
+        fileSave << GrainsExec::doubleToString(ios::scientific,FORMAT16DIGITS,
   		(*il)[X]) << " " << 
-		GrainsExec::doubleToString(ios::scientific,POSITIONFORMAT,
+		GrainsExec::doubleToString(ios::scientific,FORMAT16DIGITS,
   		(*il)[Y]) << " " << 
-		GrainsExec::doubleToString(ios::scientific,POSITIONFORMAT,
+		GrainsExec::doubleToString(ios::scientific,FORMAT16DIGITS,
   		(*il)[Z]) << endl;
     }     
               
@@ -1488,11 +1488,11 @@ void AllComponents::write_singleMPIFile( ostream &fileSave,
     {
       list<Point3>::const_iterator il;
       for (il=known_positions->cbegin();il!=known_positions->cend();il++)
-        fileSave << GrainsExec::doubleToString(ios::scientific,POSITIONFORMAT,
+        fileSave << GrainsExec::doubleToString(ios::scientific,FORMAT16DIGITS,
   		(*il)[X]) << " " << 
-		GrainsExec::doubleToString(ios::scientific,POSITIONFORMAT,
+		GrainsExec::doubleToString(ios::scientific,FORMAT16DIGITS,
   		(*il)[Y]) << " " << 
-		GrainsExec::doubleToString(ios::scientific,POSITIONFORMAT,
+		GrainsExec::doubleToString(ios::scientific,FORMAT16DIGITS,
   		(*il)[Z]) << endl;
     }
 
@@ -2294,7 +2294,7 @@ void AllComponents::updateParticleLists( double time,
           if ( GrainsExec::m_MPI_verbose )
 	  {
 	    ostringstream oss;
-	    oss << "   t=" << GrainsExec::doubleToString( time, TIMEFORMAT ) <<
+	    oss << "   t=" << GrainsExec::doubleToString( time, FORMAT10DIGITS ) <<
 		" Interior to Buffer (0 -> 1) Id = " <<
       		(*particle)->getID() << " " << *(*particle)->getPosition()
 		<< endl;
@@ -2312,7 +2312,7 @@ void AllComponents::updateParticleLists( double time,
             if ( GrainsExec::m_MPI_verbose )
 	    {
               ostringstream oss;
-              oss << "   t=" << GrainsExec::doubleToString( time, TIMEFORMAT )
+              oss << "   t=" << GrainsExec::doubleToString( time, FORMAT10DIGITS )
       		<< " Buffer to Interior (1 -> 0) Id = " <<
       		(*particle)->getID() << " " << *(*particle)->getPosition()
 		<< endl;
@@ -2329,7 +2329,7 @@ void AllComponents::updateParticleLists( double time,
               if ( GrainsExec::m_MPI_verbose )
 	      {
                 ostringstream oss;
-                oss << "   t=" << GrainsExec::doubleToString( time, TIMEFORMAT )
+                oss << "   t=" << GrainsExec::doubleToString( time, FORMAT10DIGITS )
       		<< " Buffer to Buffer (1 -> 1)   Id = " <<
       		(*particle)->getID() << " " << *(*particle)->getPosition()
 		<< endl;
@@ -2349,7 +2349,7 @@ void AllComponents::updateParticleLists( double time,
 	    if ( GrainsExec::m_MPI_verbose )
             {
               ostringstream oss;
-              oss << "   t=" << GrainsExec::doubleToString( time, TIMEFORMAT )
+              oss << "   t=" << GrainsExec::doubleToString( time, FORMAT10DIGITS )
       		<< " Buffer to Clone (1 -> 2)    Id = " <<
       		(*particle)->getID() << " " << *(*particle)->getPosition()
 		<< endl;
@@ -2368,7 +2368,7 @@ void AllComponents::updateParticleLists( double time,
           if ( GrainsExec::m_MPI_verbose )
 	  {
             ostringstream oss;
-            oss << "   t=" << GrainsExec::doubleToString( time, TIMEFORMAT ) <<
+            oss << "   t=" << GrainsExec::doubleToString( time, FORMAT10DIGITS ) <<
       		" Clone to Buffer (2 -> 1)    Id = " <<
       		(*particle)->getID() << " " << *(*particle)->getPosition()
 		<< endl;

@@ -145,7 +145,7 @@ void MotionError::Message( ostream& fileOut ) const
 {
   fileOut << "ERR Motion : " << m_depl 
 	<< " compared to " << m_deplMax << " allowed at t=" 
-	<< GrainsExec::doubleToString(m_time,TIMEFORMAT) << endl;
+	<< GrainsExec::doubleToString(m_time,FORMAT10DIGITS) << endl;
   fileOut << "Component : " << endl;
   fileOut << "  Number = " << m_id0->getID() << endl;
   fileOut << "  Class = ";

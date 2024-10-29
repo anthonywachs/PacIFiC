@@ -79,6 +79,9 @@ class GrainsExec
     (i.e. on all subdomains/processes), i.e. sum of total number of active 
     particles with tag 0 or 1 and inactive particles */
     static size_t getTotalNumberPhysicalParticles();
+    
+    /** @brief Returns the minimum crust thickness */
+    static double getMinCrustThickness();    
     //@}
 
 
@@ -97,6 +100,10 @@ class GrainsExec
     particles with tag 0 or 1 and inactive particles
     @param nb_ total number of physical particles */
     static void setTotalNumberPhysicalParticles( size_t const& nb_ );
+    
+    /** @brief Sets the minimum crust thickness
+    @param ct new crust thickness */
+    static void setMinCrustThickness( double const& ct );    
     //@}
 
 
@@ -344,6 +351,8 @@ class GrainsExec
   	indices of vertex used by the polytopes */
     static list<vector< vector<int> >*> m_allPolyhedronFacesConnectivity; /**<
   	list of face connectivity in the polyhedrons */
+    static double m_minCrustThickness; /**< minimum crust thickness over all 
+    	rigid bodies in the simulation */	
     //@}
 
 

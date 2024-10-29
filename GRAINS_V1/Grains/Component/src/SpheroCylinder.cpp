@@ -44,7 +44,8 @@ SpheroCylinder::SpheroCylinder( DOMNode* root, int const& pc )
   // The composite particle does not have a shape per se, its shape is made
   // of the glued elementary particles. Hence we defines its shape by a point
   // corresponding to its center of mass position (same as in CompositeObstacle)
-  m_geoRBWC = new RigidBodyWithCrust( new PointC(), Transform() );
+  m_geoRBWC = new RigidBodyWithCrust( new PointC(), Transform(), true,
+  	EPSILON );
 
   // Create kinematics
   m_kinematics = KinematicsBuilderFactory::create(
@@ -654,11 +655,11 @@ void SpheroCylinder::writePositionInFluid( ostream& fluid )
   for (point=allPoints.begin(); point!=allPoints.end(); point++)
   {
     pointEnvelope = (*transform)(*point);
-    fluid << GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+    fluid << GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 		pointEnvelope[X] ) << " " <<
-	GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 		pointEnvelope[Y] ) << " " <<
-	GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 		pointEnvelope[Z] ) << endl;	
   }
   

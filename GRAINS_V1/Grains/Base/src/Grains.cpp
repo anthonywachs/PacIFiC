@@ -757,7 +757,14 @@ void Grains::Construction( DOMElement* rootElement )
       if ( m_rank == 0 ) cout << GrainsExec::m_shift6 <<
       	"Reading new particle types completed" << endl;
     }
-
+    
+    if ( GrainsExec::getMinCrustThickness() <= 0. )
+    {
+      if ( m_rank == 0 )
+        cout << "Some Particles have been defined with a negative or"
+		" 0 crust thickness" << endl;
+      grainsAbort();            
+    }
 
     // Composite particles
     DOMNode* nCompositeParticles =
@@ -797,6 +804,14 @@ void Grains::Construction( DOMElement* rootElement )
       	"Reading new composite particle types completed" << endl;
     }
     
+    if ( GrainsExec::getMinCrustThickness() <= 0. )
+    {
+      if ( m_rank == 0 )
+        cout << "Some Composite Particles have been defined with a negative or"
+		" 0 crust thickness" << endl;
+      grainsAbort();            
+    }    
+    
     if  ( m_rank == 0 ) cout << GrainsExec::m_shift6 <<
       	"Number of particle types = " << 
 	m_allcomponents.getReferenceParticles()->size() << endl;
@@ -821,6 +836,16 @@ void Grains::Construction( DOMElement* rootElement )
       if ( m_rank == 0 ) cout << GrainsExec::m_shift6 <<
       	"Reading new obstacles completed" << endl;
     }
+    
+    
+    // Check that crust thickness is positive for all rigid bodies
+    if ( GrainsExec::getMinCrustThickness() <= 0. )
+    {
+      if ( m_rank == 0 )
+        cout << "Some Obstacles have been defined with a negative or"
+		" 0 crust thickness" << endl;
+      grainsAbort();            
+    }
 
 
     // Contact force models
@@ -840,7 +865,7 @@ void Grains::Construction( DOMElement* rootElement )
     if ( !contactForceModels_ok )
     {
       if ( m_rank == 0 )
-        cout << GrainsExec::m_shift6 << "No contact force model defined for "
+        cout << "No contact force model defined for "
 		"materials : " << check_matA << " & " << check_matB << endl;
       grainsAbort();
     }
