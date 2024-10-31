@@ -217,103 +217,160 @@ PointContact RigidBodyWithCrust::ClosestPoint( RigidBodyWithCrust &neighbor )
     // If no contact, overlap is positive and we do not care about the direction
     // of overlap_vector
 
-    // In case the 2 rigid bodies are spheres or discs
-    if ( convexA->getConvexType() == SPHERE && 
-    	convexB->getConvexType() == SPHERE )
-      return ( ClosestPointSPHERE( *this, neighbor ) );
-    if ( convexA->getConvexType() == DISC2D &&
-	convexB->getConvexType() == DISC2D )
-      return ( ClosestPointSPHERE( *this, neighbor ) );
+    bool general = false;
+    switch( convexA->getConvexType() )
+    {
+      case SPHERE:
+        switch( convexB->getConvexType() )	
+        {
+	  case SPHERE:
+	    return ( ClosestPointSPHERESPHERE( *this, neighbor ) );
+	    break;
+	    
+	  case BOX:
+	    return ( ClosestPointSPHEREBOX( *this, neighbor ) );
+	    break;
+	    
+	  case RECTANGLE2D:
+	    return ( ClosestPointRECTANGLE( *this, neighbor, true ) );
+	    break;
+	    
+	  default:
+	    general = true;
+	}  	      
+        break;
+	
+      case DISC2D:
+        switch( convexB->getConvexType() )	
+        {
+	  case DISC2D:
+	    return ( ClosestPointSPHERESPHERE( *this, neighbor ) );
+	    break;
+	    
+	  case BOX:
+	    return ( ClosestPointSPHEREBOX( *this, neighbor ) );
+	    break;
+	    
+	  default:
+	    general = true;
+	}  	      
+        break;        
 
-    // In case one rigid body is a sphere/disc and the other rigid body is a box
-    if ( convexA->getConvexType() == SPHERE && convexB->getConvexType() == BOX )
-      return ( ClosestPointSPHEREBOX( *this, neighbor ) );
-    if ( convexA->getConvexType() == BOX && convexB->getConvexType() == SPHERE )
-      return ( ClosestPointSPHEREBOX( *this, neighbor ) );
-    if ( convexA->getConvexType() == DISC2D && convexB->getConvexType() == BOX )
-      return ( ClosestPointSPHEREBOX( *this, neighbor ) );
-    if ( convexA->getConvexType() == BOX && convexB->getConvexType() == DISC2D )
-      return ( ClosestPointSPHEREBOX( *this, neighbor ) );
-
-//   // In case the rigid bodies are cylinders
-//   if ( convexA->getConvexType() == CYLINDER &&
-//        convexB->getConvexType() == CYLINDER )
-//     return( ClosestPointCYLINDERS( *this, neighbor ) );
+      case BOX:
+        switch( convexB->getConvexType() )	
+        {
+	  case SPHERE:
+	    return ( ClosestPointSPHEREBOX( *this, neighbor ) );
+	    break;
+	    
+	  case DISC2D:
+	    return ( ClosestPointSPHEREBOX( *this, neighbor ) );
+	    break;
+	    
+	  case RECTANGLE2D:
+	    return ( ClosestPointRECTANGLE( *this, neighbor, true ) );
+	    break;
+	    
+	  default:
+	    general = true;
+	}  	      
+        break;
+	
+      case CYLINDER:
+        switch( convexB->getConvexType() )	
+        {
+// 	  case CYLINDER:
+// 	    return( ClosestPointCYLINDERS( *this, neighbor ) );
+// 	    break;
+	    
+	  case RECTANGLE2D:
+	    return ( ClosestPointRECTANGLE( *this, neighbor, true ) );
+	    break;
+	    
+	  default:
+	    general = true;
+	}  	      
+        break;	
+      
+      default:
+        general = true;        
+    }
 
     // General case for any pair of convex rigid bodies
-    Vector3 gcagcb = *m_transform.getOrigin() 
-    	- *neighbor.m_transform.getOrigin();
-    if ( Norm(gcagcb) < m_circumscribedRadius + neighbor.m_circumscribedRadius )
+    if ( general )
     {
-      // In case one rigid body is a rectangle
-      if ( convexA->getConvexType() == RECTANGLE2D ||
-         convexB->getConvexType() == RECTANGLE2D )
-        return ( ClosestPointRECTANGLE( *this, neighbor, true ) );
+      if ( Norm( *m_transform.getOrigin() - *neighbor.m_transform.getOrigin() ) 
+    	< m_circumscribedRadius + neighbor.m_circumscribedRadius )
+      {
+        // Pre-collision Test
+        if( GrainsExec::m_colDetBoundingVolume && 
+      		!isContactBVolume( *this, neighbor ) )
+	  return ( PointNoContact );
 
-      // Pre-collision Test
-      if( GrainsExec::m_colDetBoundingVolume && 
-      	!isContactBVolume( *this, neighbor ) )
-	return ( PointNoContact );
+        // Distance between the 2 rigid bodies shrunk by their crust thickness
+        Transform const* a2w = this->getTransformWithCrust();
+        Transform const* b2w = neighbor.getTransformWithCrust();
+        Point3 pointA, pointB;
+        int nbIterGJK = 0;
 
-      // Distance between the 2 rigid bodies shrunk by their crust thickness
-      Transform const* a2w = this->getTransformWithCrust();
-      Transform const* b2w = neighbor.getTransformWithCrust();
-      Point3 pointA, pointB;
-      int nbIterGJK = 0;
-
-      // TODO: 
-      // Here, we can choose between different collision detection algorithms.
-      // Maybe, it is best to dynamically choose the algorithm of interest in the
-      // XML file. Probably, using a new class CollisionDetection and overloading
-      // the operator ().
-      // So far, it is hard-coded for the original GJK algorithm.
-      double distance = closest_points( *m_convex, *(neighbor.m_convex), *a2w,
-	*b2w, pointA, pointB, nbIterGJK );
+        // TODO: 
+        // Here, we can choose between different collision detection algorithms.
+        // Maybe, it is best to dynamically choose the algorithm of interest in
+        // the XML file. Probably, using a new class CollisionDetection and 
+        // overloading the operator ().
+        // So far, it is hard-coded for the original GJK algorithm.
+        double distance = closest_points( *m_convex, *(neighbor.m_convex), *a2w,
+		*b2w, pointA, pointB, nbIterGJK );
 //       double distance = closest_points_GJK_SV( *m_convex, 
 //       	*(neighbor.m_convex), *a2w, *b2w, pointA, pointB, nbIterGJK );
 //       double distance = closest_points_GJK_SV2( *m_convex, 
 //       	*(neighbor.m_convex), *a2w, *b2w, pointA, pointB, nbIterGJK );
 
-      if ( distance < EPSILON )
-      {
-        cout << "ERR RigidBodyWithCrust::ClosestPoint on Processor "
-     	 << (GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank() : 0 ) 
-	 << endl;
-        throw ContactError();
+        if ( distance < EPSILON )
+        {
+          cout << "ERR RigidBodyWithCrust::ClosestPoint on Processor "
+     		 << (GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank() : 0 ) 
+		 << endl;
+          throw ContactError();
+        }
+
+        // Points A and B are in their respective local coordinate systems
+        // Thus we transform them into the world coordinate system
+        pointA = (*a2w)( pointA );
+        pointB = (*b2w)( pointB );
+
+        // Comment on the ba vector
+        // pointA is the point realizing the shortest distance in rigid body A
+        // pointB is the point realizing the shortest distance in rigid body B
+        // thus pointA - pointB = ba is directed from B to A
+        Vector3 ba = pointA - pointB;
+
+        // Contact point definition as the mid point between pointA and pointB
+        Point3 contact = pointA / 2.0 + pointB / 2.0;
+
+        // Computation of the actual overlap vector
+        // If contact, crustA + crustB - distance > 0, the overlap vector is
+        // directed from B to A
+        // If no contact, crustA + crustB - distance < 0 and we do not care 
+        // about the direction of the overlap vector
+        Vector3 overlap_vector = ba / distance;
+        overlap_vector.round();
+        overlap_vector *= m_crustThickness + neighbor.m_crustThickness 
+		- distance;
+
+        // Computation of the actual overlap distance = distance - crustA 
+	// - crustB
+        // If actual overlap distance < 0 => contact
+        // otherwise no contact
+        distance -= m_crustThickness + neighbor.m_crustThickness;
+
+        return ( PointContact( contact, overlap_vector, distance, nbIterGJK ) );
       }
-
-      // Points A and B are in their respective local coordinate systems
-      // Thus we transform them into the world coordinate system
-      pointA = (*a2w)( pointA );
-      pointB = (*b2w)( pointB );
-
-      // Comment on the ba vector
-      // pointA is the point realizing the shortest distance in rigid body A
-      // pointB is the point realizing the shortest distance in rigid body B
-      // thus pointA - pointB = ba is directed from B to A
-      Vector3 ba = pointA - pointB;
-
-      // Contact point definition as the mid point between pointA and pointB
-      Point3 contact = pointA / 2.0 + pointB / 2.0;
-
-      // Computation of the actual overlap vector
-      // If contact, crustA + crustB - distance > 0, the overlap vector is
-      // directed from B to A
-      // If no contact, crustA + crustB - distance < 0 and we do not care about
-      // the direction of the overlap vector
-      Vector3 overlap_vector = ba / distance;
-      overlap_vector.round();
-      overlap_vector *= m_crustThickness + neighbor.m_crustThickness - distance;
-
-      // Computation of the actual overlap distance = distance - crustA - crustB
-      // If actual overlap distance < 0 => contact
-      // otherwise no contact
-      distance -= m_crustThickness + neighbor.m_crustThickness;
-
-      return ( PointContact( contact, overlap_vector, distance, nbIterGJK ) );
+      else
+        return ( PointNoContact );
     }
     else
-      return ( PointNoContact );
+      return ( PointNoContact );    
   }
   catch ( ContactError const& ) { throw; }
 }
@@ -394,7 +451,7 @@ PointContact RigidBodyWithCrust::ClosestPoint_ErreurHandling(
 // ----------------------------------------------------------------------------
 // Returns the features of the contact when the 2 rigid bodies are
 // spheres, i.e., a SPHERE-SPHERE contact
-PointContact ClosestPointSPHERE( RigidBodyWithCrust const& rbA,
+PointContact ClosestPointSPHERESPHERE( RigidBodyWithCrust const& rbA,
 	RigidBodyWithCrust const& rbB )
 {
   try 
@@ -414,7 +471,7 @@ PointContact ClosestPointSPHERE( RigidBodyWithCrust const& rbA,
     double  rayonB    = rbB.getCircumscribedRadius();
 
     double  distance  = Norm( vecteurAB ) - ( rayonA + rayonB );
-    if( distance > 0. )
+    if ( distance > 0. )
       return ( PointNoContact );
     else
     {
@@ -643,43 +700,97 @@ bool RigidBodyWithCrust::isClose( RigidBodyWithCrust const& neighbor ) const
 bool RigidBodyWithCrust::isContact( RigidBodyWithCrust& neighbor )
 {
   bool contact = false;
-
+  PointContact pc;
   Convex const* convexA = m_convex;
   Convex const* convexB = neighbor.m_convex;
 
-  // In case the 2 rigid bodies are spheres or discs
-  if ( convexA->getConvexType() == SPHERE
-  	&& convexB->getConvexType() == SPHERE )
-    return ( isContactSPHERE( *this,  neighbor ) );
-  if ( convexA->getConvexType() == DISC2D
-  	&& convexB->getConvexType() == DISC2D )
-    return ( isContactSPHERE( *this, neighbor ) );
-
-  // In case one rigid body is a sphere/disc and the other rigid body is a box
-  if ( convexA->getConvexType() == SPHERE && convexB->getConvexType() == BOX )
-    return ( isContactSPHEREBOX( *this, neighbor ) );
-  if ( convexA->getConvexType() == BOX && convexB->getConvexType() == SPHERE )
-    return ( isContactSPHEREBOX( *this, neighbor ) );
-  if ( convexA->getConvexType() == DISC2D && convexB->getConvexType() == BOX )
-    return ( isContactSPHEREBOX( *this, neighbor ) );
-  if ( convexA->getConvexType() == BOX && convexB->getConvexType() == DISC2D )
-    return ( isContactSPHEREBOX( *this, neighbor ) );
-
-  // In case one rigid body is a rectangle
-  if ( convexA->getConvexType() == RECTANGLE2D ||
-	convexB->getConvexType() == RECTANGLE2D )
+  bool general = false;
+  switch( convexA->getConvexType() )
   {
-    PointContact pc = ClosestPointRECTANGLE( *this, neighbor, false );
-    if ( pc.getOverlapDistance() < 0. ) contact = true;
-  } 
-  else
+    case SPHERE:
+      switch( convexB->getConvexType() )	
+      {
+	case SPHERE:
+	  return ( isContactSPHERESPHERE( *this,  neighbor ) );
+	  break;
+	    
+	case BOX:
+	  return ( isContactSPHEREBOX( *this, neighbor ) );
+	  break;
+	    
+	case RECTANGLE2D:
+	  pc = ClosestPointRECTANGLE( *this, neighbor, false );
+          if ( pc.getOverlapDistance() < 0. ) contact = true;
+	  break;
+	    
+	default:
+	  general = true;
+      }  	      
+      break;
+	
+    case DISC2D:
+      switch( convexB->getConvexType() )	
+      {
+	case DISC2D:
+	  return ( isContactSPHERESPHERE( *this, neighbor ) );
+	  break;
+	    
+	case BOX:
+	  return ( isContactSPHEREBOX( *this, neighbor ) );
+	  break;
+	    
+	default:
+	  general = true;
+      }  	      
+      break;        
+
+    case BOX:
+      switch( convexB->getConvexType() )	
+      {
+	case SPHERE:
+	  return ( isContactSPHEREBOX( *this, neighbor ) );
+	  break;
+	    
+	case DISC2D:
+	  return ( isContactSPHEREBOX( *this, neighbor ) );
+	  break;
+	    
+	case RECTANGLE2D:
+	  pc = ClosestPointRECTANGLE( *this, neighbor, false );
+          if ( pc.getOverlapDistance() < 0. ) contact = true;
+	  break;
+	    
+	default:
+	  general = true;  	      
+      }  	      
+      break;  
+	
+    case CYLINDER:
+      switch( convexB->getConvexType() )	
+      {	    
+	case RECTANGLE2D:
+	  pc = ClosestPointRECTANGLE( *this, neighbor, false );
+          if ( pc.getOverlapDistance() < 0. ) contact = true;
+	  break;
+	    
+	default:
+	  general = true;
+      }  	      
+      break;  
+      
+    default:
+      general = true;        
+  }
+
+
+  // General case
+  // Comment: GJK has consistantly shown accuracy issues when 2 particles
+  // overlap a lot. Instead returning a distance of zero to machine precision,
+  // it returns a small number that scales with the size of the particle
+  // Consequently, some particles are mistakenly inserted in the simulation
+  // This requires a fix in the future
+  if ( general )
   {
-    // General case
-    // Comment: GJK has consistantly shown accuracy issues when 2 particles
-    // overlap a lot. Instead returning a distance of zero to machine precision,
-    // it returns a small number that scales with the size of the particle
-    // Consequently, some particles are mistakenly inserted in the simulation
-    // This requires a fix in the future
     Point3 pointA, pointB;
     int nbIterGJK = 0;
     Transform const* a2w = this->getTransformWithCrust();
@@ -704,7 +815,7 @@ bool RigidBodyWithCrust::isContact( RigidBodyWithCrust& neighbor )
 // Returns whether there is geometric contact with another rigid body
 // in the sense of ClosestPoint when the 2 rigid bodies are spheres, i.e., a
 // SPHERE-SPHERE contact
-bool isContactSPHERE( RigidBodyWithCrust const& rbA,
+bool isContactSPHERESPHERE( RigidBodyWithCrust const& rbA,
 	RigidBodyWithCrust const& rbB )
 {
   bool contact = false;

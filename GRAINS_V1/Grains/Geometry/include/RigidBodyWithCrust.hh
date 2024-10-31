@@ -187,7 +187,7 @@ private:
 spheres, i.e., a SPHERE-SPHERE contact
 @param rbA 1st rigid body
 @param rbB 2nd rigid body */
-PointContact ClosestPointSPHERE( RigidBodyWithCrust const& rbA,
+PointContact ClosestPointSPHERESPHERE( RigidBodyWithCrust const& rbA,
 	RigidBodyWithCrust const& rbB );
 
 /** @brief Returns the features of the contact when the 1 rigid body is a sphere
@@ -202,7 +202,7 @@ in the sense of ClosestPoint when the 2 rigid bodies are spheres, i.e., a
 SPHERE-SPHERE contact
 @param rbA 1st rigid body
 @param rbB 2nd rigid body */
-bool isContactSPHERE( RigidBodyWithCrust const& rbA,
+bool isContactSPHERESPHERE( RigidBodyWithCrust const& rbA,
 	RigidBodyWithCrust const& rbB );
 
 /** @brief Returns whether there is geometric contact with another rigid body
