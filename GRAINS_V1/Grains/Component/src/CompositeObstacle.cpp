@@ -50,7 +50,7 @@ CompositeObstacle::CompositeObstacle( DOMNode* root )
     obstacle = ObstacleBuilderFactory::create( allObstacles->item( i ) );
     m_obstacles.push_back( obstacle );
   }
-  computeCenterOfMass();
+  computeVolumeCenterOfMass();
 }
 
 
@@ -225,7 +225,7 @@ list<SimpleObstacle*> CompositeObstacle::Move( double time, double dt,
 
 // ----------------------------------------------------------------------------
 // Computes center of mass position
-pair<Point3,double> CompositeObstacle::computeCenterOfMass()
+pair<Point3,double> CompositeObstacle::computeVolumeCenterOfMass()
 {
   // Notes: 
   // 1) Obstacles do not have any density, so we assume that all obstacles 
@@ -234,22 +234,22 @@ pair<Point3,double> CompositeObstacle::computeCenterOfMass()
   // computation might be erroneous if obstacles overlap signigicantly
 
   Point3 centre;
-  double mass = 0.;
+  m_volume = 0.;
   int nbre = 0;
   list<Obstacle*>::iterator obstacle;
   pair<Point3,double> pp;
   for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); 
       nbre++, obstacle++)
   {
-    pp = (*obstacle)->computeCenterOfMass();
+    pp = (*obstacle)->computeVolumeCenterOfMass();
     centre += pp.first * pp.second;
-    mass += pp.second; 
+    m_volume += pp.second; 
   }
-  centre /= mass;
+  centre /= m_volume;
   setPosition( centre );
   
   pp.first = centre;
-  pp.second = mass;
+  pp.second = m_volume;
   
   return ( pp );
 }
@@ -437,7 +437,7 @@ void CompositeObstacle::reload( Obstacle& mother, istream& file )
     ObstacleBuilderFactory::reload( ttag, *this, file );
     file >> ttag;
   }
-  computeCenterOfMass();
+  computeVolumeCenterOfMass();
   mother.append( this );
 }    
 
@@ -960,4 +960,25 @@ void CompositeObstacle::resetInCells()
   list<Obstacle*>::iterator obstacle;
   for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++) 
     (*obstacle)->resetInCells();
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the volume of the composite obstacle
+double CompositeObstacle::getVolume() const
+{
+  return ( m_volume );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the radius of the sphere of volume equivalent to that of the 
+// composite obstacle 
+double CompositeObstacle::getEquivalentSphereRadius() const
+{
+  return ( pow( ( 0.75 / PI ) * m_volume, 1. / 3. ) );
 }

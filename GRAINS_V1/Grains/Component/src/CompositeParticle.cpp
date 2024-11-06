@@ -573,17 +573,29 @@ double CompositeParticle::getVolume() const
 
 
 
+
+// ----------------------------------------------------------------------------
+// Returns the radius of the sphere of volume equivalent to that of the 
+// composite particle 
+double CompositeParticle::getEquivalentSphereRadius() const
+{
+  return ( pow( ( 0.75 / PI ) * m_mass / m_density, 1. / 3. ) );
+}
+
+
+
+
 // ----------------------------------------------------------------------------
 // Sets the elementary particle position given the position of the composite
 // particle
 void CompositeParticle::setElementaryParticlesPosition()
 {
-  // Note: we know the composite particle transformation at this time and we use
-  // it to update the elementary particle transformations.
-  // However, we do not have access to the composite particle relative
-  // tranformation from t to t+dt and cannot simply left compose the elementary
-  // particle transformation by the composite particle relative tranformation.
-  // Instead we work with the elementary particle initial transformation defined
+  // Note: we know the composite particle transformation at this time and we 
+  // use it to update the elementary particle transformations. However, we do 
+  // not have access to the composite particle relative tranformation from t 
+  // to t+dt and cannot simply left compose the elementary particle 
+  // transformation by the composite particle relative tranformation. Instead 
+  // we work with the elementary particle initial transformation defined
   // by their initial relative position with respect to the composite particle
   // center of mass required to be at (0,0,0) and their initial rotation matrix
   // Therefore there is an additional component to the translation coming from

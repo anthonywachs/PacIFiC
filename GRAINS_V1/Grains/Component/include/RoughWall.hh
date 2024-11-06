@@ -81,8 +81,7 @@ class RoughWall : public CompositeObstacle
     /** @name Constructors */
     //@{
     /** @brief Copy constructor
-    @param copy copied RoughWall
-    @param s obstacle name */
+    @param copy copied RoughWall */
     RoughWall( RoughWall const& copy );   
     //@} 
     

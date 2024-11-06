@@ -160,9 +160,9 @@ class ParticleKinematics : public Kinematics
     void setAngularVelocity( Vector3 const& omega );
     
     /** @brief Sets the angular velocity
-    @param vx x-angular velocity component 
-    @param vy y-angular velocity component     
-    @param vz z-angular velocity component */
+    @param omx x-angular velocity component 
+    @param omy y-angular velocity component     
+    @param omz z-angular velocity component */
     void setAngularVelocity( double const& omx, double const& omy,
 	double const& omz );     
 

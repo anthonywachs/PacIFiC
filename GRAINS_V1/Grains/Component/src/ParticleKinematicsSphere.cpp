@@ -47,8 +47,8 @@ ParticleKinematics* ParticleKinematicsSphere::clone() const
 void ParticleKinematicsSphere::computeAngularAccelerationBodyFixed( 
 	Particle const* particle, Vector3 const& torque_bf,
 	Vector3 const& om_bf, Vector3& dOmdt_bf )
-{
-  const double *inertia = particle->getInertiaTensorBodyFixed();
+{  
+  double const* inertia = particle->getInertiaTensorBodyFixed();
   dOmdt_bf[X] = torque_bf[X] / ( m_coupling_factor * inertia[0] );
   dOmdt_bf[Y] = torque_bf[Y] / ( m_coupling_factor * inertia[3] );
   dOmdt_bf[Z] = torque_bf[Z] / ( m_coupling_factor * inertia[5] );

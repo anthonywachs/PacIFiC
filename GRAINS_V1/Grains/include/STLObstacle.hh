@@ -274,7 +274,7 @@ class STLObstacle : public SimpleObstacle
     /** @name Methods */
     //@{  
     /** @brief Computes center of mass position */
-    pair<Point3,double> computeCenterOfMass();
+    pair<Point3,double> computeVolumeCenterOfMass();
     //@}    
 
 };

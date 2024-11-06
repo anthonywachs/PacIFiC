@@ -113,7 +113,8 @@ class CompositeParticle : public Particle
     @param vrot angular velocity
     @param qrot rotation quaternion
     @param config particle transformation
-    @param activ particle activity */
+    @param activ particle activity 
+    @param contactMap contact map */
     Particle* createCloneCopy( int const& id_,
     	Particle const* ParticleRef, Vector3 const& vtrans,
 	Quaternion const& qrot,	Vector3 const& vrot,
@@ -263,6 +264,10 @@ class CompositeParticle : public Particle
 
     /** @brief Returns a pointer to the vector of initial relative positions */
     vector<Vector3> const* getInitialRelativePositions() const;
+    
+    /** @brief Returns the radius of the sphere of volume equivalent to that of 
+    the composite particle */ 
+    double getEquivalentSphereRadius() const;    
     //@}
 
 
@@ -273,9 +278,9 @@ class CompositeParticle : public Particle
     void setAngularVelocity( Vector3 const& vrot );
 
     /** @brief Sets the angular velocity
-    @param vx x-angular velocity component 
-    @param vy y-angular velocity component     
-    @param vz z-angular velocity component */
+    @param omx x-angular velocity component 
+    @param omy y-angular velocity component     
+    @param omz z-angular velocity component */
     void setAngularVelocity( double const& omx, double const& omy,
 	double const& omz ); 
 

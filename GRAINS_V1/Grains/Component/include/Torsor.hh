@@ -186,7 +186,7 @@ class Torsor
     void write( ostream& fileOut ) const;
     
     /** @brief Reads the object from an input stream
-    @param fileOut output stream */
+    @param fileIN output stream */
     void read( istream& fileIN );    
     //@}
 

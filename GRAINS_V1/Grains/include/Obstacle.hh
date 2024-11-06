@@ -96,7 +96,7 @@ class Obstacle : public Component
     virtual string getObstacleType() = 0;
     
     /** @brief Computes center of mass position */
-    virtual pair<Point3,double> computeCenterOfMass() = 0;
+    virtual pair<Point3,double> computeVolumeCenterOfMass() = 0;
     
     /** @brief Empties the list of cells the obstacle is linked to and deletes
     the pointer to the obstacle is these cells */

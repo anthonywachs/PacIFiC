@@ -318,7 +318,7 @@ class SimpleObstacle : public Obstacle
     /** @name Methods */
     //@{  
     /** @brief Computes center of mass position */
-    pair<Point3,double> computeCenterOfMass();
+    pair<Point3,double> computeVolumeCenterOfMass();
     //@}
 
 
@@ -326,8 +326,7 @@ class SimpleObstacle : public Obstacle
     /** @name Constructors */
     //@{
     /** @brief Copy constructor
-    @param copy copied SimpleObstacle
-    @param s obstacle name */
+    @param copy copied SimpleObstacle */
     SimpleObstacle( SimpleObstacle const& copy );
     //@}   
 };

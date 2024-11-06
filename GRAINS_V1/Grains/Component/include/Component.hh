@@ -239,8 +239,8 @@ class Component
     /** @brief Returns the circumscribed radius of the rigid body */
     double getCircumscribedRadius() const;
 
-    /** @brief Returns the radius ofthe sphere of equivalent volume as the rigid
-    body */
+    /** @brief Returns the radius of the sphere of volume equivalent to that of
+    the rigid body */
     virtual double getEquivalentSphereRadius() const;
 
     /** @brief Returns the crust thickness of the rigid body */
@@ -359,7 +359,7 @@ class Component
     virtual bool isCompositeObstacle() const;
 
     /** @brief Returns whether the component is an obstacle ? (use the fact
-    that obstacle have a zero mass by convention) */
+    that all obstacles have the same very large mass by convention) */
     bool isObstacle() const;
 
     /** @brief Returns whether the component is an elementary particle */
@@ -500,6 +500,8 @@ class Component
 	dispacement, previous normal vector, kr * cumulative rotational 
 	motion> > */
     static size_t m_nb; /**< Number of created components */
+    static double m_massObstacle; /**< Mass of obstacle assumed to be infinite
+    */
     //@}
 };
 

@@ -47,7 +47,7 @@ class BVolume
     /** @brief Output operator
     @param f output stream
     @param bvol_ BVolume object */
-    friend ostream& operator << ( ostream& fileOut, BVolume const& bvol_ );
+    friend ostream& operator << ( ostream& f, BVolume const& bvol_ );
     //@}
 };
 

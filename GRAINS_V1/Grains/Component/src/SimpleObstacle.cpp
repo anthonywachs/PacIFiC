@@ -727,7 +727,7 @@ void SimpleObstacle::setMinIDnumber()
 
 // ----------------------------------------------------------------------------
 // Computes center of mass position
-pair<Point3,double> SimpleObstacle::computeCenterOfMass()
+pair<Point3,double> SimpleObstacle::computeVolumeCenterOfMass()
 {
   return( pair<Point3,double>( *(getPosition()), getVolume() ) );
 }

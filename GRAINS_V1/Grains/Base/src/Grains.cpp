@@ -952,7 +952,7 @@ void Grains::Forces( DOMElement* rootElement )
         grainsAbort();
       }
       
-      // AppBrownian force
+      // Brownian force
       DOMNode* nAppBrownian = ReaderXML::getNode( root, "Brownian" );
       if ( nAppBrownian )
       {

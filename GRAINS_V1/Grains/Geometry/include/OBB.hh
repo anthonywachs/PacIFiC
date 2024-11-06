@@ -27,7 +27,7 @@ class OBB : public BVolume
     OBB( Vector3 const& extent, Matrix const& ori );
 
     /** @brief Copy constructor
-    @param obc_ reference OBB */
+    @param obb_ reference OBB */
     OBB( OBB const& obb_ );
 
     /** @brief Destructur */

@@ -186,7 +186,8 @@ RoughWall::RoughWall( DOMNode* root ) :
 	  cg[m] = cg[m] + ( cg[m] < m_domain_origin[m] + m_lper[m] ? 
 	    	1. : -1. ) * m_domain_size[m];
           ssphere->setPosition( cg );
-          name = m_name + "_Rough" + GrainsExec::intToString( ssphere->getID() );
+          name = m_name + "_Rough" + GrainsExec::intToString( 
+	  	ssphere->getID() );
 	  ssphere->setName( name );	  
           perspheres.push_back( ssphere );
 	  ++counter;	    
@@ -258,7 +259,8 @@ RoughWall::RoughWall( DOMNode* root ) :
 		m_materialName, transferToFluid, false );
 	  ssphere->setID( (*obstacle)->getID() );
           ssphere->setPosition( cg );
-          name = m_name + "_Rough" + GrainsExec::intToString( ssphere->getID() );
+          name = m_name + "_Rough" + GrainsExec::intToString( 
+	  	ssphere->getID() );
 	  ssphere->setName( name );	  
           perspheres.push_back( ssphere );
 	  ++counter;	    
@@ -280,7 +282,9 @@ RoughWall::RoughWall( DOMNode* root ) :
       
   // Update simple obstacle bounding boxes  
   for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end();obstacle++)
-    (*obstacle)->Translate( zerotranslation );      	
+    (*obstacle)->Translate( zerotranslation );
+    
+  computeVolumeCenterOfMass();          	
 }
 
 
@@ -393,7 +397,8 @@ void RoughWall::periodicity( LinkedCell* LC )
 			(*obstacle)->getCrustThickness() ); 
             Obstacle* ssphere = new SimpleObstacle( "", geoRBWC_sphere, 
 			(*obstacle)->getMaterial(), 
-			(*obstacle)->getObstaclesToFluid().size() != 0, false );
+			(*obstacle)->getObstaclesToFluid().size() != 0, 
+			false );
 	    ssphere->setID( (*obstacle)->getID() );	      
             ssphere->setPosition( cg );
 	    ssphere->setName( (*obstacle)->getName() );
@@ -430,7 +435,7 @@ void RoughWall::periodicity( LinkedCell* LC )
 		&& ( m_pos_nm1[(*obstacle)->getID()][m] 
 			> m_domain_origin[m] + m_lper[m] 
 			|| m_pos_nm1[(*obstacle)->getID()][n] 
-			> m_domain_origin[n] + m_lper[n] ) )			
+			> m_domain_origin[n] + m_lper[n] ) )
 	    {
 	      create = true;
 	      cg[m] += m_domain_size[m];
@@ -491,7 +496,8 @@ void RoughWall::periodicity( LinkedCell* LC )
 			(*obstacle)->getCrustThickness() ); 
               Obstacle* ssphere = new SimpleObstacle( "", geoRBWC_sphere, 
 			(*obstacle)->getMaterial(), 
-			(*obstacle)->getObstaclesToFluid().size() != 0, false );
+			(*obstacle)->getObstaclesToFluid().size() != 0, 
+			false );
 	      ssphere->setID( (*obstacle)->getID() );
               ssphere->setPosition( cg );
 	      ssphere->setName( (*obstacle)->getName() );
@@ -579,8 +585,8 @@ void RoughWall::reload( Obstacle& mother, istream& file )
   size_t size, dir;
   
   // Read extra properties  
-  file >> buffer >> m_shift >> m_nb_spheres[0] >> m_nb_spheres[1] >> m_radius >>
-  	m_random_mag >> m_periodic_ext >> m_periodic >> size;
+  file >> buffer >> m_shift >> m_nb_spheres[0] >> m_nb_spheres[1] >> 
+  	m_radius >> m_random_mag >> m_periodic_ext >> m_periodic >> size;
   if  ( size )
     for (size_t i=0;i<size;++i) 
     {
@@ -598,7 +604,7 @@ void RoughWall::reload( Obstacle& mother, istream& file )
     ObstacleBuilderFactory::reload( ttag, *this, file );
     file >> ttag;
   }
-  computeCenterOfMass();
+  computeVolumeCenterOfMass();
   mother.append( this );
 
   // Crust thickness 

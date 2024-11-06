@@ -16,11 +16,84 @@ class Component;
 /** The class HODCContactForceModel.
 
     Contact force model involving a normal Hookean spring, a normal Dashpot and
-    a tangential Coulomb friction (HO-D-C) to compute the force and torque 
+    a tangential Coulomb friction (HO-D-C) supplemented by a relative velocity 
+    dependent rolling resistance torque to compute the force and torque 
     induced by the contact between two rigid components.
+    
+    The force is formulated as follows:
+    
+    \f{eqnarray*}{
+       \mbox{\LARGE $\bm{F}_n$} &=& \mbox{\LARGE $k_n \delta \bm{n}
+       	- \gamma_n \bm{U}_n$} \\ 
+        \mbox{\LARGE $\bm{F}_t$} &=& \mbox{\LARGE $- min\left( 
+		| - \gamma_t \bm{U}_t |, 
+		\mu_c | \bm{F}_n | \right)\cdot \bm{t}$}
+    \f}
+    
+    where \f$\delta\f$ is the overlap distance, \f$\bm{n}\f$ is 
+    the unit normal vector at the contact point, \f$\bm{U}_n\f$ is the normal 
+    relative velocity at the contact point, \f$\bm{U}_t\f$ is 
+    the tangential relative velocity at the contact point and \f$\bm{t}\f$ is 
+    the unit tangential vector at the contact point defined as
+    \f$\displaystyle \frac{\bm{U}_t}{|\bm{U}_t}|\f$.
+    
+    The meaning and expression of the contact force parameters are:
+    - \f$k_n\f$ is the normal stiffness coefficient,
+    - \f$\gamma_n\f$ is the normal dissipative coefficient defined as
+    
+    \f[
+    \mbox{\LARGE $\displaystyle \gamma_n = - 2\beta\sqrt{k_n m^*} 
+    	\:\:\mathrm{with}\:\: 
+    	\beta=\frac{\ln(e_n)}{\sqrt{\pi^2+(\ln(e_n))^2}}\:\:\mathrm{and}\:\: 
+	\frac{1}{m^*}=\frac{1}{m_1}+\frac{1}{m_2}$}
+    \f]
+    
+    where \f$e_n\f$ is the restitution coefficient, \f$m^*\f$ is the reduced
+    mass, \f$m_0\f$ is the mass of the first rigid component and \f$m_1\f$ is 
+    the mass of the second rigid component. If one of the two components is an
+    obstacle, then \f$m_{0\:\mathrm{or}\:1} \rightarrow \infty\f$ such that
+    \f$m^*=m_{0\:\mathrm{or}\:1}\f$, and in
+    practice we take \f$m_{0\:\mathrm{or}\:1} = 10^{20}\f$.
+    
+    - \f$\gamma_t\f$ is the tangential dissipative coefficient defined as
+    
+    \f[
+    \mbox{\LARGE $\gamma_t = 2 m^* \eta_t$}
+    \f]
+    
+    where \f$\eta_t\f$ is the tangential dissipative coefficient.    
+
+    - \f$\mu_c\f$ is the Coulomb tangential friction coefficient.
+    
+    The rolling resistance torque is formulated as follows:
+      
+    \f[
+    \mbox{\LARGE $\displaystyle \bm{T} = - k_r R^* |\bm{F}_n| 
+    	| \bm{\omega}_0 \times \bm{r}_0 
+    	- \bm{\omega}_1 \times \bm{r}_1|\frac{\bm{\omega}_0 - \bm{\omega}_1}
+	{|\bm{\omega}_0 - \bm{\omega}_1|}$}
+    \f]     
+      
+    where \f$k_r\f$ is the rolling resistance coefficient, \f$\displaystyle
+    \frac{\bm{\omega}_0 - \bm{\omega}_1}{|\bm{\omega}_0 - \bm{\omega}_1|}\f$ is 
+    the unit vector along the direction of relative angular velocity and 
+    \f$\displaystyle | \bm{\omega}_0 \times \bm{r}_0 
+    - \bm{\omega}_1 \times \bm{r}_1|\f$ is the norm of the relative tangential
+    velocity contributed by the angular velocities at the contact point. 
+    
+    The input parameters of the model are:
+    - \f$k_n\f$: the normal stiffness coefficient \f$\left(N\cdot 
+    	m^{-1}\right)\f$
+    - \f$e_n\f$: the restitution coefficient (-)
+    - \f$\eta_t\f$: the tangential dissipative coefficient 
+    	\f$\left(s^{-1}\right)\f$
+    - \f$\mu_c\f$: the Coulomb tangential friction coefficient (-)
+    - \f$k_r\f$: the rolling resistance coefficient 
+    	\f$\left(s\cdot m^{-1}\right)\f$
 
     @author A.WACHS - IFPEN - 2011 - Creation 
-    @author A.WACHS - 2019 - Major cleaning & refactoring */
+    @author A.WACHS - 2019 - Major cleaning & refactoring 
+    @author A.WACHS - 2024 - Further cleaning & documentation */
 // ============================================================================
 class HODCContactForceModel : public ContactForceModel
 {
@@ -82,6 +155,7 @@ class HODCContactForceModel : public ContactForceModel
     double m_etat; /**< Tangential damping coefficient */
     double m_muc; /**< Tangential Coulomb friction coefficient */
     double m_kr; /**< Rolling resistance coefficient */
+    double m_beta; /**< The log(m_en)/sqrt(PI*PI+log(m_en)*log(m_en)) factor */
     //@}
 
 

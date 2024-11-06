@@ -99,6 +99,7 @@ class MemoryContactForceModel : public ContactForceModel
     	undefined and arbitrarily set to 0. Default value is 1.e-10. */
     bool m_rolling_friction; /**< Boolean to switch on/off the rolling 
     	resistance model */
+    double m_beta; /**< The log(m_en)/sqrt(PI*PI+log(m_en)*log(m_en)) factor */	
     //@}
 
 

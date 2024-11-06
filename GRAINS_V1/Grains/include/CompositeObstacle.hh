@@ -55,7 +55,18 @@ class CompositeObstacle : public Obstacle
     list<Obstacle*> getObstaclesToFluid() ;
 
     /** @brief Returns obstacle type */
-    string getObstacleType() ; 
+    string getObstacleType() ;
+    
+    /** @brief Returns a pointer to the torsor exerted on the composite 
+    obstacle */
+    Torsor const* getTorsor();       
+    
+    /** @brief Returns the volume of the composite obstacle */
+    double getVolume() const; 
+    
+    /** @brief Returns the radius of the sphere of volume equivalent to that of 
+    the composite obstacle */ 
+    double getEquivalentSphereRadius() const;       
     //@}
 
 
@@ -152,10 +163,6 @@ class CompositeObstacle : public Obstacle
     @param name_ name of obstacle to be deleted
     @param LC linked-cell grid */
     void ClearObstacle( string const& name_, LinkedCell* LC ) ;
-  
-    /** @brief Returns a pointer to the torsor exerted on the composite 
-    obstacle */
-    Torsor const* getTorsor();  
       
     /** @brief Update contact map */
     virtual void updateContactMap();
@@ -322,7 +329,7 @@ class CompositeObstacle : public Obstacle
     /** @name Methods */
     //@{  
     /** @brief Computes center of mass position */
-    pair<Point3,double> computeCenterOfMass();
+    pair<Point3,double> computeVolumeCenterOfMass();
     //@}
     
 
@@ -340,7 +347,9 @@ class CompositeObstacle : public Obstacle
     	from 0 (the root) down to m_min_CompositeObstacle_id and are 
 	therefore always negative except the root */
     string m_type; /**< type of composite obstacle: standard or one of the
-    	specific derived types such as CylindricalShell or RoughWall */	 
+    	specific derived types such as CylindricalShell or RoughWall */
+    double m_volume; /**< approximate volume of the composite obstacles that 
+    	ignores geometric overlaps between obstacles */	 
     //@}
 
 
@@ -348,8 +357,7 @@ class CompositeObstacle : public Obstacle
     /** @name Constructors */
     //@{
     /** @brief Copy constructor
-    @param copy copied CompositeObstacle
-    @param s obstacle name */
+    @param copy copied CompositeObstacle */
     CompositeObstacle( CompositeObstacle const& copy );
     //@}   
 };

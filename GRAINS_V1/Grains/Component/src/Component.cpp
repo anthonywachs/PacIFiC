@@ -11,6 +11,7 @@ using namespace std;
 size_t Component::m_nb = 0;
 size_t Component::m_sizeofContactMemory = 4 * sizeof( int )
 	+ 3 * solid::Group3::m_sizeofGroup3;
+double Component::m_massObstacle = 1.e20;	
 
 
 // ----------------------------------------------------------------------------
@@ -18,7 +19,7 @@ size_t Component::m_sizeofContactMemory = 4 * sizeof( int )
 Component::Component()
   : m_id( 0 )
   , m_materialName( "" )
-  , m_mass( 0. )
+  , m_mass( m_massObstacle )
   , m_geoRBWC( NULL )
   , m_memento( NULL )
 {
@@ -159,7 +160,7 @@ int Component::getID() const
 // Returns the mass of the component
 double Component::getMass() const
 {
-  return m_mass;
+  return ( m_mass );
 }
 
 
@@ -197,10 +198,11 @@ double Component::getCircumscribedRadius() const
 
 
 // ----------------------------------------------------------------------------
-// Returns the radius ofthe sphere of equivalent volume as the rigid body
+// Returns the radius of the sphere of volume equivalent to that of the rigid 
+// body
 double Component::getEquivalentSphereRadius() const
 {
-  return ( 0. );
+  return ( pow( ( 0.75 / PI ) * m_geoRBWC->getVolume(), 1. / 3. ) );
 }
 
 
@@ -936,11 +938,11 @@ bool Component::isCompositeObstacle() const
 
 
 // ----------------------------------------------------------------------------
-// Returns whether the component is an obstacle ? (use the fact that obstacle
-// have a zero mass by convention)
+// Returns whether the component is an obstacle ? (use the fact that all 
+// obstacles have the same very large mass by convention)
 bool Component::isObstacle() const
 {
-  return ( m_mass == 0. );
+  return ( m_mass == m_massObstacle );
 }
 
 

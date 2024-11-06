@@ -1029,7 +1029,7 @@ int STLObstacle::isVinV(STLVertex &v1, STLVertex &v2)
 
 // ----------------------------------------------------------------------------
 // Computes center of mass position
-pair<Point3,double> STLObstacle::computeCenterOfMass()
+pair<Point3,double> STLObstacle::computeVolumeCenterOfMass()
 {
   pair<Point3,double> pp( Vector3Null, 0. );
   

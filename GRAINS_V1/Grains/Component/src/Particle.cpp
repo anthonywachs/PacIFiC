@@ -634,16 +634,6 @@ double Particle::getDensity() const
 
 
 // ----------------------------------------------------------------------------
-// Returns the radius of the sphere of same volume
-double Particle::getEquivalentSphereRadius() const
-{
-  return ( pow( ( 0.75 / PI ) * m_mass / m_density, 1. / 3. ) );
-}
-
-
-
-
-// ----------------------------------------------------------------------------
 // Returns the velocity at a point in space based on the
 // translational and angular velocity of the particle. This method assumes
 // that the point belongs to the particle but this assumption is not verified.

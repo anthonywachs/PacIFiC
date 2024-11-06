@@ -58,7 +58,7 @@ void ParticleKinematics3D::computeAngularAccelerationBodyFixed(
 	Vector3 const& om_bf, Vector3& dOmdt_bf )
 {
   // Note: in the body-fixed space, the moment of inertia tensor is diagonal
-  const double *inertia = particle->getInertiaTensorBodyFixed();    
+  double const* inertia = particle->getInertiaTensorBodyFixed();    
   if ( Grains::isModePredictor() )
   {   
     dOmdt_bf[X] = ( torque_bf[X] / inertia[0] 

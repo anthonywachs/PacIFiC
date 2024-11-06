@@ -372,13 +372,14 @@ class AllComponents
 	
     /** @brief Reloads reference particles and obstacles from an input stream
     @param fileSave input stream 
+    @param known_positions the list of remaining insertion positions    
     @param rank process rank    
     @param nprocs number of processes */
     size_t read( istream& fileSave, list<Point3>* known_positions,
     	int const& rank, int const& nprocs );
     
     /** @brief Reloads particles from an input stream 
-    @param rootfilename root file name 
+    @param filename file name 
     @param npart number of particles to be read
     @param LC linked cell grid 
     @param rank process rank

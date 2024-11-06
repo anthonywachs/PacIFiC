@@ -50,7 +50,7 @@ class ObstacleImposedForce
     interval [td,te] and if it is the sub-interval length within [td,te] when it
     is actually active 
     @param td simulation start time
-    @param fin simulation end time
+    @param te simulation end time
     @param dt time step magnitude 
     @param subinterval the sub-interval length within [td,te] when it
     is actually active */

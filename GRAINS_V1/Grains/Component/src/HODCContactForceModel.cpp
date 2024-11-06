@@ -16,6 +16,7 @@ HODCContactForceModel::HODCContactForceModel( map<string,double>& parameters )
   m_etat = parameters["etat"];
   m_muc = parameters["muc"];
   m_kr = parameters["kr"];
+  m_beta = log(m_en) / sqrt( PI * PI + log(m_en) * log(m_en) );
 }
 
 
@@ -54,7 +55,7 @@ void HODCContactForceModel::performForcesCalculus( Component* p0_,
 
   // Relative velocity at contact point
   Vector3 tmpV = p0_->getVelocityAtPoint( geometricPointOfContact ) 
-  	- p1_->getVelocityAtPoint( geometricPointOfContact );
+  	- p1_->getVelocityAtPoint( geometricPointOfContact );	
 
   Vector3 v_n = normal * ( tmpV * normal );
   Vector3 v_t = tmpV - v_n;
@@ -69,41 +70,39 @@ void HODCContactForceModel::performForcesCalculus( Component* p0_,
 
   // Normal dissipative force  
   double mass0 = p0_->getMass();
-  double mass1 = p1_->getMass();
-  double avmass = mass0 * mass1 / ( mass0 + mass1 );
-  double omega0 = sqrt( m_kn / avmass );
-  if ( avmass == 0. ) 
-  {
-    avmass = mass1 == 0. ? 0.5 * mass0 : 0.5 * mass1;
-    omega0 = sqrt( 2. * m_kn / avmass );
-  }
-  double etan = - omega0 * log(m_en) / 
-  	sqrt( PI * PI + log(m_en) * log(m_en) );    
-  delFN += - etan * 2.0 * avmass * v_n;
+  double mass1 = p1_->getMass();  
+  double avmass = 1. / ( 1. / mass0 + 1. / mass1 );
+  double gamman = - 2. * m_beta * sqrt( avmass * m_kn );
+  delFN -= gamman * v_n;  
   double normFN = Norm( delFN );
   
   // Tangential dissipative force
-  delFT = v_t * ( - m_etat * 2.0 * avmass );  
+  double gammat = 2. * m_etat * avmass;
+  delFT = - gammat * v_t ;  
 
   // Tangential Coulomg saturation
   double fn = m_muc * normFN;
   double ft = Norm( delFT );
-  if ( fn < ft ) delFT = tangent * (-fn);
+  if ( fn < ft ) delFT = tangent * ( - fn );
   
   // Rolling resistance moment
   if ( m_kr )
-  {
+  {    
     // Relative angular velocity at contact point
-    Vector3 w = *p0_->getAngularVelocity() - *p1_->getAngularVelocity();
-    Vector3 wn = ( w * normal ) * normal;
-    Vector3 wt = w - wn ;
-    double normwt = Norm( wt );
-
-    // Anti-spinning effect along the normal wn
-    delM = - m_kr * normFN * 0.001 * wn ;
+    Vector3 wrel = *p0_->getAngularVelocity() - *p1_->getAngularVelocity();
+    double normwrel = Norm( wrel );
+    double normwtrel = Norm( ( *p0_->getAngularVelocity() ^ (
+    	*p0_->getPosition() - geometricPointOfContact ) )
+	- ( *p1_->getAngularVelocity() ^ ( *p1_->getPosition()
+    	- geometricPointOfContact ) ) );
     
-    // Classical rolling resistance moment
-    if ( normwt > EPSILON )  delM -= m_kr * normFN * wt;    
+    // Rolling resistance moment
+    if ( normwrel > EPSILON )
+    {  
+      double Req = 1. / ( 1. / p0_->getEquivalentSphereRadius() 
+    	+ 1. / p1_->getEquivalentSphereRadius() ); // Effective radius      
+      delM = - ( m_kr * Req * normFN * normwtrel / normwrel ) * wrel ;
+    }   
   }
   else delM = 0.0;  
 }
@@ -140,7 +139,8 @@ bool HODCContactForceModel::computeForces( Component* p0_,
   performForcesCalculus( ref_p0_, ref_p1_, contactInfos, delFN, delFT, delM );
 
   // Component p0_
-  ref_p0_->addForce( geometricPointOfContact, coef * (delFN + delFT), tag_p1_ );
+  ref_p0_->addForce( geometricPointOfContact, coef * ( delFN + delFT ), 
+  	tag_p1_ );
   if ( m_kr ) ref_p0_->addTorque( delM * coef, tag_p1_ );     
     
   // Component p1_
@@ -150,7 +150,7 @@ bool HODCContactForceModel::computeForces( Component* p0_,
     
   // Force postprocessing
   if ( GrainsExec::m_postprocess_forces_at_this_time )
-    LC->addPPForce( geometricPointOfContact, coef * (delFN + delFT),
+    LC->addPPForce( geometricPointOfContact, coef * ( delFN + delFT ),
 	ref_p0_, ref_p1_ );            
   
   return ( true ) ;  

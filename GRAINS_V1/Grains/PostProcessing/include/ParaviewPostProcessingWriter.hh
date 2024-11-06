@@ -340,6 +340,7 @@ class ParaviewPostProcessingWriter : public PostProcessingWriter
     single MPI file in text mode with MPI I/O routines
     @param particles active particles
     @param partFilename output file name 
+    @param forceForAllTag writes particle data regardless of the particle tag
     @param processwrites whether this process writes data */
     void writeParticleVelocityVectors_Paraview_MPIIO_text(
   	list<Particle*> const* particles, string const& partFilename,
@@ -350,6 +351,7 @@ class ParaviewPostProcessingWriter : public PostProcessingWriter
     single MPI file in binary mode with MPI I/O routines
     @param particles active particles
     @param partFilename output file name 
+    @param forceForAllTag writes particle data regardless of the particle tag
     @param processwrites whether this process writes data */
     void writeParticleVelocityVectors_Paraview_MPIIO_binary(
   	list<Particle*> const* particles, string const& partFilename,
@@ -384,7 +386,7 @@ class ParaviewPostProcessingWriter : public PostProcessingWriter
     mode with MPI I/O routines 
     @param particles active particles   
     @param LC linked-cell gruid
-    @param partFilename output file name
+    @param filename output file name
     @param time physical time 
     @param processwrites whether this process writes data */
     void writeContactForceChains_Paraview_MPIIO_text(
@@ -396,7 +398,7 @@ class ParaviewPostProcessingWriter : public PostProcessingWriter
     mode with MPI I/O routines 
     @param particles active particles   
     @param LC linked-cell gruid
-    @param partFilename output file name
+    @param filename output file name
     @param time physical time 
     @param processwrites whether this process writes data */
     void writeContactForceChains_Paraview_MPIIO_binary(

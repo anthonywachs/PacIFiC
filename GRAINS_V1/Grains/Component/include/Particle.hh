@@ -190,9 +190,9 @@ class Particle : public Component
     virtual void setAngularVelocity( Vector3 const& vrot );
     
     /** @brief Sets the angular velocity
-    @param vx x-angular velocity component 
-    @param vy y-angular velocity component     
-    @param vz z-angular velocity component */
+    @param omx x-angular velocity component 
+    @param omy y-angular velocity component     
+    @param omz z-angular velocity component */
     virtual void setAngularVelocity( double const& omx, double const& omy,
 	double const& omz );    
 
@@ -501,9 +501,6 @@ class Particle : public Component
 
     /** @brief Returns particle density */
     double getDensity() const;
-
-    /** @brief Returns the radius of the sphere of same volume */
-    double getEquivalentSphereRadius() const;
 
     /** @brief Returns the velocity at a point in space based on the
     translational and angular velocity of the particle. This method assumes

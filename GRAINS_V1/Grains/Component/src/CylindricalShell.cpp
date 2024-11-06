@@ -73,6 +73,8 @@ CylindricalShell::CylindricalShell( DOMNode* root ) :
     sbox->Translate( zerotranslation );
     m_obstacles.push_back( sbox );	    
   }
+  
+  computeVolumeCenterOfMass();
 }
 
 
@@ -135,6 +137,6 @@ void CylindricalShell::reload( Obstacle& mother, istream& file )
     ObstacleBuilderFactory::reload( ttag, *this, file );
     file >> ttag;
   }
-  computeCenterOfMass();
+  computeVolumeCenterOfMass();
   mother.append( this );
 } 

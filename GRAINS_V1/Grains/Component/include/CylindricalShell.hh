@@ -61,8 +61,7 @@ class CylindricalShell : public CompositeObstacle
     /** @name Constructors */
     //@{
     /** @brief Copy constructor
-    @param copy copied CylindricalShell
-    @param s obstacle name */
+    @param copy copied CylindricalShell */
     CylindricalShell( CylindricalShell const& copy );    
     //@}   
 };

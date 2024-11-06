@@ -138,14 +138,6 @@ class BBox
     @param b 2nd bounding box */
     friend bool intersect( BBox const& a, BBox const& b );
 
-    /** @brief Returns whether 2 boxes are in contact
-    @param a 1st bounding box
-    @param b 2nd bounding box
-    @param a2w transformation of the first box
-    @param b2w transformation of the second box */
-    friend bool isContact( BBox const& boxA, BBox const& boxB,
-                           Transform const& a2w, Transform const& b2w );
-
     /** @brief Output operator
     @param f output stream
     @param B BBox object */

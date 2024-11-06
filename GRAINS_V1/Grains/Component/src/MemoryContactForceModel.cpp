@@ -24,6 +24,8 @@ MemoryContactForceModel::MemoryContactForceModel( map<string,double>& parameters
   rolling friction torque. */
   if ( m_mur ) m_rolling_friction = true;
   else m_rolling_friction = false;
+  
+  m_beta = log(m_en) / sqrt( PI * PI + log(m_en) * log(m_en) );  
 }
 
 
@@ -83,8 +85,8 @@ void MemoryContactForceModel::performForcesCalculus( Component* p0_,
   Vector3 w ; // relative angular velocity
   Vector3 wn ; // normal relative angular velocity
   Vector3 wt ; // tangential relative angular velocity
-  double radius ; // radius of particle 0 (if any)
-  double radius1 ; // radius of particle 1
+//  double radius ; // radius of particle 0 (if any)
+//  double radius1 ; // radius of particle 1
   double Req = 0. ; // effective radius
   double kr = 0.; // spring torque stiffness
   double etar = 0.; // critical torque (cf. Ai, 2011)
@@ -115,24 +117,32 @@ void MemoryContactForceModel::performForcesCalculus( Component* p0_,
   delFN = m_kn * penetration;
 
   // Normal dissipative force
+//   double mass0 = p0_->getMass();
+//   double mass1 = p1_->getMass();
+//   double avmass = mass0 * mass1 / ( mass0 + mass1 );
+//   double omega0 = sqrt( m_kn / avmass );
+//   if ( avmass == 0. )
+//   {
+//     avmass = mass1 == 0. ? 0.5 * mass0 : 0.5 * mass1;
+//     Req = p0_->getEquivalentSphereRadius();
+//     omega0 = sqrt( 2. * m_kn / avmass );
+//   }
+//   double etan = - omega0 * m_beta;
+//   delFN += ( - 2. * etan * avmass ) * v_n;
+//   double normFN = Norm( delFN );
   double mass0 = p0_->getMass();
-  double mass1 = p1_->getMass();
-  double avmass = mass0 * mass1 / ( mass0 + mass1 );
-  double omega0 = sqrt( m_kn / avmass );
-  if ( avmass == 0. )
-  {
-    avmass = mass1 == 0. ? 0.5 * mass0 : 0.5 * mass1;
-    Req = p0_->getEquivalentSphereRadius();
-    omega0 = sqrt( 2. * m_kn / avmass );
-  }
-  double etan = - omega0 * log(m_en) /
-  	sqrt( PI * PI + log(m_en) * log(m_en) );
-  delFN += - etan * 2.0 * avmass * v_n;
-  double normFN = Norm( delFN );
+  double mass1 = p1_->getMass();  
+  double avmass = 1. / ( 1. / mass0 + 1. / mass1 );
+  double gamman = - 2. * m_beta * sqrt( avmass * m_kn );
+  delFN -= gamman * v_n;  
+  double normFN = Norm( delFN );  
+  
 
   // 2) Compute tangential force with memory
   // Tangential viscous dissipative force
-  Vector3 viscousFT = v_t * ( - m_etat * 2.0 * avmass );
+//  Vector3 viscousFT = v_t * ( - m_etat * 2.0 * avmass );
+  double gammat = 2. * m_etat * avmass;
+  Vector3 viscousFT = - gammat * v_t ;   
 
   // Retrieve the previous cumulative motion (if the contact does not 
   // exist we create it)
@@ -152,7 +162,8 @@ void MemoryContactForceModel::performForcesCalculus( Component* p0_,
   *pprev_normal = normal;  
   
   // Compute a tentative friction force (including the viscous disspative terms)
-  computeTangentialVector( tij, m_etat * 2.0 * avmass, v_t, *pkdelta );
+//  computeTangentialVector( tij, m_etat * 2.0 * avmass, v_t, *pkdelta );
+  computeTangentialVector( tij, gammat, v_t, *pkdelta );  
   double normFT = Norm( - *pkdelta + viscousFT );
   
   // If less than the Coulomb limit, we are done
@@ -170,14 +181,16 @@ void MemoryContactForceModel::performForcesCalculus( Component* p0_,
   if ( m_rolling_friction ) 
   {
     // Compute the spring and dashpot coefficients from the particle properties
-    radius = p0_->getEquivalentSphereRadius() ;
-    if ( !Req )
-    {
-      radius1 = p1_->getEquivalentSphereRadius() ;
-      Req = radius * radius1 / ( radius + radius1 ) ;
-    }
+//     radius = p0_->getEquivalentSphereRadius() ;
+//     if ( !Req )
+//     {
+//       radius1 = p1_->getEquivalentSphereRadius() ;
+//       Req = radius * radius1 / ( radius + radius1 ) ;
+//     }
+    Req = 1. / ( 1. / p0_->getEquivalentSphereRadius() 
+    	+ 1. / p1_->getEquivalentSphereRadius() );
     kr = 3. * m_kn * m_mur * m_mur * Req * Req ; // c.f. Jiang et al (2005,2015)
-    etar = 3. * ( etan * 2.0 * avmass ) * m_mur * m_mur * Req * Req ; // c.f. 
+    etar = 3. * gamman * m_mur * m_mur * Req * Req ; // c.f. 
     	// Jiang et al (2005,2015)
     double max_normFT = m_mur * Req * normFN ;
     
