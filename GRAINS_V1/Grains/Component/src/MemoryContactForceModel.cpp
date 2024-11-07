@@ -52,7 +52,7 @@ string MemoryContactForceModel::name() const
 // ----------------------------------------------------------------------------
 // Computes the vector tangent at the contact point
 void MemoryContactForceModel::computeTangentialVector( Vector3& tij, 
-	double n_t, const Vector3 ut, const Vector3 kdelta )
+	double n_t, Vector3 const& ut, Vector3 const& kdelta )
 {
   // Definition of the tangential vector (cf Costa et.al., 2015)
   if ( Norm( ut ) > 0.001 )
@@ -76,20 +76,12 @@ void MemoryContactForceModel::performForcesCalculus( Component* p0_,
 {
   Point3 geometricPointOfContact = contactInfos.getContact();
   Vector3 penetration = contactInfos.getOverlapVector();
-  Vector3 *pkdelta = NULL; // previous vector kt * tangential motion
-  Vector3 *pprev_normal = NULL; // previous vector normal to the contact plane
-  Vector3 *pspringRotFriction = NULL; // previous rolling friction spring-torque
+  Vector3* pkdelta = NULL; // previous vector kt * tangential motion
+  Vector3* pprev_normal = NULL; // previous vector normal to the contact plane
+  Vector3* pspringRotFriction = NULL; // previous rolling friction spring-torque
   Vector3 tij; // tangential vector (lives in the contact plane)
   Quaternion qrot = 0.; // quaternion from tangential plane at previous time 
   	// step to current tangential plane
-  Vector3 w ; // relative angular velocity
-  Vector3 wn ; // normal relative angular velocity
-  Vector3 wt ; // tangential relative angular velocity
-//  double radius ; // radius of particle 0 (if any)
-//  double radius1 ; // radius of particle 1
-  double Req = 0. ; // effective radius
-  double kr = 0.; // spring torque stiffness
-  double etar = 0.; // critical torque (cf. Ai, 2011)
   std::tuple<int,int,int> idmap0; // id of this contact for particle 0
   std::tuple<int,int,int> idmap1; // id of this contact for particle 1
   idmap0 = std::make_tuple(elementary_id0,p1_->getID(),elementary_id1);
@@ -117,19 +109,6 @@ void MemoryContactForceModel::performForcesCalculus( Component* p0_,
   delFN = m_kn * penetration;
 
   // Normal dissipative force
-//   double mass0 = p0_->getMass();
-//   double mass1 = p1_->getMass();
-//   double avmass = mass0 * mass1 / ( mass0 + mass1 );
-//   double omega0 = sqrt( m_kn / avmass );
-//   if ( avmass == 0. )
-//   {
-//     avmass = mass1 == 0. ? 0.5 * mass0 : 0.5 * mass1;
-//     Req = p0_->getEquivalentSphereRadius();
-//     omega0 = sqrt( 2. * m_kn / avmass );
-//   }
-//   double etan = - omega0 * m_beta;
-//   delFN += ( - 2. * etan * avmass ) * v_n;
-//   double normFN = Norm( delFN );
   double mass0 = p0_->getMass();
   double mass1 = p1_->getMass();  
   double avmass = 1. / ( 1. / mass0 + 1. / mass1 );
@@ -140,8 +119,11 @@ void MemoryContactForceModel::performForcesCalculus( Component* p0_,
 
   // 2) Compute tangential force with memory
   // Tangential viscous dissipative force
-//  Vector3 viscousFT = v_t * ( - m_etat * 2.0 * avmass );
-  double gammat = 2. * m_etat * avmass;
+  // If m_etat = -1, we compute its value such that gamma_n = gamma_t, i.e., 
+  // same damping in the normal and tangential directions, this gives
+  // etat = - m_beta * sqrt( m_kn / avmass )
+  double etat = m_etat == -1. ? - m_beta * sqrt( m_kn / avmass ) : m_etat;
+  double gammat = 2. * etat * avmass;
   Vector3 viscousFT = - gammat * v_t ;   
 
   // Retrieve the previous cumulative motion (if the contact does not 
@@ -161,8 +143,7 @@ void MemoryContactForceModel::performForcesCalculus( Component* p0_,
   // Update the normal vector in the map
   *pprev_normal = normal;  
   
-  // Compute a tentative friction force (including the viscous disspative terms)
-//  computeTangentialVector( tij, m_etat * 2.0 * avmass, v_t, *pkdelta );
+  // Compute a tentative friction force (including the viscous disspative term)
   computeTangentialVector( tij, gammat, v_t, *pkdelta );  
   double normFT = Norm( - *pkdelta + viscousFT );
   
@@ -173,45 +154,39 @@ void MemoryContactForceModel::performForcesCalculus( Component* p0_,
   {
     // Otherwise, we modify the cumulative tangential motion and replace
     // the tangential force by the Coulomb limit
-    *pkdelta = - m_muc * normFN * tij + viscousFT;
+    *pkdelta = ( - m_muc * normFN * tij + viscousFT ) / m_kt;
     delFT = m_muc * normFN * tij ;
   }
 
-  // 3) Compute rolling resistance moment with memory (if applicable)
+  // 3) Compute rolling resistance torque with memory (if applicable)
   if ( m_rolling_friction ) 
   {
     // Compute the spring and dashpot coefficients from the particle properties
-//     radius = p0_->getEquivalentSphereRadius() ;
-//     if ( !Req )
-//     {
-//       radius1 = p1_->getEquivalentSphereRadius() ;
-//       Req = radius * radius1 / ( radius + radius1 ) ;
-//     }
-    Req = 1. / ( 1. / p0_->getEquivalentSphereRadius() 
-    	+ 1. / p1_->getEquivalentSphereRadius() );
-    kr = 3. * m_kn * m_mur * m_mur * Req * Req ; // c.f. Jiang et al (2005,2015)
-    etar = 3. * gamman * m_mur * m_mur * Req * Req ; // c.f. 
-    	// Jiang et al (2005,2015)
-    double max_normFT = m_mur * Req * normFN ;
+    // following Jiang et al (2005,2015)
+    double Req = 1. / ( 1. / p0_->getEquivalentSphereRadius() 
+    	+ 1. / p1_->getEquivalentSphereRadius() ); // effective radius
+    double kr = 3. * m_kn * m_mur * m_mur * Req * Req ; // torque spring 
+	// stiffness
+    double etar = 3. * gamman * m_mur * m_mur * Req * Req ; // torque 
+    	// dissipative coefficient
+    double max_normMk = m_mur * Req * normFN ; // saturation torque
     
     // Compute the relative angular velocity
-    w = *p0_->getAngularVelocity() - *p1_->getAngularVelocity();
-    wn = ( w * normal ) * normal;
-    wt = w - wn ;  
+    Vector3 wrel = *p0_->getAngularVelocity() - *p1_->getAngularVelocity();
 
     if ( contact_existed ) 
     {
       // Rotate the cumulative spring torque to the new plane    
       *pspringRotFriction = qrot.rotateVector( *pspringRotFriction );      
     }
-    *pspringRotFriction -= kr * dt * wt ;
-    normFT = Norm( *pspringRotFriction );
-    if ( normFT > max_normFT ) 
+    *pspringRotFriction -= kr * dt * wrel ;
+    double normMk = Norm( *pspringRotFriction );
+    if ( normMk > max_normMk ) 
     {
       // Otherwise, we replace the tangential torque by the Coulomb limit
-      *pspringRotFriction *= max_normFT / normFT;
+      *pspringRotFriction *= max_normMk / normMk;
     }
-    delM = *pspringRotFriction - m_etarpf * etar * wt;
+    delM = *pspringRotFriction - m_etarpf * etar * wrel;
   }
   else delM = 0.;
 
@@ -302,7 +277,8 @@ map<string,double> MemoryContactForceModel::defineParameters( DOMNode* & root )
   parameters["en"] = value;
   
   parameter = ReaderXML::getNode( root, "etat" );
-  value = ReaderXML::getNodeValue_Double( parameter );
+  if ( parameter ) value = ReaderXML::getNodeValue_Double( parameter );
+  else value = - 1.;
   parameters["etat"] = value;
   
   parameter = ReaderXML::getNode( root, "mur" );

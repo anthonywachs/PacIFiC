@@ -23,32 +23,32 @@ class Component;
     The force is formulated as follows:
     
     \f{eqnarray*}{
-       \mbox{\LARGE $\bm{F}_n$} &=& \mbox{\LARGE $k_n \delta \bm{n}
+       \mbox{\LARGE $\bm{F}_n$} &=& \mbox{\LARGE $k_n \delta_n \bm{n}
        	- \gamma_n \bm{U}_n$} \\ 
-        \mbox{\LARGE $\bm{F}_t$} &=& \mbox{\LARGE $- min\left( 
+        \mbox{\LARGE $\bm{F}_t$} &=& \mbox{\LARGE $min\left( 
 		| - \gamma_t \bm{U}_t |, 
 		\mu_c | \bm{F}_n | \right)\cdot \bm{t}$}
     \f}
     
-    where \f$\delta\f$ is the overlap distance, \f$\bm{n}\f$ is 
-    the unit normal vector at the contact point, \f$\bm{U}_n\f$ is the normal 
-    relative velocity at the contact point, \f$\bm{U}_t\f$ is 
+    where \f$\delta_n\f$ is the overlap distance in the normal direction, 
+    \f$\bm{n}\f$ is the unit normal vector at the contact point, \f$\bm{U}_n\f$ 
+    is the normal relative velocity at the contact point, \f$\bm{U}_t\f$ is 
     the tangential relative velocity at the contact point and \f$\bm{t}\f$ is 
     the unit tangential vector at the contact point defined as
-    \f$\displaystyle \frac{\bm{U}_t}{|\bm{U}_t}|\f$.
+    \f$\displaystyle -\frac{\bm{U}_t}{|\bm{U}_t|}\f$.
     
     The meaning and expression of the contact force parameters are:
-    - \f$k_n\f$ is the normal stiffness coefficient,
+    - \f$k_n\f$ is the normal stiffness coefficient.
     - \f$\gamma_n\f$ is the normal dissipative coefficient defined as
     
     \f[
     \mbox{\LARGE $\displaystyle \gamma_n = - 2\beta\sqrt{k_n m^*} 
     	\:\:\mathrm{with}\:\: 
-    	\beta=\frac{\ln(e_n)}{\sqrt{\pi^2+(\ln(e_n))^2}}\:\:\mathrm{and}\:\: 
-	\frac{1}{m^*}=\frac{1}{m_1}+\frac{1}{m_2}$}
+    	\beta=\frac{\ln(e_n)}{\sqrt{\pi^2+(\ln(e_n))^2}}$}
     \f]
     
-    where \f$e_n\f$ is the restitution coefficient, \f$m^*\f$ is the reduced
+    where \f$e_n\f$ is the restitution coefficient, 
+    \f$\displaystyle m^*=\frac{1}{\frac{1}{m_0}+\frac{1}{m_1}}\f$ is the reduced
     mass, \f$m_0\f$ is the mass of the first rigid component and \f$m_1\f$ is 
     the mass of the second rigid component. If one of the two components is an
     obstacle, then \f$m_{0\:\mathrm{or}\:1} \rightarrow \infty\f$ such that
@@ -61,14 +61,23 @@ class Component;
     \mbox{\LARGE $\gamma_t = 2 m^* \eta_t$}
     \f]
     
-    where \f$\eta_t\f$ is the tangential dissipative coefficient.    
+    where \f$\eta_t\f$ is the input tangential dissipative coefficient. If the
+    value specified in the input file is \f$-1\f$, \f$\eta_t\f$ is automatically
+    computed such that \f$\gamma_n = \gamma_t\f$, i.e., same damping in the 
+    normal and tangential directions. This gives the following expression of 
+    \f$\eta_t\f$:
+    
+    \f[
+    \mbox{\LARGE $\eta_t = - 2\beta\sqrt{\frac{k_n}{m^*}}$}
+    \f]      
 
     - \f$\mu_c\f$ is the Coulomb tangential friction coefficient.
+
     
     The rolling resistance torque is formulated as follows:
       
     \f[
-    \mbox{\LARGE $\displaystyle \bm{T} = - k_r R^* |\bm{F}_n| 
+    \mbox{\LARGE $\displaystyle \bm{T}_r = - k_r R^* |\bm{F}_n| 
     	| \bm{\omega}_0 \times \bm{r}_0 
     	- \bm{\omega}_1 \times \bm{r}_1|\frac{\bm{\omega}_0 - \bm{\omega}_1}
 	{|\bm{\omega}_0 - \bm{\omega}_1|}$}
@@ -90,6 +99,7 @@ class Component;
     - \f$\mu_c\f$: the Coulomb tangential friction coefficient (-)
     - \f$k_r\f$: the rolling resistance coefficient 
     	\f$\left(s\cdot m^{-1}\right)\f$
+
 
     @author A.WACHS - IFPEN - 2011 - Creation 
     @author A.WACHS - 2019 - Major cleaning & refactoring 
@@ -152,7 +162,10 @@ class HODCContactForceModel : public ContactForceModel
     //@{
     double m_kn; /**< Normal stiffness coefficient */  
     double m_en; /**< Normal restitution coefficient */ 
-    double m_etat; /**< Tangential damping coefficient */
+    double m_etat; /**< Tangential damping coefficient, if the value is set to
+    	-1 in the input file, it is determined automatically such that 
+    	gamma_n = gamma_t, i.e., same damping in the normal and tangential
+	directions */
     double m_muc; /**< Tangential Coulomb friction coefficient */
     double m_kr; /**< Rolling resistance coefficient */
     double m_beta; /**< The log(m_en)/sqrt(PI*PI+log(m_en)*log(m_en)) factor */

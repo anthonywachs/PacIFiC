@@ -19,9 +19,151 @@ class Component;
     normal and tangential directions as well as in the rotational space; and
     a tangential Coulomb friction to compute the force and torque
     induced by the contact between two rigid components.
+    
+    The force is formulated as follows:
+    
+    \f{eqnarray*}{
+       \mbox{\LARGE $\bm{F}_n$} &=& \mbox{\LARGE $k_n \delta_n \bm{n}
+       	- \gamma_n \bm{U}_n$} \\ 
+        \mbox{\LARGE $\bm{F}_t$} &=& \mbox{\LARGE $min\left( 
+		| -k_t \bm{\delta}_t - \gamma_t \bm{U}_t |, 
+		\mu_c | \bm{F}_n | \right)\cdot \bm{t}$}
+    \f}
+    
+    where \f$\delta_n\f$ is the overlap distance in the normal direction, 
+    \f$\bm{n}\f$ is the unit normal vector at the contact point, 
+    \f$\bm{\delta}_t\f$ is the cumulative tangential displacement at the contact
+     point, \f$\bm{U}_n\f$ is the normal relative velocity at the contact point,
+     \f$\bm{U}_t\f$ is the tangential relative velocity at the contact point and
+    \f$\bm{t}\f$ is the unit tangential vector at the contact point defined as
+     \f$\displaystyle -\frac{k_t \bm{\delta}_t + \gamma_t \bm{U}_t}
+    {|k_t \bm{\delta}_t + \gamma_t \bm{U}_t|}\f$.
+    
+    The meaning and expression of the contact force parameters are:
+    - \f$k_n\f$ is the normal stiffness coefficient.
+    - \f$\gamma_n\f$ is the normal dissipative coefficient defined as
+    
+    \f[
+    \mbox{\LARGE $\displaystyle \gamma_n = - 2\beta\sqrt{k_n m^*} 
+    	\:\:\mathrm{with}\:\: 
+    	\beta=\frac{\ln(e_n)}{\sqrt{\pi^2+(\ln(e_n))^2}}$}
+    \f]
+    
+    where \f$e_n\f$ is the restitution coefficient, 
+    \f$\displaystyle m^*=\frac{1}{\frac{1}{m_0}+\frac{1}{m_1}}\f$ is the reduced
+    mass, \f$m_0\f$ is the mass of the first rigid component and \f$m_1\f$ is 
+    the mass of the second rigid component. If one of the two components is an
+    obstacle, then \f$m_{0\:\mathrm{or}\:1} \rightarrow \infty\f$ such that
+    \f$m^*=m_{0\:\mathrm{or}\:1}\f$, and in
+    practice we take \f$m_{0\:\mathrm{or}\:1} = 10^{20}\f$.
+    
+    - \f$\gamma_t\f$ is the tangential dissipative coefficient defined as
+    
+    \f[
+    \mbox{\LARGE $\gamma_t = 2 m^* \eta_t$}
+    \f]
+    
+    where \f$\eta_t\f$ is the input tangential dissipative coefficient. If the
+    value specified in the input file is \f$-1\f$, \f$\eta_t\f$ is automatically
+    computed such that \f$\gamma_n = \gamma_t\f$, i.e., same damping in the 
+    normal and tangential directions. This gives the following expression of 
+    \f$\eta_t\f$:
+    
+    \f[
+    \mbox{\LARGE $\eta_t = - 2\beta\sqrt{\frac{k_n}{m^*}}$}
+    \f]
+    
+    - \f$k_t\f$ is the tangential stiffness coefficient.    
 
-    @author D.Huet - 2022
-// ============================================================================*/
+    - \f$\mu_c\f$ is the Coulomb tangential friction coefficient. 
+    
+    The cumulative tangential displacement at the contact point \f$\delta_t\f$
+    is defined as follows:
+    
+    \f[
+    \mbox{\LARGE $\displaystyle \bm{\delta}_t = \left\{
+    \begin{array}{lcl}
+    \bm{q}_{rot} \bm{\delta}_t^{t-\Delta t} \bm{q}_{rot}^{-1} 
+    + \int_{t-\Delta t}^t \bm{U}_t(s)ds & \mathrm{if} 
+    & |\bm{F}_t| \leq \mu_c | \bm{F}_n | \\
+    \frac{-\mu_c| \bm{F}_n |\bm{t} - \gamma_t \bm{U}_t}{k_t} & \mathrm{if} 
+    & |\bm{F}_t| > \mu_c | \bm{F}_n |
+    \end{array} \right.
+    $}\f] 
+    
+    where \f$\bm{q}_{rot}\f$ is the rotation quaternion from the tangential
+    plane at time \f$t-\Delta t\f$ to the tangential plane at time \f$t\f$.
+
+    The rolling resistance torque is formulated as follows:
+    
+    \f[
+    \mbox{\LARGE $\displaystyle \bm{T}_r = \bm{T}_k + \bm{T}_d $}
+    \f] 
+    
+    with    
+            
+    \f[
+    \mbox{\LARGE $\displaystyle \bm{T}_k^t = \left\{
+    \begin{array}{lcl}
+    \bm{q}_{rot} \bm{T}_k^{t-\Delta t} \bm{q}_{rot}^{-1} 
+    - k_r \Delta \bm{\theta} & \mathrm{if} & |\bm{T}_k^t| \leq T_{max} \\
+    T_{max}\bm{r} & \mathrm{if} & |\bm{T}_k^t| > T_{max}
+    \end{array} \right.
+    $}\f] 
+    
+    where \f$\displaystyle \Delta \bm{\theta} = ( \bm{\omega}_0 -
+    \bm{\omega}_1 ) \Delta t\f$ is the rotational increment, 
+    \f$\displaystyle T_{max} = \mu_r R^* | \bm{F}_n |\f$ is the saturation
+    torque,  and \f$\displaystyle R^*=\frac{1}{\frac{1}{R_0}+\frac{1}{R_1}}\f$ 
+    is the reduced radius, \f$R_0\f$ is the radius of the first rigid component 
+    and \f$R_1\f$ is the radius of the second rigid component, 
+    \f$\displaystyle \bm{r} = \frac{\bm{q}_{rot} \bm{T}_k^{t-\Delta t} 
+    \bm{q}_{rot}^{-1} - k_r \Delta \bm{\theta}}{|\bm{q}_{rot} 
+    \bm{T}_k^{t-\Delta t} \bm{q}_{rot}^{-1} - k_r \Delta \bm{\theta}|}\f$ is 
+    the cumulative rolling direction unit vector.   
+
+    and 
+    
+    \f[
+    \mbox{\LARGE $\displaystyle \bm{T}_d = \left\{
+    \begin{array}{lcl}
+    -\eta_{pfr} \eta_r ( \bm{\omega}_0 -
+    \bm{\omega}_1 ) & \mathrm{if} & |\bm{T}_k^t| < T_{max} \\
+    \bm{0} & \mathrm{if} & |\bm{T}_k^t| = T_{max}
+    \end{array} \right.
+    $}\f]  
+    
+    In the above, the four coefficients \f$\mu_r\f$, \f$k_r\f$, \f$\eta_r\f$ and
+    \f$\eta_{pfr}\f$ are defined as follows:
+    
+    - \f$\mu_r\f$ is the Coulomb rolling resistance coefficient. 
+    
+    - \f$k_r = 3 k_n \mu_r^2\ R^{*,2}\f$ is the rolling stiffness coefficient.
+    
+    - \f$\eta_r = 3 \gamma_n \mu_r^2\ R^{*,2}\f$ is the rolling dissipative
+    coefficient. 
+    
+    - \f$\eta_{pfr}\f$ is a pre-factor to adjust the amount of rolling 
+    dissipative resistance.
+    
+
+    The input parameters of the model are:
+    - \f$k_n\f$: the normal stiffness coefficient \f$\left(N\cdot 
+    	m^{-1}\right)\f$
+    - \f$e_n\f$: the restitution coefficient (-)
+    - \f$\eta_t\f$: the tangential dissipative coefficient 
+    	\f$\left(s^{-1}\right)\f$
+    - \f$\mu_c\f$: the Coulomb tangential friction coefficient (-)
+    - \f$k_t\f$: the tangential stiffness coefficient \f$\left(N\cdot 
+    	m^{-1}\right)\f$
+    - \f$\mu_r\f$: the Coulomb rolling coefficient (-)
+    - \f$\eta_{pfr}\f$: the pre-factor to adjust the amount of rolling 
+    dissipative resistance (-)
+                 
+
+    @author D.HUET - 2022
+    @author A.WACHS - 2024 - Cleaning & documentation */    
+// ============================================================================
 class MemoryContactForceModel : public ContactForceModel
 {
   public:
@@ -69,8 +211,8 @@ class MemoryContactForceModel : public ContactForceModel
     @param n_t eta_t, tangential damping coefficient
     @param ut tangential velocity
     @param kdelta cumulative motion */
-    void computeTangentialVector( Vector3& tij, double n_t, const Vector3 ut,
-  	const Vector3 kdelta );
+    void computeTangentialVector( Vector3& tij, double n_t, Vector3 const& ut,
+  	Vector3 const& kdelta );
     //@}
 
 

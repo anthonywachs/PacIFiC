@@ -60,10 +60,11 @@ void HODCContactForceModel::performForcesCalculus( Component* p0_,
   Vector3 v_n = normal * ( tmpV * normal );
   Vector3 v_t = tmpV - v_n;
 
-  // Unit tangential vector along relative velocity at contact point 
+  // Unit tangential vector in the reverse direction of the relative velocity 
+  // at contact point 
   double normv_t = Norm( v_t );
-  Vector3 tangent(0.);
-  if ( normv_t > EPSILON ) tangent = v_t / normv_t;
+  Vector3 tangent( 0. );
+  if ( normv_t > EPSILON ) tangent = - v_t / normv_t;
   
   // Normal linear elastic force
   delFN = m_kn * penetration;
@@ -77,13 +78,17 @@ void HODCContactForceModel::performForcesCalculus( Component* p0_,
   double normFN = Norm( delFN );
   
   // Tangential dissipative force
-  double gammat = 2. * m_etat * avmass;
+  // If m_etat = -1, we compute its value such that gamma_n = gamma_t, i.e., 
+  // same damping in the normal and tangential directions, this gives
+  // etat = - m_beta * sqrt( m_kn / avmass )
+  double etat = m_etat == -1. ? - m_beta * sqrt( m_kn / avmass ) : m_etat;
+  double gammat = 2. * etat * avmass;
   delFT = - gammat * v_t ;  
 
   // Tangential Coulomg saturation
   double fn = m_muc * normFN;
   double ft = Norm( delFT );
-  if ( fn < ft ) delFT = tangent * ( - fn );
+  if ( fn < ft ) delFT = tangent * fn ;
   
   // Rolling resistance moment
   if ( m_kr )
@@ -181,7 +186,8 @@ map<string,double> HODCContactForceModel::defineParameters( DOMNode* & root )
   parameters["en"] = value;
   
   parameter = ReaderXML::getNode( root, "etat" );
-  value = ReaderXML::getNodeValue_Double( parameter );
+  if ( parameter ) value = ReaderXML::getNodeValue_Double( parameter );
+  else value = - 1.;
   parameters["etat"] = value;
   
   parameter = ReaderXML::getNode( root, "kr" );

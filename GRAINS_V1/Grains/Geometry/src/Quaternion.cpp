@@ -266,7 +266,7 @@ void Quaternion::setRotFromTwoVectors( Vector3 const& u, Vector3 const& v )
   double real_part = norm_u_norm_v + u*v;
   Vector3 vect;
 
-  if (real_part < 1.e-6 * norm_u_norm_v)
+  if ( real_part < 1.e-6 * norm_u_norm_v )
   {
     /* If u and v are exactly opposite, rotate 180 degrees
     around an arbitrary orthogonal axis. Axis normalisation
