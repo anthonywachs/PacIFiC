@@ -86,7 +86,7 @@ Polyhedron* Polyhedron::create( istream& fileIn )
   int nb_point;
   *PolyIN >> nb_point >> nb_point;
   
-  // Creation du tableau de points du polyedre  
+  // Creation of the array of vertices
   Point3* point = new Point3[nb_point];
   VertexBase* vertexbase = new VertexBase( (void *)point );
   
@@ -212,67 +212,6 @@ double Polyhedron::computeCircumscribedRadius() const
 
 
 // -------------------------------------------------------------------
-// Computes the contribution to inertia and volume of a tetrahedron
-// defined by the center of mass (assuming that the center of mass is located 
-// at (0,0,0)), the center of mass on a face and 2 consecutives vertices on 
-// this face
-void Polyhedron::computeVolumeInertiaContrib( const Point3 &A2, 
-	const Point3 &A3, const Point3 &A4 )
-{
-  // From Journal of Mathematics and Statistics 1 (1): 8-11, 2004
-  // "Explicit Exact Formulas for the 3-D Tetrahedron Inertia Tensor
-  // in Terms of its Vertex Coordinates", F. Tonon
-
-  double x1 = 0., x2 = A2[X], x3 = A3[X], x4 = A4[X],
-  	y1 = 0., y2 = A2[Y], y3 = A3[Y], y4 = A4[Y],
-	z1 = 0., z2 = A2[Z], z3 = A3[Z], z4 = A4[Z],
-	det ;
-	
-  det = fabs( ( x2 - x1 ) * ( y3 - y1 ) * ( z4 - z1 )
-  	+ ( y2 - y1 ) * ( z3 - z1 ) * (	x4 - x1 )
-	+ ( z2 - z1 ) * ( x3 - x1 ) * (	y4 - y1 )
-	- ( z2 - z1 ) * ( y3 - y1 ) * (	x4 - x1 )
-	- ( x2 - x1 ) * ( z3 - z1 ) * (	y4 - y1 )
-	- ( y2 - y1 ) * ( x3 - x1 ) * (	z4 - z1 ) );
-
-  m_VolumePoly += det / 6. ;
-  
-  m_InertiaPoly[0] += det * ( y1 * y1 + y1 * y2 + y2 * y2 
-  	+ y1 * y3 + y2 * y3 + y3 * y3
-	+ y1 * y4 + y2 * y4 + y3 * y4 + y4 * y4
-	+ z1 * z1 + z1 * z2 + z2 * z2 
-  	+ z1 * z3 + z2 * z3 + z3 * z3
-	+ z1 * z4 + z2 * z4 + z3 * z4 + z4 * z4 ) / 60. ;
-  m_InertiaPoly[1] -= det * ( 2. * x1 * z1 + x2 * z1 + x3 * z1 + x4 * z1 
-  	+ x1 * z2 + 2. * x2 * z2 + x3 * z2 + x4 * z2 
-	+ x1 * z3 + x2 * z3 + 2. * x3 * z3 + x4 * z3 
-	+ x1 * z4 + x2 * z4 + x3 * z4 + 2. * x4 * z4 ) / 120. ;
-  m_InertiaPoly[2] -= det * ( 2. * x1 * y1 + x2 * y1 + x3 * y1 + x4 * y1 
-  	+ x1 * y2 + 2. * x2 * y2 + x3 * y2 + x4 * y2 
-	+ x1 * y3 + x2 * y3 + 2. * x3 * y3 + x4 * y3 
-	+ x1 * y4 + x2 * y4 + x3 * y4 + 2. * x4 * y4 ) / 120. ;
-  m_InertiaPoly[3] += det * ( x1 * x1 + x1 * x2 + x2 * x2 
-  	+ x1 * x3 + x2 * x3 + x3 * x3
-	+ x1 * x4 + x2 * x4 + x3 * x4 + x4 * x4
-	+ z1 * z1 + z1 * z2 + z2 * z2 
-  	+ z1 * z3 + z2 * z3 + z3 * z3
-	+ z1 * z4 + z2 * z4 + z3 * z4 + z4 * z4 ) / 60. ;
-  m_InertiaPoly[4] -= det * ( 2. * y1 * z1 + y2 * z1 + y3 * z1 + y4 * z1 
-  	+ y1 * z2 + 2. * y2 * z2 + y3 * z2 + y4 * z2 
-	+ y1 * z3 + y2 * z3 + 2. * y3 * z3 + y4 * z3 
-	+ y1 * z4 + y2 * z4 + y3 * z4 + 2. * y4 * z4 ) / 120. ;
-  m_InertiaPoly[5] += det * ( x1 * x1 + x1 * x2 + x2 * x2 
-  	+ x1 * x3 + x2 * x3 + x3 * x3
-	+ x1 * x4 + x2 * x4 + x3 * x4 + x4 * x4
-	+ y1 * y1 + y1 * y2 + y2 * y2 
-  	+ y1 * y3 + y2 * y3 + y3 * y3
-	+ y1 * y4 + y2 * y4 + y3 * y4 + y4 * y4 ) / 60. ;			
-}
-
-
-
-
-// -------------------------------------------------------------------
 // Allocates the inertia tensor array and sets its component and the 
 // volume to 0
 void Polyhedron::Initialisation() 
@@ -319,7 +258,7 @@ Convex* Polyhedron::clone() const
 
 // ----------------------------------------------------------------------
 // Polyhedron support function, returns the support point P, i.e. 
-// the point on the surface of the sphere that satisfies max(P.v)
+// the point on the surface of the polyhedron that satisfies max(P.v)
 // Note: condition "d <= h" has been replaced by "d-h < eps" in relation to
 // round error issues. For now, eps = 1.e-16 but this should be re-examined   
 Point3 Polyhedron::support( Vector3 const& v ) const 
@@ -400,8 +339,9 @@ void Polyhedron::BuildPolyhedron( int nbface, IndexArray const* face )
     
     if ( face[i].size() == 3 )
     {
-      computeVolumeInertiaContrib( (*this)[face[i][0]], (*this)[face[i][1]],
-      	(*this)[face[i][2]]);
+      GrainsExec::computeVolumeInertiaContrib( (*this)[face[i][0]], 
+      	(*this)[face[i][1]], (*this)[face[i][2]], 
+	m_VolumePoly, m_InertiaPoly );
     }
     else
     {
@@ -409,8 +349,8 @@ void Polyhedron::BuildPolyhedron( int nbface, IndexArray const* face )
       for(j=0; j<face[i].size(); ++j) G_ += (*this)[face[i][j]];
       G_ /= face[i].size();
       for(j=0, k=face[i].size() - 1; j<face[i].size(); k=j++) 
-        computeVolumeInertiaContrib( G_, (*this)[face[i][k]], 
-		(*this)[face[i][j]]);
+        GrainsExec::computeVolumeInertiaContrib( G_, (*this)[face[i][k]], 
+		(*this)[face[i][j]], m_VolumePoly, m_InertiaPoly);
     }
   }
   
@@ -798,8 +738,8 @@ bool Polyhedron::isIn( Point3 const& pt ) const
 {
   bool isIn = false;
 
-  // Recall that by definition, center of mass is at the origin in the reference
-  // configuration
+  // Recall that by definition, center of mass is at the origin in the 
+  // reference configuration
   Point3 G_, centerOfMass ;
   size_t i, j, k, nbface = m_allFaces->size();
   for (i=0; i<nbface && !isIn; i++)

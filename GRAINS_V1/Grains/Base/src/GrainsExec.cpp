@@ -731,3 +731,64 @@ double GrainsExec::getMinCrustThickness()
 {
   return ( m_minCrustThickness ); 
 }
+
+
+
+
+// -------------------------------------------------------------------
+// Computes the contribution to inertia and volume of a tetrahedron
+// defined by the center of mass (assuming that the center of mass is located 
+// at (0,0,0)), the center of mass on a face and 2 consecutives vertices on 
+// this face, to the inertia and volume of a polyhedron
+void GrainsExec::computeVolumeInertiaContrib( const Point3 &A2, 
+	const Point3 &A3, const Point3 &A4, double &vol, double* inertia )
+{
+  // From Journal of Mathematics and Statistics 1 (1): 8-11, 2004
+  // "Explicit Exact Formulas for the 3-D Tetrahedron Inertia Tensor
+  // in Terms of its Vertex Coordinates", F. Tonon
+
+  double x1 = 0., x2 = A2[X], x3 = A3[X], x4 = A4[X],
+  	y1 = 0., y2 = A2[Y], y3 = A3[Y], y4 = A4[Y],
+	z1 = 0., z2 = A2[Z], z3 = A3[Z], z4 = A4[Z],
+	det ;
+	
+  det = fabs( ( x2 - x1 ) * ( y3 - y1 ) * ( z4 - z1 )
+  	+ ( y2 - y1 ) * ( z3 - z1 ) * (	x4 - x1 )
+	+ ( z2 - z1 ) * ( x3 - x1 ) * (	y4 - y1 )
+	- ( z2 - z1 ) * ( y3 - y1 ) * (	x4 - x1 )
+	- ( x2 - x1 ) * ( z3 - z1 ) * (	y4 - y1 )
+	- ( y2 - y1 ) * ( x3 - x1 ) * (	z4 - z1 ) );
+
+  vol += det / 6. ;
+  
+  inertia[0] += det * ( y1 * y1 + y1 * y2 + y2 * y2 
+  	+ y1 * y3 + y2 * y3 + y3 * y3
+	+ y1 * y4 + y2 * y4 + y3 * y4 + y4 * y4
+	+ z1 * z1 + z1 * z2 + z2 * z2 
+  	+ z1 * z3 + z2 * z3 + z3 * z3
+	+ z1 * z4 + z2 * z4 + z3 * z4 + z4 * z4 ) / 60. ;
+  inertia[1] -= det * ( 2. * x1 * z1 + x2 * z1 + x3 * z1 + x4 * z1 
+  	+ x1 * z2 + 2. * x2 * z2 + x3 * z2 + x4 * z2 
+	+ x1 * z3 + x2 * z3 + 2. * x3 * z3 + x4 * z3 
+	+ x1 * z4 + x2 * z4 + x3 * z4 + 2. * x4 * z4 ) / 120. ;
+  inertia[2] -= det * ( 2. * x1 * y1 + x2 * y1 + x3 * y1 + x4 * y1 
+  	+ x1 * y2 + 2. * x2 * y2 + x3 * y2 + x4 * y2 
+	+ x1 * y3 + x2 * y3 + 2. * x3 * y3 + x4 * y3 
+	+ x1 * y4 + x2 * y4 + x3 * y4 + 2. * x4 * y4 ) / 120. ;
+  inertia[3] += det * ( x1 * x1 + x1 * x2 + x2 * x2 
+  	+ x1 * x3 + x2 * x3 + x3 * x3
+	+ x1 * x4 + x2 * x4 + x3 * x4 + x4 * x4
+	+ z1 * z1 + z1 * z2 + z2 * z2 
+  	+ z1 * z3 + z2 * z3 + z3 * z3
+	+ z1 * z4 + z2 * z4 + z3 * z4 + z4 * z4 ) / 60. ;
+  inertia[4] -= det * ( 2. * y1 * z1 + y2 * z1 + y3 * z1 + y4 * z1 
+  	+ y1 * z2 + 2. * y2 * z2 + y3 * z2 + y4 * z2 
+	+ y1 * z3 + y2 * z3 + 2. * y3 * z3 + y4 * z3 
+	+ y1 * z4 + y2 * z4 + y3 * z4 + 2. * y4 * z4 ) / 120. ;
+  inertia[5] += det * ( x1 * x1 + x1 * x2 + x2 * x2 
+  	+ x1 * x3 + x2 * x3 + x3 * x3
+	+ x1 * x4 + x2 * x4 + x3 * x4 + x4 * x4
+	+ y1 * y1 + y1 * y2 + y2 * y2 
+  	+ y1 * y3 + y2 * y3 + y3 * y3
+	+ y1 * y4 + y2 * y4 + y3 * y4 + y4 * y4 ) / 60. ;
+}

@@ -152,16 +152,6 @@ class Polyhedron : public Polytope
     /** @brief Returns the circumscribed radius of the reference polygon,
     i.e., without applying any transformation */
     double computeCircumscribedRadius() const;
-  
-    /** @brief Computes the contribution to inertia and volume of a tetrahedron
-    defined by the center of mass (assuming that the center of mass is located 
-    at (0,0,0)), the center of mass on a face and 2 consecutives vertices on 
-    this face
-    @param A2 center of mass of the face
-    @param A3 a point of the face that H belongs to
-    @param A4 the next point neighbor of A3 of the face that H belongs to */
-    void computeVolumeInertiaContrib( Point3 const& A2, Point3 const& A3, 
-	Point3 const& A4 );
 
     /** @brief Allocates the inertia tensor array and sets its component and the
     volume to 0 */

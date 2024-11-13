@@ -169,7 +169,8 @@ void Box::setCornersFaces()
 // Returns a clone of the box
 Convex* Box::clone() const
 {
-  return ( new Box( 2.0 * m_extent[X], 2.0 * m_extent[Y], 2.0 * m_extent[Z] ) );
+  return ( new Box( 2.0 * m_extent[X], 2.0 * m_extent[Y], 
+  	2.0 * m_extent[Z] ) );
 }
 
 
@@ -339,7 +340,7 @@ int Box::numberOfCells_PARAVIEW() const
 
 
 // ----------------------------------------------------------------------------
-// Writes a list of points describing the sphere in a Paraview format
+// Writes a list of points describing the box in a Paraview format
 void Box::write_polygonsPts_PARAVIEW( ostream& f,
   	Transform const& transform, Vector3 const* translation ) const
 {
@@ -376,7 +377,7 @@ list<Point3> Box::get_polygonsPts_PARAVIEW( Transform const& transform,
 
 
 // ----------------------------------------------------------------------------
-// Ecrit le convexe pour post-processing avec Paraview
+// Writes the box in a Paraview format
 void Box::write_polygonsStr_PARAVIEW( list<int>& connectivity,
     	list<int>& offsets, list<int>& cellstype, int& firstpoint_globalnumber,
 	int& last_offset ) const
@@ -613,8 +614,8 @@ Point3 Box::IntersectionPointSPHERE( Point3 const& SphereCenter,
 	if ( normDistance < SphereRadius )
         {
           overlap = normDistance - SphereRadius;
-          contactPoint.setValue( SphereCenter[X], - m_extent[Y] - 0.5 * overlap,
-	  	SphereCenter[Z] );
+          contactPoint.setValue( SphereCenter[X], - m_extent[Y] 
+	  	- 0.5 * overlap, SphereCenter[Z] );
         }
       }
     }
@@ -646,8 +647,8 @@ Point3 Box::IntersectionPointSPHERE( Point3 const& SphereCenter,
       {
         if ( warningSphereCenterInBox )
 	{
-	  cout << "Warning: sphere center in box in Box::IntersectionPointSPHERE"
-		<< endl;
+	  cout << "Warning: sphere center in box in "
+	  	"Box::IntersectionPointSPHERE" << endl;
 	  GrainsExec::m_exception_Contact = true;
           throw ContactError();
 	}

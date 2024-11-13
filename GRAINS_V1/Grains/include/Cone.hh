@@ -137,7 +137,7 @@ class Cone : public Convex {
     //@{
     double m_bottomRadius; /**< radius of the flat base */
     double m_quarterHeight; /**< quarter-height */
-    double m_sinAngle; /**< sine of the half-angle at the center */
+    double m_sinAngle; /**< sine of the angle at the pointed tip */
     static int m_visuNodeNbOnPer; /**< number of points over the circular edges
     	for Paraview post-processing */    
     //@}  

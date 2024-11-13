@@ -138,7 +138,7 @@ RigidBodyWithCrust::RigidBodyWithCrust( DOMNode* root )
   m_crustThickness = ReaderXML::getNodeAttr_Double( forme, "CrustThickness" );
   m_boundingVolume = m_convex->
                           computeBVolume( GrainsExec::m_colDetBoundingVolume );
-  GrainsExec::setMinCrustThickness( m_crustThickness ); 			  
+  GrainsExec::setMinCrustThickness( m_crustThickness );
 
   // Transformation
   m_transform.load( root );
@@ -291,19 +291,27 @@ PointContact RigidBodyWithCrust::ClosestPoint( RigidBodyWithCrust &neighbor )
 	    general = true;
 	}  	      
         break;	
+	
+      case RECTANGLE2D:
+        return ( ClosestPointRECTANGLE( *this, neighbor, true ) );
+        break;
       
       default:
-        general = true;        
+        if ( convexB->getConvexType() == RECTANGLE2D )
+	  return ( ClosestPointRECTANGLE( *this, neighbor, true ) );
+	else
+          general = true;        
     }
 
     // General case for any pair of convex rigid bodies
     if ( general )
     {
-      if ( Norm( *m_transform.getOrigin() - *neighbor.m_transform.getOrigin() ) 
+      if ( Norm( *m_transform.getOrigin() 
+      		- *neighbor.m_transform.getOrigin() ) 
     	< m_circumscribedRadius + neighbor.m_circumscribedRadius )
       {
         // Pre-collision Test
-        if( GrainsExec::m_colDetBoundingVolume && 
+        if ( GrainsExec::m_colDetBoundingVolume && 
       		!isContactBVolume( *this, neighbor ) )
 	  return ( PointNoContact );
 
@@ -329,8 +337,8 @@ PointContact RigidBodyWithCrust::ClosestPoint( RigidBodyWithCrust &neighbor )
         if ( distance < EPSILON )
         {
           cout << "ERR RigidBodyWithCrust::ClosestPoint on Processor "
-     		 << (GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank() : 0 ) 
-		 << endl;
+     		 << (GrainsExec::m_MPI ? 
+		 GrainsExec::getComm()->get_rank() : 0 ) << endl;
           throw ContactError();
         }
 
@@ -777,9 +785,20 @@ bool RigidBodyWithCrust::isContact( RigidBodyWithCrust& neighbor )
 	  general = true;
       }  	      
       break;  
-      
+
+    case RECTANGLE2D:
+      pc = ClosestPointRECTANGLE( *this, neighbor, false );
+      if ( pc.getOverlapDistance() < 0. ) contact = true;
+      break;
+
     default:
-      general = true;        
+      if ( convexB->getConvexType() == RECTANGLE2D )
+      {
+        pc = ClosestPointRECTANGLE( *this, neighbor, false );
+        if ( pc.getOverlapDistance() < 0. ) contact = true;      
+      }
+      else
+        general = true;       
   }
 
 
@@ -1008,7 +1027,8 @@ PointContact ClosestPointRECTANGLE( RigidBodyWithCrust const& rbA,
             {
               cout << "ERR RigidBodyWithCrust::ClosestPointRECTANGLE "
 	    	"on Processor "
-		<< ( GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank() : 0 )
+		<< ( GrainsExec::m_MPI ? 
+			GrainsExec::getComm()->get_rank() : 0 )
 		<< ": " << - overlap << " & " << 2. * rdwB 
 		<< endl;
 	      overlap = - 2. * rdwB;
@@ -1025,7 +1045,7 @@ PointContact ClosestPointRECTANGLE( RigidBodyWithCrust const& rbA,
       Point3 cPt = *( a2w->getOrigin() ); // center of the convex body
       Vector3 rNorm = b2w->getBasis() * Vector3( 0., 0., 1. ); // rectangle 
       							       // normal
-      rNorm.normalized();
+      rNorm.normalized();      
       rNorm = copysign( 1., rNorm * ( cPt - *rPt ) ) * rNorm;
       Point3 pointA = (*a2w)
 	( convexA->support( ( -rNorm ) * a2w->getBasis() ) );
@@ -1041,15 +1061,16 @@ PointContact ClosestPointRECTANGLE( RigidBodyWithCrust const& rbA,
           Point3 contact = pointA / 2.0 + pointB / 2.0;
           Vector3 overlap_vector = pointB - pointA;
           overlap = - Norm( overlap_vector );
-          double rdwA = rbA.getCrustThickness();
 	  
 	  if ( checkoverlap )
 	  {          
+	    double rdwA = rbA.getCrustThickness();
 	    if ( - overlap >= 2. * rdwA )
             {
               cout << "ERR RigidBodyWithCrust::ClosestPointRECTANGLE "
 	    	"on Processor "
-		<< ( GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank() : 0 )
+		<< ( GrainsExec::m_MPI ? 
+			GrainsExec::getComm()->get_rank() : 0 )
 		<< ": " << - overlap << " & " << 2. * rdwA 
 		<< endl;
 	      overlap = - 2. * rdwA;		

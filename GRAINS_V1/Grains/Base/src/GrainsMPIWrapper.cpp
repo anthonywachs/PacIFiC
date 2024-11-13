@@ -1985,7 +1985,7 @@ size_t GrainsMPIWrapper::Broadcast_UNSIGNED_INT( size_t const& i ) const
   
   MPI_Bcast( &collective_i, 1, MPI_UNSIGNED_LONG, 0, m_MPI_COMM_activeProc );
   
-  return collective_i; 
+  return ( collective_i ); 
 }
 
 
@@ -2074,7 +2074,7 @@ int GrainsMPIWrapper::sum_INT_master( int const& i ) const
 // within the MPI_COMM_activProc communicator
 size_t GrainsMPIWrapper::sum_UNSIGNED_INT_master( size_t const& i ) const
 {
-  int sum = 0;
+  size_t sum = 0;
   
   MPI_Reduce( &i, &sum, 1, MPI_UNSIGNED_LONG, MPI_SUM, m_rank_master, 
   	m_MPI_COMM_activeProc );
@@ -2090,7 +2090,7 @@ size_t GrainsMPIWrapper::sum_UNSIGNED_INT_master( size_t const& i ) const
 // all processes on all processes
 bool GrainsMPIWrapper::logical_and( bool const& input ) const
 {
-  int land=0;
+  unsigned int land = 0;
   
   MPI_Allreduce( &input, &land, 1, MPI_UNSIGNED_SHORT, MPI_LAND,
   	m_MPI_COMM_activeProc );

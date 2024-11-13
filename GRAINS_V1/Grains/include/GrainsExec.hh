@@ -217,7 +217,17 @@ class GrainsExec
     @param rootname root file name 
     @param addrank add rank number */
     static string fullResultFileName( string const& rootname,
-    	bool addrank = true ); 	
+    	bool addrank = true );
+	
+    /** @brief Computes the contribution to inertia and volume of a tetrahedron
+    defined by the center of mass (assuming that the center of mass is located 
+    at (0,0,0)), the center of mass on a face and 2 consecutives vertices on 
+    this face, to the inertia and volume of a polyhedron
+    @param A2 center of mass of the face (or a point of the face)
+    @param A3 a point of the face 
+    @param A4 the next point neighbor of A3 of the face */
+    static void computeVolumeInertiaContrib( Point3 const& A2, 
+    	Point3 const& A3, Point3 const& A4, double &vol, double* inertia );
     //@}
 
 
