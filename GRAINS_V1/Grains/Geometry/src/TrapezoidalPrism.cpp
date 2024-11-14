@@ -227,7 +227,7 @@ double const* TrapezoidalPrism::getExtent() const
 // i.e., without applying any transformation
 double TrapezoidalPrism::computeCircumscribedRadius() const
 {
-  return ( Norm( m_corners[2] ) );
+  return ( max( Norm( m_corners[2] ), Norm( m_corners[1] ) ) );
 }
 
 

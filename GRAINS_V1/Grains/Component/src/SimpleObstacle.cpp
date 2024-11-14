@@ -71,7 +71,6 @@ SimpleObstacle::SimpleObstacle( string const& name,
     	string const& mat, bool const& toFluid, 
 	bool const& autonumbering )
   : Obstacle( "", autonumbering )
-  , m_transferToFluid( false )
 {
   m_ObstacleType = "SimpleObstacle";
 
