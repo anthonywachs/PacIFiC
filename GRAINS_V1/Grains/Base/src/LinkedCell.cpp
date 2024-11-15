@@ -1336,7 +1336,10 @@ void LinkedCell::Link( Obstacle* root_obstacle )
   Point3 const* cg = NULL;
   Point3 obscg;
   bool add = false;
-
+  size_t i, j, k;
+  double angx, angy, angz;
+  Matrix mrotX, mrotY, mrotZ, mrot;
+  
   for (myObs=m_allSimpleObstacles.begin();myObs!=m_allSimpleObstacles.end();
   	myObs++)
   {
@@ -1352,9 +1355,9 @@ void LinkedCell::Link( Obstacle* root_obstacle )
     	(*myObs)->getCrustThickness() );
 
     // Intersection of the cell with the obstacle
-    for (int i=0; i<m_nb; i++)
+    for (int m=0; m<m_nb; m++)
     {
-      cell_ = m_allcells[i];
+      cell_ = m_allcells[m];
       cg = cell_->getCentre();
       add = false;
       if ( obstacleBBox->InZone( cg, cellBoxExtension[X], cellBoxExtension[Y],
@@ -1362,10 +1365,41 @@ void LinkedCell::Link( Obstacle* root_obstacle )
       {
         if ( (*myObs)->isSTLObstacle() ) add = true; // Temporary, TO DO
 	else 
-	{
+	{	  
 	  cellBoxRBWC.setOrigin( (*cg)[X], (*cg)[Y], (*cg)[Z] );
-	  cellBoxRBWC.initialize_transformWithCrust_to_notComputed();
-	  add = cellBoxRBWC.isContact( *obstacleRBWC );
+	  
+	  // Note: to avoid false outcome of isContact in the case of perfectly
+	  // aligned rigid bodies with the faces of the cell box, we perturb
+	  // the angular position of the cell box in the 8 quadrants of the
+	  // Cartesian space
+	  // Example: a Rectangle2D perfectly aligned with the XY, YZ or XZ
+	  // plane, in this case the support function of the cell box may return
+	  // any of the 4 points of the face that is closest to the Rectangle2D
+	  for (i=0;i<2 && !add;++i)
+	  { 
+	    angx = i == 0 ? - LOWEPS : LOWEPS;
+	    mrotX.setValue( 1., 0., 0.,
+	    	0., cos( angx ), - sin( angx ), 
+		0., sin( angx ), cos( angx ) );
+	    for (j=0;j<2 && !add;++j) 
+	    {
+	      angy = j == 0 ? - LOWEPS : LOWEPS;
+	      mrotY.setValue( cos( angy ), 0., - sin( angy ), 
+    		0., 1., 0.,
+		sin( angy ), 0., cos( angy ) );
+	      for (k=0;k<2 && !add;++k) 
+	      {
+	        angz = k == 0 ? - LOWEPS : LOWEPS;
+                mrotZ.setValue( cos( angz ), - sin( angz ), 0., 
+    			sin( angz ), cos( angz ), 0., 
+    			0., 0., 1. );
+		mrot = mrotZ * mrotY;
+		cellBoxRBWC.getTransform()->setBasis( mrot * mrotX );
+	        cellBoxRBWC.initialize_transformWithCrust_to_notComputed();
+	        add = cellBoxRBWC.isContact( *obstacleRBWC );
+	      }
+	    }
+	  }	    
 	}
 	
 	if ( add )
