@@ -1,22 +1,24 @@
 #include "GrainsMPIWrapper.hh"
-#include "HODCContactForceModel.hh"
+#include "HertzContactForceModel.hh"
 #include "GrainsExec.hh"
 #include "Component.hh"
 #include "Memento.hh"
 #include "LinkedCell.hh"
+#include <math.h>
 
 
 // ----------------------------------------------------------------------------
 // Constructor with a map of contact parameters as inputs
-HODCContactForceModel::HODCContactForceModel( map<string,double>& parameters ) 
+HertzContactForceModel::HertzContactForceModel( map<string,double>& parameters ) 
   : ContactForceModel()
 {
-  m_kn = parameters["kn"];
+  m_Es = parameters["Es"];
   m_en = parameters["en"];
-  m_etat = parameters["etat"];
+  m_Gs = parameters["Gs"];
   m_muc = parameters["muc"];
   m_kr = parameters["kr"];
   m_beta = log(m_en) / sqrt( PI * PI + log(m_en) * log(m_en) );
+  m_m2sqrt56 = - 2. * sqrt( 5. / 6. );
 }
 
 
@@ -24,16 +26,16 @@ HODCContactForceModel::HODCContactForceModel( map<string,double>& parameters )
 
 // ----------------------------------------------------------------------------
 // Destructor
-HODCContactForceModel::~HODCContactForceModel()
+HertzContactForceModel::~HertzContactForceModel()
 {}
 
 
 
 
 // ----------------------------------------------------------------------------
-string HODCContactForceModel::name() const 
+string HertzContactForceModel::name() const 
 { 
-  return ( "HODCContactForceModel" ); 
+  return ( "HertzContactForceModel" ); 
 }
 
 
@@ -41,13 +43,21 @@ string HODCContactForceModel::name() const
 
 // ----------------------------------------------------------------------------
 // Performs forces & torques computation
-void HODCContactForceModel::performForcesCalculus( Component* p0_, 
+void HertzContactForceModel::performForcesCalculus( Component* p0_, 
 	Component* p1_, PointContact const& contactInfos,
 	Vector3& delFN, Vector3& delFT, Vector3& delM )
 {
   Point3 geometricPointOfContact = contactInfos.getContact();
   Vector3 penetration = contactInfos.getOverlapVector();
-
+  double deltan = - contactInfos.getOverlapDistance();
+  double Req = 1. / ( 1. / p0_->getEquivalentSphereRadius() 
+    	+ 1. / p1_->getEquivalentSphereRadius() ); // Effective radius  
+  double avmass = 1. / ( 1. / p0_->getMass() 
+  	+ 1. / p1_->getMass() ); // Effective mass
+  double sqrtReqdeltan = sqrt( Req * deltan );
+  double Sn = 2. * m_Es * sqrtReqdeltan;
+  double St = 8. * m_Gs * sqrtReqdeltan;  	
+	
   // Unit normal vector at contact point
   Vector3 normal( penetration );
   normal /= Norm( normal );
@@ -67,22 +77,16 @@ void HODCContactForceModel::performForcesCalculus( Component* p0_,
   if ( normv_t > EPSILON ) tangent = - v_t / normv_t;
   
   // Normal linear elastic force
-  delFN = m_kn * penetration;
+  double kn = ( 4. / 3. ) * m_Es * sqrtReqdeltan;
+  delFN = kn * penetration;
 
   // Normal dissipative force  
-  double mass0 = p0_->getMass();
-  double mass1 = p1_->getMass();  
-  double avmass = 1. / ( 1. / mass0 + 1. / mass1 );
-  double gamman = - 2. * m_beta * sqrt( avmass * m_kn );
+  double gamman = m_m2sqrt56 * m_beta * sqrt( avmass * Sn );  
   delFN -= gamman * v_n;  
   double normFN = Norm( delFN );
   
   // Tangential dissipative force
-  // If m_etat = -1, we compute its value such that gamma_n = gamma_t, i.e., 
-  // same damping in the normal and tangential directions, this gives
-  // etat = - m_beta * sqrt( m_kn / avmass )
-  double etat = m_etat == -1. ? - m_beta * sqrt( m_kn / avmass ) : m_etat;
-  double gammat = 2. * etat * avmass;
+  double gammat = m_m2sqrt56 * m_beta * sqrt( avmass * St );;
   delFT = - gammat * v_t ;  
 
   // Tangential Coulomg saturation
@@ -103,11 +107,7 @@ void HODCContactForceModel::performForcesCalculus( Component* p0_,
     
     // Rolling resistance moment
     if ( normwrel > EPSILON )
-    {  
-      double Req = 1. / ( 1. / p0_->getEquivalentSphereRadius() 
-    	+ 1. / p1_->getEquivalentSphereRadius() ); // Effective radius      
-      delM = - ( m_kr * Req * normFN * normwtrel / normwrel ) * wrel ;
-    }   
+      delM = - ( m_kr * Req * normFN * normwtrel / normwrel ) * wrel ;  
   }
   else delM = 0.0;  
 }
@@ -117,7 +117,7 @@ void HODCContactForceModel::performForcesCalculus( Component* p0_,
 
 // ----------------------------------------------------------------------------
 // Computes forces & torques
-bool HODCContactForceModel::computeForces( Component* p0_, 
+bool HertzContactForceModel::computeForces( Component* p0_, 
 	Component* p1_,
 	PointContact const& contactInfos,
 	LinkedCell* LC,
@@ -166,33 +166,33 @@ bool HODCContactForceModel::computeForces( Component* p0_,
 
 // ----------------------------------------------------------------------------
 // Reads and returns contact parameter map from an XML node
-map<string,double> HODCContactForceModel::defineParameters( DOMNode* & root )
+map<string,double> HertzContactForceModel::defineParameters( DOMNode* & root )
 {
   map<string,double> parameters;
 
   DOMNode* parameter;
   double value;
   
-  parameter = ReaderXML::getNode( root, "kn" );
+  parameter = ReaderXML::getNode( root, "Es" );
   value = ReaderXML::getNodeValue_Double( parameter );
-  parameters["kn"] = value;
-  
+  parameters["Es"] = value;
+
+  parameter = ReaderXML::getNode( root, "en" );
+  value = ReaderXML::getNodeValue_Double( parameter );
+  parameters["en"] = value;
+
   parameter = ReaderXML::getNode( root, "muc" );
   value = ReaderXML::getNodeValue_Double( parameter );
   parameters["muc"] = value;
   
-  parameter = ReaderXML::getNode( root, "en" );
-  value = ReaderXML::getNodeValue_Double( parameter );
-  parameters["en"] = value;
-  
-  parameter = ReaderXML::getNode( root, "etat" );
-  if ( parameter ) value = ReaderXML::getNodeValue_Double( parameter );
-  else value = - 1.;
-  parameters["etat"] = value;
-  
   parameter = ReaderXML::getNode( root, "kr" );
   value = ReaderXML::getNodeValue_Double( parameter );
-  parameters["kr"] = value;
+  parameters["kr"] = value;  
+  
+  parameter = ReaderXML::getNode( root, "Gs" );
+  if ( parameter ) value = ReaderXML::getNodeValue_Double( parameter );
+  else value = parameters["Es"] / 4.;  
+  parameters["Gs"] = value;
   
   return ( parameters );
 }
@@ -204,22 +204,33 @@ map<string,double> HODCContactForceModel::defineParameters( DOMNode* & root )
 // Computes an estimate of the contact time and maximum penetration 
 // depth in the case of a gravityless binary collision of spheres, and writes
 // the result in an output stream
-void HODCContactForceModel::computeAndWriteEstimates( Component* p0_, 
+void HertzContactForceModel::computeAndWriteEstimates( Component* p0_, 
 	Component* p1_, double const& v0, double const& dt, ostream& OUT ) const
 {
-  double mass0 = p0_->getMass();
-  double mass1 = p1_->getMass();	
-  double avmass = 1. / ( 1. / mass0 + 1. / mass1 );
-  double etan = - sqrt( m_kn / avmass ) * m_beta;  	
+  double Req = 1. / ( 1. / p0_->getEquivalentSphereRadius() 
+    	+ 1. / p1_->getEquivalentSphereRadius() ); // Effective radius  
   double delta_allowed = p0_->getCrustThickness()
   	+ p1_->getCrustThickness();
-  double omega0 = sqrt( m_kn / avmass ); 
-  double theta = sqrt( pow( omega0, 2. ) - pow( etan, 2. ) );
-  double tc = PI / theta;
-  cout << "XXX = " << v0 << endl; 
-  
-  double delta_max = computeDeltaMax( theta, etan, m_en, tc, v0 );
+  double mass0 = p0_->getMass();
+  double mass1 = p1_->getMass();	
+  double avmass = 1. / ( 1. / mass0 + 1. / mass1 ); // Effective mass	
+  double t = 0, deltan = 0., v = v0, k1d, k1v, k2d, k2v, 
+  	delta_max = -1.e20, maxfel = 0.;
 
+  // We integrate the equations of motion with an explicit RK2 scheme
+  while ( deltan >= 0. )
+  {
+    k1d = v * dt;
+    k1v = computeDvDt( avmass, Req, deltan, v ) * dt;
+    k2d = ( v + k1v / 2. ) * dt;
+    k2v = computeDvDt( avmass, Req, deltan + k1d / 2., v + k1v / 2. ) * dt;
+    deltan += k2d;
+    v += k2v; 
+    t += dt;
+    delta_max = max( deltan, delta_max );    
+  }
+  maxfel = ( 4. / 3. ) * m_Es * sqrt( Req ) * pow( delta_max, 1.5 );
+   
   OUT << "  Component 0: material = " << p0_->getMaterial()
   	<< " crust thickness = " << p0_->getCrustThickness() 
 	<< " weight = " << mass0 * 9.81 << endl;
@@ -229,14 +240,13 @@ void HODCContactForceModel::computeAndWriteEstimates( Component* p0_,
   OUT << "  Maximum overlap allowed by crusts = " << delta_allowed 
     	<< endl;
   OUT << "  Collisional relative velocity = " << v0 << endl;
-  OUT << "  Tc = " << tc << "  delta_max = " << delta_max << endl;    
-  OUT << "  eta_n = " << etan << endl; 
-  OUT << "  Maximum elastic force fel = " << m_kn*delta_allowed << endl;
+  OUT << "  Tc = " << t << "  delta_max = " << delta_max << endl;    
+  OUT << "  Maximum elastic force fel = " << maxfel << endl;
   if ( !p0_->isObstacle() )
-    OUT << "  fel/weight0 ratio = " << m_kn * delta_allowed / ( mass0 * 9.81 ) 
+    OUT << "  fel/weight0 ratio = " << maxfel / ( mass0 * 9.81 ) 
   	<< endl;
   if ( !p1_->isObstacle() )
-    OUT << "  fel/weight1 ratio = " << m_kn * delta_allowed / ( mass1 * 9.81 )
+    OUT << "  fel/weight1 ratio = " << maxfel / ( mass1 * 9.81 )
   	<< endl;
   if ( delta_max > delta_allowed ) 
   {
@@ -245,33 +255,22 @@ void HODCContactForceModel::computeAndWriteEstimates( Component* p0_,
     OUT << "  delta_max > maximum overlap allowed by crusts" << endl;
     OUT << "  *********************************************" << endl;
   }
-  OUT << endl;        
+  OUT << endl;  
+  
 }
 
 
 
 
 // ----------------------------------------------------------------------------
-// Computes maximum penetration depth using a analytical solution
-// and a Newton algorithm
-double HODCContactForceModel::computeDeltaMax( double const& theta_, 
-	double const& eta_, double const& en_, double const& tc_, 
-	double const& v0_ ) const
+// Computes the sum of the normal forces divided by the effective mass
+double HertzContactForceModel::computeDvDt( double const& avmass, 
+	double const& Req, double const& deltan, double const& v ) const
 {
-  double f = 1., df, t0 = tc_ / (en_ > 0.2 ? 2. : 100.);
-  while ( fabs(f) > 1e-10 )
-  {
-    f = ( v0_ / theta_ ) * exp( - eta_ * t0 ) * ( - eta_ * sin ( theta_ * t0 )
-    	+ theta_ * cos ( theta_ * t0 ) );
-    df = ( v0_ / theta_ ) * exp( - eta_ * t0 ) * 
-    	( pow( eta_, 2. ) * sin ( theta_ * t0 )
-	- 2. * eta_ * theta_ * cos ( theta_ * t0 )
-	- pow( theta_, 2. ) * sin ( theta_ * t0 ) );
-    t0 -= f / df ;	
-  } 
-
-  double delta_max = ( v0_ / theta_ ) * exp( - eta_ * t0 ) 
-    	* sin( theta_ * t0 );
-	
-  return ( delta_max );
+  double sqrtReqdeltan = sqrt( Req * deltan );
+  double Sn = 2. * m_Es * sqrtReqdeltan;
+  double DvDt = ( - ( 4. / 3. ) * m_Es * sqrtReqdeltan * deltan 
+  	- m_m2sqrt56 * m_beta * sqrt( avmass * Sn ) * v ) / avmass;
+	 
+  return ( DvDt );
 }

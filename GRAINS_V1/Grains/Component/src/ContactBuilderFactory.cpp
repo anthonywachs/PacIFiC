@@ -2,6 +2,7 @@
 #include "ContactBuilderFactory.hh"
 #include "ContactForceModel.hh"
 #include "HODCContactForceModel.hh"
+#include "HertzContactForceModel.hh"
 #include "MemoryContactForceModel.hh"
 #include "Particle.hh"
 #include "WriterXML.hh"
@@ -144,6 +145,13 @@ pair<ContactBuilderFactory::ContactFeatures,ContactForceModel*>
       	contact);
       forceLaw.second = new MemoryContactForceModel(forceLaw.first.values);
     }
+    else if ( type == "Hertz" )
+    {
+      forceLaw.first.name   = Hertz;
+      forceLaw.first.values = HertzContactForceModel::defineParameters(
+      	contact);
+      forceLaw.second = new HertzContactForceModel(forceLaw.first.values);
+    }    
   }
 
   return ( forceLaw );

@@ -1,5 +1,5 @@
-#ifndef _HODCCONTACTFORCEMODEL_HH_
-#define _HODCCONTACTFORCEMODEL_HH_
+#ifndef _HERTZCONTACTFORCEMODEL_HH_
+#define _HERTZCONTACTFORCEMODEL_HH_
 
 #include "ContactForceModel.hh"
 #include "Basic.hh"
@@ -13,7 +13,7 @@ using namespace std;
 class Component;
 
 
-/** The class HODCContactForceModel.
+/** The class HertzContactForceModel.
 
     Contact force model involving a normal Hookean spring, a normal Dashpot and
     a tangential Coulomb friction (HO-D-C) supplemented by a relative velocity 
@@ -101,21 +101,19 @@ class Component;
     	\f$\left(s\cdot m^{-1}\right)\f$
 
 
-    @author A.WACHS - IFPEN - 2011 - Creation 
-    @author A.WACHS - 2019 - Major cleaning & refactoring 
-    @author A.WACHS - 2024 - Further cleaning & documentation */
+    @author A.WACHS - 2024 - Creation */
 // ============================================================================
-class HODCContactForceModel : public ContactForceModel
+class HertzContactForceModel : public ContactForceModel
 {
   public:
     /** @name Constructors */
     //@{
     /** @brief Constructor with a map of contact parameters as inputs
     @param parameters map of parameters */
-    HODCContactForceModel( map<string,double>& parameters );
+    HertzContactForceModel( map<string,double>& parameters );
 
     /** @brief Destructor */
-    virtual ~HODCContactForceModel();
+    virtual ~HertzContactForceModel();
     //@}
 
 
@@ -162,36 +160,33 @@ class HODCContactForceModel : public ContactForceModel
   protected:
     /** @name Parameters */
     //@{
-    double m_kn; /**< Normal stiffness coefficient */  
+    double m_Es; /**< Average Young modulus */  
     double m_en; /**< Normal restitution coefficient */ 
-    double m_etat; /**< Tangential damping coefficient, if the value is set to
-    	-1 in the input file, it is determined automatically such that 
-    	gamma_n = gamma_t, i.e., same damping in the normal and tangential
-	directions */
+    double m_Gs; /**< Average shear modulus */
     double m_muc; /**< Tangential Coulomb friction coefficient */
     double m_kr; /**< Rolling resistance coefficient */
     double m_beta; /**< The log(m_en)/sqrt(PI*PI+log(m_en)*log(m_en)) factor */
+    double m_m2sqrt56; /**< -2*sqrt(5/6) constant */ 
     //@}
 
 
     /**@name Constructors */
     //@{
     /** @brief Default constructor (forbidden) */
-    HODCContactForceModel();
+    HertzContactForceModel();
     //@}
 
   
     /**@name Methods */
     //@{  
-    /** @brief Computes maximum penetration depth using a analytical solution
-    and a Newton algorithm
-    @param theta_ sqrt( omega0*omega0 - mu*mu ) 
-    @param eta_ dissipation coefficient
-    @param en_ restitution coefficient
-    @param tc_ contact time   
-    @param v0_ pre-collisional relative velocity */
-    double computeDeltaMax( double const& theta_, double const& eta_,
-  	double const& en_, double const& tc_, double const& v0_ ) const;
+    /** @brief Computes the sum of the normal forces divided by the effective
+    mass
+    @param avmass effective mass 
+    @param Req effective radius
+    @param deltan overlap distance
+    @param v relative velocity */
+    double computeDvDt( double const& avmass, double const& Req,
+  	double const& deltan, double const& v ) const;
 	
     /** @brief Performs forces & torques computation
     @param p0_ first Component (Particle)

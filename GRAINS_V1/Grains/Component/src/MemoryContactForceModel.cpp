@@ -320,95 +320,45 @@ map<string,double> MemoryContactForceModel::defineParameters( DOMNode* & root )
 // depth in the case of a gravityless binary collision of spheres, and writes
 // the result in an output stream
 void MemoryContactForceModel::computeAndWriteEstimates( Component* p0_,
-	Component* p1_, double const& v0, ostream& OUT ) const
+	Component* p1_, double const& v0, double const& dt, ostream& OUT ) const
 {
   double mass0 = p0_->getMass();
-  double mass1 = p1_->getMass();
-  double avmass = mass0 * mass1 / (mass0 + mass1);
-  if (avmass == 0.) avmass = mass1==0. ? 0.5*mass0 : 0.5*mass1;
-  double etan = - sqrt(m_kn/avmass) * log(m_en) 
-  	/ sqrt( PI*PI+log(m_en)*log(m_en) );
-
-  // Particle/obstacle contact
-  if ( p0_->isObstacle() || p1_->isObstacle() )
-  {
-    Component* particle = NULL;
-    Component* obstacle = NULL;
-    if ( p0_->isObstacle() )
-    {
-      particle = p1_;
-      obstacle = p0_ ;
-    }
-    else
-    {
-      particle = p0_;
-      obstacle = p1_ ;
-    }
-    mass0 = particle->getMass();
-    double delta_allowed = p0_->getCrustThickness()
+  double mass1 = p1_->getMass();	
+  double avmass = 1. / ( 1. / mass0 + 1. / mass1 );
+  double etan = - sqrt( m_kn / avmass ) * m_beta;  	
+  double delta_allowed = p0_->getCrustThickness()
   	+ p1_->getCrustThickness();
-    double omega0 = sqrt(m_kn/mass0);
-    double theta = sqrt(pow(omega0,2.) - pow(0.5*etan,2.));
-    double tc = PI / theta;
+  double omega0 = sqrt( m_kn / avmass ); 
+  double theta = sqrt( pow( omega0, 2. ) - pow( etan, 2. ) );
+  double tc = PI / theta;
+  cout << "XXX = " << v0 << endl; 
+  
+  double delta_max = computeDeltaMax( theta, etan, m_en, tc, v0 );
 
-    double delta_max = computeDeltaMax( theta, 0.5*etan, m_en, tc, v0 );
-
-    OUT << "  Particle: material = " << particle->getMaterial()
-  	<< " crust thickness = " << particle->getCrustThickness()
-	<< " weight = " << mass0*9.81 << endl;
-    OUT << "  Obstacle: material = " << obstacle->getMaterial()
-  	<< " crust thickness = " << obstacle->getCrustThickness()
-	<< " weight = " << mass0*9.81 << endl;
-    OUT << "  Maximum overlap allowed by crusts = "
-    	<< delta_allowed << endl;
-    OUT << "  Collisional relative velocity = " << v0 << endl;
-    OUT << "  Tc = " << tc << "  delta_max = " << delta_max << endl;
-    OUT << "  eta_n = " << etan << endl;
-    OUT << "  Maximum elastic force fel = " << m_kn*delta_allowed << endl;
-    OUT << "  fel/weight0 ratio = " << m_kn*delta_allowed/(mass0*9.81)
-  	<< endl;
-    if ( delta_max > delta_allowed )
-    {
-      OUT << "  *********************************************" << endl;
-      OUT << "  !!!!! WARNING !!!!!" << endl;
-      OUT << "  delta_max > maximum overlap allowed by crusts" << endl;
-      OUT << "  *********************************************" << endl;
-    }
-  }
-  // Particle/particle contact
-  else
-  {
-    double delta_allowed = p0_->getCrustThickness()
-  	+ p1_->getCrustThickness();
-    double omega0 = sqrt(m_kn/avmass);
-    double theta = sqrt(pow(omega0,2.) - pow(etan,2.));
-    double tc = PI / theta;
-
-    double delta_max = computeDeltaMax( theta, etan, m_en, tc, v0 );
-
-    OUT << "  Particle 0: material = " << p0_->getMaterial()
-  	<< " crust thickness = " << p0_->getCrustThickness()
-	<< " weight = " << mass0*9.81 << endl;
-    OUT << "  Particle 1: materiau = " << p1_->getMaterial()
+  OUT << "  Component 0: material = " << p0_->getMaterial()
+  	<< " crust thickness = " << p0_->getCrustThickness() 
+	<< " weight = " << mass0 * 9.81 << endl;
+  OUT << "  Component 1: material = " << p1_->getMaterial()
   	<< " crust thickness = " << p1_->getCrustThickness()
-	<< " weight = " << mass1*9.81 << endl;
-    OUT << "  Maximum overlap allowed by crusts = " << delta_allowed
+	<< " weight = " << mass1 * 9.81 << endl;
+  OUT << "  Maximum overlap allowed by crusts = " << delta_allowed 
     	<< endl;
-    OUT << "  Collisional relative velocity = " << v0 << endl;
-    OUT << "  Tc = " << tc << "  delta_max = " << delta_max << endl;
-    OUT << "  eta_n = " << etan << endl;
-    OUT << "  Maximum elastic force fel = " << m_kn*delta_allowed << endl;
-    OUT << "  fel/weight0 ratio = " << m_kn*delta_allowed/(mass0*9.81)
+  OUT << "  Collisional relative velocity = " << v0 << endl;
+  OUT << "  Tc = " << tc << "  delta_max = " << delta_max << endl;    
+  OUT << "  eta_n = " << etan << endl; 
+  OUT << "  Maximum elastic force fel = " << m_kn*delta_allowed << endl;
+  if ( !p0_->isObstacle() )
+    OUT << "  fel/weight0 ratio = " << m_kn*delta_allowed/(mass0*9.81) 
   	<< endl;
+  if ( !p1_->isObstacle() )
     OUT << "  fel/weight1 ratio = " << m_kn*delta_allowed/(mass1*9.81)
   	<< endl;
-    if ( delta_max > delta_allowed )
-    {
-      OUT << "  *********************************************" << endl;
-      OUT << "  !!!!! WARNING !!!!!" << endl;
-      OUT << "  delta_max > maximum overlap allowed by crusts" << endl;
-      OUT << "  *********************************************" << endl;
-    }
+  if ( delta_max > delta_allowed ) 
+  {
+    OUT << "  *********************************************" << endl;
+    OUT << "  !!!!! WARNING !!!!!" << endl;
+    OUT << "  delta_max > maximum overlap allowed by crusts" << endl;
+    OUT << "  *********************************************" << endl;
   }
   OUT << endl;
 }

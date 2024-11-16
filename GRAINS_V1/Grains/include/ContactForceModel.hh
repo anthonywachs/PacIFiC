@@ -48,10 +48,12 @@ class ContactForceModel
     @param p0_ first component (Particle)
     @param p1_ second component (Particle or Obstacle)
     @param v0 pre-collisional relative velocity 
+    @param dt time step to integrate equations in case an analytical solution is
+    not known 
     @param OUT output stream */
     virtual void computeAndWriteEstimates( Component* p0_,  
 	Component* p1_,
-  	double const& v0, 
+  	double const& v0, double const& dt,
 	ostream& OUT ) const = 0 ;
 
     /** @brief Computes forces & torques 

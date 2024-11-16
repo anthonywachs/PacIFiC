@@ -183,16 +183,18 @@ class MemoryContactForceModel : public ContactForceModel
     /** @brief Returns the name of the contact force model */
     string name() const;
 
-    /** @brief Computes an estimate of the contact time and maximum penetration
+    /** @brief Computes an estimate of the contact time and maximum penetration 
     depth in the case of a gravityless binary collision of spheres, and writes
     the result in an output stream
     @param p0_ first component (Particle)
     @param p1_ second component (Particle or Obstacle)
-    @param v0 pre-collisional relative velocity
+    @param v0 pre-collisional relative velocity 
+    @param dt time step to integrate equations in case an analytical solution is
+    not known 
     @param OUT output stream */
-    void computeAndWriteEstimates( Component* p0_,
+    void computeAndWriteEstimates( Component* p0_,  
 	Component* p1_,
-  	double const& v0,
+  	double const& v0, double const& dt,
 	ostream& OUT ) const ;
 
     /** @brief Computes forces & torques

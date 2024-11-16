@@ -299,7 +299,7 @@ void GrainsParameters::Simulation( double time_interval )
       ContactBuilderFactory::contactForceModel( 
        	(*particleClasses)[i]->getMaterial(),
       	particle->getMaterial() )->computeAndWriteEstimates( 
-		(*particleClasses)[i], particle, m_colRelVel, cout );    
+		(*particleClasses)[i], particle, m_colRelVel, m_dt, cout );    
       delete particle;
     }    
 
@@ -312,7 +312,7 @@ void GrainsParameters::Simulation( double time_interval )
 		(*particleClasses)[i]->getMaterial(),
       		(*particleClasses)[j]->getMaterial() )
 		->computeAndWriteEstimates( (*particleClasses)[i],
-			 (*particleClasses)[j], m_colRelVel, cout ); 	
+			 (*particleClasses)[j], m_colRelVel, m_dt, cout ); 	
       }
 
     cout << "PARTICLE/OBSTACLE CONTACTS" << endl;    
@@ -328,7 +328,7 @@ void GrainsParameters::Simulation( double time_interval )
 	ContactBuilderFactory::contactForceModel(
 	  	(*particleClasses)[i]->getMaterial(), (*il)->getMaterial() )
 		->computeAndWriteEstimates( (*particleClasses)[i], *il,
-		m_colRelVel, cout ); 
+		m_colRelVel, m_dt, cout ); 
       } 
 	
     cout << "PARTICLE DISPLACEMENT" << endl;    

@@ -87,7 +87,9 @@ class ContactBuilderFactory
        HODC,
        /// Memory model: hookean spring and dashpot in all directions; Coulomb
        /// friction in tangential and rotational directions
-       Memory
+       Memory,
+       /// Hertz spring, dashpot and Coulomb friction
+       Hertz       
     };
     //@}
 
