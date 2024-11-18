@@ -1,5 +1,5 @@
-#ifndef _MEMORYCONTACTFORCEMODEL_HH_
-#define _MEMORYCONTACTFORCEMODEL_HH_
+#ifndef _HOOKEMEMORYCONTACTFORCEMODEL_HH_
+#define _HOOKEMEMORYCONTACTFORCEMODEL_HH_
 
 #include "ContactForceModel.hh"
 #include "Basic.hh"
@@ -13,7 +13,7 @@ using namespace std;
 class Component;
 
 
-/** The class MemoryContactForceModel.
+/** The class HookeMemoryContactForceModel.
 
     Contact force model involving a Hookean spring and a Dashpot in both the
     normal and tangential directions as well as in the rotational space; and
@@ -152,7 +152,8 @@ class Component;
     	m^{-1}\right)\f$
     - \f$e_n\f$: the restitution coefficient (-)
     - \f$\eta_t\f$: the tangential dissipative coefficient 
-    	\f$\left(s^{-1}\right)\f$
+    	\f$\left(s^{-1}\right)\f$, automatically computed if not specified and
+	assigned a value of \f$-1\f$
     - \f$\mu_c\f$: the Coulomb tangential friction coefficient (-)
     - \f$k_t\f$: the tangential stiffness coefficient \f$\left(N\cdot 
     	m^{-1}\right)\f$
@@ -164,17 +165,17 @@ class Component;
     @author D.HUET - 2022
     @author A.WACHS - 2024 - Cleaning & documentation */    
 // ============================================================================
-class MemoryContactForceModel : public ContactForceModel
+class HookeMemoryContactForceModel : public ContactForceModel
 {
   public:
     /** @name Constructors */
     //@{
     /** @brief Constructor with a map of contact parameters as inputs
     @param parameters map of parameters */
-    MemoryContactForceModel( map<string,double>& parameters );
+    HookeMemoryContactForceModel( map<string,double>& parameters );
 
     /** @brief Destructor */
-    virtual ~MemoryContactForceModel();
+    virtual ~HookeMemoryContactForceModel();
     //@}
 
 
@@ -207,14 +208,6 @@ class MemoryContactForceModel : public ContactForceModel
     bool computeForces( Component* p0_, Component* p1_,
 	PointContact const& contactInfos, LinkedCell* LC,
 	double dt, int nbContact = 1 ) ;
-
-    /** @brief Computes the vector tangent at the contact point
-    @param tij vector where the result is stored
-    @param n_t eta_t, tangential damping coefficient
-    @param ut tangential velocity
-    @param kdelta cumulative motion */
-    void computeTangentialVector( Vector3& tij, double n_t, Vector3 const& ut,
-  	Vector3 const& kdelta );
     //@}
 
 
@@ -250,7 +243,7 @@ class MemoryContactForceModel : public ContactForceModel
     /**@name Constructors */
     //@{
     /** @brief Default constructor (forbidden) */
-    MemoryContactForceModel();
+    HookeMemoryContactForceModel();
     //@}
 
 
@@ -281,7 +274,15 @@ class MemoryContactForceModel : public ContactForceModel
     void performForcesCalculus( Component* p0_,  Component* p1_, double dt,
 	PointContact const& contactInfos,
 	Vector3& delFN, Vector3& delFT, Vector3& delM, int elementary_id0,
-  int elementary_id1 );
+  	int elementary_id1 );
+	
+    /** @brief Computes the vector tangent at the contact point
+    @param tij vector where the result is stored
+    @param n_t eta_t, tangential damping coefficient
+    @param ut tangential velocity
+    @param kdelta cumulative motion */
+    void computeTangentialVector( Vector3& tij, double n_t, Vector3 const& ut,
+  	Vector3 const& kdelta );	
     //@}
 };
 

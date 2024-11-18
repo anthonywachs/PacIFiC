@@ -66,35 +66,36 @@ void HertzContactForceModel::performForcesCalculus( Component* p0_,
   // Relative velocity at contact point
   Vector3 tmpV = p0_->getVelocityAtPoint( geometricPointOfContact ) 
   	- p1_->getVelocityAtPoint( geometricPointOfContact );	
-
   Vector3 v_n = normal * ( tmpV * normal );
   Vector3 v_t = tmpV - v_n;
-
-  // Unit tangential vector in the reverse direction of the relative velocity 
-  // at contact point 
-  double normv_t = Norm( v_t );
-  Vector3 tangent( 0. );
-  if ( normv_t > EPSILON ) tangent = - v_t / normv_t;
   
-  // Normal linear elastic force
+  // Normal non-linear elastic force
   double kn = ( 4. / 3. ) * m_Es * sqrtReqdeltan;
   delFN = kn * penetration;
 
-  // Normal dissipative force  
+  // Normal non-linear dissipative force  
   double gamman = m_m2sqrt56 * m_beta * sqrt( avmass * Sn );  
   delFN -= gamman * v_n;  
   double normFN = Norm( delFN );
   
-  // Tangential dissipative force
+  // Tangential non-linear dissipative force
   double gammat = m_m2sqrt56 * m_beta * sqrt( avmass * St );;
   delFT = - gammat * v_t ;  
 
-  // Tangential Coulomg saturation
+  // Tangential Coulomb saturation
   double fn = m_muc * normFN;
   double ft = Norm( delFT );
-  if ( fn < ft ) delFT = tangent * fn ;
+  if ( fn < ft ) 
+  {
+    // Unit tangential vector in the reverse direction of the relative velocity 
+    // at contact point 
+    double normv_t = Norm( v_t );
+    Vector3 tangent( 0. );
+    if ( normv_t > EPSILON ) tangent = - v_t / normv_t;    
+    delFT = tangent * fn ;
+  }
   
-  // Rolling resistance moment
+  // Rolling resistance torque
   if ( m_kr )
   {    
     // Relative angular velocity at contact point
@@ -105,7 +106,7 @@ void HertzContactForceModel::performForcesCalculus( Component* p0_,
 	- ( *p1_->getAngularVelocity() ^ ( *p1_->getPosition()
     	- geometricPointOfContact ) ) );
     
-    // Rolling resistance moment
+    // Rolling resistance torque
     if ( normwrel > EPSILON )
       delM = - ( m_kr * Req * normFN * normwtrel / normwrel ) * wrel ;  
   }

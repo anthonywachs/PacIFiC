@@ -1,5 +1,5 @@
 #include "GrainsMPIWrapper.hh"
-#include "MemoryContactForceModel.hh"
+#include "HookeMemoryContactForceModel.hh"
 #include "GrainsExec.hh"
 #include "Component.hh"
 #include "Memento.hh"
@@ -8,7 +8,7 @@
 
 // ----------------------------------------------------------------------------
 // Constructor with a map of contact parameters as inputs
-MemoryContactForceModel::MemoryContactForceModel( map<string,double>& parameters )
+HookeMemoryContactForceModel::HookeMemoryContactForceModel( map<string,double>& parameters )
   : ContactForceModel()
 {
   m_kn = parameters["kn"];
@@ -33,7 +33,7 @@ MemoryContactForceModel::MemoryContactForceModel( map<string,double>& parameters
 
 // ----------------------------------------------------------------------------
 // Destructor
-MemoryContactForceModel::~MemoryContactForceModel()
+HookeMemoryContactForceModel::~HookeMemoryContactForceModel()
 {}
 
 
@@ -41,9 +41,9 @@ MemoryContactForceModel::~MemoryContactForceModel()
 
 // ----------------------------------------------------------------------------
 // Returns the name of the contact force model
-string MemoryContactForceModel::name() const
+string HookeMemoryContactForceModel::name() const
 {
-  return ( "MemoryContactForceModel" );
+  return ( "HookeMemoryContactForceModel" );
 }
 
 
@@ -51,7 +51,7 @@ string MemoryContactForceModel::name() const
 
 // ----------------------------------------------------------------------------
 // Computes the vector tangent at the contact point
-void MemoryContactForceModel::computeTangentialVector( Vector3& tij, 
+void HookeMemoryContactForceModel::computeTangentialVector( Vector3& tij, 
 	double n_t, Vector3 const& ut, Vector3 const& kdelta )
 {
   // Definition of the tangential vector (cf Costa et.al., 2015)
@@ -69,7 +69,7 @@ void MemoryContactForceModel::computeTangentialVector( Vector3& tij,
 
 // ----------------------------------------------------------------------------
 // Performs forces & torques computation
-void MemoryContactForceModel::performForcesCalculus( Component* p0_,
+void HookeMemoryContactForceModel::performForcesCalculus( Component* p0_,
 	Component* p1_, double dt, PointContact const& contactInfos,
 	Vector3& delFN, Vector3& delFT, Vector3& delM, int elementary_id0,
   	int elementary_id1 )
@@ -95,14 +95,9 @@ void MemoryContactForceModel::performForcesCalculus( Component* p0_,
   // Relative velocity at contact point
   Vector3 tmpV = p0_->getVelocityAtPoint( geometricPointOfContact )
   	- p1_->getVelocityAtPoint( geometricPointOfContact );
-
   Vector3 v_n  = normal * ( tmpV * normal );
   Vector3 v_t  = tmpV - v_n;
 
-  // Unit tangential vector along relative velocity at contact point
-  double normv_t = Norm( v_t );
-  Vector3 tangent(0.);
-  if ( normv_t > EPSILON ) tangent = v_t / normv_t;
 
   // 1) Compute normal force
   // Normal linear elastic force
@@ -158,6 +153,7 @@ void MemoryContactForceModel::performForcesCalculus( Component* p0_,
     delFT = m_muc * normFN * tij ;
   }
 
+
   // 3) Compute rolling resistance torque with memory (if applicable)
   if ( m_rolling_friction ) 
   {
@@ -201,7 +197,7 @@ void MemoryContactForceModel::performForcesCalculus( Component* p0_,
 
 // ----------------------------------------------------------------------------
 // Computes forces & torques
-bool MemoryContactForceModel::computeForces( Component* p0_,
+bool HookeMemoryContactForceModel::computeForces( Component* p0_,
 	Component* p1_,
 	PointContact const& contactInfos,
 	LinkedCell* LC,
@@ -257,7 +253,8 @@ bool MemoryContactForceModel::computeForces( Component* p0_,
 
 // ----------------------------------------------------------------------------
 // Reads and returns contact parameter map from an XML node
-map<string,double> MemoryContactForceModel::defineParameters( DOMNode* & root )
+map<string,double> HookeMemoryContactForceModel::defineParameters( 
+	DOMNode* & root )
 {
   map<string,double> parameters;
 
@@ -319,7 +316,7 @@ map<string,double> MemoryContactForceModel::defineParameters( DOMNode* & root )
 // Computes an estimate of the contact time and maximum penetration
 // depth in the case of a gravityless binary collision of spheres, and writes
 // the result in an output stream
-void MemoryContactForceModel::computeAndWriteEstimates( Component* p0_,
+void HookeMemoryContactForceModel::computeAndWriteEstimates( Component* p0_,
 	Component* p1_, double const& v0, double const& dt, ostream& OUT ) const
 {
   double mass0 = p0_->getMass();
@@ -369,7 +366,7 @@ void MemoryContactForceModel::computeAndWriteEstimates( Component* p0_,
 // ----------------------------------------------------------------------------
 // Computes maximum penetration depth using a analytical solution
 // and a Newton algorithm
-double MemoryContactForceModel::computeDeltaMax( double const& theta_,
+double HookeMemoryContactForceModel::computeDeltaMax( double const& theta_,
 	double const& eta_, double const& en_, double const& tc_,
 	double const& v0_ ) const
 {

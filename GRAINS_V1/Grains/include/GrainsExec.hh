@@ -225,7 +225,9 @@ class GrainsExec
     this face, to the inertia and volume of a polyhedron
     @param A2 center of mass of the face (or a point of the face)
     @param A3 a point of the face 
-    @param A4 the next point neighbor of A3 of the face */
+    @param A4 the next point neighbor of A3 of the face 
+    @param vol volume of the polyhedron 
+    @param inertia inertia tensor of the polyhedron */
     static void computeVolumeInertiaContrib( Point3 const& A2, 
     	Point3 const& A3, Point3 const& A4, double &vol, double* inertia );
     //@}

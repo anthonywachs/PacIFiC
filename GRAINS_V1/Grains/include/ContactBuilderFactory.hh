@@ -84,12 +84,15 @@ class ContactBuilderFactory
     //@{
     enum ContactType {
        /// Hookean spring, dashpot and Coulomb friction
-       HODC,
+       Hooke,
        /// Memory model: hookean spring and dashpot in all directions; Coulomb
        /// friction in tangential and rotational directions
-       Memory,
+       HookeMemory,
        /// Hertz spring, dashpot and Coulomb friction
-       Hertz       
+       Hertz,
+       /// Memory model: Hertz non-linear spring and dashpot in all directions; 
+       /// Coulomb friction in tangential and rotational directions
+       HertzMemory              
     };
     //@}
 

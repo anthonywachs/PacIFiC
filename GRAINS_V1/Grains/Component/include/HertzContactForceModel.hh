@@ -15,10 +15,10 @@ class Component;
 
 /** The class HertzContactForceModel.
 
-    Contact force model involving a normal Hookean spring, a normal Dashpot and
-    a tangential Coulomb friction (HO-D-C) supplemented by a relative velocity 
-    dependent rolling resistance torque to compute the force and torque 
-    induced by the contact between two rigid components.
+    Contact force model involving a normal non-linear spring, a normal
+    non-linear Dashpot and a tangential Coulomb friction supplemented by a 
+    relative velocity dependent rolling resistance torque to compute the force 
+    and torque induced by the contact between two rigid components.
     
     The force is formulated as follows:
     
@@ -38,13 +38,32 @@ class Component;
     \f$\displaystyle -\frac{\bm{U}_t}{|\bm{U}_t|}\f$.
     
     The meaning and expression of the contact force parameters are:
-    - \f$k_n\f$ is the normal stiffness coefficient.
+    - \f$k_n\f$ is the normal stiffness coefficient defined as
+    
+    \f[
+    \mbox{\LARGE $\displaystyle k_n = \frac{4}{3}E^*\sqrt{R^* \delta_n}$}
+    \f]
+    
+    where \f$\displaystyle E^* = \frac{1}{\frac{1-\nu_0^2}{E_0}
+    +\frac{1-\nu_1^2}{E_1}}\f$ 
+    and \f$R^*=\frac{1}{\frac{1}{R_0}+\frac{1}{R_1}}\f$ are the effective Young
+    modulus and effective radius of curvature, respectively. \f$R_0\f$ is the 
+    radius of curvature of the first rigid component and \f$R_1\f$ is 
+    the radius of curvature of the second rigid component. \f$E_0\f$ is the 
+    Young modulus of the first rigid component and \f$E_1\f$ is 
+    the Young modulus of the second rigid component. Finally, \f$\nu_0\f$ is 
+    the Poisson ratio of the first rigid component and \f$\nu_1\f$ is 
+    the Poisson ratio of the second rigid component.      
+    
     - \f$\gamma_n\f$ is the normal dissipative coefficient defined as
     
     \f[
-    \mbox{\LARGE $\displaystyle \gamma_n = - 2\beta\sqrt{k_n m^*} 
+    \mkern-18mu\mbox{\LARGE $\displaystyle \gamma_n = - 2\sqrt{\frac{5}{6}}
+    	\beta\sqrt{S_n m^*} 
     	\:\:\mathrm{with}\:\: 
-    	\beta=\frac{\ln(e_n)}{\sqrt{\pi^2+(\ln(e_n))^2}}$}
+    	\beta=\frac{\ln(e_n)}{\sqrt{\pi^2+(\ln(e_n))^2}}
+	\:\:\mathrm{,}\:\:
+	S_n = 2E^*\sqrt{R^* \delta_n}$}
     \f]
     
     where \f$e_n\f$ is the restitution coefficient, 
@@ -53,23 +72,18 @@ class Component;
     the mass of the second rigid component. If one of the two components is an
     obstacle, then \f$m_{0\:\mathrm{or}\:1} \rightarrow \infty\f$ such that
     \f$m^*=m_{0\:\mathrm{or}\:1}\f$, and in
-    practice we take \f$m_{0\:\mathrm{or}\:1} = 10^{20}\f$.
+    practice we take \f$m_{0\:\mathrm{or}\:1} = 10^{20}\f$. 
     
     - \f$\gamma_t\f$ is the tangential dissipative coefficient defined as
     
     \f[
-    \mbox{\LARGE $\gamma_t = 2 m^* \eta_t$}
+    \mbox{\LARGE $\gamma_t = - 2\sqrt{\frac{5}{6}}
+    	\beta\sqrt{S_t m^*}\:\:\mathrm{with}\:\:
+	S_t = 8G^*\sqrt{R^* \delta_n}$}
     \f]
     
-    where \f$\eta_t\f$ is the input tangential dissipative coefficient. If the
-    value specified in the input file is \f$-1\f$, \f$\eta_t\f$ is automatically
-    computed such that \f$\gamma_n = \gamma_t\f$, i.e., same damping in the 
-    normal and tangential directions. This gives the following expression of 
-    \f$\eta_t\f$:
-    
-    \f[
-    \mbox{\LARGE $\eta_t = - 2\beta\sqrt{\frac{k_n}{m^*}}$}
-    \f]      
+    where \f$\displaystyle G^* = \frac{1}{\frac{2(2-\nu_0)(1+\nu_0)}{E_0}
+    +\frac{2(2-\nu_1)(1+\nu_1)}{E_1}}\f$ is the effective shear modulus.     
 
     - \f$\mu_c\f$ is the Coulomb tangential friction coefficient.
 
@@ -89,13 +103,26 @@ class Component;
     \f$\displaystyle | \bm{\omega}_0 \times \bm{r}_0 
     - \bm{\omega}_1 \times \bm{r}_1|\f$ is the norm of the relative tangential
     velocity contributed by the angular velocities at the contact point. 
+
+    Note that for most materials, the value of the Poisson ratio belongs to the 
+    interval \f$[0.1,0,4]\f$. In this interval, we have \f$1-\nu^2 \approx 2\f$ 
+    and \f$2(2-\nu)(1+\nu)\approx 4\f$, such that if the two components in 
+    contact are made of the same material, the following simplifying 
+    approximations hold:
+    
+    \f[
+    \mbox{\LARGE $E^*\approx\frac{E}{2}
+    	\:\:\mathrm{,}\:\:G^*\approx\frac{E}{8}
+	\:\:\Rightarrow\:\:G^*\approx 4E^*$}
+    \f]     
     
     The input parameters of the model are:
-    - \f$k_n\f$: the normal stiffness coefficient \f$\left(N\cdot 
-    	m^{-1}\right)\f$
+    - \f$E^*\f$: the effective Young modulus \f$\left(N\cdot 
+    	m^{-2}=Pa\right)\f$
     - \f$e_n\f$: the restitution coefficient (-)
-    - \f$\eta_t\f$: the tangential dissipative coefficient 
-    	\f$\left(s^{-1}\right)\f$
+    - \f$G^*\f$: the effective shear modulus \f$\left(N\cdot 
+    	m^{-2}=Pa\right)\f$, automatically computed as \f$4E^*\f$ if not 
+	specified 
     - \f$\mu_c\f$: the Coulomb tangential friction coefficient (-)
     - \f$k_r\f$: the rolling resistance coefficient 
     	\f$\left(s\cdot m^{-1}\right)\f$

@@ -1,5 +1,5 @@
 #include "GrainsMPIWrapper.hh"
-#include "HODCContactForceModel.hh"
+#include "HookeContactForceModel.hh"
 #include "GrainsExec.hh"
 #include "Component.hh"
 #include "Memento.hh"
@@ -8,7 +8,7 @@
 
 // ----------------------------------------------------------------------------
 // Constructor with a map of contact parameters as inputs
-HODCContactForceModel::HODCContactForceModel( map<string,double>& parameters ) 
+HookeContactForceModel::HookeContactForceModel( map<string,double>& parameters )
   : ContactForceModel()
 {
   m_kn = parameters["kn"];
@@ -24,16 +24,16 @@ HODCContactForceModel::HODCContactForceModel( map<string,double>& parameters )
 
 // ----------------------------------------------------------------------------
 // Destructor
-HODCContactForceModel::~HODCContactForceModel()
+HookeContactForceModel::~HookeContactForceModel()
 {}
 
 
 
 
 // ----------------------------------------------------------------------------
-string HODCContactForceModel::name() const 
+string HookeContactForceModel::name() const 
 { 
-  return ( "HODCContactForceModel" ); 
+  return ( "HookeContactForceModel" ); 
 }
 
 
@@ -41,7 +41,7 @@ string HODCContactForceModel::name() const
 
 // ----------------------------------------------------------------------------
 // Performs forces & torques computation
-void HODCContactForceModel::performForcesCalculus( Component* p0_, 
+void HookeContactForceModel::performForcesCalculus( Component* p0_, 
 	Component* p1_, PointContact const& contactInfos,
 	Vector3& delFN, Vector3& delFT, Vector3& delM )
 {
@@ -56,15 +56,8 @@ void HODCContactForceModel::performForcesCalculus( Component* p0_,
   // Relative velocity at contact point
   Vector3 tmpV = p0_->getVelocityAtPoint( geometricPointOfContact ) 
   	- p1_->getVelocityAtPoint( geometricPointOfContact );	
-
   Vector3 v_n = normal * ( tmpV * normal );
   Vector3 v_t = tmpV - v_n;
-
-  // Unit tangential vector in the reverse direction of the relative velocity 
-  // at contact point 
-  double normv_t = Norm( v_t );
-  Vector3 tangent( 0. );
-  if ( normv_t > EPSILON ) tangent = - v_t / normv_t;
   
   // Normal linear elastic force
   delFN = m_kn * penetration;
@@ -88,7 +81,15 @@ void HODCContactForceModel::performForcesCalculus( Component* p0_,
   // Tangential Coulomg saturation
   double fn = m_muc * normFN;
   double ft = Norm( delFT );
-  if ( fn < ft ) delFT = tangent * fn ;
+  if ( fn < ft ) 
+  {
+    // Unit tangential vector in the reverse direction of the relative velocity 
+    // at contact point 
+    double normv_t = Norm( v_t );
+    Vector3 tangent( 0. );
+    if ( normv_t > EPSILON ) tangent = - v_t / normv_t;    
+    delFT = tangent * fn ;
+  }
   
   // Rolling resistance moment
   if ( m_kr )
@@ -117,7 +118,7 @@ void HODCContactForceModel::performForcesCalculus( Component* p0_,
 
 // ----------------------------------------------------------------------------
 // Computes forces & torques
-bool HODCContactForceModel::computeForces( Component* p0_, 
+bool HookeContactForceModel::computeForces( Component* p0_, 
 	Component* p1_,
 	PointContact const& contactInfos,
 	LinkedCell* LC,
@@ -166,7 +167,7 @@ bool HODCContactForceModel::computeForces( Component* p0_,
 
 // ----------------------------------------------------------------------------
 // Reads and returns contact parameter map from an XML node
-map<string,double> HODCContactForceModel::defineParameters( DOMNode* & root )
+map<string,double> HookeContactForceModel::defineParameters( DOMNode* & root )
 {
   map<string,double> parameters;
 
@@ -204,7 +205,7 @@ map<string,double> HODCContactForceModel::defineParameters( DOMNode* & root )
 // Computes an estimate of the contact time and maximum penetration 
 // depth in the case of a gravityless binary collision of spheres, and writes
 // the result in an output stream
-void HODCContactForceModel::computeAndWriteEstimates( Component* p0_, 
+void HookeContactForceModel::computeAndWriteEstimates( Component* p0_, 
 	Component* p1_, double const& v0, double const& dt, ostream& OUT ) const
 {
   double mass0 = p0_->getMass();
@@ -254,7 +255,7 @@ void HODCContactForceModel::computeAndWriteEstimates( Component* p0_,
 // ----------------------------------------------------------------------------
 // Computes maximum penetration depth using a analytical solution
 // and a Newton algorithm
-double HODCContactForceModel::computeDeltaMax( double const& theta_, 
+double HookeContactForceModel::computeDeltaMax( double const& theta_, 
 	double const& eta_, double const& en_, double const& tc_, 
 	double const& v0_ ) const
 {

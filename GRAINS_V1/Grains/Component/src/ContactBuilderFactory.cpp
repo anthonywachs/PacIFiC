@@ -1,9 +1,10 @@
 #include "GrainsExec.hh"
 #include "ContactBuilderFactory.hh"
 #include "ContactForceModel.hh"
-#include "HODCContactForceModel.hh"
+#include "HookeContactForceModel.hh"
 #include "HertzContactForceModel.hh"
-#include "MemoryContactForceModel.hh"
+#include "HookeMemoryContactForceModel.hh"
+#include "HertzMemoryContactForceModel.hh"
 #include "Particle.hh"
 #include "WriterXML.hh"
 #include <assert.h>
@@ -95,9 +96,9 @@ void ContactBuilderFactory::define( DOMNode* root )
     else
     {
       // Contact Pair
-      DOMNode* material = ReaderXML::getNode(contact,"Material");
-      string matA = ReaderXML::getNodeAttr_String(material, "materialA");
-      string matB = ReaderXML::getNodeAttr_String(material, "materialB");
+      DOMNode* material = ReaderXML::getNode( contact, "Material" );
+      string matA = ReaderXML::getNodeAttr_String( material, "materialA" );
+      string matB = ReaderXML::getNodeAttr_String( material, "materialB" );
       contactValue = m_materials[matA] | m_materials[matB];
     }
     
@@ -132,26 +133,36 @@ pair<ContactBuilderFactory::ContactFeatures,ContactForceModel*>
   {
     DOMNode* contact = allTags->item(i);
     string   type    = ReaderXML::getNodeName(contact);
-    if ( type == "HODC" )
+    if ( type == "Hooke" )
     {
-      forceLaw.first.name   = HODC;
-      forceLaw.first.values = HODCContactForceModel::defineParameters(contact);
-      forceLaw.second = new HODCContactForceModel(forceLaw.first.values);
+      forceLaw.first.name   = Hooke;
+      forceLaw.first.values = HookeContactForceModel::defineParameters(
+      	contact );
+      forceLaw.second = new HookeContactForceModel( forceLaw.first.values );
     }
-    else if ( type == "Memory" )
+    else if ( type == "HookeMemory" )
     {
-      forceLaw.first.name   = Memory;
-      forceLaw.first.values = MemoryContactForceModel::defineParameters(
+      forceLaw.first.name   = HookeMemory;
+      forceLaw.first.values = HookeMemoryContactForceModel::defineParameters(
       	contact);
-      forceLaw.second = new MemoryContactForceModel(forceLaw.first.values);
+      forceLaw.second = new HookeMemoryContactForceModel( 
+      	forceLaw.first.values );
     }
     else if ( type == "Hertz" )
     {
       forceLaw.first.name   = Hertz;
       forceLaw.first.values = HertzContactForceModel::defineParameters(
       	contact);
-      forceLaw.second = new HertzContactForceModel(forceLaw.first.values);
-    }    
+      forceLaw.second = new HertzContactForceModel( forceLaw.first.values );
+    } 
+    else if ( type == "HertzMemory" )
+    {
+      forceLaw.first.name   = HertzMemory;
+      forceLaw.first.values = HertzMemoryContactForceModel::defineParameters(
+      	contact);
+      forceLaw.second = new HertzMemoryContactForceModel( 
+      	forceLaw.first.values );
+    }       
   }
 
   return ( forceLaw );
@@ -202,13 +213,13 @@ void ContactBuilderFactory::reload( istream& file )
 
   if ( root )
   {
-    DOMNode* materiaux = ReaderXML::getNode( root, "Materials" );
-    DOMNodeList* allMateriaux = ReaderXML::getNodes( materiaux );
-    for (XMLSize_t i=0; i<allMateriaux->getLength(); i++)
+    DOMNode* nmats = ReaderXML::getNode( root, "Materials" );
+    DOMNodeList* allmats = ReaderXML::getNodes( nmats );
+    for (XMLSize_t i=0; i<allmats->getLength(); i++)
     {
-      DOMNode* materiau = allMateriaux->item(i);
-      int value = ReaderXML::getNodeAttr_Int( materiau, "value" );
-      string mat = ReaderXML::getNodeValue_String( materiau );
+      DOMNode* nmat = allmats->item(i);
+      int value = ReaderXML::getNodeAttr_Int( nmat, "value" );
+      string mat = ReaderXML::getNodeValue_String( nmat );
       m_materials[mat] = value;
       ContactBuilderFactory::m_value = value;
       ContactBuilderFactory::m_value <<= 1;
@@ -235,12 +246,18 @@ void ContactBuilderFactory::reload( istream& file )
         parameters.values[name] = value_;
       }
       m_contactParametres[value] = parameters;
-      if ( parameters.name == HODC )
-        m_contactForceModels[value] = new HODCContactForceModel(
+      if ( parameters.name == Hooke )
+        m_contactForceModels[value] = new HookeContactForceModel(
 				parameters.values );
-      else if( parameters.name == Memory )
-        m_contactForceModels[value] = new MemoryContactForceModel( 
+      else if ( parameters.name == HookeMemory )
+        m_contactForceModels[value] = new HookeMemoryContactForceModel( 
 		parameters.values );
+      else if ( parameters.name == Hertz )
+        m_contactForceModels[value] = new HertzContactForceModel( 
+		parameters.values );
+      else if ( parameters.name == HertzMemory )
+        m_contactForceModels[value] = new HertzMemoryContactForceModel( 
+		parameters.values );				
     }
   }
 }
@@ -269,12 +286,12 @@ void ContactBuilderFactory::save( ostream& file, const string& contactFile,
     {
       DOMElement* root = WriterXML::initialize( "GRAINS" );
 
-      DOMElement* materiaux = WriterXML::createNode( root, "Materials" );
+      DOMElement* nmats = WriterXML::createNode( root, "Materials" );
       map<string,int>::const_iterator material;
       for (material=m_materials.begin(); material!=m_materials.end(); 
       	material++)
       {
-        DOMElement* materialNode = WriterXML::createNode( materiaux, 
+        DOMElement* materialNode = WriterXML::createNode( nmats, 
 		"Material" );
         WriterXML::createNodeValue( materialNode, (*material).first );
         WriterXML::createNodeAttr( materialNode, "value", (*material).second );

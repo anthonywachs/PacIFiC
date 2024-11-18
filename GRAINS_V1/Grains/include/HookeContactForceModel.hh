@@ -1,5 +1,5 @@
-#ifndef _HODCCONTACTFORCEMODEL_HH_
-#define _HODCCONTACTFORCEMODEL_HH_
+#ifndef _HOOKECONTACTFORCEMODEL_HH_
+#define _HOOKECONTACTFORCEMODEL_HH_
 
 #include "ContactForceModel.hh"
 #include "Basic.hh"
@@ -13,7 +13,7 @@ using namespace std;
 class Component;
 
 
-/** The class HODCContactForceModel.
+/** The class HookeContactForceModel.
 
     Contact force model involving a normal Hookean spring, a normal Dashpot and
     a tangential Coulomb friction (HO-D-C) supplemented by a relative velocity 
@@ -62,7 +62,8 @@ class Component;
     \f]
     
     where \f$\eta_t\f$ is the input tangential dissipative coefficient. If the
-    value specified in the input file is \f$-1\f$, \f$\eta_t\f$ is automatically
+    value specified in the input file is \f$-1\f$ or if the value is simply not
+    specified in the input file, \f$\eta_t\f$ is automatically
     computed such that \f$\gamma_n = \gamma_t\f$, i.e., same damping in the 
     normal and tangential directions. This gives the following expression of 
     \f$\eta_t\f$:
@@ -85,17 +86,22 @@ class Component;
       
     where \f$k_r\f$ is the rolling resistance coefficient, \f$\displaystyle
     \frac{\bm{\omega}_0 - \bm{\omega}_1}{|\bm{\omega}_0 - \bm{\omega}_1|}\f$ is 
-    the unit vector along the direction of relative angular velocity and 
+    the unit vector along the direction of relative angular velocity, 
     \f$\displaystyle | \bm{\omega}_0 \times \bm{r}_0 
     - \bm{\omega}_1 \times \bm{r}_1|\f$ is the norm of the relative tangential
-    velocity contributed by the angular velocities at the contact point. 
+    velocity contributed by the angular velocities at the contact point and 
+    \f$R^*=\frac{1}{\frac{1}{R_0}+\frac{1}{R_1}}\f$ is the effective radius of 
+    curvature. \f$R_0\f$ is the radius of curvature of the first rigid 
+    component and \f$R_1\f$ is the radius of curvature of the second rigid 
+    component. 
     
     The input parameters of the model are:
     - \f$k_n\f$: the normal stiffness coefficient \f$\left(N\cdot 
     	m^{-1}\right)\f$
     - \f$e_n\f$: the restitution coefficient (-)
     - \f$\eta_t\f$: the tangential dissipative coefficient 
-    	\f$\left(s^{-1}\right)\f$
+    	\f$\left(s^{-1}\right)\f$, automatically computed if not specified and
+	assigned a value of \f$-1\f$ 
     - \f$\mu_c\f$: the Coulomb tangential friction coefficient (-)
     - \f$k_r\f$: the rolling resistance coefficient 
     	\f$\left(s\cdot m^{-1}\right)\f$
@@ -105,17 +111,17 @@ class Component;
     @author A.WACHS - 2019 - Major cleaning & refactoring 
     @author A.WACHS - 2024 - Further cleaning & documentation */
 // ============================================================================
-class HODCContactForceModel : public ContactForceModel
+class HookeContactForceModel : public ContactForceModel
 {
   public:
     /** @name Constructors */
     //@{
     /** @brief Constructor with a map of contact parameters as inputs
     @param parameters map of parameters */
-    HODCContactForceModel( map<string,double>& parameters );
+    HookeContactForceModel( map<string,double>& parameters );
 
     /** @brief Destructor */
-    virtual ~HODCContactForceModel();
+    virtual ~HookeContactForceModel();
     //@}
 
 
@@ -177,7 +183,7 @@ class HODCContactForceModel : public ContactForceModel
     /**@name Constructors */
     //@{
     /** @brief Default constructor (forbidden) */
-    HODCContactForceModel();
+    HookeContactForceModel();
     //@}
 
   
