@@ -106,8 +106,11 @@ class RigidBodyWithCrust : public RigidBody
     /** @brief Returns whether there is geometric contact with another rigid
     body in the sense of ClosestPoint, i.e., if minimal distance
     between the shrunk rigid bodies < sum of the crust thicknesses
-    @param neighbor the other rigid body */
-    bool isContact( RigidBodyWithCrust& neighbor );
+    @param neighbor the other rigid body 
+    @param checkCGInRec in case one of the rigid body is a Rectangle, check 
+    whether the projection of the center of mass of the non Rectangle rigid 
+    body belongs to the rectangle */
+    bool isContact( RigidBodyWithCrust& neighbor, bool checkCGInRec = false );
 
     /** @brief Returns whether the rigid body is close to another rigid body in
     the sense of whether their respective bounding boxes plus their crust
@@ -232,8 +235,11 @@ a rectangle
 @param rbA 1st rigid body
 @param rbB 2nd rigid body 
 @param checkoverlap check whether the overlap is lower than the maximum allowed
-overlap */
+overlap 
+@param checkCGInRec check whether the projection of the center of mass of the
+non Rectangle rigid body belongs to the rectangle */
 PointContact ClosestPointRECTANGLE( RigidBodyWithCrust const& rbA ,
-  RigidBodyWithCrust const& rbB, bool const& checkoverlap );
+  RigidBodyWithCrust const& rbB, bool const& checkoverlap,
+  bool checkCGInRec = false );
 
 #endif

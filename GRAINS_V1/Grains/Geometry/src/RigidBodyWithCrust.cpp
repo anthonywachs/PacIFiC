@@ -705,7 +705,8 @@ bool RigidBodyWithCrust::isClose( RigidBodyWithCrust const& neighbor ) const
 // Returns whether there is geometric contact with another rigid
 // body in the sense of ClosestPoint, i.e., if minimal distance
 // between the shrunk rigid bodies < sum of the crust thicknesses
-bool RigidBodyWithCrust::isContact( RigidBodyWithCrust& neighbor )
+bool RigidBodyWithCrust::isContact( RigidBodyWithCrust& neighbor,
+	bool checkCGInRec )
 {
   bool contact = false;
   PointContact pc;
@@ -764,7 +765,7 @@ bool RigidBodyWithCrust::isContact( RigidBodyWithCrust& neighbor )
 	  break;
 	    
 	case RECTANGLE2D:
-	  pc = ClosestPointRECTANGLE( *this, neighbor, false );
+	  pc = ClosestPointRECTANGLE( *this, neighbor, false, true );
           if ( pc.getOverlapDistance() < 0. ) contact = true;
 	  break;
 	    
@@ -978,7 +979,8 @@ bool isContactBVolume( RigidBodyWithCrust const& rbA,
 // ----------------------------------------------------------------------------
 // Returns the features of the contact when the 1 rigid body is a rectangle
 PointContact ClosestPointRECTANGLE( RigidBodyWithCrust const& rbA,
-  RigidBodyWithCrust const& rbB, bool const& checkoverlap )
+  RigidBodyWithCrust const& rbB, bool const& checkoverlap,
+  bool checkCGInRec )
 {
   // Note: the rectangle has conceptually no width and therefore no crust 
   // thickness, so instead of using the sum of the crust thicknesses of the 
@@ -996,6 +998,7 @@ PointContact ClosestPointRECTANGLE( RigidBodyWithCrust const& rbA,
     Transform const* a2w = rbA.getTransform();
     Transform const* b2w = rbB.getTransform();
     double overlap = 0.;
+    bool proj = false;
 
     if ( convexA->getConvexType() == RECTANGLE2D )
     {
@@ -1011,10 +1014,19 @@ PointContact ClosestPointRECTANGLE( RigidBodyWithCrust const& rbA,
       if ( ( rNorm * ( pointA - *rPt ) ) < 0. )
       {
         Point3 pointB = ( ( *rPt - pointA ) * rNorm ) * rNorm + pointA;
+
         // The projection point lies in the rectangle?
         Transform invTransform;
         invTransform.setToInverseTransform( *a2w );      
-        if ( convexA->isIn( ( invTransform )( pointB ) ) )
+        if ( convexA->isIn( ( invTransform )( pointB ) ) ) proj = true;
+        // The projection of the center of mass lies in the rectangle?	
+	else if ( checkCGInRec )
+	{
+	  Point3 pointC = ( ( *rPt - cPt ) * rNorm ) * rNorm + cPt;     
+          if ( convexA->isIn( ( invTransform )( pointC ) ) ) proj = true;
+	}
+	
+	if ( proj )
         {
           Point3 contact = pointA / 2.0 + pointB / 2.0;
           Vector3 overlap_vector = pointA - pointB;
@@ -1053,10 +1065,18 @@ PointContact ClosestPointRECTANGLE( RigidBodyWithCrust const& rbA,
       if ( ( rNorm * ( pointA - *rPt ) ) < 0. )
       {
         Point3 pointB = ( ( *rPt - pointA ) * rNorm ) * rNorm + pointA;
+
         // The projection point lies in the rectangle?
         Transform invTransform;
         invTransform.setToInverseTransform( *b2w );
-        if ( convexB->isIn( ( invTransform )( pointB ) ) )
+        if ( convexB->isIn( ( invTransform )( pointB ) ) ) proj = true;
+	else if ( checkCGInRec )
+	{
+	  Point3 pointC = ( ( *rPt - cPt ) * rNorm ) * rNorm + cPt;     
+          if ( convexB->isIn( ( invTransform )( pointC ) ) ) proj = true;
+	}
+		
+	if ( proj )
         {
           Point3 contact = pointA / 2.0 + pointB / 2.0;
           Vector3 overlap_vector = pointB - pointA;
@@ -1084,5 +1104,5 @@ PointContact ClosestPointRECTANGLE( RigidBodyWithCrust const& rbA,
 
     return ( PointNoContact );
   }
-  catch ( ContactError const& ) { throw ContactError(); }
+  catch ( ContactError const& ) { throw; }
 }
