@@ -162,7 +162,8 @@ void Obstacle::resetKinematics()
   m_kinematics.reset();
   m_confinement.reset();
   m_translationalVelocity = 0.;
-  m_angularVelocity = 0.;  
+  m_angularVelocity = 0.;
+  m_ismoving = false;  
 }
 
 

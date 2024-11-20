@@ -1,5 +1,5 @@
-#ifndef _HertzMemoryContactForceModel_HH_
-#define _HertzMemoryContactForceModel_HH_
+#ifndef _HERTZMEMORYCONTACTFORCEMODEL_HH_
+#define _HERTZMEMORYCONTACTFORCEMODEL_HH_
 
 #include "ContactForceModel.hh"
 #include "Basic.hh"

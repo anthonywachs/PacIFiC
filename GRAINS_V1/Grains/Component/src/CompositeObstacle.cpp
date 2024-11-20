@@ -450,7 +450,10 @@ void CompositeObstacle::resetKinematics()
 {
   m_kinematics.reset();
   m_confinement.reset();
-
+  m_translationalVelocity = 0.;
+  m_angularVelocity = 0.;
+  m_ismoving = false; 
+  
   list<Obstacle*>::iterator obstacle;
   for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++)
     (*obstacle)->resetKinematics();

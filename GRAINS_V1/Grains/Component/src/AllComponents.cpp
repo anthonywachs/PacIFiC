@@ -225,7 +225,8 @@ list<SimpleObstacle*> AllComponents::Move( double time,
 	  anyactive = true;        
     	           
       // Move obstacles
-      if ( anyactive || anyactive_previousdt ) m_obstacle->resetKinematics();
+      if ( anyactive || anyactive_previousdt ) m_obstacle->resetKinematics();   
+      anyactive_previousdt = anyactive;
       if ( anyactive ) displacedObstacles = 
     	m_obstacle->Move( time, dt_obstacle, false, false );
 
