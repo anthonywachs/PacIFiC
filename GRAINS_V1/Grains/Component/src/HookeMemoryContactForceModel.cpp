@@ -149,7 +149,7 @@ void HookeMemoryContactForceModel::performForcesCalculus( Component* p0_,
   {
     // Otherwise, we modify the cumulative tangential motion and replace
     // the tangential force by the Coulomb limit
-    *pkdelta = ( - m_muc * normFN * tij + viscousFT ) / m_kt;
+    if ( m_kt ) *pkdelta = ( - m_muc * normFN * tij + viscousFT ) / m_kt;
     delFT = m_muc * normFN * tij ;
   }
 

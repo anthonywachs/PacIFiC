@@ -62,7 +62,7 @@ void GrainsPostProcessing::do_before_time_stepping( DOMElement* rootElement )
   m_allcomponents.computeNumberParticles( m_wrapper );
   m_npwait_nm1 = m_allcomponents.getNumberPhysicalParticlesToInsert();
 
-  // Initialisation obstacle kinematics
+  // Initialisation of obstacle kinematics
   m_allcomponents.setKinematicsObstacleWithoutMoving( m_time, m_dt ); 
 
   cout << "Initialization completed" << endl << endl;                           
