@@ -108,10 +108,10 @@ Convex* Sphere::clone() const
 Point3 Sphere::support( Vector3 const& v ) const 
 {
   double s = Norm( v );
-  if (s > EPSILON) 
+  if ( s > EPSILON ) 
   {
     double r = m_radius / s;
-    return ( Point3(v[X] * r, v[Y] * r, v[Z] * r) );
+    return ( Point3( v[X] * r, v[Y] * r, v[Z] * r ) );
   } 
   else 
     return ( Point3() );    

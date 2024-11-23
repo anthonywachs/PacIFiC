@@ -116,8 +116,11 @@ Point3 Cylinder::support( Vector3 const& v ) const
     if ( s > EPSILON )
     {
       double d = m_radius / s;
-      return ( Point3( v[X] * d, v[Y] < 0. ? - m_halfHeight : m_halfHeight,
-      	v[Z] * d ) );
+      if ( fabs( v[Y] ) < EPSILON )
+        return ( Point3( v[X] * d, 0., v[Z] * d ) );      
+      else      
+        return ( Point3( v[X] * d, v[Y] < 0. ? - m_halfHeight : m_halfHeight,
+      		v[Z] * d ) );
     }
     else
       return ( Point3( 0., v[Y] < 0. ? - m_halfHeight : m_halfHeight, 0. ) );
