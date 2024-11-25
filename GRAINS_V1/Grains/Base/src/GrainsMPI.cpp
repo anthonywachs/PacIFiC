@@ -432,7 +432,8 @@ void GrainsMPI::InsertCreateNewParticles()
 
   // In case of a restarted simulation, if the linked cell changed from the 
   // previous simulation, we need to check that all clones are there
-  if ( m_restart && m_periodic ) checkClonesReload();  
+  if ( m_restart && ( m_periodic || !GrainsExec::m_ReadMPIInASingleFile ) ) 
+    checkClonesReload();  
 
   // Set particle positions from file or from a structured array
   size_t error = 0;

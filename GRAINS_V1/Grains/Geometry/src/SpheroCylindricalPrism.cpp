@@ -76,14 +76,18 @@ bool SpheroCylindricalPrism::BuildInertia( double* inertia, double* inertia_1 )
   inertia[1] = inertia[2] = inertia[4] = 0.;
   inertia_1[1] = inertia_1[2] = inertia_1[4] = 0.0;  
   
-  inertia[0] = 2. * m_height * ( m_length + 2. * m_radius ) * m_radius
-    * ( 0.25 * m_height * m_height + m_radius * m_radius ) / 3.0;
-  inertia[3] = 2. * m_height * ( m_length + 2. * m_radius ) * m_radius
-    * ( ( 0.5 * m_length + m_radius ) * ( 0.5 * m_length + m_radius ) 
-    + m_radius * m_radius ) / 3.0;
-  inertia[5] = 2. * m_height * ( m_length + 2. * m_radius ) * m_radius
-    * ( 0.25 * m_height * m_height 
-    + ( 0.5 * m_length + m_radius ) * ( 0.5 * m_length + m_radius ) ) / 3.0;
+  double xsq = m_height * m_radius * pow( m_length, 3. ) / 6.
+  	+ PI * m_height * pow( m_radius, 2. )
+		* ( pow( m_radius, 2. ) + pow( m_length, 2. ) ) / 4.
+	+ 4. * m_height * m_length * pow( m_radius, 3. ) / 3.;
+  double ysq = m_radius * pow( m_height, 3. ) 
+  	* ( m_length + 0.5 * PI * m_radius ) / 6. ;
+  double zsq = m_height * pow( m_radius, 3. ) 
+	* ( 2. * m_length / 3. + PI * m_radius / 4. );	
+
+  inertia[0] = ysq + zsq;  
+  inertia[3] = xsq + zsq;  
+  inertia[5] = xsq + ysq;
 	
   inertia_1[0] = 1.0 / inertia[0];
   inertia_1[3] = 1.0 / inertia[3];
@@ -336,8 +340,8 @@ void SpheroCylindricalPrism::write_polygonsPts_PARAVIEW( ostream& f,
 
 
 // ----------------------------------------------------------------------------
-// Returns a list of points describing the spherocylindrical prism in a Paraview 
-// format
+// Returns a list of points describing the spherocylindrical prism in a 
+// Paraview format
 list<Point3> SpheroCylindricalPrism::get_polygonsPts_PARAVIEW( 
 	Transform const& transform,
 	Vector3 const* translation ) const
@@ -433,9 +437,9 @@ list<Point3> SpheroCylindricalPrism::get_polygonsPts_PARAVIEW(
 
 // ----------------------------------------------------------------------------
 // Writes the spherocylindrical prism in a Paraview format
-void SpheroCylindricalPrism::write_polygonsStr_PARAVIEW( list<int>& connectivity,
-    	list<int>& offsets, list<int>& cellstype, int& firstpoint_globalnumber,
-	int& last_offset ) const
+void SpheroCylindricalPrism::write_polygonsStr_PARAVIEW( 
+	list<int>& connectivity, list<int>& offsets, list<int>& cellstype, 
+	int& firstpoint_globalnumber, int& last_offset ) const
 {
   // Left half cylinder
   for (int i=0;i<m_visuNodeNbPerHalf;++i)
@@ -505,7 +509,7 @@ bool SpheroCylindricalPrism::isIn( Point3 const& pt ) const
   
   if ( pt[Y] >= - halfHeight && pt[Y] <= halfHeight )
   { 
-    if ( pt[X] >= - halfLength - m_radius && pt[Y] < - halfLength )
+    if ( pt[X] >= - halfLength - m_radius && pt[X] < - halfLength )
       isIn = ( pt[X] + halfLength ) * ( pt[X] + halfLength ) 
 	+ pt[Z] * pt[Z] <= r2;
     else if ( pt[X] >= - halfLength && pt[X] <= halfLength )
