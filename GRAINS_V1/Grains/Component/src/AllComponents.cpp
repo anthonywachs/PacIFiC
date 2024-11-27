@@ -9,6 +9,8 @@
 #include "PostProcessingWriter.hh"
 #include "ParaviewPostProcessingWriter.hh"
 #include "GrainsBuilderFactory.hh"
+#include "SpheroCylinder.hh"
+#include "Quadrilobe.hh"
 #include <math.h>
 #include <stdlib.h>
 
@@ -896,6 +898,8 @@ void AllComponents::read_pre2024( istream& fileSave, string const& filename,
       fileSave >> buffer >> buffer;
       if ( buffer == "SpheroCylinder" )
         particle = new SpheroCylinder( false );
+      else if ( buffer == "Quadrilobe" )
+        particle = new Quadrilobe( false );        	
       else        
         particle = new CompositeParticle( false );
     }
@@ -936,6 +940,9 @@ void AllComponents::read_pre2024( istream& fileSave, string const& filename,
       if ( m_ReferenceParticles[ParticleGeomType]
       		->getSpecificCompositeShapeName() == "SpheroCylinder" )
         particle = new SpheroCylinder( false );
+      else if ( m_ReferenceParticles[ParticleGeomType]
+      		->getSpecificCompositeShapeName() == "Quadrilobe" )
+        particle = new Quadrilobe( false );	
       else   
         particle = new CompositeParticle( false );
     }
@@ -1037,6 +1044,8 @@ size_t AllComponents::read( istream& fileSave, list<Point3>* known_positions,
       fileSave >> buffer >> buffer;
       if ( buffer == "SpheroCylinder" )
         particle = new SpheroCylinder( false );
+      else if ( buffer == "Quadrilobe" )
+        particle = new Quadrilobe( false ); 
       else        
         particle = new CompositeParticle( false );
     }
@@ -1226,6 +1235,9 @@ void AllComponents::read_particles( string const& filename, size_t const& npart,
         if ( m_ReferenceParticles[ParticleGeomType]
       		->getSpecificCompositeShapeName() == "SpheroCylinder" )
           particle = new SpheroCylinder( false );
+        else if ( m_ReferenceParticles[ParticleGeomType]
+      		->getSpecificCompositeShapeName() == "Quadrilobe" )
+          particle = new Quadrilobe( false );	  
         else   
           particle = new CompositeParticle( false );
       }

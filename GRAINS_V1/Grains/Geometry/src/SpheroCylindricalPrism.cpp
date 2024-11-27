@@ -104,8 +104,8 @@ bool SpheroCylindricalPrism::BuildInertia( double* inertia, double* inertia_1 )
 // i.e., without applying any transformation
 double SpheroCylindricalPrism::computeCircumscribedRadius() const
 {
-  return ( sqrt( m_height * m_height 
-  	+ ( m_length + m_radius ) * ( m_length + m_radius ) ) );
+  return ( sqrt( 0.25 * m_height * m_height 
+  	+ ( 0.5 * m_length + m_radius ) * ( 0.5 * m_length + m_radius ) ) );
 }
 
 

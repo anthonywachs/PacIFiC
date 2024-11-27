@@ -7,6 +7,8 @@
 #include "PostProcessingWriter.hh"
 #include "ParaviewPostProcessingWriter.hh"
 #include "ContactForceModel.hh"
+#include "SpheroCylinder.hh"
+#include "Quadrilobe.hh"
 
 
 // ----------------------------------------------------------------------------
@@ -153,6 +155,8 @@ void GrainsParameters::Construction( DOMElement* rootElement )
 	  	"SpecificShape" );
 	if ( sshape == "SpheroCylinder" )
 	  particleRef = new SpheroCylinder( nCompParticle, nbPC+int(i) );
+	else if ( sshape == "Quadrilobe" )
+	  particleRef = new Quadrilobe( nCompParticle, nbPC+int(i) );
 	else 	
 	  particleRef = new CompositeParticle( nCompParticle, nbPC+int(i) );
         m_allcomponents.AddReferenceParticle( particleRef, nb );

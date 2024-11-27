@@ -8,6 +8,8 @@
 #include "PostProcessingWriter.hh"
 #include "PostProcessingWriterBuilderFactory.hh"
 #include "RawDataPostProcessingWriter.hh"
+#include "SpheroCylinder.hh"
+#include "Quadrilobe.hh"
 #include "stdlib.h"
 
 
@@ -793,6 +795,8 @@ void Grains::Construction( DOMElement* rootElement )
 	  	"SpecificShape" );
 	if ( sshape == "SpheroCylinder" )
 	  particleRef = new SpheroCylinder( nCompParticle, nbPC+int(i) );
+	else if ( sshape == "Quadrilobe" )
+	  particleRef = new Quadrilobe( nCompParticle, nbPC+int(i) );
 	else 	
 	  particleRef = new CompositeParticle( nCompParticle, nbPC+int(i) );
         m_allcomponents.AddReferenceParticle( particleRef, nb );

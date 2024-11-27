@@ -217,7 +217,6 @@ void HookeContactForceModel::computeAndWriteEstimates( Component* p0_,
   double omega0 = sqrt( m_kn / avmass ); 
   double theta = sqrt( pow( omega0, 2. ) - pow( etan, 2. ) );
   double tc = PI / theta;
-  cout << "XXX = " << v0 << endl; 
   
   double delta_max = computeDeltaMax( theta, etan, m_en, tc, v0 );
 
