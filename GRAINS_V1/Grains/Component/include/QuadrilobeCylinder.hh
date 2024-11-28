@@ -1,30 +1,30 @@
-#ifndef _Quadrilobe_HH_
-#define _Quadrilobe_HH_
+#ifndef _QUADRILOBECYLINDER_HH_
+#define _QUADRILOBECYLINDER_HH_
 
 #include "CompositeParticle.hh"
 
 
-/** @brief The class Quadrilobe.
+/** @brief The class QuadrilobeCylinder.
 
-    A freely moving sphero-cylinder.
+    A freely moving quadrilobe cylinder.
 
     @author A.WACHS - 2023 - Creation */
 // ============================================================================
-class Quadrilobe : public CompositeParticle
+class QuadrilobeCylinder : public CompositeParticle
 {
   public:
     /**@name Constructors & Destructor */
     //@{
     /** @brief Constructor with autonumbering as input parameter
     @param autonumbering whether to increment the component indexing */
-    Quadrilobe( bool const& autonumbering );
+    QuadrilobeCylinder( bool const& autonumbering );
 
     /** @brief Constructor with an XML node as an input parameter. This
     constructor is expected to be used for reference composite particles.
     Autonumbering is set to false
     @param root XML node
     @param pc particle class */
-    Quadrilobe( DOMNode* root, int const& pc );
+    QuadrilobeCylinder( DOMNode* root, int const& pc );
 
     /** @brief Constructor with input parameters. Autonumbering
     is set to false and numbering is set with the parameter id_
@@ -44,7 +44,7 @@ class Quadrilobe : public CompositeParticle
     @param activ particle activity
     @param tag_ tag of the cell the particle belongs to
     @param coordination_number_ particle coordination number */
-    Quadrilobe( int const& id_, Particle const* ParticleRef,
+    QuadrilobeCylinder( int const& id_, Particle const* ParticleRef,
 	double const& vx, double const& vy, double const& vz,
 	double const& qrotationx, double const& qrotationy,
 	double const& qrotationz, double const& qrotations,
@@ -65,7 +65,7 @@ class Quadrilobe : public CompositeParticle
     @param config particle transformation
     @param activ particle activity 
     @param contactMap contact map */
-    Quadrilobe( int const& id_, Particle const* ParticleRef,
+    QuadrilobeCylinder( int const& id_, Particle const* ParticleRef,
 	Vector3 const& vtrans,
 	Quaternion const& qrot,
 	Vector3 const& vrot,
@@ -75,13 +75,13 @@ class Quadrilobe : public CompositeParticle
      	std::tuple<bool, Vector3, Vector3, Vector3> > const* contactMap );
 
     /** @brief Copy constructor (the torsor is initialized to 0)
-    @param other copied Quadrilobe object 
+    @param other copied QuadrilobeCylinder object 
     @param autonumbering whether to increment the component indexing */
-    Quadrilobe( Quadrilobe const& other, 
+    QuadrilobeCylinder( QuadrilobeCylinder const& other, 
     	bool const& autonumbering );
 
     /** @brief Destructor */
-    virtual ~Quadrilobe();
+    virtual ~QuadrilobeCylinder();
     //@}
 
 
@@ -94,7 +94,7 @@ class Quadrilobe : public CompositeParticle
     Particle* createCloneCopy( bool const& autonumbering ) const ;
 
     /** @brief Creates a clone of the composite particle. This method calls the
-    constructor Quadrilobe( int const& id_, Particle const* ParticleRef,
+    constructor QuadrilobeCylinder( int const& id_, Particle const* ParticleRef,
     Vector3 const& vtrans, Quaternion const& qrot, Vector3 const& vrot,
     Transform const& config, ParticleActivity const& activ ) and is used for
     periodic clone composite particles to be inserted in the simulation.
@@ -209,7 +209,9 @@ class Quadrilobe : public CompositeParticle
     /** @name Parameters */
     //@{
     double m_radius; /**< Radius of the two half cylinders */
-    double m_length; /**< Length */ 
+    double m_armLength; /**< Length of each of the 4 arms of the quadrilobe,
+    	from the center of mass to end of each arm minus the radius of the 
+	cylindrical cap */ 
     double m_height; /**< Height */       
     static int m_visuNodeNbPerHalf; /**< number of points over 
     	the circular perimeter of each half cylinder (half of a cricle ) 
@@ -219,7 +221,7 @@ class Quadrilobe : public CompositeParticle
     /**@name Constructors */
     //@{
     /** @brief Default constructor */
-    Quadrilobe();
+    QuadrilobeCylinder();
     //@}
 };
 

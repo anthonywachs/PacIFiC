@@ -5,7 +5,8 @@
 #include "ParaviewPostProcessingWriter.hh"
 #include "BBox.hh"
 #include "SpheroCylinder.hh"
-#include "Quadrilobe.hh"
+#include "TrilobeCylinder.hh"
+#include "QuadrilobeCylinder.hh"
 
 
 // ----------------------------------------------------------------------------
@@ -151,8 +152,10 @@ void GrainsCRBFeatures::Construction( DOMElement* rootElement )
 	  	"SpecificShape" );
 	if ( sshape == "SpheroCylinder" )
 	  particleRef = new SpheroCylinder( nCompParticle, nbPC+int(i) );
-	else if ( sshape == "Quadrilobe" )
-	  particleRef = new Quadrilobe( nCompParticle, nbPC+int(i) );
+	else if ( sshape == "TrilobeCylinder" )
+	  particleRef = new TrilobeCylinder( nCompParticle, nbPC+int(i) );
+	else if ( sshape == "QuadrilobeCylinder" )
+	  particleRef = new QuadrilobeCylinder( nCompParticle, nbPC+int(i) );
 	else 	
 	  particleRef = new CompositeParticle( nCompParticle, nbPC+int(i) );
         m_allcomponents.AddReferenceParticle( particleRef, nb );

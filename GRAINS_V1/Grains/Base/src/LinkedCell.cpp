@@ -1384,9 +1384,9 @@ void LinkedCell::Link( Obstacle* root_obstacle )
 	    for (j=0;j<2 && !add;++j) 
 	    {
 	      angy = j == 0 ? - LOWEPS : LOWEPS;
-	      mrotY.setValue( cos( angy ), 0., - sin( angy ), 
+	      mrotY.setValue( cos( angy ), 0., sin( angy ), 
     		0., 1., 0.,
-		sin( angy ), 0., cos( angy ) );
+		- sin( angy ), 0., cos( angy ) );
 	      for (k=0;k<2 && !add;++k) 
 	      {
 	        angz = k == 0 ? - LOWEPS : LOWEPS;

@@ -1,5 +1,5 @@
 #include "GrainsMPIWrapper.hh"
-#include "Quadrilobe.hh"
+#include "QuadrilobeCylinder.hh"
 #include "ContactBuilderFactory.hh"
 #include "Memento.hh"
 #include "KinematicsBuilderFactory.hh"
@@ -12,18 +12,18 @@
 #include <iterator>
 #include <algorithm>
 
-int Quadrilobe::m_visuNodeNbPerHalf = 16;
+int QuadrilobeCylinder::m_visuNodeNbPerHalf = 16;
 
 
 // ----------------------------------------------------------------------------
 // Constructor with autonumbering as input parameter
-Quadrilobe::Quadrilobe( bool const& autonumbering )
+QuadrilobeCylinder::QuadrilobeCylinder( bool const& autonumbering )
   : CompositeParticle( autonumbering )
 {
-  m_specific_composite_shape = "Quadrilobe";
+  m_specific_composite_shape = "QuadrilobeCylinder";
   m_radius = 0.;
   m_height = 0.;
-  m_length = 0.;
+  m_armLength = 0.;
 }
 
 
@@ -33,10 +33,10 @@ Quadrilobe::Quadrilobe( bool const& autonumbering )
 // ----------------------------------------------------------------------------
 // Constructor with an XML node as an input parameter. This constructor is
 // expected to be used for reference composite particles
-Quadrilobe::Quadrilobe( DOMNode* root, int const& pc )
+QuadrilobeCylinder::QuadrilobeCylinder( DOMNode* root, int const& pc )
   : CompositeParticle( false )
 {
-  m_specific_composite_shape = "Quadrilobe";
+  m_specific_composite_shape = "QuadrilobeCylinder";
 
   // Geometric type
   m_GeomType = pc;
@@ -59,9 +59,9 @@ Quadrilobe::Quadrilobe( DOMNode* root, int const& pc )
   DOMNode* nGeometry = ReaderXML::getNode( root, "Geometry" );
   m_radius = ReaderXML::getNodeAttr_Double( nGeometry, "Radius" ); 
   m_height = ReaderXML::getNodeAttr_Double( nGeometry, "Height" );
-  m_length = ReaderXML::getNodeAttr_Double( nGeometry, "Length" ); 
+  m_armLength = ReaderXML::getNodeAttr_Double( nGeometry, "ArmLength" ); 
   m_mass = m_density * ( m_height * pow( m_radius, 2. ) * ( 2. * PI
-  	- 4. ) + 4. * m_radius * m_length * m_height );
+  	- 4. ) + 8. * m_radius * m_armLength * m_height );
   computeWeight();
   double crust_thickness = 
   	ReaderXML::getNodeAttr_Double( nGeometry, "CrustThickness" );
@@ -77,26 +77,25 @@ Quadrilobe::Quadrilobe( DOMNode* root, int const& pc )
 
   // Angular position of the composite particle
   m_geoRBWC->getTransform()->load( root );
-
-  // Moment of inertia tensor of the Quadrilobe
+  
+  // Moment of inertia tensor of the QuadrilobeCylinder
   m_inertia[1] = m_inertia[2] = m_inertia[4] = 0.;
-  double h2 = m_height * m_height, r2 = m_radius * m_radius, 
-  	halfl = 0.5 * m_length;
+  double h2 = m_height * m_height, r2 = m_radius * m_radius;
   double a1 = 4 * r2 * m_height,
-  	a2 = ( halfl - m_radius ) * 2. * m_radius * m_height,
+  	a2 = ( m_armLength - m_radius ) * 2. * m_radius * m_height,
 	a3 = 0.5 * PI * r2 * m_height;  
   m_inertia[0] = a1 * ( 4. * r2 + h2 ) / 12.
-  	+ 0.5 * a2 * ( ( pow( halfl - m_radius, 2. ) + h2 ) / 3.   
-		+ pow( halfl +  m_radius, 2. ) 
+  	+ 0.5 * a2 * ( ( pow( m_armLength - m_radius, 2. ) + h2 ) / 3.   
+		+ pow( m_armLength +  m_radius, 2. ) 
 		+ ( 4. * r2 + h2 ) / 3. )
 	+ 2. * a3 * ( ( 0.25 - 16. / ( 9. * PI * PI ) ) * r2
-		+ h2 / 6. + pow( halfl + 4. * m_radius / ( 3. * PI ), 2. ) 
-		+ 0.25 * r2 ) ;
+		+ h2 / 6. + pow( m_armLength + 4. 
+		* m_radius / ( 3. * PI ), 2. ) + 0.25 * r2 ) ;
   m_inertia[3] = 2. * a1 * r2 / 3.
-  	+ a2 * ( ( pow( halfl - m_radius, 2. ) + 4. * r2 ) / 3. 
-		+ pow( halfl + m_radius, 2.) )
+  	+ a2 * ( ( pow( m_armLength - m_radius, 2. ) + 4. * r2 ) / 3. 
+		+ pow( m_armLength + m_radius, 2.) )
 	+ 4. * a3 * ( ( 0.5 - 16. / ( 9. * PI * PI ) ) * r2 
-		+ pow( halfl + 4. * m_radius / ( 3. * PI ), 2. ) ); 
+		+ pow( m_armLength + 4. * m_radius / ( 3. * PI ), 2. ) ); 
   m_inertia[5] = m_inertia[0];  
   BuildInertia();
 
@@ -119,7 +118,7 @@ Quadrilobe::Quadrilobe( DOMNode* root, int const& pc )
 
   // First spherocylindrical prism
   SpheroCylindricalPrism* scp1 = new SpheroCylindricalPrism( m_radius, 
-  	m_length, m_height );
+  	2. * m_armLength, m_height );
   RigidBodyWithCrust* geoRBWC_scp1 = new RigidBodyWithCrust( scp1, Transform(),
   	false, crust_thickness ); 
   m_elementaryParticles[0] = new Particle( geoRBWC_scp1, m_density,
@@ -136,7 +135,7 @@ Quadrilobe::Quadrilobe( DOMNode* root, int const& pc )
 
   // Second spherocylindrical prism
   SpheroCylindricalPrism* scp2 = new SpheroCylindricalPrism( m_radius, 
-  	m_length, m_height );
+  	2. * m_armLength, m_height );
   RigidBodyWithCrust* geoRBWC_scp2 = new RigidBodyWithCrust( scp2, Transform(),
   	false, crust_thickness ); 
   m_elementaryParticles[1] = new Particle( geoRBWC_scp2, m_density,
@@ -168,7 +167,7 @@ Quadrilobe::Quadrilobe( DOMNode* root, int const& pc )
 
 // ----------------------------------------------------------------------------
 // Constructor with input parameters
-Quadrilobe::Quadrilobe( int const& id_,
+QuadrilobeCylinder::QuadrilobeCylinder( int const& id_,
 	Particle const* ParticleRef,
 	double const& vx, double const& vy, double const& vz,
 	double const& qrotationx, double const& qrotationy,
@@ -182,12 +181,12 @@ Quadrilobe::Quadrilobe( int const& id_,
 	vx, vy, vz, qrotationx, qrotationy, qrotationz, qrotations,
 	rx, ry, rz, m, activ, tag_, coordination_number_ )	
 {
-  m_specific_composite_shape = "Quadrilobe";
-  Quadrilobe const* QuadrilobeRef =
-  	dynamic_cast<Quadrilobe const*>(ParticleRef);
-  m_radius = QuadrilobeRef->m_radius; 
-  m_length = QuadrilobeRef->m_length;    
-  m_height = QuadrilobeRef->m_height;
+  m_specific_composite_shape = "QuadrilobeCylinder";
+  QuadrilobeCylinder const* QuadrilobeCylinderRef =
+  	dynamic_cast<QuadrilobeCylinder const*>(ParticleRef);
+  m_radius = QuadrilobeCylinderRef->m_radius; 
+  m_armLength = QuadrilobeCylinderRef->m_armLength;    
+  m_height = QuadrilobeCylinderRef->m_height;
 }
 
 
@@ -195,7 +194,7 @@ Quadrilobe::Quadrilobe( int const& id_,
 
 // ----------------------------------------------------------------------------
 // Constructor with input parameters
-Quadrilobe::Quadrilobe( int const& id_,
+QuadrilobeCylinder::QuadrilobeCylinder( int const& id_,
 	Particle const* ParticleRef,
 	Vector3 const& vtrans,
 	Quaternion const& qrot,
@@ -207,12 +206,12 @@ Quadrilobe::Quadrilobe( int const& id_,
   : CompositeParticle( id_, ParticleRef, vtrans, qrot, vrot, config, activ,
   	contactMap )
 {
-  m_specific_composite_shape = "Quadrilobe";
-  Quadrilobe const* QuadrilobeRef =
-  	dynamic_cast<Quadrilobe const*>(ParticleRef);
-  m_radius = QuadrilobeRef->m_radius; 
-  m_length = QuadrilobeRef->m_length;    
-  m_height = QuadrilobeRef->m_height;
+  m_specific_composite_shape = "QuadrilobeCylinder";
+  QuadrilobeCylinder const* QuadrilobeCylinderRef =
+  	dynamic_cast<QuadrilobeCylinder const*>(ParticleRef);
+  m_radius = QuadrilobeCylinderRef->m_radius; 
+  m_armLength = QuadrilobeCylinderRef->m_armLength;    
+  m_height = QuadrilobeCylinderRef->m_height;
 }
 
 
@@ -220,7 +219,7 @@ Quadrilobe::Quadrilobe( int const& id_,
 
 // ----------------------------------------------------------------------------
 // Destructor
-Quadrilobe::~Quadrilobe()
+QuadrilobeCylinder::~QuadrilobeCylinder()
 {}
 
 
@@ -228,12 +227,12 @@ Quadrilobe::~Quadrilobe()
 
 // ----------------------------------------------------------------------------
 // Copy constructor (the torsor is initialized to 0)
-Quadrilobe::Quadrilobe( Quadrilobe const& other, 
+QuadrilobeCylinder::QuadrilobeCylinder( QuadrilobeCylinder const& other, 
     	bool const& autonumbering )
   : CompositeParticle( other, autonumbering )
 {
   m_radius = other.m_radius;
-  m_length = other.m_length;
+  m_armLength = other.m_armLength;
   m_height = other.m_height;
 }
 
@@ -246,9 +245,9 @@ Quadrilobe::Quadrilobe( Quadrilobe const& other,
 // simulation. Numbering is automatic, total number of components is
 // incremented by 1 and activity is set to WAIT. The calling object is
 // expected to be a reference particle
-Particle* Quadrilobe::createCloneCopy( bool const& autonumbering ) const
+Particle* QuadrilobeCylinder::createCloneCopy( bool const& autonumbering ) const
 {
-  Particle* particle = new Quadrilobe( *this, autonumbering );
+  Particle* particle = new QuadrilobeCylinder( *this, autonumbering );
 
   return ( particle );
 }
@@ -258,19 +257,19 @@ Particle* Quadrilobe::createCloneCopy( bool const& autonumbering ) const
 
 // ----------------------------------------------------------------------------
 // Creates a clone of the composite particle. This method calls the
-// constructor Quadrilobe( int const& id_, Particle const* ParticleRef,
+// constructor QuadrilobeCylinder( int const& id_, Particle const* ParticleRef,
 // Vector3 const& vtrans, Quaternion const& qrot, Vector3 const& vrot,
 // Transform const& config, ParticleActivity const& activ ) and is used for
 // periodic clone composite particles to be inserted in the simulation.
 // Autonumbering is set to false and numbering is set with the parameter id_
-Particle* Quadrilobe::createCloneCopy( int const& id_,
+Particle* QuadrilobeCylinder::createCloneCopy( int const& id_,
     	Particle const* ParticleRef, Vector3 const& vtrans,
 	Quaternion const& qrot,	Vector3 const& vrot,
 	Transform const& config, ParticleActivity const& activ,
 	map< std::tuple<int,int,int>,
      	std::tuple<bool, Vector3, Vector3, Vector3> > const* contactMap ) const
 {
-  Particle* particle = new Quadrilobe( id_, ParticleRef, vtrans,
+  Particle* particle = new QuadrilobeCylinder( id_, ParticleRef, vtrans,
 	qrot, vrot, config, activ, contactMap );
 
   return ( particle );
@@ -282,7 +281,7 @@ Particle* Quadrilobe::createCloneCopy( int const& id_,
 // ----------------------------------------------------------------------------
 // Returns the number of points to write the composite particle in a
 // Paraview format
-int Quadrilobe::numberOfPoints_PARAVIEW() const
+int QuadrilobeCylinder::numberOfPoints_PARAVIEW() const
 {
  return ( 8 * ( m_visuNodeNbPerHalf + 2 ) );  
 }
@@ -293,7 +292,7 @@ int Quadrilobe::numberOfPoints_PARAVIEW() const
 // ----------------------------------------------------------------------------
 // Returns the number of elementary polytopes to write the
 // composite particle shape in a Paraview format
-int Quadrilobe::numberOfCells_PARAVIEW() const
+int QuadrilobeCylinder::numberOfCells_PARAVIEW() const
 {  
   return ( 2 * ( 2 * m_visuNodeNbPerHalf + 1 ) );   
 }
@@ -303,7 +302,7 @@ int Quadrilobe::numberOfCells_PARAVIEW() const
 
 // ----------------------------------------------------------------------------
 // Writes the points describing the composite particle in a Paraview format
-void Quadrilobe::write_polygonsPts_PARAVIEW( ostream& f,
+void QuadrilobeCylinder::write_polygonsPts_PARAVIEW( ostream& f,
 	Vector3 const* translation )const
 { 
   Point3 pp, p;
@@ -320,7 +319,7 @@ void Quadrilobe::write_polygonsPts_PARAVIEW( ostream& f,
     p[Y] = - 0.5 * m_height;
     for (int i=0;i<m_visuNodeNbPerHalf+1;++i)
     {
-      p[X] = m_radius * cos ( tstartleft - i * dtheta ) - 0.5 * m_length;
+      p[X] = m_radius * cos ( tstartleft - i * dtheta ) - m_armLength;
       p[Z] = m_radius * sin ( tstartleft - i * dtheta );
       pp = (*transform)( p );
       if ( translation ) pp += *translation;
@@ -331,7 +330,7 @@ void Quadrilobe::write_polygonsPts_PARAVIEW( ostream& f,
     p[Y] = 0.5 * m_height;
     for (int i=0;i<m_visuNodeNbPerHalf+1;++i)
     {
-      p[X] = m_radius * cos ( tstartleft - i * dtheta ) - 0.5 * m_length;
+      p[X] = m_radius * cos ( tstartleft - i * dtheta ) - m_armLength;
       p[Z] = m_radius * sin ( tstartleft - i * dtheta );
       pp = (*transform)( p );
       if ( translation ) pp += *translation;
@@ -339,7 +338,7 @@ void Quadrilobe::write_polygonsPts_PARAVIEW( ostream& f,
     }
 
     // Lower disk center
-    p[X] = - 0.5 * m_length;
+    p[X] = - m_armLength;
     p[Y] = - 0.5 * m_height;
     p[Z] = 0.;
     pp = (*transform)( p );
@@ -358,7 +357,7 @@ void Quadrilobe::write_polygonsPts_PARAVIEW( ostream& f,
     p[Y] = - 0.5 * m_height;
     for (int i=0;i<m_visuNodeNbPerHalf+1;++i)
     {
-      p[X] = m_radius * cos ( tstartright + i * dtheta ) + 0.5 * m_length;
+      p[X] = m_radius * cos ( tstartright + i * dtheta ) + m_armLength;
       p[Z] = m_radius * sin ( tstartright + i * dtheta );
       pp = (*transform)( p );
       if ( translation ) pp += *translation;
@@ -369,7 +368,7 @@ void Quadrilobe::write_polygonsPts_PARAVIEW( ostream& f,
     p[Y] = 0.5 * m_height;
     for (int i=0;i<m_visuNodeNbPerHalf+1;++i)
     {
-      p[X] = m_radius * cos ( tstartright + i * dtheta ) + 0.5 * m_length;
+      p[X] = m_radius * cos ( tstartright + i * dtheta ) + m_armLength;
       p[Z] = m_radius * sin ( tstartright + i * dtheta );
       pp = (*transform)( p );
       if ( translation ) pp += *translation;
@@ -377,7 +376,7 @@ void Quadrilobe::write_polygonsPts_PARAVIEW( ostream& f,
     }
 
     // Lower disk center
-    p[X] = 0.5 * m_length;
+    p[X] = m_armLength;
     p[Y] = - 0.5 * m_height;
     p[Z] = 0.;
     pp = (*transform)( p );
@@ -397,7 +396,7 @@ void Quadrilobe::write_polygonsPts_PARAVIEW( ostream& f,
 
 // ----------------------------------------------------------------------------
 // Returns a list of points describing the component in a Paraview format
-list<Point3> Quadrilobe::get_polygonsPts_PARAVIEW(
+list<Point3> QuadrilobeCylinder::get_polygonsPts_PARAVIEW(
 	Vector3 const* translation ) const
 {
   list<Point3> ParaviewPoints;
@@ -415,7 +414,7 @@ list<Point3> Quadrilobe::get_polygonsPts_PARAVIEW(
     p[Y] = - 0.5 * m_height;
     for (int i=0;i<m_visuNodeNbPerHalf+1;++i)
     {
-      p[X] = m_radius * cos ( tstartleft - i * dtheta ) - 0.5 * m_length;
+      p[X] = m_radius * cos ( tstartleft - i * dtheta ) - m_armLength;
       p[Z] = m_radius * sin ( tstartleft - i * dtheta );
       pp = (*transform)( p );
       if ( translation ) pp += *translation;
@@ -426,7 +425,7 @@ list<Point3> Quadrilobe::get_polygonsPts_PARAVIEW(
     p[Y] = 0.5 * m_height;
     for (int i=0;i<m_visuNodeNbPerHalf+1;++i)
     {
-      p[X] = m_radius * cos ( tstartleft - i * dtheta ) - 0.5 * m_length;
+      p[X] = m_radius * cos ( tstartleft - i * dtheta ) - m_armLength;
       p[Z] = m_radius * sin ( tstartleft - i * dtheta );
       pp = (*transform)( p );
       if ( translation ) pp += *translation;
@@ -434,7 +433,7 @@ list<Point3> Quadrilobe::get_polygonsPts_PARAVIEW(
     }
 
     // Lower disk center
-    p[X] = - 0.5 * m_length;
+    p[X] = - m_armLength;
     p[Y] = - 0.5 * m_height;
     p[Z] = 0.;
     pp = (*transform)( p );
@@ -453,7 +452,7 @@ list<Point3> Quadrilobe::get_polygonsPts_PARAVIEW(
     p[Y] = - 0.5 * m_height;
     for (int i=0;i<m_visuNodeNbPerHalf+1;++i)
     {
-      p[X] = m_radius * cos ( tstartright + i * dtheta ) + 0.5 * m_length;
+      p[X] = m_radius * cos ( tstartright + i * dtheta ) + m_armLength;
       p[Z] = m_radius * sin ( tstartright + i * dtheta );
       pp = (*transform)( p );
       if ( translation ) pp += *translation;
@@ -464,7 +463,7 @@ list<Point3> Quadrilobe::get_polygonsPts_PARAVIEW(
     p[Y] = 0.5 * m_height;
     for (int i=0;i<m_visuNodeNbPerHalf+1;++i)
     {
-      p[X] = m_radius * cos ( tstartright + i * dtheta ) + 0.5 * m_length;
+      p[X] = m_radius * cos ( tstartright + i * dtheta ) + m_armLength;
       p[Z] = m_radius * sin ( tstartright + i * dtheta );
       pp = (*transform)( p );
       if ( translation ) pp += *translation;
@@ -472,7 +471,7 @@ list<Point3> Quadrilobe::get_polygonsPts_PARAVIEW(
     }
 
     // Lower disk center
-    p[X] = 0.5 * m_length;
+    p[X] = m_armLength;
     p[Y] = - 0.5 * m_height;
     p[Z] = 0.;
     pp = (*transform)( p );
@@ -494,7 +493,7 @@ list<Point3> Quadrilobe::get_polygonsPts_PARAVIEW(
 
 // ----------------------------------------------------------------------------
 // Writes the composite particle in a Paraview format
-void Quadrilobe::write_polygonsStr_PARAVIEW( list<int>& connectivity,
+void QuadrilobeCylinder::write_polygonsStr_PARAVIEW( list<int>& connectivity,
     	list<int>& offsets, list<int>& cellstype, int& firstpoint_globalnumber,
 	int& last_offset ) const
 {
@@ -617,7 +616,7 @@ void Quadrilobe::write_polygonsStr_PARAVIEW( list<int>& connectivity,
 // ----------------------------------------------------------------------------
 // Returns the number of corners of the rigib body shape and a code
 // describing the rigid body shape
-int Quadrilobe::getNbCorners() const
+int QuadrilobeCylinder::getNbCorners() const
 {
   return ( 1001 );
 }
@@ -632,7 +631,7 @@ int Quadrilobe::getNbCorners() const
 // face of the elementary cylinder, an arbitrary point on the lateral surface 
 // of the elementary cylinder and center of top circular face of the elementary
 // cylinder    
-void Quadrilobe::writePositionInFluid( ostream& fluid )
+void QuadrilobeCylinder::writePositionInFluid( ostream& fluid )
 {
   // TO DO
 }
@@ -643,7 +642,7 @@ void Quadrilobe::writePositionInFluid( ostream& fluid )
 // ----------------------------------------------------------------------------
 // Reads composite particle data from a stream. Usage: for standard composite
 // particles in the 2014 reload format
-void Quadrilobe::read2014( istream& fileIn, vector<Particle*> const*
+void QuadrilobeCylinder::read2014( istream& fileIn, vector<Particle*> const*
   	referenceParticles )
 {
   CompositeParticle::read2014( fileIn, referenceParticles );
@@ -651,12 +650,12 @@ void Quadrilobe::read2014( istream& fileIn, vector<Particle*> const*
   // We know that (*referenceParticles)[m_GeomType] points to a
   // CompositeParticle, such that we can dynamic cast it to actual type and
   // use -> instead of using get methods through virtual typing
-  Quadrilobe const* CompParticleRef =
-  	dynamic_cast<Quadrilobe const*>(
+  QuadrilobeCylinder const* CompParticleRef =
+  	dynamic_cast<QuadrilobeCylinder const*>(
 		(*referenceParticles)[m_GeomType]);
 
   m_radius = CompParticleRef->m_radius;
-  m_length = CompParticleRef->m_length;
+  m_armLength = CompParticleRef->m_armLength;
   m_height = CompParticleRef->m_height;
 }
 
@@ -666,7 +665,7 @@ void Quadrilobe::read2014( istream& fileIn, vector<Particle*> const*
 // ----------------------------------------------------------------------------
 // Reads composite particle data from a stream in a binary form.
 // Usage: for standard composite particles in the 2014 reload format
-void Quadrilobe::read2014_binary( istream& fileIn,
+void QuadrilobeCylinder::read2014_binary( istream& fileIn,
 	vector<Particle*> const* referenceParticles )
 {
   CompositeParticle::read2014_binary( fileIn, referenceParticles );
@@ -674,12 +673,12 @@ void Quadrilobe::read2014_binary( istream& fileIn,
   // We know that (*referenceParticles)[m_GeomType] points to a
   // CompositeParticle, such that we can dynamic cast it to actual type and
   // use -> instead of using get methods through virtual typing
-  Quadrilobe const* CompParticleRef =
-  	dynamic_cast<Quadrilobe const*>(
+  QuadrilobeCylinder const* CompParticleRef =
+  	dynamic_cast<QuadrilobeCylinder const*>(
 		(*referenceParticles)[m_GeomType]);
 
   m_radius = CompParticleRef->m_radius;
-  m_length = CompParticleRef->m_length;
+  m_armLength = CompParticleRef->m_armLength;
   m_height = CompParticleRef->m_height;
 }
 
@@ -688,10 +687,10 @@ void Quadrilobe::read2014_binary( istream& fileIn,
 
 // ----------------------------------------------------------------------------
 // Computes and sets the circumscribed radius
-void Quadrilobe::setCircumscribedRadius()
+void QuadrilobeCylinder::setCircumscribedRadius()
 {
   m_geoRBWC->setCircumscribedRadius( sqrt( 0.25 * m_height * m_height 
-  	+ ( 0.5 * m_length + m_radius ) * ( 0.5 * m_length + m_radius ) ) );
+  	+ ( m_armLength + m_radius ) * ( m_armLength + m_radius ) ) );
 }
 
 
@@ -700,10 +699,10 @@ void Quadrilobe::setCircumscribedRadius()
 // ----------------------------------------------------------------------------
 // Saves additional features of a (in practice reference) composite particle
 // for reload
-void Quadrilobe::writeAdditionalFeatures( ostream& fileSave ) const
+void QuadrilobeCylinder::writeAdditionalFeatures( ostream& fileSave ) const
 {
-  fileSave << endl << "*RadiusLengthHeight " << m_radius << " " << m_length
-  	<< " " << m_height;  
+  fileSave << endl << "*RadiusArmLengthHeight " << m_radius << " " << 
+  	m_armLength << " " << m_height;  
   CompositeParticle::writeAdditionalFeatures( fileSave );
 }
 
@@ -713,9 +712,9 @@ void Quadrilobe::writeAdditionalFeatures( ostream& fileSave ) const
 // ----------------------------------------------------------------------------
 // Reads additional features of a (in practice reference) composite particle
 // data from a stream
-void Quadrilobe::readAdditionalFeatures( istream& fileIn )
+void QuadrilobeCylinder::readAdditionalFeatures( istream& fileIn )
 {
   string buffer;
-  fileIn >> buffer >> m_radius >> m_length >> m_height;
+  fileIn >> buffer >> m_radius >> m_armLength >> m_height;
   CompositeParticle::readAdditionalFeatures( fileIn );
 }
