@@ -22,8 +22,7 @@ class SpheroCyl : public Convex
   public:
     /** @name Constructors */
     //@{
-    /** @brief Constructor with edge length as input parameters
-    @param width edge length in x
+    /** @brief Constructor with radius and height as input parameters
     @param r radius of the elementary cylinder and the two spherical caps
     @param h height of the elementary cylinder */
     SpheroCyl( double r, double h );

@@ -169,7 +169,7 @@ class Component;
     \f[
     \mbox{\LARGE $E^*\approx\frac{E}{2}
     	\:\:\mathrm{,}\:\:G^*\approx\frac{E}{8}
-	\:\:\Rightarrow\:\:G^*\approx 4E^*$}
+	\:\:\Rightarrow\:\:G^*\approx \frac{E^*}{4}$}
     \f]     
     
     The input parameters of the model are:
@@ -177,8 +177,8 @@ class Component;
     	m^{-2}=Pa\right)\f$
     - \f$e_n\f$: the restitution coefficient (-)
     - \f$G^*\f$: the effective shear modulus \f$\left(N\cdot 
-    	m^{-2}=Pa\right)\f$, automatically computed as \f$4E^*\f$ if not 
-	specified 
+    	m^{-2}=Pa\right)\f$, automatically computed as \f$\frac{E^*}{4}\f$ if 
+	not specified 
     - \f$\mu_c\f$: the Coulomb tangential friction coefficient (-)
     - \f$\mu_r\f$: the Coulomb rolling coefficient (-)
     - \f$\eta_{pfr}\f$: the pre-factor to adjust the amount of rolling 

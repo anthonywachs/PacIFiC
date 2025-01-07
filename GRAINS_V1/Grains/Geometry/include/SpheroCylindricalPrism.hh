@@ -22,9 +22,8 @@ class SpheroCylindricalPrism : public Convex
   public:
     /** @name Constructors */
     //@{
-    /** @brief Constructor with edge length as input parameters
-    @param width edge length in x
-    @param r eadius of the two half cylinders
+    /** @brief Constructor with radius, length and height as input parameters
+    @param r radius of the two half cylinders
     @param l length 
     @param h height */
     SpheroCylindricalPrism( double r, double l, double h );
