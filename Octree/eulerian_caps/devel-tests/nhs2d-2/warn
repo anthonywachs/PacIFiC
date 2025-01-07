@@ -1,0 +1,25 @@
+nhs2d-2.c: In function ‘movie’:
+nhs2d-2.c:119:18: warning: missing braces around initializer [-Wmissing-braces]
+   cells ();
+                  ^
+nhs2d-2.c:119:18: warning: (near initialization for ‘(anonymous).n’) [-Wmissing-braces]
+nhs2d-2.c:126:18: warning: missing braces around initializer [-Wmissing-braces]
+   cells ();
+                  ^
+nhs2d-2.c:126:18: warning: (near initialization for ‘(anonymous).n’) [-Wmissing-braces]
+nhs2d-2.c:161:18: warning: missing braces around initializer [-Wmissing-braces]
+   cells ();
+                  ^
+nhs2d-2.c:161:18: warning: (near initialization for ‘(anonymous).n’) [-Wmissing-braces]
+nhs2d-2.c:168:18: warning: missing braces around initializer [-Wmissing-braces]
+   cells ();
+                  ^
+nhs2d-2.c:168:18: warning: (near initialization for ‘(anonymous).n’) [-Wmissing-braces]
+nhs2d-2.c:217:18: warning: missing braces around initializer [-Wmissing-braces]
+   cells ();
+                  ^
+nhs2d-2.c:217:18: warning: (near initialization for ‘(anonymous).n’) [-Wmissing-braces]
+nhs2d-2.c:224:18: warning: missing braces around initializer [-Wmissing-braces]
+   cells ();
+                  ^
+nhs2d-2.c:224:18: warning: (near initialization for ‘(anonymous).n’) [-Wmissing-braces]

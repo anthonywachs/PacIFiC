@@ -1,0 +1,15 @@
+2D_pozrikidis2000_17.c:19:2: error: invalid preprocessing directive #ifndif
+ 
+  ^
+2D_pozrikidis2000_17.c:168:2: error: #endif without #if
+   if (pmtrace.fp)
+  ^
+2D_pozrikidis2000_17.c: In function ‘movie’:
+2D_pozrikidis2000_17.c:150:18: warning: missing braces around initializer [-Wmissing-braces]
+   cells ();
+                  ^
+2D_pozrikidis2000_17.c:150:18: warning: (near initialization for ‘(anonymous).n’) [-Wmissing-braces]
+2D_pozrikidis2000_17.c:157:18: warning: missing braces around initializer [-Wmissing-braces]
+   cells ();
+                  ^
+2D_pozrikidis2000_17.c:157:18: warning: (near initialization for ‘(anonymous).n’) [-Wmissing-braces]
