@@ -27,106 +27,95 @@
 # define inf2deltaz (relnl.z < 2.1*delta) && (relnl.z > 1.9*delta)
 # define inf1deltaz (relnl.z < 1.1*delta) && (relnl.z > 0.9*delta)
 
+/** Compute the 1D distance for stencils in Periodic conditions */
+#define ACROSS_PERIODIC( a, b ) ( a - b > L0/2. || a - b < - L0/2. )
+#define PERIODIC_1DIST( a, b ) ( ( a - L0 - b > L0/2. \
+	|| a - L0 - b < - L0/2. ) ? a + L0 - b : a - L0 - b )
+#define GENERAL_1DIST( a, b ) ( ACROSS_PERIODIC( a, b ) ? \
+	PERIODIC_1DIST( a, b ) : a - b )
+
+
 
 //----------------------------------------------------------------------------
-void compute_relative_vector (coord vec1, coord vec2, coord * rel) 
+void assign_dial( coord rel, int * CX ) 
 //----------------------------------------------------------------------------
 {
-  foreach_dimension() {
-    rel->x = vec2.x - vec1.x;
-  }
+# if dimension == 2
+    if ( rel.x > 0. )
+    {
+      if ( rel.y > 0. )
+        /* We are on the lower left cell */
+        *CX = 1;
+      else // rel.y <= 0.
+        /* We are on the upper left cell */
+        *CX = 4;
+    }  
+    else // rel.x <= 0.
+    {
+      if ( rel.y > 0. )
+        /* we are on the lower right cell */
+        *CX = 2;
+      else // rel.y <= 0. ) {
+        /* We are on the upper right cell */
+        *CX = 3;
+    }
+
+# elif dimension == 3 
+    if ( rel.z > 0. )
+    {
+      /* one has to pick the forward cells + the middle ones according 
+      to their 2D counterpart */
+      if ( rel.x > 0. )
+      {
+        if ( rel.y > 0. )
+	  /* We are on the lower left cell */
+	  *CX = 10;
+        else // rel.y <= 0. )
+	  /* We are on the upper left cell */
+	  *CX = 40;
+      }
+      else // rel.x <= 0. 
+      {
+        if ( rel.y > 0. )
+	  /* we are on the lower right cell */
+	  *CX = 20;
+        else // rel.y <= 0 )
+	  /* We are on the upper right cell */
+	  *CX = 30;
+      }
+    }
+    else // rel.z <= 0. 
+    {
+      /* one has to pick the backward cells + the middle ones according 
+      to their 2D counterpart */
+      if ( rel.x > 0. )
+      {
+        if ( rel.y > 0. )
+	  /* We are on the lower left cell */
+	  *CX = 11;
+        else // rel.y <= 0. 
+	  /* We are on the upper left cell */
+	  *CX = 41;
+      }
+      else // rel.x <= 0. )
+      {
+        if ( rel.y > 0. )
+	  /* We are on the lower right cell */
+	  *CX = 21;
+        else // rel.y <= 0. ) 
+	  /* We are on the upper right cell */
+	  *CX = 31;
+      }
+    }
+# endif 
 }
 
 
 
 
 //----------------------------------------------------------------------------
-void assign_dial (coord rel, int * CX) 
-//----------------------------------------------------------------------------
-{
-#if dimension == 2
-  if (rel.x > 0 ) {
-    if (rel.y > 0 ) {
-      /* We are on the lower left cell */
-      *CX = 1;
-    }
-    else if(rel.y < 0 ) {
-      /* We are on the upper left cell */
-      *CX = 4;
-    }
-  }
-  
-  if (rel.x < 0 ) {
-    if (rel.y > 0 ) {
-      /* we are on the lower right cell */
-      *CX = 2;
-    }
-    else if(rel.y < 0 ) {
-      /* We are on the upper right cell */
-      *CX = 3;
-    }
-  }
-
-#elif dimension == 3 
-  if (rel.z > 0){
-    /* one has to pick the forward cells + the middle ones according 
-    to their 2D counterpart */
-    if (rel.x > 0 ){
-      if (rel.y > 0 ){
-	/* We are on the lower left cell */
-	*CX = 10;
-      }
-      else if(rel.y < 0 ) {
-	/* We are on the upper left cell */
-	*CX = 40;
-      }
-    }
-    if (rel.x < 0 ){
-      if (rel.y > 0 ){
-	/* we are on the lower right cell */
-	*CX = 20;
-      }
-      else if(rel.y < 0 ) {
-	/* We are on the upper right cell */
-	*CX = 30;
-      }
-    }
-  }
-  
-  if (rel.z < 0){
-    /* one has to pick the backward cells + the middle ones according 
-    to their 2D counterpart */
-
-    if (rel.x > 0 ){
-      if (rel.y > 0 ){
-	/* We are on the lower left cell */
-	*CX = 11;
-      }
-      else if(rel.y < 0 ) {
-	/* We are on the upper left cell */
-	*CX = 41;
-      }
-    }
-    if (rel.x < 0 ){
-      if (rel.y > 0 ){
-	/* We are on the lower right cell */
-	*CX = 21;
-      }
-      else if(rel.y < 0 ) {
-	/* We are on the upper right cell */
-	*CX = 31;
-      }
-    }
-  }
-#endif 
-}
-
-
-
-
-//----------------------------------------------------------------------------
-void NCX1_CX1 (const coord relnl, const double delta, 
-	const int weight_numbers[9], int * weight_id, size_t * goflag) 
+void NCX1_CX1( const coord relnl, const double delta, 
+	const int weight_numbers[9], int * weight_id, size_t * goflag ) 
 //----------------------------------------------------------------------------
 {
   // weight_numbers[2] -> right column top
@@ -152,13 +141,16 @@ void NCX1_CX1 (const coord relnl, const double delta,
   if ((relnl.x < -1.9*delta) && (relnl.x > -2.1*delta)) {
      
     if ((relnl.y < -1.9*delta) && (relnl.y > -2.1*delta)) {
-      *weight_id = weight_numbers[2]; *goflag = 1; // right top cell // sup2deltay
+      *weight_id = weight_numbers[2]; *goflag = 1; // right top cell 
+      						   // sup2deltay
     }
     if ((relnl.y < -0.9*delta) && (relnl.y > -1.1*delta)) {
-      *weight_id = weight_numbers[5]; *goflag = 1; // right middle cell // sup1deltay
+      *weight_id = weight_numbers[5]; *goflag = 1; // right middle cell 
+      						   // sup1deltay
     }
     if (fabs(relnl.y) < 0.1*delta) {
-      *weight_id = weight_numbers[1]; *goflag = 1; // right bottom cell // sup0deltay
+      *weight_id = weight_numbers[1]; *goflag = 1; // right bottom cell 
+      						   // sup0deltay
     }
   }
 
@@ -167,13 +159,16 @@ void NCX1_CX1 (const coord relnl, const double delta,
   if ((relnl.x < -0.9*delta) && (relnl.x > -1.1*delta)) {
 
     if ((relnl.y < -1.9*delta) && (relnl.y > -2.1*delta)) {
-      *weight_id = weight_numbers[6]; *goflag = 1; // middle top cell // sup2deltay
+      *weight_id = weight_numbers[6]; *goflag = 1; // middle top cell 
+      						   // sup2deltay
     }
     if ((relnl.y < -0.9*delta) && (relnl.y > -1.1*delta)) {
-      *weight_id = weight_numbers[8]; *goflag = 1; // middle cell // sup1deltay
+      *weight_id = weight_numbers[8]; *goflag = 1; // middle cell 
+      						   // sup1deltay
     }
     if (fabs(relnl.y) < 0.1*delta) {
-      *weight_id = weight_numbers[4]; *goflag = 1; // middle bottom cell // sup0deltay
+      *weight_id = weight_numbers[4]; *goflag = 1; // middle bottom cell 
+      						   // sup0deltay
     }
   }
   
@@ -182,13 +177,16 @@ void NCX1_CX1 (const coord relnl, const double delta,
   if (fabs(relnl.x) < 0.1*delta) {
     
     if((relnl.y < -1.9*delta) && (relnl.y > -2.1*delta)) {
-      *weight_id = weight_numbers[3]; *goflag = 1; // left top cell // sup2deltay
+      *weight_id = weight_numbers[3]; *goflag = 1; // left top cell 
+      						   // sup2deltay
     }
     if((relnl.y < -0.9*delta) && (relnl.y > -1.1*delta)) {
-      *weight_id = weight_numbers[7]; *goflag = 1; // left middle cell // sup1deltay
+      *weight_id = weight_numbers[7]; *goflag = 1; // left middle cell 
+      						   // sup1deltay
     }
     if(fabs(relnl.y) < 0.1*delta) {
-      *weight_id = weight_numbers[0]; *goflag = 1; // left bottom cell // sup0deltay
+      *weight_id = weight_numbers[0]; *goflag = 1; // left bottom cell 
+      						   // sup0deltay
     }
   }
 
@@ -199,8 +197,8 @@ void NCX1_CX1 (const coord relnl, const double delta,
 
 
 //----------------------------------------------------------------------------
-void NCX1_CX2 (const coord relnl, const double delta, 
-	const int weight_numbers[9], int * weight_id, size_t * goflag) 
+void NCX1_CX2( const coord relnl, const double delta, 
+	const int weight_numbers[9], int * weight_id, size_t * goflag ) 
 //----------------------------------------------------------------------------
 {
   // weight_numbers[2] -> right column top
@@ -2287,9 +2285,9 @@ void NCX41_CX41 (const coord relnl, const double delta, int * weight_id,
 
 
 //----------------------------------------------------------------------------
-void assign_weight_id_quad_outward (const int NCX, const int CX, 
+void assign_weight_id_quad_outward( const int NCX, const int CX, 
 	const coord relnl, const double Delta, int * weight_id, 
-	size_t * goflag) 
+	size_t * goflag ) 
 //----------------------------------------------------------------------------
 {
   double delta = Delta;
@@ -3089,10 +3087,10 @@ double compute_weight_Quad (const int weight_id, const coord posb ,
       weight_NCX4_CX4 (poslocal, Delta, &x1, &y1);
   }
   
-  posref.x = (posb.x - x1)/(2.*Delta);
-  posref.y = (posb.y - y1)/(2.*Delta);
+  posref.x = GENERAL_1DIST( posb.x, x1 ) / ( 2. * Delta );
+  posref.y = GENERAL_1DIST( posb.y, y1 ) / ( 2. * Delta );
     
-  return weight = Q2weighting(weight_id, posref.x, posref.y, 0. );
+  return weight = Q2weighting( weight_id, posref.x, posref.y, 0. );
   
 #elif dimension == 3
   double z1 = 0.;
@@ -3451,11 +3449,11 @@ double compute_weight_Quad (const int weight_id, const coord posb ,
   }
   // ok z1 for NCX = 41
   
-  posref.x = (posb.x - x1)/(2*Delta); 
-  posref.y = (posb.y - y1)/(2*Delta);
-  posref.z = (posb.z - z1)/(2*Delta);
+  posref.x = GENERAL_1DIST( posb.x, x1 ) / ( 2. * Delta );
+  posref.y = GENERAL_1DIST( posb.y, y1 ) / ( 2. * Delta );
+  posref.z = GENERAL_1DIST( posb.z, z1 ) / ( 2. * Delta );
   
-  return weight = Q2weighting(weight_id, posref.x, posref.y, posref.z); 
+  return weight = Q2weighting( weight_id, posref.x, posref.y, posref.z ); 
 #endif
 }
 
@@ -3502,7 +3500,6 @@ void assign_dial_fd_boundary( particle* p, const coord posb,
 {
   bool isin_xp = false, isin_yp = false, isin_zp = false;  
   double RDelta = Delta / 100.;
-  coord checkpt;
 
   switch ( p->shape )
   {
@@ -3518,21 +3515,9 @@ void assign_dial_fd_boundary( particle* p, const coord posb,
       break;
 	  
     case CUBE:
-      checkpt.x = posb.x + RDelta;
-      checkpt.y = posb.y;
-      checkpt.z = posb.z;      
-      isin_xp = is_in_Cube( &(p->g.pgp->u1), &(p->g.pgp->v1), 
-    	&(p->g.pgp->w1), &(p->g.pgp->mins), &(p->g.pgp->maxs), &checkpt );
-      checkpt.x = posb.x;
-      checkpt.y = posb.y + RDelta;
-      checkpt.z = posb.z;
-      isin_yp = is_in_Cube( &(p->g.pgp->u1), &(p->g.pgp->v1), 
-    	&(p->g.pgp->w1), &(p->g.pgp->mins), &(p->g.pgp->maxs), &checkpt );	
-      checkpt.x = posb.x;
-      checkpt.y = posb.y;
-      checkpt.z  = posb.z + RDelta;
-      isin_zp = is_in_Cube( &(p->g.pgp->u1), &(p->g.pgp->v1), 
-    	&(p->g.pgp->w1), &(p->g.pgp->mins), &(p->g.pgp->maxs), &checkpt );
+      isin_xp = is_in_Cube( posb.x + RDelta, posb.y, posb.z, gp );
+      isin_yp = is_in_Cube( posb.x, posb.y + RDelta, posb.z, gp );
+      isin_zp = is_in_Cube( posb.x, posb.y, posb.z + RDelta, gp );
       break;
 
     case TETRAHEDRON:

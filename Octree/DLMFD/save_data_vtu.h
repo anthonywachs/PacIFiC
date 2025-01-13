@@ -1,11 +1,26 @@
 /** 
 # Wrapper for output functions with Paraview
 */
+
+# ifndef PARAVIEW_DATATYPE_DOUBLE
+#   define PARAVIEW_DATATYPE_DOUBLE 0 // 1 for double and 0 for float
+# endif
+# if ( PARAVIEW_DATATYPE_DOUBLE == 1 )
+#   define PARAVIEW_DATATYPE double
+#   define PARAVIEW_DATANAME "Float64"
+# else
+#   define PARAVIEW_DATATYPE float
+#   define PARAVIEW_DATANAME "Float32"
+# endif
+# ifndef PARAVIEW_BINFILE
+#   define PARAVIEW_BINFILE 1
+# endif
+
 # include "DLMFD_Output_vtu_foreach.h"
 
 
 //----------------------------------------------------------------------------
-void output_pvd( FILE * fp, char const* times_series )
+void output_pvd( FILE* fp, char const* times_series )
 //----------------------------------------------------------------------------
 {
   fputs( "<?xml version=\"1.0\"?>\n"
@@ -21,7 +36,7 @@ void output_pvd( FILE * fp, char const* times_series )
 
 
 //----------------------------------------------------------------------------
-void save_data( scalar * list, vector * vlist, double const time )
+void save_data( scalar* list, vector* vlist, double const time )
 //----------------------------------------------------------------------------
 {
   static int cycle_number = 0; 
@@ -41,7 +56,8 @@ void save_data( scalar * list, vector * vlist, double const time )
   strcat( filename_vtu, suffix );
  
   fpvtk = fopen( filename_vtu, "w" );
-  output_vtu_bin_foreach( list, vlist, fpvtk, false );
+  if ( PARAVIEW_BINFILE ) output_vtu_bin_foreach( list, vlist, fpvtk, false );
+  else output_vtu_ascii_foreach( list, vlist, fpvtk, false );  
   fclose( fpvtk );
    
   // Write the PVTU file  
@@ -55,10 +71,11 @@ void save_data( scalar * list, vector * vlist, double const time )
 
     fpvtk = fopen( filename_pvtu, "w" );
     
-    sprintf ( filename_vtu, "%s", result_fluid_rootfilename );
+    sprintf( filename_vtu, "%s", result_fluid_rootfilename );
     sprintf( suffix, "_T%d", cycle_number );
     strcat( filename_vtu, suffix );
-    output_pvtu_bin ( list, vlist, fpvtk, filename_vtu );
+    if ( PARAVIEW_BINFILE ) output_pvtu_bin( list, vlist, fpvtk, filename_vtu );
+    else output_pvtu_ascii( list, vlist, fpvtk, filename_vtu );    
 
     fclose( fpvtk );
   }
@@ -224,7 +241,7 @@ void output_vtu_dlmfd_bpts( particle const* allpart, const int np,
         fprintf( fdlm, "%d ", j+1 );
       fprintf( fdlm, "\n" );		
       fputs( "</DataArray>\n", fdlm );
-      fputs( "<DataArray type=\"Int64\" Name=\"types\" "
+      fputs( "<DataArray type=\"Int8\" Name=\"types\" "
       	"format=\"ascii\">\n", fdlm );
       for (int j = 0; j < total_boundary_points; j++)
         fprintf( fdlm, "1 " );
@@ -261,7 +278,7 @@ void output_vtu_dlmfd_intpts( particle const* allpart, const int np,
     
     for (int k = 0; k < np; k++) 
       foreach(serial)
-        if ( flagfield[] < 1 && (int)index_lambda.y[] == k )
+        if ( DLM_Flag[] < 1 && (int)DLM_Index.y[] == k )
        	  number_interior_points += 1;
      
     double* interior_coordx = NULL;
@@ -282,7 +299,7 @@ void output_vtu_dlmfd_intpts( particle const* allpart, const int np,
     int counter = 0;
     for (int k = 0; k < np; k++) 
       foreach(serial)
-     	if ( flagfield[] < 1 && (int)index_lambda.y[] == k ) 
+     	if ( DLM_Flag[] < 1 && (int)DLM_Index.y[] == k ) 
        	{
           interior_coordx[counter] = x;
           interior_coordy[counter] = y;
@@ -393,7 +410,7 @@ void output_vtu_dlmfd_intpts( particle const* allpart, const int np,
         fprintf( fdlm, "%d ", j+1 );
       fprintf( fdlm, "\n" );		
       fputs( "</DataArray>\n", fdlm );
-      fputs( "<DataArray type=\"Int64\" Name=\"types\" "
+      fputs( "<DataArray type=\"Int8\" Name=\"types\" "
       	"format=\"ascii\">\n", fdlm );
       for (int j = 0; j < total_interior_points; j++)
         fprintf( fdlm, "1 " );

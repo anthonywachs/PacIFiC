@@ -77,6 +77,13 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
 	MRxx = 0., MRxy = 0., MRxz = 0., MRyx = 0., MRyy = 0., MRyz = 0.,
 	MRzx = 0., MRzy = 0., MRzz = 0.;
   int ncornersp = 0;
+  char particleTag[3] = "";
+  char particleDefaultTagPer[] = "PP";    
+  int nperclonesp = 0;
+  double* vecx = NULL;
+  double* vecy = NULL;
+  double* vecz = NULL;  
+  
   for (size_t k = 0; k < npart_; k++) 
   { 
     GeomParameter* gg = &(allpart[k].g);
@@ -95,7 +102,8 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
     
     // Read the particle type: standard, periodic or obstacle (not used for now)
     token = strtok( NULL, " " );
-    
+    sscanf( token, "%s", particleTag );
+        
     // Read Ux
     token = strtok( NULL, " " );
     sscanf( token, "%lf", &Ux );
@@ -208,6 +216,35 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
       sscanf( token, "%lf", &gz );
 #   endif                    
 
+    // If particleTag is "PP", read periodic clone vectors
+    if ( !strcmp( particleTag, particleDefaultTagPer ) )
+    {
+      // Read the number of clones
+      token = strtok( NULL, " " );
+      sscanf( token, "%d", &nperclonesp);
+      vecx = (double*) malloc( nperclonesp * sizeof(double) );
+      vecy = (double*) malloc( nperclonesp * sizeof(double) );
+      vecz = (double*) malloc( nperclonesp * sizeof(double) );
+      
+      // Read the periodic clone vectors
+      for (size_t j = 0; j < nperclonesp; j++)
+      {
+        // Read vecx
+	token = strtok( NULL, " " );
+	sscanf( token, "%lf", &vecx[j] );
+
+	// Read vecy
+	token = strtok( NULL, " " );
+	sscanf( token, "%lf", &vecy[j] );
+
+#       if dimension == 3
+	  // Read vecz
+	 token = strtok( NULL, " " );
+	 sscanf( token, "%lf", &vecz[j] );
+#        endif
+      }                 
+    }
+
     // Read radius
     token = strtok( NULL, " " );
     sscanf( token, "%lf", &radiusp );
@@ -307,6 +344,7 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
       allpart[k].RotMat[2][1] = 0.;
 #   endif
     allpart[k].RotMat[2][2] = MRzz;        
+    strcpy( allpart[k].tag, particleTag ); 
     gg->center.x = gx;
     gg->center.y = gy;
 #   if dimension == 3
@@ -315,7 +353,27 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
       gg->center.z = 0.;      
 #   endif
     gg->ncorners = ncornersp;
-    gg->radius = radiusp;             
+    gg->radius = radiusp; 
+    gg->nperclones = nperclonesp;    
+    if ( nperclonesp )
+    {
+	gg->perclonecenters = (coord*) malloc( nperclonesp * sizeof(coord) );
+	for (int j=0; j < nperclonesp; j++)
+ 	{
+          gg->perclonecenters[j].x = gx + vecx[j];
+ 	  gg->perclonecenters[j].y = gy + vecy[j];
+#         if dimension == 3
+	    gg->perclonecenters[j].z = gz + vecz[j];
+#         else
+	    gg->perclonecenters[j].z = 0.;
+#         endif
+   	}
+
+	// Free the vecx pointers
+	free(vecx);
+	free(vecy);
+	free(vecz);      
+    }            
     
     // DLMFD coupling factor
     // If fluidCorrectedAcceleration_ == true, DLMFD_couplingFactor = 
