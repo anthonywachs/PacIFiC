@@ -5,7 +5,7 @@
 
 /** Tests whether a point lies inside the 2D circular cylinder */
 //----------------------------------------------------------------------------
-bool is_in_CircularCylinder2D( const double x, const double y, 
+bool is_in_CircularCylinder2D_clone( const double x, const double y, 
 	const GeomParameter gp )
 //----------------------------------------------------------------------------
 {
@@ -15,62 +15,98 @@ bool is_in_CircularCylinder2D( const double x, const double y,
 
 
 
-/** Computes the number of boundary points on the surface of the 2D circular 
+/** Tests whether a point lies inside the 2D circular cylinder or any of its 
+periodic clones */
+//----------------------------------------------------------------------------
+bool is_in_CircularCylinder2D( const double x, const double y, 
+	const GeomParameter gp )
+//----------------------------------------------------------------------------
+{
+  // Check if it is in the master particle
+  bool status = is_in_CircularCylinder2D_clone( x, y, gp );
+
+  // Check if it is in any clone particle
+  if ( gp.nperclones && !status )
+    for (int i = 0; i < gp.nperclones && !status; i++)
+    {
+      GeomParameter clones = gp;
+      clones.center = gp.perclonecenters[i];
+      status = is_in_CircularCylinder2D_clone( x, y, clones );
+    }
+
+  return status;
+}
+
+
+
+
+/** Tests whether a point lies inside the 2D circular cylinder or any of its 
+periodic clones and assign the proper center of mass coordinates associated to
+this point */
+//----------------------------------------------------------------------------
+bool in_which_CircularCylinder2D( double x1, double y1, 
+	const GeomParameter gp, vector PeriodicRefCenter, 
+	const bool setPeriodicRefCenter )
+//----------------------------------------------------------------------------
+{
+  // Check if it is in the master particle
+  bool status = is_in_CircularCylinder2D_clone( x1, y1, gp );
+  if ( status )
+  {
+    Cache poscache = {0};
+    Point lpoint;
+    lpoint = locate( x1, y1 );
+
+    if ( lpoint.level > -1 )
+    {
+      cache_append( &poscache, lpoint, 0 );
+      foreach_cache(poscache)
+        foreach_dimension()
+          PeriodicRefCenter.x[] = gp.center.x;
+      free( poscache.p );
+    }
+  }
+
+  //  Check if it is in any clone particle
+  if ( gp.nperclones && !status )
+    for (int i = 0; i < gp.nperclones && !status; i++) 
+    {
+      GeomParameter clones = gp;
+      clones.center = gp.perclonecenters[i];
+      status = is_in_CircularCylinder2D_clone( x1, y1, clones );
+      if ( status && setPeriodicRefCenter )
+      {
+        Cache poscache = {0};
+	Point lpoint;
+	lpoint = locate( x1, y1 );
+	
+	if ( lpoint.level > -1 )
+	{
+	  cache_append( &poscache, lpoint, 0 );
+	  foreach_cache(poscache)
+	    foreach_dimension()
+	      PeriodicRefCenter.x[] = clones.center.x;
+          free( poscache.p );
+        }
+      }
+    }
+
+  return status;
+}
+
+
+
+
+/** Computes the number of boundary points on the perimeter of the 2D circular 
 cylinder */
 //----------------------------------------------------------------------------
 void compute_nboundary_CircularCylinder2D( const GeomParameter gcp, int* nb ) 
 //----------------------------------------------------------------------------
 {
-  coord pos[6];
-  Cache poscache = {0};
-  Point lpoint;
-   
-  pos[0].x = gcp.center.x + gcp.radius + X0;
-  pos[0].y = gcp.center.y + Y0;
+  double delta = L0 / (double)(1 << MAXLEVEL) ; 
 
-  pos[1].x = gcp.center.x - gcp.radius + X0;
-  pos[1].y = gcp.center.y + Y0;
-
-  pos[2].x = gcp.center.x + X0;
-  pos[2].y = gcp.center.y + gcp.radius + Y0;
-
-  pos[3].x = gcp.center.x + X0;
-  pos[3].y = gcp.center.y - gcp.radius + Y0;
-  
-  *nb = 0;
-  lpoint.level = -1;
-  int ip = 0;
-  
-  /* We assume that around the circular cylinder at least one point has to be 
-     at maximum level of refinement. */
-  for (ip = 0; ip < dimension*2; ip++) 
-  {
-    lpoint = locate( pos[ip].x, pos[ip].y );
-    if ( lpoint.level == depth() )
-      break;
-  }
-  
-  /** Multiple threads can have a different point at the same level of
-      refinement. This is fine, they will do the same computation for
-      *nb. This problem does not exist in serial but the code below
-      still works. */
-  if ( lpoint.level == depth() ) 
-  {           
-    /** Only this thread creates the Cache ... */
-    cache_append( &poscache, lpoint, 0 );
-
-    /** and only this thread computes the number of boundary points ... */
-    foreach_cache(poscache) 
-      *nb += (int)( floor( gcp.radius * 2. * pi / ( sqrt(2.) * Delta ) ) );
-
-    /** and finally, this thread destroys the cache. */    
-    free( poscache.p );
-  }
-
-#if _MPI
-  MPI_Barrier( MPI_COMM_WORLD );
-  mpi_all_reduce ( *nb, MPI_INT, MPI_MAX );
-#endif
+  *nb = (int)( floor( 2. * pi * gcp.radius
+	/ ( INTERBPCOEF * delta ) ) );
       
   if( *nb == 0 )
     printf( "nboundary = 0: No boundary points !!!\n" );
@@ -81,22 +117,21 @@ void compute_nboundary_CircularCylinder2D( const GeomParameter gcp, int* nb )
 
 /** Creates boundary points on the surface of the 2D circular cylinder */
 //----------------------------------------------------------------------------
-void create_FD_Boundary_CircularCylinder2D( GeomParameter gcp, 
-	SolidBodyBoundary* dlm_bd, const int nsphere, vector pshift ) 
+void create_FD_Boundary_CircularCylinder2D( GeomParameter gcp,
+	SolidBodyBoundary* dlm_bd, const int nsphere, 
+	vector* pPeriodicRefCenter, const bool setPeriodicRefCenter  ) 
 //----------------------------------------------------------------------------
 {
-
   int m = nsphere;
-  coord pos;
-  pos.z = 0.;
+  coord pos; pos.z = 0.;
   Point lpoint;
   
   coord shift = {0., 0., 0.};
-  coord ori = {X0, Y0, Z0};
+  coord ori = {X0, Y0, 0.};
  
   int i;
   double theta[m];
-  double radius  = gcp.radius;
+  double radius = gcp.radius;
   coord fact_theta[m];
   
   for (i = 0; i < m; i++) 
@@ -105,46 +140,51 @@ void create_FD_Boundary_CircularCylinder2D( GeomParameter gcp,
     fact_theta[i].x = cos( theta[i] );
     fact_theta[i].y = sin( theta[i] );
     
-    /* Assign positions x,y on a circle's boundary */ 
+    /* Assign positions x, y on the circular cylinder boundary */ 
     pos.x = radius * fact_theta[i].x + gcp.center.x + X0;
     pos.y = radius * fact_theta[i].y + gcp.center.y + Y0;
 
-    /* Check if the point falls outside of the domain */
-    foreach_dimension() 
+    /* Check if the point falls outside of the domain */    
+    foreach_dimension()
     {
-      if ( Period.x ) 
+      shift.x = 0.;      
+      if ( Period.x )
       {
-	shift.x = 0.;
-	if ( pos.x > L0 + ori.x ) 
-	{
+	if ( pos.x > L0 + ori.x )
+	{  
 	  pos.x -= L0;
-	  shift.x = -L0;
-	} 
-	if ( pos.x < 0. + ori.x ) 
+	  shift.x = - L0;
+	}
+        else if ( pos.x < 0. + ori.x )
 	{
 	  pos.x += L0;
 	  shift.x = L0;
 	}
       }
-      dlm_bd->x[i] = pos.x; 
     }
    
-    Cache poscache = {0};
-    lpoint = locate( pos.x, pos.y );
+    if ( setPeriodicRefCenter )
+    {
+      // Setting the periodic clone center vector field
+      Cache poscache = {0};
+      lpoint = locate( pos.x, pos.y );
 
-    if ( lpoint.level > -1 ) 
-    {	
-      cache_append( &poscache, lpoint, 0 );
-
-      foreach_cache(poscache) 
-	foreach_dimension()
-	  pshift.x[] = shift.x;
-      
-      free( poscache.p );
+      if ( lpoint.level > -1 )
+      {
+        cache_append( &poscache, lpoint, 0 );
+        foreach_cache(poscache)
+          foreach_dimension()
+            pPeriodicRefCenter->x[] = gcp.center.x + shift.x;
+        free( poscache.p );
+      }
     }
+
+    dlm_bd->x[i] = pos.x;
+    dlm_bd->y[i] = pos.y;
   }
-  
-//  boundary((scalar*){pshift});
+
+  if ( setPeriodicRefCenter ) synchronize((scalar*){pPeriodicRefCenter->x,
+  	pPeriodicRefCenter->y, pPeriodicRefCenter->z});
 }
 
 
@@ -152,78 +192,27 @@ void create_FD_Boundary_CircularCylinder2D( GeomParameter gcp,
 
 /** Finds cells lying inside the 2D circular cylinder */
 //----------------------------------------------------------------------------
-void create_FD_Interior_CircularCylinder2D( particle* p, vector Index_lambda, 
-	vector shift, scalar flag )
+void create_FD_Interior_CircularCylinder2D( particle* p, vector Index,
+	vector PeriodicRefCenter )
 //----------------------------------------------------------------------------
 {
   GeomParameter gci = p->g;
   Cache* fd = &(p->Interior);
-  
+
   /** Create the cache for the interior points */
-  foreach() 
+  foreach()
   {
-    if ((sq(x - (gci.center.x + X0)) + sq(y - (gci.center.y + Y0))) 
-	< sq(gci.radius)) 
+    bool in_clone;
+    in_clone = in_which_CircularCylinder2D( x, y, gci, PeriodicRefCenter, 
+    	true );
+    if ( in_clone )
     {
-      cache_append (fd, point, 0);
-      
-      /* tag cell with the number of the particle */
-      if ((int)Index_lambda.y[] == -1)
-	Index_lambda.y[] = p->pnum; 
+      cache_append( fd, point, 0 );
+      if ( (int)Index.y[] == -1 )
+        Index.y[] = p->pnum;
     }
-
-    if (Period.x) {
-      if ((sq(x - L0 - (gci.center.x + X0)) + sq(y - (gci.center.y + Y0))) 
-	< sq(gci.radius)) 
-      {
-    	cache_append (fd, point, 0);
-	
-    	/* tag cell with the number of the particle */
-    	if ((int)Index_lambda.y[] == -1) 
-    	  Index_lambda.y[] = p->pnum;
-	if ((int)Index_lambda.y[] == p->pnum)
-	  shift.x[] = L0;
-      }
-      if ((sq(x + L0 - (gci.center.x + X0)) + sq(y - (gci.center.y + Y0))) 
-      	< sq(gci.radius)) 
-      {
-    	cache_append (fd, point, 0);
-
-	/* tag cell with the number of the particle */
-    	if ((int)Index_lambda.y[] == -1) 
-    	  Index_lambda.y[] = p->pnum;
-	if ((int)Index_lambda.y[] == p->pnum)
-	  shift.x[] = -L0;
-      }
-    }
-   
-    if (Period.y) {
-      if ((sq(x - (gci.center.x + X0)) + sq(y - L0 - (gci.center.y + Y0))) 
-      	< sq(gci.radius)) 
-      {
-    	cache_append (fd, point, 0);
-	
-	/* tag cell with the number of the particle */
-	if ((int)Index_lambda.y[] == -1) {
-	  Index_lambda.y[] = p->pnum;
-	  if (flag[] < 1)
-	    shift.y[] = L0;
-	}
-      }
-      if ((sq(x - (gci.center.x + X0)) + sq(y + L0 - (gci.center.y + Y0))) 
-      	< sq(gci.radius)) 
-      {
-    	cache_append (fd, point, 0);
-	
-	/* tag cell with the number of the particle */
-	if ((int)Index_lambda.y[] == -1) {
-	  Index_lambda.y[] = p->pnum;
-	  if (flag[] < 1)
-	    shift.y[] = -L0;
-	}
-      }
-    }        
   }
+
   cache_shrink( fd );
 }
 

@@ -4,6 +4,7 @@
 
 
 /** Tests whether a point lies inside the sphere */
+//----------------------------------------------------------------------------
 bool is_in_Sphere_clone( const double x, const double y, const double z,
 	const GeomParameter gp )
 //----------------------------------------------------------------------------
@@ -44,17 +45,18 @@ bool is_in_Sphere( const double x, const double y, const double z,
 periodic clones and assign the proper center of mass coordinates associated to
 this point */
 //----------------------------------------------------------------------------
-bool in_which_Sphere( double x, double y, double z,
-	const GeomParameter gp, vector PeriodicRefCenter )
+bool in_which_Sphere( double x1, double y1, double z1,
+	const GeomParameter gp, vector PeriodicRefCenter, 
+	const bool setPeriodicRefCenter )
 //----------------------------------------------------------------------------
 {
   // Check if it is in the master particle
-  bool status = is_in_Sphere_clone( x, y, z, gp );
+  bool status = is_in_Sphere_clone( x1, y1, z1, gp );
   if ( status )
   {
     Cache poscache = {0};
     Point lpoint;
-    lpoint = locate(x, y, z);
+    lpoint = locate( x1, y1, z1 );
 
     if ( lpoint.level > -1 )
     {
@@ -67,17 +69,17 @@ bool in_which_Sphere( double x, double y, double z,
   }
 
   //  Check if it is in any clone particle
-  if( gp.nperclones && !status )
+  if ( gp.nperclones && !status )
     for (int i = 0; i < gp.nperclones && !status; i++) 
     {
       GeomParameter clones = gp;
       clones.center = gp.perclonecenters[i];
-      status = is_in_Sphere_clone( x, y, z, clones );
-      if ( status )
+      status = is_in_Sphere_clone( x1, y1, z1, clones );
+      if ( status && setPeriodicRefCenter )
       {
         Cache poscache = {0};
 	Point lpoint;
-	lpoint = locate(x, y, z);
+	lpoint = locate( x1, y1, z1 );
 	
 	if ( lpoint.level > -1 )
 	{
@@ -179,6 +181,7 @@ void create_FD_Boundary_Sphere( GeomParameter gcp,
     pos.y = hydro_radius * sin( phik ) * sin( thetak ) + gcp.center.y;
     pos.z = hydro_radius * cos( thetak ) + gcp.center.z;
 
+    /* Check if the point falls outside of the domain */    
     foreach_dimension()
     {
       shift.x = 0.;      
@@ -238,7 +241,7 @@ void create_FD_Interior_Sphere( particle* p, vector Index,
   foreach()
   {
     bool in_clone;
-    in_clone = in_which_Sphere ( x, y, z, gci, PeriodicRefCenter );
+    in_clone = in_which_Sphere( x, y, z, gci, PeriodicRefCenter, true );
     if ( in_clone )
     {
       cache_append( fd, point, 0 );

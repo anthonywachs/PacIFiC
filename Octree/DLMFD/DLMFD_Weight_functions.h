@@ -3542,13 +3542,7 @@ void assign_dial_fd_boundary( particle* p, const coord posb,
       isin_xp = is_in_Icosahedron( posb.x + RDelta, posb.y, posb.z, gp );
       isin_yp = is_in_Icosahedron( posb.x, posb.y + RDelta, posb.z, gp );
       isin_zp = is_in_Icosahedron( posb.x, posb.y, posb.z + RDelta, gp );
-      break;     
-
-    case TRANCOCTAHEDRON:
-      isin_xp = is_in_Trancoctahedron( posb.x + RDelta, posb.y, posb.z, gp );
-      isin_yp = is_in_Trancoctahedron( posb.x, posb.y + RDelta, posb.z, gp );
-      isin_zp = is_in_Trancoctahedron( posb.x, posb.y, posb.z + RDelta, gp );
-      break;      
+      break;         
 	  
     default:
       fprintf( stderr,"Unknown Rigid Body shape !!\n" );

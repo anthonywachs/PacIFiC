@@ -1,17 +1,99 @@
-/** 
-# Set of functions for a tetrahedron 
+/**
+# Set of functions for a tetrahedron
 */
 
-
+/** Periodic correction */
 //----------------------------------------------------------------------------
-int determ_posi_plane_Tetrahedron( coord* pointOne, coord* pointTwo, 
-	coord* pointThree, coord* pointCheck ) 
+void periodic_correction_Tetra( GeomParameter* gcp, coord* pos, 
+	vector* pPeriodicRefCenter, const bool setPeriodicRefCenter )
+//----------------------------------------------------------------------------
+{
+  coord ori = {X0, Y0, Z0};
+  coord shift = {0., 0., 0.};
+  Point lpoint;
+
+  foreach_dimension()
+  {
+    if ( Period.x )
+    {
+      shift.x = 0.;
+      if ( pos->x > L0 + ori.x )
+      {
+        pos->x -= L0;
+        shift.x = -L0;
+      }
+      if ( pos->x < 0. + ori.x )
+      {
+        pos->x += L0;
+        shift.x = L0;
+      }
+    }
+  }
+
+  if ( setPeriodicRefCenter )
+  {
+    Cache poscache = {0};
+    lpoint = locate( pos->x, pos->y, pos->z );
+
+    if ( lpoint.level > -1 )
+    {
+      cache_append( &poscache, lpoint, 0 );
+      foreach_cache(poscache)
+        foreach_dimension()
+          pPeriodicRefCenter->x[] = gcp->center.x + shift.x;
+      free( poscache.p );
+    }
+  }
+}
+
+
+
+
+/** Distributes points on an edge of the tetrahedron */
+//----------------------------------------------------------------------------
+void distribute_points_edge_Tetrahedron( GeomParameter* gcp, coord const corner1, 
+	coord const corner2, SolidBodyBoundary* dlm_bd, int const lN, 
+	int const istart, vector* pPeriodicRefCenter, 
+	const bool setPeriodicRefCenter )
+//----------------------------------------------------------------------------
+{
+  if ( lN > 0 )
+  {
+    coord dinc;
+    coord pos;
+
+    foreach_dimension()
+      dinc.x = (corner2.x - corner1.x)/(lN-1);
+
+    for (int i = 1; i <= lN-2; i++)
+    {
+      pos.x = corner1.x + (double)i * dinc.x;
+      pos.y = corner1.y + (double)i * dinc.y;
+      pos.z = corner1.z + (double)i * dinc.z;
+
+      periodic_correction( gcp, &pos, pPeriodicRefCenter, 
+      	setPeriodicRefCenter );
+      
+      dlm_bd->x[istart + i -1] = pos.x;
+      dlm_bd->y[istart + i -1] = pos.y;
+      dlm_bd->z[istart + i -1] = pos.z;
+    }
+  }
+}
+
+
+
+
+/** Determines on which side of a plane a point is */
+//----------------------------------------------------------------------------
+int determ_posi_plane_Tetrahedron( coord* pointOne, coord* pointTwo,
+	coord* pointThree, coord* pointCheck )
 //----------------------------------------------------------------------------
 {
   // Equation of the plan: ax + by + cz + k = 0
   double x1 = pointOne->x;
   double y1 = pointOne->y;
-  double z1 = pointOne->z;	
+  double z1 = pointOne->z;
   double x2 = pointTwo->x;
   double y2 = pointTwo->y;
   double z2 = pointTwo->z;
@@ -21,42 +103,41 @@ int determ_posi_plane_Tetrahedron( coord* pointOne, coord* pointTwo,
   double xc = pointCheck->x;
   double yc = pointCheck->y;
   double zc = pointCheck->z;
-	
+
   // Compute coefficients a, b, c
   double cross_a = (y2 - y1) * (z3 - z2) - (z2 - z1) * (y3 - y2);
   double cross_b = (z2 - z1) * (x3 - x2) - (x2 - x1) * (z3 - z2);
   double cross_c = (x2 - x1) * (y3 - y2) - (y2 - y1) * (x3 - x2);
 
-  // Compute the value of k, which is also the result fater plugging in the 
-  // geometry center (0, 0, 0)
+  // Compute the value of k
   double k =  - (cross_a*x1 + cross_b*y1 + cross_c*z1);
 
-  // Plugin the tested point (x, y, z)
+  // Plugin the tested point (xc, yc, zc)
   double check_value  = cross_a*xc + cross_b*yc + cross_c*zc + k;
 
-  // Determine the position relation of the test point relative to the plan
+  // Determine the position of the test point relative to the plan
   // created by three surface points
   int retVal;
   if ( fabs( check_value ) > 1.e-13 )
-    retVal = (k*check_value > 0) - (k*check_value < 0); 
-  else 
+    retVal = (k*check_value > 0) - (k*check_value < 0);
+  else
     retVal = 0;
 
   return retVal;
-}	
+}
 
 
 
 
 /** Tests whether a point lies inside the tetrahedron */
 //----------------------------------------------------------------------------
-bool is_in_Tetrahedron( const double x, const double y, const double z, 
-	const GeomParameter gp )
+bool is_in_Tetra_clone(double x, double y, double z,
+	GeomParameter gp)
 //----------------------------------------------------------------------------
 {
-  GeomParameter const* gcp = &gp;
-  
-  // Coordinates of the checkpoint, relative to the gometry center
+  GeomParameter* gcp = &gp;
+
+  //Coordinates of the checkpoint, relative to the center of mass
   coord checkpt;
   checkpt.x = x - gcp->center.x;
   checkpt.y = y - gcp->center.y;
@@ -68,43 +149,43 @@ bool is_in_Tetrahedron( const double x, const double y, const double z,
   ichoice = 0;
   int npoints;
 
-  int* position = (int *) calloc(nfaces, sizeof(int));
+  int *position = (int *) calloc(nfaces, sizeof(int));
 
-  for (int i = 0; i < nfaces; i++) 
+  for (int i = 0; i < nfaces; i++)
   {
     npoints = gcp->pgp->numPointsOnFaces[i];
-  
+
     iref = gcp->pgp->cornersIndex[i][ichoice];
     i1 = gcp->pgp->cornersIndex[i][ichoice + 1];
     i2 = gcp->pgp->cornersIndex[i][npoints - 1];
 
-    // Compute the coordinate of the three points relative to the 
-    // geometry center 
-    coord refcorner = {gcp->pgp->cornersCoord[iref][0] - gcp->center.x, 
+    //Compute the coordinate of the three points relative to the
+    //geometry center
+    coord refcorner = {gcp->pgp->cornersCoord[iref][0] - gcp->center.x,
     	gcp->pgp->cornersCoord[iref][1] - gcp->center.y,
-    	gcp->pgp->cornersCoord[iref][2] - gcp->center.z} ; 
+    	gcp->pgp->cornersCoord[iref][2] - gcp->center.z} ;
 
-    coord cornerTwo = {gcp->pgp->cornersCoord[i1][0] - gcp->center.x, 
+    coord cornerTwo = {gcp->pgp->cornersCoord[i1][0] - gcp->center.x,
     	gcp->pgp->cornersCoord[i1][1] - gcp->center.y,
     	gcp->pgp->cornersCoord[i1][2] - gcp->center.z};
 
-    coord cornerThree = {gcp->pgp->cornersCoord[i2][0] - gcp->center.x, 
+    coord cornerThree = {gcp->pgp->cornersCoord[i2][0] - gcp->center.x,
     	gcp->pgp->cornersCoord[i2][1] - gcp->center.y,
     	gcp->pgp->cornersCoord[i2][2] - gcp->center.z};
-    
-    // Judge if the point lies at the same side with origin 
+
+    // Judge if the point lies at the same side with origin
     // compared to the plane generated by refcorner, cornerTwo
     // and cornerThree
-    position[i]  = determ_posi_plane_Tetrahedron( &refcorner, &cornerTwo, 
-	        &cornerThree, &checkpt );
+    position[i]  = determ_posi_plane_Tetrahedron(&refcorner, &cornerTwo,
+	        &cornerThree, &checkpt);
   }
 
   bool isin=false;
   int all_position = 0;
-  for (int i = 0; i < nfaces; i++) all_position += position[i] ;
+  for(int i = 0; i < nfaces; i++) all_position += position[i] ;
 
-  // The test point lies inside the polyhedron only if it lies on the same side
-  //  as the geometry center relative to all faces of the polyhedron
+  // The test point lies inside the polyhedron only if it lies at the same side
+  // as the geometry center relative to all faces of the polyhedron
   if ( all_position == nfaces ) isin = true;
 
   free( position );
@@ -115,72 +196,124 @@ bool is_in_Tetrahedron( const double x, const double y, const double z,
 
 
 
-/** Computes the number of boundary points on the surface of the tetrahedron */
+/** Tests whether a point lies inside the cube or any of its 
+periodic clones */
 //----------------------------------------------------------------------------
-void compute_nboundary_Tetrahedron( GeomParameter* gcp, int* nb, int* lN ) 
+bool is_in_Tetrahedron( double x1, double y1, double z1,
+	const GeomParameter gp )
 //----------------------------------------------------------------------------
 {
-  Cache poscache = {0};
-  Point lpoint;
-  *nb = 0;
-  coord pos = {0., 0., 0.};
-  int ip = 0;
+  // Check if it is in the master particle
+  bool status = is_in_Tetra_clone( x1, y1, z1, gp );
+  
+  double x2, y2, z2;
 
-  while ( *nb == 0 ) 
+  // Check if it is in any periodic clone particle
+  if ( gp.nperclones && !status )
+    for (int i = 0; i < gp.nperclones && !status; i++)
+    {
+      GeomParameter clones = gp;
+      clones.center = gp.perclonecenters[i];
+      x2 = x1 + gp.center.x - clones.center.x;
+      y2 = y1 + gp.center.y - clones.center.y;
+      z2 = z1 + gp.center.z - clones.center.z;
+      status = is_in_Tetra_clone( x2, y2, z2, gp );
+    }
+
+  return status;
+}
+
+
+
+
+/** Tests whether a point lies inside the sphere */
+//----------------------------------------------------------------------------
+bool in_which_Tetrahedron( double x1, double y1, double z1,
+	const GeomParameter gp, vector* pPeriodicRefCenter, 
+	const bool setPeriodicRefCenter )
+//----------------------------------------------------------------------------
+{
+  // Check if it is in the master particle
+  bool status = is_in_Tetra_clone( x1, y1, z1, gp );    
+  if ( status && setPeriodicRefCenter )
   {
-    pos.x = gcp->pgp->cornersCoord[ip][0];
-    pos.y = gcp->pgp->cornersCoord[ip][1];
-    pos.z = gcp->pgp->cornersCoord[ip][2];
-    lpoint = locate( pos.x, pos.y, pos.z );
-   
-    /** Only one thread has the point in its domain (works in serial
-	too). */
-    if ( lpoint.level > -1 ) 
-    {    
-      /** Only this thread creates the Cache ... */
-      cache_append(&poscache, lpoint, 0); 
+    Cache poscache = {0};
+    Point lpoint;
+    lpoint = locate( x1, y1, z1 );
 
-      /** and only this thread computes the number of boundary points
-	  ... */
-    
-      /* Grains sends the tetrahedron circumscribed radius, so to get the 
-      tetrahedron edge length we multiply by sqrt(8/3) */ 
-      double lengthedge = gcp->radius * sqrt (8.) / sqrt(3.);
-    
-      /* We compute the number of intervals on the tetrahedron  edge */ 
-      foreach_cache (poscache) 
-      {
-	*lN = floor( lengthedge / ( INTERBPCOEF * Delta ) );
-	
-        /* The number of points on a tetrahedron edge is the number of 
-	intervals + 1 */
-        *lN += 1;      
-      }
-      
-      /* number of points required for the 6 edges of the tetrahedron */
-      *nb += (*lN-2)*6;
-      /* number of points required for the 4 faces of the tetrahedron inside a 
-      triangle */
-      *nb += 4*(*lN-2)*(*lN-3)/2.;
-      /* number of points required for the 4 corners */
-      *nb += 4;
-      
-      /** and finally, this thread destroys the cache. */
+    if ( lpoint.level > -1 )
+    {
+      cache_append( &poscache, lpoint, 0 );
+      foreach_cache(poscache)
+        foreach_dimension()
+	  pPeriodicRefCenter->x[] = gp.center.x;
       free( poscache.p );
     }
-  
-#   if _MPI
-      MPI_Barrier( MPI_COMM_WORLD );
-      mpi_all_reduce( *nb, MPI_INT, MPI_MAX );
-      mpi_all_reduce( *lN, MPI_INT, MPI_MAX );
-#   endif
-
-    if ( ip < gcp->ncorners )
-      ip++;
-    else
-      break;
   }
+
+  double x2, y2, z2;
+
+  // Check if it is in any clone particle
+  if ( gp.nperclones && !status )
+    for (int i = 0; i < gp.nperclones && !status; i++) 
+    {
+      GeomParameter clones = gp;
+      clones.center = gp.perclonecenters[i];
+      x2 = x1 + gp.center.x - clones.center.x;
+      y2 = y1 + gp.center.y - clones.center.y;
+      z2 = z1 + gp.center.z - clones.center.z;
+      status = is_in_Tetra_clone( x2, y2, z2, gp );
+      if ( status && setPeriodicRefCenter )
+      {
+        Cache poscache = {0};
+	Point lpoint;
+	lpoint = locate( x1, y1, z1 );
+        
+	if ( lpoint.level > -1 )
+	{
+	  cache_append( &poscache, lpoint, 0 );
+	  foreach_cache(poscache)
+	    foreach_dimension()
+	      pPeriodicRefCenter->x[] = clones.center.x;
+          free( poscache.p );
+	}
+      }
+    }
+
+  return status;
+}
+
+
+
+
+
+/** Computes the number of boundary points on the surface of the tetrahedron */
+//----------------------------------------------------------------------------
+void compute_nboundary_Tetrahedron( GeomParameter* gcp, int* nb, int* lN )
+//----------------------------------------------------------------------------
+{
+  double delta = L0 / (double)(1 << MAXLEVEL) ;  
   
+  /* Grains sends the tetrahedron circumscribed radius, so to get the 
+  tetrahedron edge length we multiply by sqrt(8/3) */
+  double lengthedge = gcp->radius * sqrt (8.) / sqrt(3.);  
+
+  /* We compute the number of intervals on the cube edge */
+  *lN = floor( lengthedge / ( INTERBPCOEF * delta ) );
+
+  /* The number of points on a cube edge is the number of intervals + 1 */
+  *lN += 1;
+  
+  /* Number of points required for the 6 edges of the tetrahedron */
+  *nb += ( *lN - 2 ) * 6;
+  
+  /* Number of points required for the 4 faces of the tetrahedron inside a 
+  triangle */
+  *nb += 4 * ( *lN - 2 ) * ( *lN - 3 ) / 2;
+  
+  /* Number of points required for the 4 corners */
+  *nb += 4;  
+
   if ( *nb == 0 )
     fprintf( stderr,"nboundary = 0: No boundary points for the"
     	" Tetrahedron !!!\n" );
@@ -189,226 +322,177 @@ void compute_nboundary_Tetrahedron( GeomParameter* gcp, int* nb, int* lN )
 
 
 
-/** Distributes points on an edge of the tetrahedron */
-//----------------------------------------------------------------------------
-void distribute_points_edge_Tetrahedron( coord const corner1, 
-	coord const corner2, SolidBodyBoundary* dlm_bd, int const lN, 
-	int const istart ) 
-//----------------------------------------------------------------------------
-{
-  if ( lN > 0 ) 
-  {
-    coord dinc; 
-
-    foreach_dimension()
-      dinc.x = (corner2.x - corner1.x)/(lN-1);
-
-    for (int i = 1; i <= lN-2; i++) 
-    {
-      dlm_bd->x[istart + i -1] = corner1.x + (double)i * dinc.x; 
-      dlm_bd->y[istart + i -1] = corner1.y + (double)i * dinc.y;
-      dlm_bd->z[istart + i -1] = corner1.z + (double)i * dinc.z;
-    }
-  }
-}
-
-
-
-
 /** Creates boundary points on the surface of the tetrahedron */
 //----------------------------------------------------------------------------
-void create_FD_Boundary_Tetrahedron( GeomParameter* gcp, 
-	SolidBodyBoundary* dlm_bd, const int m, const int lN, vector pshift ) 
+void create_FD_Boundary_Tetrahedron( GeomParameter* gcp,
+	SolidBodyBoundary* dlm_bd, const int m, const int lN, 
+	vector* pPeriodicRefCenter, const bool setPeriodicRefCenter )
 //----------------------------------------------------------------------------
 {
   int nfaces = gcp->pgp->allFaces;
-  int iref, i1, i2, ichoice;
-
-  ichoice = 0;
-  int isb = 0;
-  int npoints;
+  int iref, i1, i2, ichoice = 0, isb = 0, npoints;
+  coord pos;
 
   /* Add first interrior points on surfaces */
-  for (int i = 0; i < nfaces; i++) 
+  for (int i = 0; i < nfaces; i++)
   {
     npoints = gcp->pgp->numPointsOnFaces[i];
-    
+
     iref = gcp->pgp->cornersIndex[i][ichoice];
     i1 = gcp->pgp->cornersIndex[i][ichoice + 1];
     i2 = gcp->pgp->cornersIndex[i][npoints-1];
 
-    coord refcorner = {gcp->pgp->cornersCoord[iref][0], 
+    coord refcorner = {gcp->pgp->cornersCoord[iref][0],
     	gcp->pgp->cornersCoord[iref][1],
-    	gcp->pgp->cornersCoord[iref][2]} ; 
+    	gcp->pgp->cornersCoord[iref][2]} ;
 
-    coord dir1 = {gcp->pgp->cornersCoord[i1][0], 
+    coord dir1 = {gcp->pgp->cornersCoord[i1][0],
     	gcp->pgp->cornersCoord[i1][1],
     	gcp->pgp->cornersCoord[i1][2]};
 
-    coord dir2 = {gcp->pgp->cornersCoord[i2][0], 
+    coord dir2 = {gcp->pgp->cornersCoord[i2][0],
     	gcp->pgp->cornersCoord[i2][1],
     	gcp->pgp->cornersCoord[i2][2]};
-    
-    foreach_dimension() 
+
+    foreach_dimension()
     {
       dir1.x -= refcorner.x;
       dir2.x -= refcorner.x;
       dir1.x /= (lN-1);
       dir2.x /= (lN-1);
     }
-       
-    for (int ii = 1; ii <= lN-2; ii++) 
+
+    for (int ii = 1; ii <= lN-2; ii++)
     {
-      for (int jj = 1; jj <= lN-2 - ii; jj++) 
-      { 
-	dlm_bd->x[isb] = refcorner.x + (double) ii * dir1.x 
-		+ (double) jj * dir2.x;
+      for (int jj = 1; jj <= lN-2 - ii; jj++)
+      {
+        pos.x = refcorner.x + (double) ii * dir1.x
+		      + (double) jj * dir2.x;
+        pos.y = refcorner.y + (double) ii * dir1.y
+      		+ (double) jj * dir2.y;
+        pos.z = refcorner.z + (double) ii * dir1.z
+      		+ (double) jj * dir2.z;
+		
+        periodic_correction_Tetra( gcp, &pos, pPeriodicRefCenter, 
+		setPeriodicRefCenter );
 
-	dlm_bd->y[isb] = refcorner.y + (double) ii * dir1.y 
-		+ (double) jj * dir2.y;
-
-	dlm_bd->z[isb] = refcorner.z + (double) ii * dir1.z 
-		+ (double) jj * dir2.z;
+        dlm_bd->x[isb] = pos.x;
+	dlm_bd->y[isb] = pos.y;
+	dlm_bd->z[isb] = pos.z;
+	
 	isb++;
       }
     }
   }
-  
-  // Tetrahedron has 4 vertex points 
-  int allindextable[4][4] = {{0}};
-  int j1, jm1;
 
-  
+  // We have 8 corner points for the tetrahedron
+  int allindextable[4][4] = {{0}};
+  int j1,jm1;
+
+
   /* Add points on the edges without the corners*/
-  for (int i = 0; i < nfaces; i++) 
+  for (int i = 0; i < nfaces; i++)
   {
     npoints = gcp->pgp->numPointsOnFaces[i];
     i1 = gcp->pgp->cornersIndex[i][1];
 
-    for (int j = 1; j < npoints; j++) 
+    for (int j = 1; j < npoints; j++)
     {
       jm1 = gcp->pgp->cornersIndex[i][j-1];
       j1 = gcp->pgp->cornersIndex[i][j];
-      
-      if ( jm1 > j1 ) 
+
+      if (jm1 > j1)
       {
-	if ( allindextable[jm1][j1] == 0 ) 
+	if (allindextable[jm1][j1] == 0)
 	{
-	  coord c1 = {gcp->pgp->cornersCoord[jm1][0], 
-	  	gcp->pgp->cornersCoord[jm1][1], 
+	  coord c1 = {gcp->pgp->cornersCoord[jm1][0],
+	  	gcp->pgp->cornersCoord[jm1][1],
 	  	gcp->pgp->cornersCoord[jm1][2]};
-	  coord c2 = {gcp->pgp->cornersCoord[j1][0], 
-	  	gcp->pgp->cornersCoord[j1][1], 
+	  coord c2 = {gcp->pgp->cornersCoord[j1][0],
+	  	gcp->pgp->cornersCoord[j1][1],
 	  	gcp->pgp->cornersCoord[j1][2]};
-	  distribute_points_edge_Tetrahedron( c1, c2, dlm_bd, lN, isb );
+	  distribute_points_edge_Tetrahedron( gcp, c1, c2, dlm_bd, lN, isb, 
+	  	pPeriodicRefCenter, setPeriodicRefCenter );
 	  allindextable[jm1][j1] = 1;
-	  isb +=lN-2;
-	}
-      }      
-      else 
-      {
-	if ( allindextable[j1][jm1] == 0 ) 
-	{
-	  coord c1 = {gcp->pgp->cornersCoord[j1][0], 
-	  	gcp->pgp->cornersCoord[j1][1], 
-	  	gcp->pgp->cornersCoord[j1][2]};
-	  coord c2 = {gcp->pgp->cornersCoord[jm1][0], 
-	  	gcp->pgp->cornersCoord[jm1][1], 
-	  	gcp->pgp->cornersCoord[jm1][2]};
-	  distribute_points_edge_Tetrahedron( c1, c2, dlm_bd, lN, isb );
-	  allindextable[j1][jm1] = 1;
-	  isb +=lN-2;
+	  isb += lN - 2;
 	}
       }
-    }   
+      else
+      {
+	if (allindextable[j1][jm1] == 0)
+	{
+	  coord c1 = {gcp->pgp->cornersCoord[j1][0],
+	  	gcp->pgp->cornersCoord[j1][1],
+	  	gcp->pgp->cornersCoord[j1][2]};
+	  coord c2 = {gcp->pgp->cornersCoord[jm1][0],
+	  	gcp->pgp->cornersCoord[jm1][1],
+	  	gcp->pgp->cornersCoord[jm1][2]};
+	  distribute_points_edge_Tetrahedron( gcp, c1, c2, dlm_bd, lN, isb, 
+	  	pPeriodicRefCenter, setPeriodicRefCenter );
+	  allindextable[j1][jm1] = 1;
+	  isb += lN - 2;
+	}
+      }
+    }
   }
-  
+
   /* Add the final 4 corners points */
-  for (int i = 0; i  < gcp->ncorners; i++) 
+  for (int i = 0; i  < gcp->ncorners; i++)
   {
-    dlm_bd->x[isb] = gcp->pgp->cornersCoord[i][0];
-    dlm_bd->y[isb] = gcp->pgp->cornersCoord[i][1];
-    dlm_bd->z[isb] = gcp->pgp->cornersCoord[i][2];
+    pos.x = gcp->pgp->cornersCoord[i][0];
+    pos.y = gcp->pgp->cornersCoord[i][1];
+    pos.z = gcp->pgp->cornersCoord[i][2];
+    
+    periodic_correction_Tetra( gcp, &pos, pPeriodicRefCenter, 
+    	setPeriodicRefCenter );
+
+    dlm_bd->x[isb] = pos.x;
+    dlm_bd->y[isb] = pos.y;
+    dlm_bd->z[isb] = pos.z;
+
     isb++;
   }
+  
+  if ( setPeriodicRefCenter ) synchronize((scalar*){pPeriodicRefCenter->x,
+  	pPeriodicRefCenter->y, pPeriodicRefCenter->z});   
 }
-
 
 
 
 /** Finds cells lying inside the tetrahedron */
 //----------------------------------------------------------------------------
-void create_FD_Interior_Tetrahedron( particle * p, vector Index_lambda, 
-	vector shift ) 
+void create_FD_Interior_Tetrahedron( particle* p, vector Index, 
+	vector PeriodicRefCenter )
 //----------------------------------------------------------------------------
 {
-  Cache* c;
-  
-  /** Create the cache of the interior points for a tetrahedron*/
+  Cache * c;
+
+  /** Create the cache of the interior points for a tetrahedron */
   c = &(p->Interior);
 
-  /** Extract geometric information from particle pointer p */
   GeomParameter gp = p->g;
-
-  /* Min/Max coordinates for the AABB (Axed-Aligned-Bounding-Box) */
-  coord mincoord = {HUGE, HUGE, HUGE};
-  coord maxcoord = {-HUGE, -HUGE, -HUGE};
-
-  double ** table = p->g.pgp->cornersCoord;
-  for (int ii = 0; ii < p->g.ncorners; ii++) 
+  foreach()
   {
-    if (mincoord.x > table[ii][0])
-      mincoord.x = table[ii][0];
-
-    if (mincoord.y > table[ii][1])
-      mincoord.y = table[ii][1];
-
-    if (mincoord.z > table[ii][2])
-      mincoord.z = table[ii][2];
-
-    if (maxcoord.x < table[ii][0])
-      maxcoord.x = table[ii][0];
-
-    if (maxcoord.y < table[ii][1])
-      maxcoord.y = table[ii][1];
-
-    if (maxcoord.z < table[ii][2])
-      maxcoord.z = table[ii][2];
+    if ( in_which_Tetrahedron( x, y, z, gp, &PeriodicRefCenter, true ) )
+    {
+      cache_append ( c, point, 0 );
+      /* tag cell with the number of the particle */
+      if ( (int)Index.y[] == -1 )
+        Index.y[] = p->pnum;
+    }
   }
 
-  foreach() 
-  {
-    coord checkpt;
-    checkpt.x = x;
-    checkpt.y = y;
-    checkpt.z = z;
-
-    /* Check only if the point is in the AABB (Axed-Aligned-Bounding-Box) */
-    if ( ( x > mincoord.x ) && ( x < maxcoord.x ) ) 
-      if ( ( y > mincoord.y ) && ( y < maxcoord.y ) )
-	if ( ( z > mincoord.z ) && ( z < maxcoord.z ) )
-
-	  /* If yes: check if it is inside the tetrahedron now */
-    	  if ( is_in_Tetrahedron( checkpt.x, checkpt.y, checkpt.z, gp ) ) 
-	  {
-	    cache_append( c, point, 0 );
-	    /* tag cell with the number of the particle */
-	    if ( (int)Index_lambda.y[] == -1 )
-	      Index_lambda.y[] = p->pnum;
-	  }
-  }
- 
-  cache_shrink( c ); 
+  cache_shrink( c );
 }
 
 
 
 
-/** Reads geometric parameters of the tetrahedron */
+// Reads geometric parameters of the tetrahedron
 //----------------------------------------------------------------------------
-void update_Tetrahedron( GeomParameter* gcp ) 
+void update_Tetrahedron(GeomParameter* gcp)
 //----------------------------------------------------------------------------
-{  
+{
   char* token = NULL;
 
   // Read number of corners, check that it is 4
@@ -475,14 +559,14 @@ void update_Tetrahedron( GeomParameter* gcp )
 
 
 
-/** Frees the geometric parameters of the tetrahedron */
+// Frees the geometric parameters of the tetrahedron
 //----------------------------------------------------------------------------
-void free_Tetrahedron( GeomParameter* gcp ) 
+void free_Tetrahedron( GeomParameter* gcp )
 //----------------------------------------------------------------------------
-{  
+{
   // Free the point/corner coordinate array
   double* cc = NULL;
-  for (int i=0; i < gcp->pgp->allPoints; ++i) 
+  for (int i=0; i < gcp->pgp->allPoints; ++i)
   {
     cc = &(gcp->pgp->cornersCoord[i][0]);
     free( cc );
@@ -494,9 +578,9 @@ void free_Tetrahedron( GeomParameter* gcp )
 
   // Free the point/corner arrays
   long int* in = NULL;
-  for (int i=0;i < gcp->pgp->allFaces; ++i) 
+  for (int i=0;i < gcp->pgp->allFaces; ++i)
   {
-    in = &(gcp->pgp->cornersIndex[i][0]);   
+    in = &(gcp->pgp->cornersIndex[i][0]);
     free( in );
     in = NULL;
   }
@@ -505,7 +589,7 @@ void free_Tetrahedron( GeomParameter* gcp )
   free( gcp->pgp->numPointsOnFaces );
   gcp->pgp->numPointsOnFaces = NULL;
   gcp->pgp->allFaces = 0;
-  
+
   // Free the PolyGeomParameter structure
   free( gcp->pgp );
   gcp->pgp = NULL;

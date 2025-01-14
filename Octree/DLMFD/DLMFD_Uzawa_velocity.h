@@ -299,7 +299,7 @@ void DLMFD_construction( particle* p )
 	  
 	case CIRCULARCYLINDER2D:
 	  create_FD_Interior_CircularCylinder2D( &p[k], DLM_Index, 
-	  	DLM_PeriodicRefCenter, DLM_Flag );
+	  	DLM_PeriodicRefCenter );
 	  break;
 	  
 	case CUBE:
@@ -323,11 +323,6 @@ void DLMFD_construction( particle* p )
 
         case DODECAHEDRON:
 	  create_FD_Interior_Dodecahedron( &p[k], DLM_Index, 
-	  	DLM_PeriodicRefCenter );
-	  break;
-	
-	case TRANCOCTAHEDRON:
-	  create_FD_Interior_Trancoctahedron( &p[k], DLM_Index, 
 	  	DLM_PeriodicRefCenter );
 	  break;	  		  
 	  

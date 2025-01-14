@@ -44,8 +44,7 @@ enum RigidBodyShape {
   TETRAHEDRON,
   OCTAHEDRON,
   DODECAHEDRON,
-  ICOSAHEDRON,
-  TRANCOCTAHEDRON
+  ICOSAHEDRON
 };
 
 
@@ -154,7 +153,6 @@ trace void synchronize( scalar* list )
 # include "Octahedron.h"
 # include "Dodecahedron.h"
 # include "Icosahedron.h"
-# include "Trancoctahedron.h"
 
 
 /** Allocates memory for m points in the SolidBodyBoundary structure. */
@@ -285,10 +283,6 @@ void free_particles( particle* allparticles, const int n )
       case DODECAHEDRON:
 	free_Dodecahedron( &(allparticles[k].g) );
 	break;	
-
-      case TRANCOCTAHEDRON:
-	free_Trancoctahedron( &(allparticles[k].g) );
-	break;	
 	  
       default:
         fprintf( stderr,"Unknown Rigid Body shape !!\n" );
@@ -337,11 +331,7 @@ void print_particle( particle const* p, char const* poshift )
 
       case DODECAHEDRON:
         printf( "DODECAHEDRON" );
-	break;
-	
-      case TRANCOCTAHEDRON:
-	printf( "TRANCOCTAHEDRON" );
-	break;		
+	break;	
 	  
       default:
         fprintf( stderr,"Unknown Rigid Body shape !!\n" );
@@ -949,7 +939,7 @@ void create_boundary_points( particle* p, vector* pPeriodicRefCenter,
       compute_nboundary_CircularCylinder2D( gci, &m );
       allocate_SolidBodyBoundary( &(p->s), m );
       create_FD_Boundary_CircularCylinder2D( gci, &(p->s), m, 
-		*pPeriodicRefCenter );
+      		pPeriodicRefCenter, setPeriodicRefCenter );
       break;
 	  
     case CUBE:
@@ -962,37 +952,30 @@ void create_boundary_points( particle* p, vector* pPeriodicRefCenter,
     case TETRAHEDRON:
       compute_nboundary_Tetrahedron( &gci, &m, &lN );
       allocate_SolidBodyBoundary( &(p->s), m );
-      create_FD_Boundary_Tetrahedron( &gci, &(p->s), m, lN, 
-		*pPeriodicRefCenter );
+      create_FD_Boundary_Tetrahedron( &gci, &(p->s), m, lN, pPeriodicRefCenter, 
+		setPeriodicRefCenter );
       break;
 	
     case OCTAHEDRON:
       compute_nboundary_Octahedron( &gci, &m, &lN );
       allocate_SolidBodyBoundary( &(p->s), m );
-      create_FD_Boundary_Octahedron( &gci, &(p->s), m, lN, 
-		*pPeriodicRefCenter );
+      create_FD_Boundary_Octahedron( &gci, &(p->s), m, lN, pPeriodicRefCenter, 
+		setPeriodicRefCenter );
       break;
 
     case ICOSAHEDRON:
       compute_nboundary_Icosahedron( &gci, &m, &lN );
       allocate_SolidBodyBoundary( &(p->s), m );
-      create_FD_Boundary_Icosahedron( &gci, &(p->s), m, lN, 
-		*pPeriodicRefCenter );
+      create_FD_Boundary_Icosahedron( &gci, &(p->s), m, lN, pPeriodicRefCenter, 
+		setPeriodicRefCenter );
       break;	
 
     case DODECAHEDRON:     
       compute_nboundary_Dodecahedron( &gci, &m, &lN );	
       allocate_SolidBodyBoundary( &(p->s), m );
-      create_FD_Boundary_Dodecahedron( &gci, &(p->s), m, lN, 
-		*pPeriodicRefCenter );
+      create_FD_Boundary_Dodecahedron( &gci, &(p->s), m, lN, pPeriodicRefCenter, 
+		setPeriodicRefCenter );
       break;	
- 
-    case TRANCOCTAHEDRON:
-      compute_nboundary_Trancoctahedron( &gci, &m, &lN );  
-      allocate_SolidBodyBoundary( &(p->s), m );
-      create_FD_Boundary_Trancoctahedron( &gci, &(p->s), m, lN, 
-		*pPeriodicRefCenter );
-      break;		
 	  
     default:
       fprintf( stderr, "Unknown Rigid Body shape !!\n" );

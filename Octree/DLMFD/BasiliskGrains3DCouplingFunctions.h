@@ -423,13 +423,7 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
        case 20: 
          allpart[k].shape = DODECAHEDRON;
 	 update_Dodecahedron( gg );
-         break;      
-          
-       // For now, we assume that all 24-corner polyhedrons are trancoctahedrons
-       case 24: 
-         allpart[k].shape = TRANCOCTAHEDRON;
-	 update_Trancoctahedron( gg );
-         break;	  	  
+         break;      	  
 #     else
         case 1: 
           allpart[k].shape = CIRCULARCYLINDER2D;
@@ -438,7 +432,7 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
 #     endif	  	  
 	        
       default:
-        fprintf( stderr,"Unknown ncorners in UpdateParticlesBasilisk!!\n" );
+        fprintf( stderr, "Unknown ncorners in UpdateParticlesBasilisk!!\n" );
     }                               
   }
   
