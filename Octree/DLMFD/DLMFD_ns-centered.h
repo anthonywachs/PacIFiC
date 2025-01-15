@@ -235,6 +235,12 @@ event stability (i++,last) {
 }
 
 /**
+Some derived solvers need to hook themselves once the time step magnitiude
+is determined. */
+
+event once_timestep_is_determined (i++, last);
+
+/**
 If we are using VOF or diffuse tracers, we need to advance them (to
 time $t+\Delta t/2$) here. Note that this assumes that tracer fields
 are defined at time $t-\Delta t/2$ i.e. are lagging the

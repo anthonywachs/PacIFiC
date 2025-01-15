@@ -451,10 +451,10 @@ event logfile ( i=0; i++ )
 
 
 
-/** Writes the dump time and time step for restart, and frees dynamic features 
-of particles */
+/** Writes the dump time and time step for restart, frees dynamic features 
+of particles and predict the position & velocity of particles */
 //----------------------------------------------------------------------------
-event start_timestep (i++)
+event once_timestep_is_determined (i++)
 //----------------------------------------------------------------------------
 {
   if ( save_data_restart && i )
@@ -510,7 +510,8 @@ event cleanup (t = end)
 //----------------------------------------------------------------------------
 {
   // This is because we free dynamic features of particles from the previous 
-  // time step at the start of the current time step (see above start_timestep)
+  // time step at the start of the current time step (see above the event 
+  // once_timestep_is_determined)
   // Since at the very end, there is no next time step, dynamic features 
   // of particles are not freed by start_timestep and hence are freed here
   free_particles( particles, NPARTICLES ); 
