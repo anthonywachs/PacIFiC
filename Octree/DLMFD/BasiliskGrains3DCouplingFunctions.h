@@ -410,7 +410,6 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
 	case 8: 
           allpart[k].shape = CUBE;
 	  update_Cube( gg );
-	  compute_principal_vectors_Cube( &(allpart[k]) ); 
           break;
 	  
        // For now, we assume that all 12-corner polyhedrons are icosahedrons

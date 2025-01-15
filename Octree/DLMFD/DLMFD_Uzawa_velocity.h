@@ -232,7 +232,7 @@ void DLMFD_construction( particle* p )
 //----------------------------------------------------------------------------
 {
 # if PARTICLE_VERBOSE
-    char outputshift[6]="      ";
+    char outputshift[7]="      ";
 # endif
 
   // Allocate and initialize particles
@@ -303,26 +303,27 @@ void DLMFD_construction( particle* p )
 	  break;
 	  
 	case CUBE:
-	  create_FD_Interior_Cube( &p[k], DLM_Index, DLM_PeriodicRefCenter );
+	  create_FD_Interior_Polyhedron( &p[k], DLM_Index, 
+	  	DLM_PeriodicRefCenter );
 	  break;
 	  
         case TETRAHEDRON:
-	  create_FD_Interior_Tetrahedron( &p[k], DLM_Index, 
+	  create_FD_Interior_Polyhedron( &p[k], DLM_Index, 
 	  	DLM_PeriodicRefCenter );
 	  break;
 	  
         case OCTAHEDRON:
-	  create_FD_Interior_Octahedron( &p[k], DLM_Index, 
+	  create_FD_Interior_Polyhedron( &p[k], DLM_Index, 
 	  	DLM_PeriodicRefCenter );
 	  break;
 	  		  
         case ICOSAHEDRON:
-	  create_FD_Interior_Icosahedron( &p[k], DLM_Index, 
+	  create_FD_Interior_Polyhedron( &p[k], DLM_Index, 
 	  	DLM_PeriodicRefCenter );
 	  break;
 
         case DODECAHEDRON:
-	  create_FD_Interior_Dodecahedron( &p[k], DLM_Index, 
+	  create_FD_Interior_Polyhedron( &p[k], DLM_Index, 
 	  	DLM_PeriodicRefCenter );
 	  break;	  		  
 	  

@@ -68,11 +68,6 @@ typedef struct {
   double** cornersCoord;
   long int** cornersIndex;
   long int* numPointsOnFaces;
-  
-  /* Special Cube: 3 principal vectors */
-  coord u1, v1, w1;
-  coord mins, maxs;
-  
 } PolyGeomParameter;
 
 
@@ -428,7 +423,7 @@ void print_all_particles( particle const* allparticles, const int n,
 {
   if ( pid() == 0 ) printf( "%sTotal number of particles = %d\n", oshift, 
   	NPARTICLES );
-  char poshift[10]="   ";
+  char poshift[20]="   ";
   strcat( poshift, oshift );
   for (size_t k=0;k<n;k++)
   { 
