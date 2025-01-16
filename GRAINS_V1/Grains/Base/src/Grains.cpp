@@ -1719,7 +1719,8 @@ void Grains::InsertCreateNewParticles()
   m_allcomponents.Link( *m_collision );
 
   // In case of a restarted simulation, if the linked cell changed from the 
-  // previous simulation, we need to check that all periodic clones are there
+  // previous simulation or periodic clones were not saved in the restart file,
+  // we need to check that all periodic clones are there
   if ( m_restart && m_periodic ) checkClonesReload();
 
   // Set particle positions from file or from a structured array

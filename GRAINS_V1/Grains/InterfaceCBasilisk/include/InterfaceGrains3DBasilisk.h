@@ -26,6 +26,8 @@ extern "C" {
   	bool bsplit_explicit_acceleration );
   
   void SetInitialCycleNumber( int cycle0 );
+  
+  size_t NumberOfRigidBodiesInBasilisk();
 
 #ifdef __cplusplus
 }

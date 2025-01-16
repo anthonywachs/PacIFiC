@@ -125,7 +125,15 @@ extern "C" {
   void SetInitialTime( double tinit ) 
   {
     grains->setInitialTime( tinit );
-  }    
+  } 
+  
+  
+  
+     
+  size_t NumberOfRigidBodiesInBasilisk()
+  {
+    return ( grains->numberOfRBToFluid() );
+  }
   
 #ifdef __cplusplus
 }

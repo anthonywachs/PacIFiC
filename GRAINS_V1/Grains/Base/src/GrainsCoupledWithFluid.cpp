@@ -63,6 +63,11 @@ void GrainsCoupledWithFluid::do_before_time_stepping( DOMElement* rootElement )
 
   // Link all components with the grid
   m_allcomponents.Link( *m_collision );
+  
+  // In case of a periodic simulation, if the linked cell changed from the 
+  // previous simulation or periodic clones were not saved in the restart file,
+  // we need to check that all periodic clones are there
+  if ( m_periodic ) checkClonesReload();  
 
   // Number of particles: inserted and in the system
   m_allcomponents.computeNumberParticles( m_wrapper );
@@ -321,7 +326,9 @@ void GrainsCoupledWithFluid::Construction( DOMElement* rootElement )
             restart.substr( restart.size()-1, 1 );
       }	
       restart = GrainsExec::fullResultFileName( restart, false );
-      
+      if ( m_rank == 0 ) cout << GrainsExec::m_shift6 <<
+      	"Simulation reloaded from " << restart << endl; 
+	      
       // Extract the reload directory from the reload file
       GrainsExec::m_ReloadDirectory = GrainsExec::extractRoot( restart ); 
 
@@ -873,7 +880,25 @@ void GrainsCoupledWithFluid::doPostProcessing( size_t indent_width )
     saveReload( m_time );
   }
 }	
+// ----------------------------------------------------------------------------
+// Number of rigid bodies to be sent to the fluid flow solver */
+size_t GrainsCoupledWithFluid::numberOfRBToFluid() const
+{
+  size_t nrb = 0;
+  
+  if ( m_processorIsActive )
+  {
+    list<Particle*> const* particles = m_allcomponents.getActiveParticles();
+    list<Obstacle*> obstaclesToFluid = m_allcomponents.getObstaclesToFluid();
+    list<Particle*>::const_iterator particle;
+    size_t nparticles = 0;
+    for (particle=particles->begin();particle!=particles->end();particle++)
+      if ( (*particle)->getTag() < 2 ) nparticles++;
+    nrb = nparticles + obstaclesToFluid.size();
+  }  
 
+  return ( nrb );
+}
 
 
 
