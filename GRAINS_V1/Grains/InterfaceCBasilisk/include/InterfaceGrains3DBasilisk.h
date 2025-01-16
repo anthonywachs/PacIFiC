@@ -22,7 +22,7 @@ extern "C" {
 
   void checkParaviewPostProcessing_Grains( char* solid_resDir );
 
-  void UpdateVelocityGrains( double arrayv[][6], const int m,
+  void UpdateVelocityGrains( double** arrayv, const int m,
   	bool bsplit_explicit_acceleration );
   
   void SetInitialCycleNumber( int cycle0 );

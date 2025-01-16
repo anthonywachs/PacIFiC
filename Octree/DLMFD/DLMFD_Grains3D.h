@@ -56,6 +56,10 @@ event GranularSolver_init (t < -1.)
     {
       // TO DO
     }
+
+    // Get the number of rigid bodies sent by Grains to Basilisk
+    // Note: this number must be constant over the simulation
+    NPARTICLES = NumberOfRigidBodiesInBasilisk();
     
     // Transfer the data from Grains to an array of characters
     pstr = GrainsToBasilisk( &pstrsize ); 
@@ -73,13 +77,22 @@ event GranularSolver_init (t < -1.)
       // initial cycle number
       SaveResults_Grains();
     }
-    else SetInitialCycleNumber( init_cycle_number );    
+    else SetInitialCycleNumber( init_cycle_number );   
   }
+ 
+# if _MPI
+    // Broadcast the number of rigid bodies
+    MPI_Bcast( &NPARTICLES, 1, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD );
+# endif
+  
+  // Allocate number of rigid bodies dependent arrays
+  allocate_np_dep_arrays( NPARTICLES, &particles, &DLMFDtoGS_vel, &vpartbuf, 
+  	&pdata, &fdata );
 
   // Update all particle data 
   pstr = UpdateParticlesBasilisk( pstr, pstrsize, particles, NPARTICLES,
-  	!b_split_explicit_acceleration, rhoval );  
-  free( pstr );      
+  	!b_split_explicit_acceleration, rhoval ); 	 
+  free( pstr );       
 } 
 
 
@@ -94,7 +107,7 @@ event GranularSolver_predictor (t < -1.)
   int pstrsize = 0;
   
   // Predictor step: pure granular problem solved by Grains (Grains works
-  // in serial only )
+  // in serial only)
   if ( pid() == 0 ) 
   {
     // Output the call to Grains3D

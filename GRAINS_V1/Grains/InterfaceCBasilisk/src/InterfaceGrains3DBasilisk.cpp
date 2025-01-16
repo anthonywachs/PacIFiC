@@ -97,7 +97,7 @@ extern "C" {
 
 
   
-  void UpdateVelocityGrains( double arrayv[][6], const int m, 
+  void UpdateVelocityGrains( double** arrayv, const int m, 
   	bool bsplit_explicit_acceleration ) 
   {
     // Transfer into a vector< vector<double> >

@@ -6,7 +6,7 @@
 /** Transfers particles velocity into a 2D array to be sent to the 
 granular solver */
 //----------------------------------------------------------------------------
-void UpdateDLMFDtoGS_vel( double arrayv[][6], particle* p, 
+void UpdateDLMFDtoGS_vel( double** arrayv, particle* p, 
 	const int m )
 //---------------------------------------------------------------------------- 
 {
@@ -42,7 +42,7 @@ void UpdateDLMFDtoGS_vel( double arrayv[][6], particle* p,
 from the granular solver */
 //----------------------------------------------------------------------------
 char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
-	particle* allpart, const int npart_, bool fluidCorrectedAcceleration_, 
+	particle* allpart, const size_t npart_, bool fluidCorrectedAcceleration_, 
 	double rhoval_ )
 //----------------------------------------------------------------------------
 {
@@ -65,8 +65,8 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
   token = strtok( pstr, " " );  
 
   // First entry is the number of particles
-  int np = 0;
-  sscanf( token, "%d", &np );
+  size_t np = 0;
+  sscanf( token, "%lu", &np );
   if ( np != npart_ )
     printf ("Error in number of particles in UpdateParticlesBasilisk\n");
   

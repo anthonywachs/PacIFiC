@@ -140,7 +140,7 @@ void granular_subproblem (particle * p, const int gravity_flag,
   coord * gravity;
   coord decal = {X0, Y0, Z0};
   
-  for (int k = 0; k < NPARTICLES; k++) {
+  for (size_t k = 0; k < NPARTICLES; k++) {
     fsf = (1. - (rho_f)/(p[k].rho_s));
    
     miter = 0;
@@ -310,7 +310,7 @@ void granular_subproblem (particle * p, const int gravity_flag,
 // -------------------------------------------------
 event GranularSolver_init (t < -1.) {
   particle * pp = particles;
-  for (int k = 0; k < NPARTICLES; k++) {
+  for (size_t k = 0; k < NPARTICLES; k++) {
     /* Contact model parameters needed to setup the granular time-step */
     pp[k].toygsp->wished_ratio = 0.1;
     pp[k].toygsp->en = 1;

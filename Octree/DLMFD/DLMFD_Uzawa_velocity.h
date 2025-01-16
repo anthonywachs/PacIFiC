@@ -67,10 +67,6 @@ solve them successively. We chose here a two-steps time-spliting.
 #   define ROTATION 1
 # endif
 
-# ifndef NPARTICLES 
-#   define NPARTICLES 1
-# endif
-
 # ifndef DLM_alpha_coupling
 #   define DLM_alpha_coupling 0
 # endif
@@ -92,6 +88,28 @@ solve them successively. We chose here a two-steps time-spliting.
 
 # ifndef BRINKMANN_DIRICHLET_PENALIZATION
 #   define BRINKMANN_DIRICHLET_PENALIZATION 0      
+# endif
+
+# if ( TRANSLATION && ROTATION )
+#   if dimension == 3
+#     define npartdata 6
+#   else
+#     define npartdata 3
+#   endif     
+# elif TRANSLATION
+#   if dimension == 3 
+#     define npartdata 3
+#   else
+#     define npartdata 2
+#   endif 
+# elif ROTATION
+#   if dimension == 3 
+#     define npartdata 3
+#   else
+#     define npartdata 1
+#   endif 
+# else
+#   define npartdata 0  
 # endif
 
 
@@ -121,38 +139,15 @@ vector DLM_tu[];
     double eta_s = 1.;    
 # endif
 
+/** Number of particles dependent arrays */
+particle* particles = NULL;
+double** DLMFDtoGS_vel = NULL;
+double* vpartbuf = NULL;
+FILE** pdata = NULL;
+FILE** fdata = NULL;
 
-particle particles[NPARTICLES] = {{0}};
-double DLMFDtoGS_vel[NPARTICLES][6] = {{0}};
-# if ( TRANSLATION && ROTATION )
-#   if dimension == 3
-#     define npartdata 6
-#   else
-#     define npartdata 3
-#   endif     
-# elif TRANSLATION
-#   if dimension == 3 
-#     define npartdata 3
-#   else
-#     define npartdata 2
-#   endif 
-# elif ROTATION
-#   if dimension == 3 
-#     define npartdata 3
-#   else
-#     define npartdata 1
-#   endif 
-# else
-#   define npartdata 0  
-# endif
-double vpartbuf[npartdata*NPARTICLES];
-
-FILE* pdata[NPARTICLES];
-FILE* fdata[NPARTICLES];
 FILE* converge = NULL;
 FILE* cellvstime = NULL;
-char converge_uzawa_filename_complete_name[80];
-char dlmfd_cells_filename_complete_name[80]; 
 
 
 /**
@@ -289,7 +284,7 @@ void DLMFD_construction( particle* p )
 
   // Create fictitious-domain's cache for the interior domain
 # if debugInterior == 0 
-    for (int k = 0; k < NPARTICLES; k++) 
+    for (size_t k = 0; k < NPARTICLES; k++) 
     {
       switch( p[k].shape )
       {
@@ -342,7 +337,7 @@ void DLMFD_construction( particle* p )
 # if BRINKMANN_DIRICHLET_PENALIZATION
 #   if debugInterior == 0    
       foreach() Xi[] = 0.;
-      for (int k = 0; k < NPARTICLES; k++) 
+      for (size_t k = 0; k < NPARTICLES; k++) 
         foreach_cache(p[k].Interior) 
           if ( DLM_Flag[] < 1 && (int)DLM_Index.y[] == k ) 
           {
@@ -431,7 +426,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
 #   endif
 # endif
   
-  for (int k = 0; k < NPARTICLES; k++) 
+  for (size_t k = 0; k < NPARTICLES; k++) 
   {    
 #   if debugInterior == 0
       Interior[k] = &(p[k].Interior);
@@ -470,7 +465,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
     Point ppp;
     initialize_and_allocate_Cache( &Traversal_rvwlambda );
     // Interior points
-    for (int m = 0; m < NPARTICLES; m++)
+    for (size_t m = 0; m < NPARTICLES; m++)
     {     
       bbb = 0; 
       foreach_cache((*Interior[m])) 
@@ -487,7 +482,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
       }
     }
     // Boundary points
-    for (int m = 0; m < NPARTICLES; m++) 
+    for (size_t m = 0; m < NPARTICLES; m++) 
     { 
       bbb = 0;
       foreach_cache((*Boundary[m])) 
@@ -508,7 +503,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
     Cache Traversal_uqutu;
     initialize_and_allocate_Cache( &Traversal_uqutu );
     // Interior points
-    for (int m = 0; m < NPARTICLES; m++)
+    for (size_t m = 0; m < NPARTICLES; m++)
     {     
       bbb = 0; 
       foreach_cache((*Interior[m])) 
@@ -558,13 +553,13 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
   // Statistics of number of Lagrange multiplier points  
   lm = total_dlmfd_multipliers (p, NPARTICLES);
   /* Get track of the number of multipliers for statistics */
-  for (int k = 0; k < NPARTICLES; k++)
+  for (size_t k = 0; k < NPARTICLES; k++)
     p[k].tmultipliers += lm;
 
   allpts = total_dlmfd_cells (p, NPARTICLES);
   /* Get track of the number of cells involved in the dlmfd solver for 
   statistics */
-  for (int k = 0; k < NPARTICLES; k++)
+  for (size_t k = 0; k < NPARTICLES; k++)
     p[k].tcells += allpts;
 
   if ( pid() == 0 )
@@ -579,7 +574,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
   // Nullify the qU, tU, qw and tw vectors of all particles
 # if DLM_Moving_particle
 #   if TRANSLATION
-      for (int k = 0; k < NPARTICLES; k++) 
+      for (size_t k = 0; k < NPARTICLES; k++) 
         foreach_dimension()
         {
 	  (*qU[k]).x = 0.; 
@@ -587,7 +582,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
         }
 #   endif
 #   if ROTATION
-      for (int k = 0; k < NPARTICLES; k++) 
+      for (size_t k = 0; k < NPARTICLES; k++) 
         foreach_dimension()
         {
 	  (*qw[k]).x = 0.; 
@@ -653,7 +648,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
      scalar product (for mpi purpose) */
 
 # if debugInterior == 0
-    for (int k = 0; k < NPARTICLES; k++) 
+    for (size_t k = 0; k < NPARTICLES; k++) 
     {
       foreach_cache((*Interior[k])) 
       {
@@ -708,7 +703,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
       double* quz_ = NULL;
 #   endif
  
-    for (int k = 0; k < NPARTICLES; k++) 
+    for (size_t k = 0; k < NPARTICLES; k++) 
     {
       particle * pp = &p[k];
     
@@ -775,7 +770,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
     }
     
 #   if DLM_Moving_particle
-      for (int k = 0; k < NPARTICLES; k++) 
+      for (size_t k = 0; k < NPARTICLES; k++) 
       {
         particle * pp = &p[k];
     
@@ -824,7 +819,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
       // Reduce to master
       // Pack data
       counter = 0;  
-      for (int k = 0; k < NPARTICLES; k++) 
+      for (size_t k = 0; k < NPARTICLES; k++) 
       {
 #       if TRANSLATION
           vpartbuf[counter] = (*qU[k]).x;
@@ -857,7 +852,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
       {
         // Unpack data    
         counter = 0;
-        for (int k = 0; k < NPARTICLES; k++) 
+        for (size_t k = 0; k < NPARTICLES; k++) 
         {
 #         if TRANSLATION
             (*qU[k]).x = vpartbuf[counter];
@@ -884,7 +879,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
 #   endif  /* end of _MPI Reduction */    
     
         // Perform the inversion (on master when in MPI)
-        for (int k = 0; k < NPARTICLES; k++) 
+        for (size_t k = 0; k < NPARTICLES; k++) 
         {
 #         if TRANSLATION
             /* Add here fU to qU */
@@ -954,7 +949,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
         // Broadcast U and w
         // Pack data
         counter = 0;  
-        for (int k = 0; k < NPARTICLES; k++) 
+        for (size_t k = 0; k < NPARTICLES; k++) 
         {
 #         if TRANSLATION
             vpartbuf[counter] = (*U[k]).x;
@@ -986,7 +981,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
 
       // Unpack data    
       counter = 0;
-      for (int k = 0; k < NPARTICLES; k++) 
+      for (size_t k = 0; k < NPARTICLES; k++) 
       {
 #       if TRANSLATION
           (*U[k]).x = vpartbuf[counter];
@@ -1037,7 +1032,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
   /* Interior points: r^0 = G - M_u*u^0 - M_U*U^0 - M_w*w^0 */
   /* So r^0 = G -<alpha, u>_P(t) + <alpha, U>_P(t) + <alpha, w^r_GM>_P(t) */
 # if debugInterior == 0
-    for (int k = 0; k < NPARTICLES; k++) 
+    for (size_t k = 0; k < NPARTICLES; k++) 
     {        
 #     if !DLM_Moving_particle
         imposedU = (p[k]).imposedU;
@@ -1097,7 +1092,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
       int ndof = 0;
 #   endif  
 
-    for (int k = 0; k < NPARTICLES; k++) 
+    for (size_t k = 0; k < NPARTICLES; k++) 
     {
       particle* pp = &p[k];
 #     if !DLM_Moving_particle
@@ -1275,7 +1270,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
 #   endif   
     
 #   if DLM_Moving_particle
-      for (int k = 0; k < NPARTICLES; k++) 
+      for (size_t k = 0; k < NPARTICLES; k++) 
       {
 #       if TRANSLATION
           foreach_dimension()
@@ -1299,7 +1294,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
     /* Interior points qw = (M_w^T)*w = - <DLM_w, xi^r_GM>_P(t) */
     /* -<DLM_w, xi^r_GM>_P(t)=-<r_GM, DLM_w^xi>_P(t)=-<xi, r_GM^DLM_w>_P(t) */
 #   if debugInterior == 0
-      for (int k = 0; k < NPARTICLES; k++) 
+      for (size_t k = 0; k < NPARTICLES; k++) 
       {
         foreach_cache((*Interior[k])) 
         {
@@ -1354,7 +1349,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
         }
 #     else
         synchronize((scalar*){DLM_w, DLM_qu});    
-        for (int k = 0; k < NPARTICLES; k++) 
+        for (size_t k = 0; k < NPARTICLES; k++) 
         {
           particle * pp = &p[k];
           foreach_cache((*Boundary[k])) 
@@ -1400,7 +1395,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
 
 	
 #     if DLM_Moving_particle
-        for (int k = 0; k < NPARTICLES; k++) 
+        for (size_t k = 0; k < NPARTICLES; k++) 
         {
           particle * pp = &p[k];
           foreach_cache((*Boundary[k])) 
@@ -1448,7 +1443,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
         // Reduce to master
         // Pack data
         counter = 0;  
-        for (int k = 0; k < NPARTICLES; k++) 
+        for (size_t k = 0; k < NPARTICLES; k++) 
         {
 #         if TRANSLATION
             vpartbuf[counter] = (*qU[k]).x;
@@ -1481,7 +1476,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
         {
           // Unpack data    
           counter = 0;
-          for (int k = 0; k < NPARTICLES; k++) 
+          for (size_t k = 0; k < NPARTICLES; k++) 
           {
 #           if TRANSLATION
               (*qU[k]).x = vpartbuf[counter];
@@ -1508,7 +1503,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
 #     endif  /* end of _MPI Reduction */    
     
           // Perform the inversion (on master when in MPI)
-          for (int k = 0; k < NPARTICLES; k++) 
+          for (size_t k = 0; k < NPARTICLES; k++) 
           {
 #           if TRANSLATION
               /* Solution of M * DLMFD_couplingfactor * tU / dt = qU */
@@ -1545,7 +1540,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
           // Broadcast tU and tw
           // Pack data
           counter = 0;  
-          for (int k = 0; k < NPARTICLES; k++) 
+          for (size_t k = 0; k < NPARTICLES; k++) 
           {
 #           if TRANSLATION
               vpartbuf[counter] = (*tU[k]).x;
@@ -1577,7 +1572,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
 
         // Unpack data    
         counter = 0;
-        for (int k = 0; k < NPARTICLES; k++) 
+        for (size_t k = 0; k < NPARTICLES; k++) 
         {
 #         if TRANSLATION
             (*tU[k]).x = vpartbuf[counter];
@@ -1624,7 +1619,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
       /* Interior points: y = M*t  */
       /* Interior points: y = M_u*tu + M_U*tU + M_w*tw */
       /* So y = <alpha, tu>_P(t) - <alpha, tU>_P(t) - <alpha, tw^r_GM>_P(t) */
-      for (int k = 0; k < NPARTICLES; k++) 
+      for (size_t k = 0; k < NPARTICLES; k++) 
       {
         foreach_cache((*Interior[k])) 
         {
@@ -1683,7 +1678,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
           pos += RUloop.ndof[k];              
         }
 #     else
-        for (int k = 0; k < NPARTICLES; k++) 
+        for (size_t k = 0; k < NPARTICLES; k++) 
         {
           particle * pp = &p[k];
       
@@ -1735,7 +1730,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
 #     endif
     
 #     if DLM_Moving_particle
-        for (int k = 0; k < NPARTICLES; k++) 
+        for (size_t k = 0; k < NPARTICLES; k++) 
         {
           particle * pp = &p[k];
       
@@ -1822,7 +1817,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
           u.x[] += DLM_alpha * DLM_tu.x[];
 
 #   if DLM_Moving_particle
-      for (int k = 0; k < NPARTICLES; k++) 
+      for (size_t k = 0; k < NPARTICLES; k++) 
       {
 #       if TRANSLATION
           foreach_dimension() 
@@ -1890,7 +1885,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
 # if DLM_alpha_coupling 
     synchronize((scalar*) {DLM_lambda});
 
-    for (int k = 0; k < NPARTICLES; k++) 
+    for (size_t k = 0; k < NPARTICLES; k++) 
     {
 #     if debugBD == 0
         particle * pp = &p[k];

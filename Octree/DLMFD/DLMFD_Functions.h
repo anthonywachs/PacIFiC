@@ -218,7 +218,7 @@ void initialize_and_allocate_Cache( Cache* p )
 
 /** Frees the particle data that were dynamically allocated */
 //----------------------------------------------------------------------------
-void free_particles( particle* allparticles, const int n ) 
+void free_particles( particle* allparticles, const size_t n ) 
 //----------------------------------------------------------------------------
 {
   for (size_t k=0;k<n;k++) 
@@ -417,11 +417,11 @@ void print_particle( particle const* p, char const* poshift )
 
 /** Prints all particle data */
 //----------------------------------------------------------------------------
-void print_all_particles( particle const* allparticles, const int n,
+void print_all_particles( particle const* allparticles, const size_t n,
 	char const* oshift )
 //----------------------------------------------------------------------------
 {
-  if ( pid() == 0 ) printf( "%sTotal number of particles = %d\n", oshift, 
+  if ( pid() == 0 ) printf( "%sTotal number of particles = %lu\n", oshift, 
   	NPARTICLES );
   char poshift[20]="   ";
   strcat( poshift, oshift );
@@ -441,7 +441,7 @@ component of the index field. If there is no DLMFD boundary point, index.x is
 set to -1 */
 //----------------------------------------------------------------------------
 void fill_DLM_Index( const SolidBodyBoundary dlm_bd, vector Index, 
-	const int kk ) 
+	const size_t kk ) 
 //----------------------------------------------------------------------------
 {  
   Point lpoint;
@@ -568,7 +568,7 @@ double reversed_weight( particle* pp, const coord weightcellpos,
 void remove_too_close_multipliers( particle* p, vector DLM_Index) 
 //----------------------------------------------------------------------------
 {   
-  for (int k = 0; k < NPARTICLES; k++) {
+  for (size_t k = 0; k < NPARTICLES; k++) {
 
     SolidBodyBoundary dlm_lambda_to_desactivate;
     int allocated = 1;
@@ -585,7 +585,7 @@ void remove_too_close_multipliers( particle* p, vector DLM_Index)
 	/* check here if this multiplier is not in another particle's
 	   domain, if yes desactive it */
 	
-	for (int l = 0; l < NPARTICLES; l++) {
+	for (size_t l = 0; l < NPARTICLES; l++) {
 	  if (l != p[k].pnum) {
       	    particle * other_particle = &(p[l]);
       	    /* printf("thread %d, this is particle %zu checkin on particle 
@@ -800,11 +800,11 @@ void remove_too_close_multipliers( particle* p, vector DLM_Index)
 /** Tag cells that belong to a 3^dim stencil associated to a Lagrange multiplier
 point of the rigid body boundary. */
 //----------------------------------------------------------------------------
-void reverse_fill_DLM_Flag( particle* allparticles, const int n, scalar Flag, 
+void reverse_fill_DLM_Flag( particle* allparticles, const size_t n, scalar Flag, 
 	vector Index, const int cacheflag ) 
 //----------------------------------------------------------------------------
 {
-  for (int k = 0; k < n; k++) 
+  for (size_t k = 0; k < n; k++) 
   {  
     coord rel = {0., 0., 0.};
     coord relnl = {0., 0., 0.};
@@ -983,7 +983,7 @@ void create_boundary_points( particle* p, vector* pPeriodicRefCenter,
 /** Initializes the particles and the scalar/vector fields needed to the 
 method */
 //----------------------------------------------------------------------------
-void allocate_and_init_particles( particle* allparticles, const int n, 
+void allocate_and_init_particles( particle* allparticles, const size_t n, 
 	vector Index, scalar Flag, scalar FlagMesh, vector PeriodicRefCenter )
 //----------------------------------------------------------------------------
 {  
@@ -1003,7 +1003,7 @@ void allocate_and_init_particles( particle* allparticles, const int n,
   synchronize((scalar *){Index, PeriodicRefCenter});
 
 
-  for (int k = 0; k < n; k++) 
+  for (size_t k = 0; k < n; k++) 
   {
     Cache* c = NULL;
 
@@ -1028,11 +1028,11 @@ void allocate_and_init_particles( particle* allparticles, const int n,
 /** Creates boundary points of all particles but does not set the 
 PeriodicRefCenter field */
 //----------------------------------------------------------------------------
-void create_particles_boundary_points( particle* allparticles, const int n )
+void create_particles_boundary_points( particle* allparticles, const size_t n )
 //----------------------------------------------------------------------------
 {  
 # if debugBD == 0
-    for (int k = 0; k < n; k++) 
+    for (size_t k = 0; k < n; k++) 
       create_boundary_points( &(allparticles[k]), NULL, false );    
 # endif
 }
@@ -1042,11 +1042,11 @@ void create_particles_boundary_points( particle* allparticles, const int n )
 
 /** Frees boundary points of all particles  */
 //----------------------------------------------------------------------------
-void free_particles_boundary_points( particle* allparticles, const int n )
+void free_particles_boundary_points( particle* allparticles, const size_t n )
 //----------------------------------------------------------------------------
 {  
 # if debugBD == 0
-    for (int k = 0; k < n; k++) 
+    for (size_t k = 0; k < n; k++) 
       free_SolidBodyBoundary( &(allparticles[k].s) );   
 # endif
 }
@@ -1119,11 +1119,11 @@ void writer_headers( FILE* pdata, FILE* sl )
 
 /** Writes particles data in files */
 //----------------------------------------------------------------------------
-void particle_data( particle* allparticles, const int n, const double t, 
+void particle_data( particle* allparticles, const size_t n, const double t, 
 	const int i, FILE** pdata ) 
 //----------------------------------------------------------------------------
 {  
-  for (int k = 0; k < n; k++) 
+  for (size_t k = 0; k < n; k++) 
   {
     GeomParameter* GCi = &(allparticles[k].g);
 #   if DLM_Moving_particle
@@ -1192,7 +1192,7 @@ void particle_data( particle* allparticles, const int n, const double t,
 
 /** Compute hydrodynamic force & torque and write the values in files */
 //----------------------------------------------------------------------------
-void sumLambda( particle* allparticles, const int n, FILE** sl, 
+void sumLambda( particle* allparticles, const size_t n, FILE** sl, 
 	const double t, const double dt, 
 	scalar Flag, vector lambda, vector Index, 
 	const double rho_f, vector prefcenter ) 
@@ -1216,12 +1216,12 @@ void sumLambda( particle* allparticles, const int n, FILE** sl,
   coord crossLambdaSumInt;
   coord crossLambdaSumBoundary;
   coord crossLambdaSum; 
-  Cache * Interior[NPARTICLES];
-  Cache * Boundary[NPARTICLES];
+  Cache* Interior[NPARTICLES];
+  Cache* Boundary[NPARTICLES];
   SolidBodyBoundary * sbm;
   
   /* Loop over all particles */
-  for (int k = 0; k < n; k++) 
+  for (size_t k = 0; k < n; k++) 
   {
     foreach_dimension() 
     {
@@ -1448,7 +1448,7 @@ void sumLambda( particle* allparticles, const int n, FILE** sl,
 
 /** Initialize/open all DLMFD file pointers */
 //----------------------------------------------------------------------------
-void init_file_pointers( const int n, FILE** p, FILE** d, FILE** UzawaCV, 
+void init_file_pointers( const size_t n, FILE** p, FILE** d, FILE** UzawaCV, 
 	FILE** CVT, const size_t rflag ) 
 //----------------------------------------------------------------------------
 {
@@ -1461,9 +1461,9 @@ void init_file_pointers( const int n, FILE** p, FILE** d, FILE** UzawaCV,
 # endif
     {
       // Particle data
-      for (int k = 0; k < n; k++) 
+      for (size_t k = 0; k < n; k++) 
       {
-        sprintf( suffix, "_%d.dat", k );
+        sprintf( suffix, "_%lu.dat", k );
 
         strcpy( name, result_dir );
         strcat( name, "/" );
@@ -1526,7 +1526,7 @@ void init_file_pointers( const int n, FILE** p, FILE** d, FILE** UzawaCV,
 
 /** Close all DLMFD files */
 //----------------------------------------------------------------------------
-void close_file_pointers( const int n, FILE** p, FILE** d, FILE* UzawaCV, 
+void close_file_pointers( const size_t n, FILE** p, FILE** d, FILE* UzawaCV, 
 	FILE* CVT ) 
 //----------------------------------------------------------------------------
 { 
@@ -1535,7 +1535,7 @@ void close_file_pointers( const int n, FILE** p, FILE** d, FILE* UzawaCV,
 # endif
     {
       // Particle data
-      for (int k = 0; k < n; k++) 
+      for (size_t k = 0; k < n; k++) 
       {
         fclose( p[k] ); 
         fclose( d[k] );
@@ -1891,12 +1891,12 @@ int totalcells()
 /** Computes and returns the total number of cells related to Distributed
 Lagrange multiplier points for all rigid bodies */
 //----------------------------------------------------------------------------
-int total_dlmfd_cells( particle* allparticles, const int np ) 
+int total_dlmfd_cells( particle* allparticles, const size_t np ) 
 //----------------------------------------------------------------------------
 {
   int apts = 0;
   
-  for (int k = 0; k < np; k++) 
+  for (size_t k = 0; k < np; k++) 
   {
 #   if debugInterior == 0
       apts += allparticles[k].Interior.n;
@@ -1919,13 +1919,13 @@ int total_dlmfd_cells( particle* allparticles, const int np )
 /** Computes and returns the total number of Ditributed Lagrange multiplier 
 points for all rigid bodies */
 //----------------------------------------------------------------------------
-int total_dlmfd_multipliers( particle* allparticles, const int np ) 
+int total_dlmfd_multipliers( particle* allparticles, const size_t np ) 
 //----------------------------------------------------------------------------
 {
   int apts = 0;
   
 # if debugInterior == 0
-    for (int k = 0; k < np; k++) 
+    for (size_t k = 0; k < np; k++) 
       apts += allparticles[k].Interior.n;
   
 #   if _MPI
@@ -1975,4 +1975,41 @@ void read_t_restart( char* dirname, double* time, double* deltat, double* ppd )
   FILE* ft = fopen( dump_name, "r" );
   fscanf ( ft, "%lf %lf %lf", time, deltat, ppd );
   fclose( ft );  
+}
+
+
+
+
+/** Allocate number of particles dependent arrays */
+//----------------------------------------------------------------------------
+void allocate_np_dep_arrays( const size_t npart, particle** particles_, 
+	double*** DLMFDtoGS_vel_, double** vpartbuf_, FILE*** pdata_, 
+	FILE*** fdata_ )
+//----------------------------------------------------------------------------
+{
+  *particles_ = (particle*) calloc( npart, sizeof(particle) );
+  *DLMFDtoGS_vel_ = (double**) calloc( npart, sizeof(double*) );
+  for (size_t k=0;k<npart;++k)
+    (*DLMFDtoGS_vel_)[k] = (double*) calloc( 6, sizeof(double) );
+  *vpartbuf_ = (double*) calloc( npartdata, npart * sizeof(double) );
+  *pdata_ = (FILE**) calloc( npart, sizeof( FILE* ) );
+  *fdata_ = (FILE**) calloc( npart, sizeof( FILE* ) );    
+}
+
+
+
+
+/** Free number of particles dependent arrays */
+//----------------------------------------------------------------------------
+void free_np_dep_arrays( const size_t npart, particle* particles_, 
+	double** DLMFDtoGS_vel_, double* vpartbuf_, FILE** pdata_, 
+	FILE** fdata_ )
+//----------------------------------------------------------------------------
+{
+  free( particles_ );
+  for (size_t k=0;k<npart;++k) free( DLMFDtoGS_vel_[k] );
+  free( DLMFDtoGS_vel_ );
+  free( vpartbuf_ );
+  free( pdata_ );
+  free( fdata_ );  
 }

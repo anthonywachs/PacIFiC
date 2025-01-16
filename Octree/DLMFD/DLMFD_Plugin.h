@@ -80,6 +80,7 @@ bool save_data_restart = false;
 scalar u_previoustime[];
 double imposed_periodicpressuredrop = 0.;
 double imposed_periodicflowrate = 0.;
+size_t NPARTICLES = 0;
 
 
 /** Fictitious domain implementation */
@@ -181,11 +182,6 @@ event init (i = 0)
 #   endif	
   }
 
-
-  // Initialize/open all DLMFD file pointers
-  init_file_pointers( NPARTICLES, pdata, fdata, &converge, &cellvstime, 
-  	restarted_simu );
-
   
   // Initialize the granular solver
   if ( pid() == 0 ) 
@@ -197,7 +193,13 @@ event init (i = 0)
   event( "GranularSolver_init" );
 # if _MPI
     MPI_Barrier( MPI_COMM_WORLD );
-# endif       
+# endif 
+
+
+  // Initialize/open all DLMFD file pointers
+  init_file_pointers( NPARTICLES, pdata, fdata, &converge, &cellvstime, 
+  	restarted_simu );      
+
 
   // Perform initial refinement around particles and write particle data
   int totalcell = 0;
@@ -218,7 +220,7 @@ event init (i = 0)
       
 #     if initialgridadaptive_newmethod == 0
             
-        for (int k = 0; k < NPARTICLES; k++) 
+        for (size_t k = 0; k < NPARTICLES; k++) 
         {
           GeomParameter * gg;
           gg = &(particles[k].g);    	  
@@ -275,7 +277,7 @@ event init (i = 0)
       
         // Create caches per particle boundary point
         Cache** stencil = (Cache **) calloc( NPARTICLES, sizeof(Cache*) );
-        for (int k = 0; k < NPARTICLES; k++)
+        for (size_t k = 0; k < NPARTICLES; k++)
         { 
           stencil[k] = (Cache *) calloc( particles[k].s.m, sizeof(Cache) );
 	  for (int j = 0; j < particles[k].s.m; j++)
@@ -290,7 +292,7 @@ event init (i = 0)
           ic++;
 	
 	  // Generate the 5^dim boundary point stencil
-	  for (int k = 0; k < NPARTICLES; k++)
+	  for (size_t k = 0; k < NPARTICLES; k++)
             for (int j = 0; j < particles[k].s.m; j++)
 	    { 
               stencil[k][j].n = 0;
@@ -316,7 +318,7 @@ event init (i = 0)
           // Assign the noisy distance function over cells that belong
 	  // to each boundary point stencil
           foreach() DLM_Flag[] = 0; 	
-	  for (int k = 0; k < NPARTICLES; k++)
+	  for (size_t k = 0; k < NPARTICLES; k++)
             for (int j = 0; j < particles[k].s.m; j++) 	        
               foreach_cache(stencil[k][j]) 
                 if ( point.level >= 0 ) 
@@ -351,7 +353,7 @@ event init (i = 0)
         } while ( ( ss.nf || ss.nc ) && ic < maxic );      
                         
         // Free all particle boundary point caches
-        for (int k = 0; k < NPARTICLES; k++)
+        for (size_t k = 0; k < NPARTICLES; k++)
         { 
           for (int j = 0; j < particles[k].s.m; j++) 
 	    free( stencil[k][j].p ); 
@@ -381,7 +383,7 @@ event init (i = 0)
 #   ifndef gravity_z
 #     define gravity_z 0.
 #   endif
-    for (int k = 0; k < NPARTICLES; k++) 
+    for (size_t k = 0; k < NPARTICLES; k++) 
     {    
       particles[k].gravity.x = gravity_x;
       particles[k].gravity.y = gravity_y;
@@ -475,7 +477,7 @@ event once_timestep_is_determined (i++)
   // We free dynamic features of particles from the previous time step
   // or from initialization at the start of the current time step 
   // (run with -events to understand)
-  free_particles( particles, NPARTICLES ); 
+  free_particles( particles, NPARTICLES );  
   
   // In case of a periodic flow, we add the imposed pressure drop
 # if imposed_periodicflow
@@ -515,6 +517,8 @@ event cleanup (t = end)
   // Since at the very end, there is no next time step, dynamic features 
   // of particles are not freed by start_timestep and hence are freed here
   free_particles( particles, NPARTICLES ); 
+  free_np_dep_arrays( NPARTICLES, particles, DLMFDtoGS_vel, vpartbuf, pdata, 
+  	fdata );
 }
 
 
@@ -536,7 +540,10 @@ event viscous_term (i++)
 
 
 
+/** Solves DLMFD velocity problem */
+//----------------------------------------------------------------------------
 void do_DLMFD( const int i )
+//----------------------------------------------------------------------------
 {
   /* Solve the DLMFD velocity problem by a Uzawa algorithm */
   if ( pid() == 0 ) printf( "   DLMFD Uzawa algorithm\n" ); 
