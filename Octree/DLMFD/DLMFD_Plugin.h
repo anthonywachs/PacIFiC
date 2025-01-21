@@ -3,70 +3,98 @@
 */
 
 /** File names definition and global variables */  
-# ifndef fluid_dump_filename
-#   define fluid_dump_filename "Savings/dump"
+# ifndef FLUID_DUMP_FILENAME
+#   define FLUID_DUMP_FILENAME "Savings/dump"
 # endif
-# ifndef dump_dir
-#   define dump_dir "Savings"
-# endif
-
-# ifndef result_dir
-#   define result_dir "Res"
-# endif
-# ifndef result_particle_vp_rootfilename
-#   define result_particle_vp_rootfilename "particle_data"
-# endif
-# ifndef result_particle_hydroFaT_rootfilename
-#   define result_particle_hydroFaT_rootfilename "particle_hydroFaT"
-# endif
-# ifndef result_fluid_rootfilename
-#   define result_fluid_rootfilename "fluid_basilisk"
+# ifndef DUMP_DIR
+#   define DUMP_DIR "Savings"
 # endif
 
-# ifndef result_dir
-#   define result_dir "Res"
+# ifndef RESULT_DIR
+#   define RESULT_DIR "Res"
+# endif
+# ifndef RESULT_RIGIDBODY_VP_ROOTFILENAME
+#   define RESULT_RIGIDBODY_VP_ROOTFILENAME "rigidbody_data"
+# endif
+# ifndef RESULT_RIGIDBODY_HYDROFAT_ROOTFILENAME
+#   define RESULT_RIGIDBODY_HYDROFAT_ROOTFILENAME "rigidbody_hydroFaT"
+# endif
+# ifndef RESULT_FLUID_ROOTFILENAME
+#   define RESULT_FLUID_ROOTFILENAME "fluid_basilisk"
 # endif
 
-# ifndef converge_uzawa_filename 
-#   define converge_uzawa_filename "converge_uzawa.dat"
-# endif
-# ifndef dlmfd_cells_filename 
-#   define dlmfd_cells_filename "dlmfd_cells.dat"
-# endif
-# ifndef dlmfd_perf_filename 
-#   define dlmfd_perf_filename "dlmfd_perf.dat"
+# ifndef RESULT_DIR
+#   define RESULT_DIR "Res"
 # endif
 
-# ifndef RoundDoubleCoef
-#   define RoundDoubleCoef (1.e-4)
+# ifndef CONVERGE_UZAWA_FILENAME 
+#   define CONVERGE_UZAWA_FILENAME "converge_uzawa.dat"
+# endif
+# ifndef DLMFD_CELLS_FILENAME 
+#   define DLMFD_CELLS_FILENAME "dlmfd_cells.dat"
+# endif
+# ifndef DLMFD_PERF_FILENAME 
+#   define DLMFD_PERF_FILENAME "dlmfd_perf.dat"
 # endif
 
-# ifndef figs_dir
-#   define figs_dir "Figs"
+# ifndef ROUNDDOUBLECOEF
+#   define ROUNDDOUBLECOEF (1.e-4)
 # endif
 
-# ifndef initialgridadaptive_newmethod
-#   define initialgridadaptive_newmethod 1
+# ifndef FIGS_DIR
+#   define FIGS_DIR "Figs"
 # endif
 
-# ifndef imposed_periodicflow
-#   define imposed_periodicflow 0
+# ifndef INITIALGRIDADAPTIVE_NEWMETHOD
+#   define INITIALGRIDADAPTIVE_NEWMETHOD 1
 # endif
 
-# ifndef imposed_periodicflow_type
-#   define imposed_periodicflow_type 0 // 0 for pressure and 1 for flow rate
+# ifndef IMPOSED_PERIODICFLOW
+#   define IMPOSED_PERIODICFLOW 0
 # endif
 
-# ifndef imposed_periodicflow_direction
-#   define imposed_periodicflow_direction 0 
+# ifndef IMPOSED_PERIODICFLOW_TYPE
+#   define IMPOSED_PERIODICFLOW_TYPE 0 // 0 for pressure and 1 for flow rate
 # endif
 
-# ifndef periodicflowrate_level
-#   define periodicflowrate_level MAXLEVEL 
+# ifndef IMPOSED_PERIODICFLOW_DIRECTION
+#   define IMPOSED_PERIODICFLOW_DIRECTION 0 
+# endif
+
+# ifndef PERIODICFLOWRATE_LEVEL
+#   define PERIODICFLOWRATE_LEVEL MAXLEVEL 
 # endif
 
 # ifndef DLMFD_PROB_AFTER_NAVIERSTOKES
 #   define DLMFD_PROB_AFTER_NAVIERSTOKES 0
+# endif
+
+# ifndef RIGIDBODIES_AS_FIXED_OBSTACLES
+#   define RIGIDBODIES_AS_FIXED_OBSTACLES 0
+# endif
+
+# ifndef FLAG_ADAPT_CRIT
+#   define FLAG_ADAPT_CRIT (1.E-9)
+# endif
+
+# ifndef UX_ADAPT_CRIT
+#   define UX_ADAPT_CRIT (1.E-2)
+# endif
+
+# ifndef UY_ADAPT_CRIT
+#   define UY_ADAPT_CRIT (1.E-2)
+# endif
+
+# ifndef UZ_ADAPT_CRIT
+#   define UZ_ADAPT_CRIT (1.E-2)
+# endif
+
+# ifndef GRAVITY_VECTOR
+#   if dimension == 2
+#     define GRAVITY_VECTOR ((coord){0.,0.})
+#   else 
+#     define GRAVITY_VECTOR ((coord){0.,0.,0.})
+#   endif
 # endif
 
 double deltau;
@@ -80,7 +108,9 @@ bool save_data_restart = false;
 scalar u_previoustime[];
 double imposed_periodicpressuredrop = 0.;
 double imposed_periodicflowrate = 0.;
-size_t NPARTICLES = 0;
+size_t nbRigidBodies = 0;
+size_t nbParticles = 0;
+size_t NbObstacles = 0;
 
 
 /** Fictitious domain implementation */
@@ -119,7 +149,7 @@ event GranularSolver_updateVelocity (t < -1.)
 
 
 
-/** Overloading of the init event: initialize fluid and particles */
+/** Overloading of the init event: initialize fluid and rigid bodies */
 //----------------------------------------------------------------------------
 event init (i = 0) 
 //----------------------------------------------------------------------------
@@ -131,27 +161,27 @@ event init (i = 0)
     printf( "==================================\n" );        
   }
 
-# ifndef rhoval
-#   define rhoval 1.
+# ifndef FLUID_DENSITY
+#   define FLUID_DENSITY 1.
 # endif
   
   /* Initialize the density field */
-  const scalar rhoc[] = rhoval;
+  const scalar rhoc[] = FLUID_DENSITY;
   rho = rhoc;
 
-# ifndef tval
-#   define tval 1.
+# ifndef FLUID_VISCOSITY
+#   define FLUID_VISCOSITY 1.
 # endif
   
   /* Initialize the viscosity field */
-  const face vector muc[] = {tval, tval, tval};
+  const face vector muc[] = {FLUID_VISCOSITY, FLUID_VISCOSITY, FLUID_VISCOSITY};
   mu = muc;
 
   // Output basic fluid and geometric parameters
   if ( pid() == 0 )
   {
-    printf( "Fluid density = %6.3e\n", rhoval );
-    printf( "Fluid viscosity = %6.3e\n", tval );
+    printf( "Fluid density = %6.3e\n", FLUID_DENSITY );
+    printf( "Fluid viscosity = %6.3e\n", FLUID_VISCOSITY );
     printf( "Space dimension = %d\n", dimension );    
     printf( "Domain size = %6.3e\n", L0 );
     printf( "\n" );            
@@ -161,7 +191,7 @@ event init (i = 0)
   initialize_DLMFD_fields_to_zero();
 
   // If new simulation: set fluid initial condition from user defined case file
-  if ( ! restore ( file = fluid_dump_filename ) ) 
+  if ( ! restore ( file = FLUID_DUMP_FILENAME ) ) 
   {
     // Set the restarted simulation boolean to 0
     restarted_simu = 0;
@@ -173,7 +203,7 @@ event init (i = 0)
 
     // Read restart time
     if ( pid() == 0 ) printf( "Read t and dt from time restart file\n" );
-    read_t_restart( dump_dir, &trestart, &dtrestart, 
+    read_t_restart( DUMP_DIR, &trestart, &dtrestart, 
     	&imposed_periodicpressuredrop );  
 
     // Re-initialize the VTK writer
@@ -197,11 +227,11 @@ event init (i = 0)
 
 
   // Initialize/open all DLMFD file pointers
-  init_file_pointers( NPARTICLES, pdata, fdata, &converge, &cellvstime, 
-  	restarted_simu );      
+  init_file_pointers( nbRigidBodies, pdata, !RIGIDBODIES_AS_FIXED_OBSTACLES, 
+  	fdata, &converge, &cellvstime, restarted_simu );      
 
 
-  // Perform initial refinement around particles and write particle data
+  // Perform initial refinement around rigid bodies and write rigid body data
   int totalcell = 0;
 
   if ( restarted_simu ) // Restarted simulation
@@ -211,25 +241,25 @@ event init (i = 0)
   }
   else // Simulation from t=0
   {
-#   if adaptive
+#   if ADAPTIVE
       if ( pid() == 0 )
       {
-        printf( "\nInitial grid refinement in the particle volume\n" );
-        printf( "----------------------------------------------\n" );      
+        printf( "\nInitial grid refinement in the rigid body volume\n" );
+        printf( "------------------------------------------------\n" );      
       }
       
-#     if initialgridadaptive_newmethod == 0
+#     if INITIALGRIDADAPTIVE_NEWMETHOD == 0
             
-        for (size_t k = 0; k < NPARTICLES; k++) 
+        for (size_t k = 0; k < nbRigidBodies; k++) 
         {
           GeomParameter * gg;
-          gg = &(particles[k].g);    	  
+          gg = &(allRigidBodies[k].g);    	  
     
           /* Perform initial refinement */
           totalcell = totalcells();
           if ( pid() == 0 )
 	    printf( "# total cells before initial refinement of "
-	  	"particle %d = %d\n", k, totalcell );
+	  	"rigid body %d = %d\n", k, totalcell );
 
           coord position = gg->center;
           double radius = gg->radius;
@@ -266,21 +296,21 @@ event init (i = 0)
           // Compute the total number of cells after refinement 
           totalcell = totalcells();
           if ( pid() == 0 )
-	    printf( "# total cells after initial refinement of particle %d = "
+	    printf( "# total cells after initial refinement of rigid body %d = "
 		"%d\n\n", k, totalcell );
         }
 	      
 #     else 
      
-        // Create particle boundary points
-        create_particles_boundary_points( particles, NPARTICLES );
+        // Create rigid body boundary points
+        create_rigidbodies_boundary_points( allRigidBodies, nbRigidBodies );
       
-        // Create caches per particle boundary point
-        Cache** stencil = (Cache **) calloc( NPARTICLES, sizeof(Cache*) );
-        for (size_t k = 0; k < NPARTICLES; k++)
+        // Create caches per rigid body boundary point
+        Cache** stencil = (Cache **) calloc( nbRigidBodies, sizeof(Cache*) );
+        for (size_t k = 0; k < nbRigidBodies; k++)
         { 
-          stencil[k] = (Cache *) calloc( particles[k].s.m, sizeof(Cache) );
-	  for (int j = 0; j < particles[k].s.m; j++)
+          stencil[k] = (Cache *) calloc( allRigidBodies[k].s.m, sizeof(Cache) );
+	  for (int j = 0; j < allRigidBodies[k].s.m; j++)
 	    initialize_and_allocate_Cache( &(stencil[k][j]) );
         }
       
@@ -292,23 +322,24 @@ event init (i = 0)
           ic++;
 	
 	  // Generate the 5^dim boundary point stencil
-	  for (size_t k = 0; k < NPARTICLES; k++)
-            for (int j = 0; j < particles[k].s.m; j++)
+	  for (size_t k = 0; k < nbRigidBodies; k++)
+            for (int j = 0; j < allRigidBodies[k].s.m; j++)
 	    { 
               stencil[k][j].n = 0;
 	      for (int ni=-2; ni<=2; ni++)
                 for (int nj=-2; nj<=2; nj++) 
 	        {
 #                 if dimension < 3
-                    Point point = locate( particles[k].s.x[j] + ni * delta,
-          		particles[k].s.y[j] + nj * delta );
+                    Point point = locate( allRigidBodies[k].s.x[j] + ni * delta,
+          		allRigidBodies[k].s.y[j] + nj * delta );
 		    cache_append( &(stencil[k][j]), point, 0 );
 #                 else
                     for (int nk=-2; nk<=2; nk++) 
 		    {
-                      Point point = locate( particles[k].s.x[j] + ni * delta,
-          		particles[k].s.y[j] + nj * delta,
-			particles[k].s.z[j] + nk * delta );
+                      Point point = locate( 
+		      	allRigidBodies[k].s.x[j] + ni * delta,
+          		allRigidBodies[k].s.y[j] + nj * delta,
+			allRigidBodies[k].s.z[j] + nk * delta );
 		      cache_append( &(stencil[k][j]), point, 0 );
 		    }
 #                 endif
@@ -318,16 +349,16 @@ event init (i = 0)
           // Assign the noisy distance function over cells that belong
 	  // to each boundary point stencil
           foreach() DLM_Flag[] = 0; 	
-	  for (size_t k = 0; k < NPARTICLES; k++)
-            for (int j = 0; j < particles[k].s.m; j++) 	        
+	  for (size_t k = 0; k < nbRigidBodies; k++)
+            for (int j = 0; j < allRigidBodies[k].s.m; j++) 	        
               foreach_cache(stencil[k][j]) 
                 if ( point.level >= 0 ) 
 	        {
                   coord dist;
-                  dist.x = x - particles[k].s.x[j];
-                  dist.y = y - particles[k].s.y[j];
+                  dist.x = x - allRigidBodies[k].s.x[j];
+                  dist.y = y - allRigidBodies[k].s.y[j];
 #                 if dimension > 2
-                    dist.z = z - particles[k].s.z[j];
+                    dist.z = z - allRigidBodies[k].s.z[j];
 #                 endif
 #                 if dimension < 3
                     if ( fabs(dist.x) <= 2. * Delta 
@@ -352,44 +383,27 @@ event init (i = 0)
 		totalcell );
         } while ( ( ss.nf || ss.nc ) && ic < maxic );      
                         
-        // Free all particle boundary point caches
-        for (size_t k = 0; k < NPARTICLES; k++)
+        // Free all rigid body boundary point caches
+        for (size_t k = 0; k < nbRigidBodies; k++)
         { 
-          for (int j = 0; j < particles[k].s.m; j++) 
+          for (int j = 0; j < allRigidBodies[k].s.m; j++) 
 	    free( stencil[k][j].p ); 
 	  free( stencil[k] );
         }
         free(stencil);     
       
-        // No need to free the particle boundary points, there will be freed
-        // in the start_timestep event by the free_particles function
+        // No need to free the rigid body boundary points, there will be freed
+        // in the once_timestep_is_determined event by the free_rigidbodies 
+	// function
       
 #     endif
 #   endif
     
-    // Save all particles trajectories
-    particle_data( particles, NPARTICLES, t, i, pdata );  
+    // Save all rigid body data
+    if ( !RIGIDBODIES_AS_FIXED_OBSTACLES )
+      rigidbody_data( allRigidBodies, nbRigidBodies, t, i, pdata );  
   }
 
-
-  // Assign gravity to particles
-# if DLM_Moving_particle
-#   ifndef gravity_x
-#     define gravity_x 0.
-#   endif
-#   ifndef gravity_y
-#     define gravity_y 0.
-#   endif
-#   ifndef gravity_z
-#     define gravity_z 0.
-#   endif
-    for (size_t k = 0; k < NPARTICLES; k++) 
-    {    
-      particles[k].gravity.x = gravity_x;
-      particles[k].gravity.y = gravity_y;
-      particles[k].gravity.z = gravity_z;
-    }    
-# endif
   
   // Simulation time interval
   maxtime = trestart + SimuTimeInterval;
@@ -419,7 +433,7 @@ event init (i = 0)
     DLM_v.x.nodump = true ;
     DLM_qu.x.nodump = true ;
     DLM_tu.x.nodump = true ;
-#   if DLM_alpha_coupling
+#   if DLM_ALPHA_COUPLING
       DLM_explicit.x.nodump = false ;
 #   endif    
   }  
@@ -436,14 +450,14 @@ event logfile ( i=0; i++ )
   // This is the condition that stops the simulation exactly at t=maxtime
   // We use -0.0001 * dt to avoid the problem of comparison of double that 
   // would exist if we would write if ( t > maxtime )
-  if ( t - maxtime > - RoundDoubleCoef * dt ) 
+  if ( t - maxtime > - ROUNDDOUBLECOEF * dt ) 
   {
     // Close all DLMFD files
-    close_file_pointers( NPARTICLES, pdata, fdata, converge, cellvstime ); 
+    close_file_pointers( nbRigidBodies, pdata, fdata, converge, cellvstime ); 
 
     // Write the dump time and time step for restart
     if ( pid() == 0 ) printf( "Write t and dt in time restart file\n" );
-    save_t_dt_restart( dump_dir, t, dt, imposed_periodicpressuredrop );  
+    save_t_dt_restart( DUMP_DIR, t, dt, imposed_periodicpressuredrop );  
     
     // Stop simulation
     return 1; 
@@ -454,7 +468,7 @@ event logfile ( i=0; i++ )
 
 
 /** Writes the dump time and time step for restart, frees dynamic features 
-of particles and predict the position & velocity of particles */
+of rigid bodies and predict the position & velocity of rigid bodies */
 //----------------------------------------------------------------------------
 event once_timestep_is_determined (i++)
 //----------------------------------------------------------------------------
@@ -462,7 +476,7 @@ event once_timestep_is_determined (i++)
   if ( save_data_restart && i )
   {
     if ( pid() == 0 ) printf( "Write t and dt in time restart file\n" );
-    save_t_dt_restart( dump_dir, t, dt, imposed_periodicpressuredrop );        
+    save_t_dt_restart( DUMP_DIR, t, dt, imposed_periodicpressuredrop );        
     save_data_restart = false;
   } 
   if ( i == 0 ) save_data_restart = false;
@@ -474,22 +488,22 @@ event once_timestep_is_determined (i++)
     printf( "   Time step = %8.5e\n", dt );
   }
   
-  // We free dynamic features of particles from the previous time step
+  // We free dynamic features of rigid bodies from the previous time step
   // or from initialization at the start of the current time step 
   // (run with -events to understand)
-  free_particles( particles, NPARTICLES );  
+  free_rigidbodies( allRigidBodies, nbRigidBodies );  
   
   // In case of a periodic flow, we add the imposed pressure drop
-# if imposed_periodicflow
-#   if imposed_periodicflow_direction == 0 
+# if IMPOSED_PERIODICFLOW
+#   if IMPOSED_PERIODICFLOW_DIRECTION == 0 
       const face vector dp[] = { 
-		imposed_periodicpressuredrop / ( L0 * rhoval ), 0., 0. };  
-#   elif imposed_periodicflow_direction == 1
+		imposed_periodicpressuredrop / ( L0 * FLUID_DENSITY ), 0., 0. };  
+#   elif IMPOSED_PERIODICFLOW_DIRECTION == 1
       const face vector dp[] = { 0.,
-		imposed_periodicpressuredrop / ( L0 * rhoval ), 0. };  	
+		imposed_periodicpressuredrop / ( L0 * FLUID_DENSITY ), 0. };  	
 #   else 
       const face vector dp[] = { 0., 0., 
-		- imposed_periodicpressuredrop / ( L0 * rhoval ) };  
+		- imposed_periodicpressuredrop / ( L0 * FLUID_DENSITY ) };  
 #   endif
     a = dp;
 # endif  
@@ -498,27 +512,27 @@ event once_timestep_is_determined (i++)
   if ( pid() == 0 ) printf( "   GS predictor step: " ); 
   event( "GranularSolver_predictor" );  
 
-  /* Construction of particles and their DLMFD features */
-  if ( pid() == 0 ) printf( "   DLMFD Particles construction\n" ); 
-  DLMFD_construction( particles );  
+  /* Construction of rigid bodies and their DLMFD features */
+  if ( pid() == 0 ) printf( "   DLMFD RB construction\n" ); 
+  DLMFD_construction();  
 }
 
 
 
 
-/** Frees dynamic features of particles at the very end */
+/** Frees dynamic features of rigid bodies at the very end */
 //----------------------------------------------------------------------------
 event cleanup (t = end)
 //----------------------------------------------------------------------------
 {
-  // This is because we free dynamic features of particles from the previous 
+  // This is because we free dynamic features of rigid bodies from the previous 
   // time step at the start of the current time step (see above the event 
   // once_timestep_is_determined)
   // Since at the very end, there is no next time step, dynamic features 
-  // of particles are not freed by start_timestep and hence are freed here
-  free_particles( particles, NPARTICLES ); 
-  free_np_dep_arrays( NPARTICLES, particles, DLMFDtoGS_vel, vpartbuf, pdata, 
-  	fdata );
+  // of rigid bodies are not freed by start_timestep and hence are freed here
+  free_rigidbodies( allRigidBodies, nbRigidBodies ); 
+  free_np_dep_arrays( nbParticles, allRigidBodies, DLMFDtoGS_vel, vpartbuf, 
+  	pdata, !RIGIDBODIES_AS_FIXED_OBSTACLES, fdata );
 }
 
 
@@ -530,10 +544,10 @@ that improves the coupling between the fluid problem and the DLMFD problem */
 event viscous_term (i++) 
 //----------------------------------------------------------------------------
 {
-# if DLM_alpha_coupling
+# if DLM_ALPHA_COUPLING
     foreach()
       foreach_dimension()
-        u.x[] += - dt * DLM_explicit.x[] / ( rhoval * dlmfd_dv() );
+        u.x[] += - dt * DLM_explicit.x[] / ( FLUID_DENSITY * dlmfd_dv() );
 # endif
 }
 
@@ -545,20 +559,23 @@ event viscous_term (i++)
 void do_DLMFD( const int i )
 //----------------------------------------------------------------------------
 {
-  /* Solve the DLMFD velocity problem by a Uzawa algorithm */
-  if ( pid() == 0 ) printf( "   DLMFD Uzawa algorithm\n" ); 
-  DLMFD_Uzawa_velocity( particles, i, rhoval );
+  /* Solve the DLMFD velocity problem by a Uzawa algorithm */ 
+  DLMFD_Uzawa_velocity( i );
 
   /* Update velocity in the granular solver */
-  if ( pid() == 0 ) printf( "   GS velocity update in " );
-  event( "GranularSolver_updateVelocity" );    
+  if ( pid() == 0 && nbParticles )
+  { 
+    printf( "   GS velocity update in " );
+    event( "GranularSolver_updateVelocity" );
+  }    
 
-  /* Save the forces acting on particles before adapting the mesh  */
-  sumLambda( particles, NPARTICLES, fdata, t + dt, dt, DLM_Flag, DLM_lambda, 
-  	DLM_Index, rhoval, DLM_PeriodicRefCenter );
+  /* Save the forces acting on rigid bodies before adapting the mesh  */
+  computeHydroForceTorque( allRigidBodies, nbRigidBodies, fdata, t + dt, dt, 
+  	DLM_Flag, DLM_lambda, DLM_Index, FLUID_DENSITY, DLM_PeriodicRefCenter );
   
-  /* Save all particles trajectories */
-  particle_data( particles, NPARTICLES, t + dt, i, pdata ); 
+  /* Save all rigid body data */
+  if ( !RIGIDBODIES_AS_FIXED_OBSTACLES )
+    rigidbody_data( allRigidBodies, nbRigidBodies, t + dt, i, pdata ); 
 }
 
 
@@ -583,11 +600,7 @@ event end_timestep (i++)
 //----------------------------------------------------------------------------
 {
   if ( pid() == 0 )
-  {
-    printf( "   Navier-Stokes solver\n" ); 
-    printf( "      MGu_niter = %d, MGp_niter = %d\n", mgu.i,
-    	mgp.i );    
-  }
+    printf( "   NS solver: MGu_niter = %d, MGp_niter = %d\n", mgu.i, mgp.i );
 
 # if DLMFD_PROB_AFTER_NAVIERSTOKES 
     do_DLMFD( i );
@@ -595,12 +608,12 @@ event end_timestep (i++)
 
   /* Compute periodic flow rate or adjust periodic pressure drop if 
   imposed periodic flow rate */
-# if imposed_periodicflow
+# if IMPOSED_PERIODICFLOW
     double flowrate = 0.;
-#   if imposed_periodicflow_type == 0
-#     if imposed_periodicflow_direction == 0 
+#   if IMPOSED_PERIODICFLOW_TYPE == 0
+#     if IMPOSED_PERIODICFLOW_DIRECTION == 0 
         flowrate = compute_flowrate_right( u, periodicflowrate_level );
-#     elif imposed_periodicflow_direction == 1
+#     elif IMPOSED_PERIODICFLOW_DIRECTION == 1
         flowrate = compute_flowrate_top( u, periodicflowrate_level );
 #     else 
         flowrate = compute_flowrate_front( u, periodicflowrate_level );
@@ -608,22 +621,22 @@ event end_timestep (i++)
       if ( pid() == 0 )
         printf( "   Periodic flow rate = %8.5e\n", flowrate );           
 #   else
-      double Q1 = - dt / ( L0 * rhoval );
+      double Q1 = - dt / ( L0 * FLUID_DENSITY );
       double deltaflowrate = 0.;                    
-#     if imposed_periodicflow_direction == 0 
-        flowrate = compute_flowrate_right( u, periodicflowrate_level );
+#     if IMPOSED_PERIODICFLOW_DIRECTION == 0 
+        flowrate = compute_flowrate_right( u, PERIODICFLOWRATE_LEVEL );
 	deltaflowrate = imposed_periodicflowrate - flowrate;
 	imposed_periodicpressuredrop += deltaflowrate / ( Q1 * L0 * L0 );
 	foreach()
 	  u.x[] += deltaflowrate / ( L0 * L0 );  
-#     elif imposed_periodicflow_direction == 1
-        flowrate = compute_flowrate_top( u, periodicflowrate_level );
+#     elif IMPOSED_PERIODICFLOW_DIRECTION == 1
+        flowrate = compute_flowrate_top( u, PERIODICFLOWRATE_LEVEL );
 	deltaflowrate = imposed_periodicflowrate - flowrate;
 	imposed_periodicpressuredrop += deltaflowrate / ( Q1 * L0 * L0 );
 	foreach()
 	  u.y[] += deltaflowrate / ( L0 * L0 ); 
 #     else 
-        flowrate = compute_flowrate_front( u, periodicflowrate_level );
+        flowrate = compute_flowrate_front( u, PERIODICFLOWRATE_LEVEL );
 	deltaflowrate = imposed_periodicflowrate - flowrate;
 	
 //         // PID controller
@@ -670,47 +683,33 @@ event end_timestep (i++)
 
 /** Overloading of the adapt event: we refine the mesh with both the velocity
 field and a phase indicator */
-# ifndef FlagAdaptCrit
-#   define FlagAdaptCrit (1.E-9)
-# endif
-
-# ifndef UxAdaptCrit
-#   define UxAdaptCrit (1.E-2)
-# endif
-
-# ifndef UyAdaptCrit
-#   define UyAdaptCrit (1.E-2)
-# endif
-
-# ifndef UzAdaptCrit
-#   define UzAdaptCrit (1.E-2)
-# endif
 //----------------------------------------------------------------------------
 event adapt (i++) 
 //----------------------------------------------------------------------------
 {
-# if adaptive
+# if ADAPTIVE
     int totalcell = totalcells();
     if ( pid() == 0 )
     {
 #     if dimension == 2  
-        printf( "   Quadtree grid\n" );
+        printf( "   Quadtree grid cells: " );
 #     else
-        printf( "   Octree grid\n" );
+        printf( "   Octree grid cells: " );
 #     endif
-      printf( "      Total number of cells = %d \n", totalcell );
+      printf( "total = %d, ", totalcell );
     }
 
-#   if DLM_Moving_particle
-      astats s = adapt_wavelet( (scalar *){DLM_FlagMesh, u}, 
-	(double[]){FlagAdaptCrit, UxAdaptCrit, UyAdaptCrit, UzAdaptCrit}, 
-	maxlevel = MAXLEVEL, minlevel = LEVEL );
-#   else
+#   if RIGIDBODIES_AS_FIXED_OBSTACLES
       astats s = adapt_wavelet( (scalar *){DLM_Flag, u}, 
-	(double[]){FlagAdaptCrit, UxAdaptCrit, UyAdaptCrit, UzAdaptCrit}, 
-	maxlevel = MAXLEVEL, minlevel = LEVEL );
-#   endif
+	(double[]){FLAG_ADAPT_CRIT, UX_ADAPT_CRIT, UY_ADAPT_CRIT, 
+	UZ_ADAPT_CRIT}, maxlevel = MAXLEVEL, minlevel = LEVEL );
+#   else
+      astats s = adapt_wavelet( (scalar *){DLM_FlagMesh, u}, 
+	(double[]){FLAG_ADAPT_CRIT, UX_ADAPT_CRIT, UY_ADAPT_CRIT, 
+	UZ_ADAPT_CRIT}, maxlevel = MAXLEVEL, minlevel = LEVEL );
+#   endif		
+
     if ( pid() == 0 ) 
-      printf( "      Refined %d cells, coarsened %d cells\n", s.nf, s.nc );
+      printf( "refined = %d, coarsened = %d\n", s.nf, s.nc );
 # endif
 }

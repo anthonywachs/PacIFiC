@@ -42,7 +42,7 @@ void compute_nboundary_Tetrahedron( GeomParameter* gcp, int* nb, int* lN )
 /** Creates boundary points on the surface of the tetrahedron */
 //----------------------------------------------------------------------------
 void create_FD_Boundary_Tetrahedron( GeomParameter* gcp,
-	SolidBodyBoundary* dlm_bd, const int m, const int lN, 
+	RigidBodyBoundary* dlm_bd, const int m, const int lN, 
 	vector* pPeriodicRefCenter, const bool setPeriodicRefCenter )
 //----------------------------------------------------------------------------
 {
@@ -179,7 +179,7 @@ void create_FD_Boundary_Tetrahedron( GeomParameter* gcp,
 
 // Reads geometric parameters of the tetrahedron
 //----------------------------------------------------------------------------
-void update_Tetrahedron(GeomParameter* gcp)
+void update_Tetrahedron( GeomParameter* gcp )
 //----------------------------------------------------------------------------
 {
   char* token = NULL;

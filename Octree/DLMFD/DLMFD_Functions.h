@@ -48,6 +48,16 @@ enum RigidBodyShape {
 };
 
 
+
+
+/** Different rigid body shapes supported */      
+enum RigidBodyType {
+  PARTICLE,
+  PERIODICPARTICLE,
+  OBSTACLE
+};
+
+
  
 
 /** Structure for the coordinates of a rigid body boundary. */
@@ -57,7 +67,7 @@ typedef struct {
   double* z;
   int m;
   int nm;
-} SolidBodyBoundary;
+} RigidBodyBoundary;
 
 
 
@@ -97,32 +107,28 @@ typedef struct {
 
 
 
-/** Set of parameters describing a rigid body (also named particle) */
+/** Set of parameters describing a rigid body */
 typedef struct {
   size_t pnum;
-  char tag[3];
+  char typetag[3];
+  enum RigidBodyType type;
   enum RigidBodyShape shape;  
-  SolidBodyBoundary s;
+  RigidBodyBoundary s;
   GeomParameter g;
   double M, Ip[6], rho_s, Vp, DLMFD_couplingfactor, RotMat[3][3];  
-# if DLM_Moving_particle
-    ToyGSParameter *toygsp;
-    coord gravity;
-    double Ip_inv[3][3];
-    coord addforce;    
-#   if TRANSLATION
-      coord U, Unm1, qU, tU;
-#   endif
-#   if ROTATION
-      coord w, wnm1, qw, tw;
-#   endif
-# else
-    coord imposedU, imposedw;    
+  ToyGSParameter *toygsp;
+  double Ip_inv[3][3];
+  coord addforce;    
+# if TRANSLATION
+    coord U, Unm1, qU, tU, imposedU;    
+# endif
+# if ROTATION
+    coord w, wnm1, qw, tw, imposedw;
 # endif
   Cache Interior;
   Cache reduced_domain;
   long tcells, tmultipliers;
-} particle;
+} RigidBody;
 
 
 
@@ -150,9 +156,9 @@ trace void synchronize( scalar* list )
 # include "Icosahedron.h"
 
 
-/** Allocates memory for m points in the SolidBodyBoundary structure. */
+/** Allocates memory for m points in the RigidBodyBoundary structure. */
 //----------------------------------------------------------------------------
-void allocate_SolidBodyBoundary( SolidBodyBoundary* sbm, const int m ) 
+void allocate_RigidBodyBoundary( RigidBodyBoundary* sbm, const int m ) 
 //----------------------------------------------------------------------------
 {
   sbm->x = (double*) calloc( m, sizeof(double) ); 
@@ -169,9 +175,9 @@ void allocate_SolidBodyBoundary( SolidBodyBoundary* sbm, const int m )
 
 
 
-/** Re-allocates memory for m points in the SolidBodyBoundary structure. */
+/** Re-allocates memory for m points in the RigidBodyBoundary structure. */
 //----------------------------------------------------------------------------
-void reallocate_SolidBodyBoundary( SolidBodyBoundary* sbm, const int m ) 
+void reallocate_RigidBodyBoundary( RigidBodyBoundary* sbm, const int m ) 
 //----------------------------------------------------------------------------
 {
   sbm->x = (double*) realloc( sbm->x, m * sizeof(double) ); 
@@ -186,9 +192,9 @@ void reallocate_SolidBodyBoundary( SolidBodyBoundary* sbm, const int m )
 
 
 
-/** Frees memory associated to the points in the SolidBodyBoundary structure. */
+/** Frees memory associated to the points in the RigidBodyBoundary structure. */
 //----------------------------------------------------------------------------
-void free_SolidBodyBoundary( SolidBodyBoundary* sbm ) 
+void free_RigidBodyBoundary( RigidBodyBoundary* sbm ) 
 //----------------------------------------------------------------------------
 {
   free( sbm->x ); sbm->x = NULL;
@@ -216,67 +222,65 @@ void initialize_and_allocate_Cache( Cache* p )
 
 
 
-/** Frees the particle data that were dynamically allocated */
+/** Frees the rigid body data that were dynamically allocated */
 //----------------------------------------------------------------------------
-void free_particles( particle* allparticles, const size_t n ) 
+void free_rigidbodies( RigidBody* allrbs, const size_t nrb ) 
 //----------------------------------------------------------------------------
 {
-  for (size_t k=0;k<n;k++) 
+  for (size_t k=0;k<nrb;k++) 
   {        
     // Free the boundary point coordinate arrays
-    SolidBodyBoundary* sbm = &(allparticles[k].s);
-    free_SolidBodyBoundary( sbm );
+    RigidBodyBoundary* sbm = &(allrbs[k].s);
+    free_RigidBodyBoundary( sbm );
     
     // Free the periodic clones position vector
-    if ( allparticles[k].g.nperclones ) 
-      free( allparticles[k].g.perclonecenters ); 
+    if ( allrbs[k].g.nperclones ) 
+      free( allrbs[k].g.perclonecenters ); 
     
     // Free the caches 
-    Cache* c = &(allparticles[k].Interior);
+    Cache* c = &(allrbs[k].Interior);
     free( c->p );
     c->p = NULL;
-    c = &(allparticles[k].reduced_domain);
+    c = &(allrbs[k].reduced_domain);
     free( c->p );
     c->p = NULL;    
     
     // Free the toy granular solver parameter structure
-#   if DLM_Moving_particle
-      if ( allparticles[k].toygsp )
-      {
-        free( allparticles[k].toygsp );
-        allparticles[k].toygsp = NULL;
-      }     
-#   endif
+    if ( allrbs[k].toygsp )
+    {
+      free( allrbs[k].toygsp );
+      allrbs[k].toygsp = NULL;
+    }     
 
-    // Free the additional geometric features of the particle
-    switch ( allparticles[k].shape )
+    // Free the additional geometric features of the RigidBody*
+    switch ( allrbs[k].shape )
     {
       case SPHERE:
-        free_Sphere( &(allparticles[k].g) );
+        free_Sphere( &(allrbs[k].g) );
 	break;
 	  
       case CIRCULARCYLINDER2D:
-        free_CircularCylinder2D( &(allparticles[k].g) );
+        free_CircularCylinder2D( &(allrbs[k].g) );
 	break;
 	  
       case CUBE:
-        free_Cube( &(allparticles[k].g) );
+        free_Cube( &(allrbs[k].g) );
 	break;
 
       case TETRAHEDRON:
-        free_Tetrahedron( &(allparticles[k].g) );
+        free_Tetrahedron( &(allrbs[k].g) );
 	break;
 	
       case OCTAHEDRON:
-	free_Octahedron( &(allparticles[k].g) );
+	free_Octahedron( &(allrbs[k].g) );
 	break;
 	
       case ICOSAHEDRON:
-	free_Icosahedron( &(allparticles[k].g) );
+	free_Icosahedron( &(allrbs[k].g) );
 	break;
 
       case DODECAHEDRON:
-	free_Dodecahedron( &(allparticles[k].g) );
+	free_Dodecahedron( &(allrbs[k].g) );
 	break;	
 	  
       default:
@@ -288,15 +292,15 @@ void free_particles( particle* allparticles, const size_t n )
 
 
 
-/** Prints data of a particle */
+/** Prints data of a rigid body */
 //----------------------------------------------------------------------------
-void print_particle( particle const* p, char const* poshift )
+void print_rigidbody( RigidBody const* p, char const* poshift )
 //----------------------------------------------------------------------------
 {
   if ( pid() == 0 ) 
   {
     printf( "%sNumber = %lu\n", poshift, p->pnum ); 
-    printf( "%sTag = %s\n", poshift, p->tag ); 
+    printf( "%sTag = %s\n", poshift, p->typetag ); 
     printf( "%sShape = ", poshift );
     switch ( p->shape )
     {
@@ -356,7 +360,8 @@ void print_particle( particle const* p, char const* poshift )
     printf( "%sMass = %e\n", poshift, p->M ); 
     printf( "%sVolume = %e\n", poshift, p->Vp );     
     printf( "%sDensity = %e\n", poshift, p->rho_s ); 
-#   if DLM_Moving_particle
+    if ( p->type != OBSTACLE )
+    {
 #     if dimension == 3
         printf( "%sInertia tensor\n", poshift );
         printf( "%s   Ixx = %e\n", poshift, p->Ip[0] );
@@ -383,7 +388,9 @@ void print_particle( particle const* p, char const* poshift )
 #       endif
         printf( " %e\n", p->w.z );
 #     endif
-#   else
+    }
+    else
+    {
       printf( "%sImposed translational velocity = %e %e", 
     	poshift, p->imposedU.x, p->imposedU.y );
 #     if dimension == 3
@@ -394,8 +401,8 @@ void print_particle( particle const* p, char const* poshift )
 #     if dimension == 3
         printf( "%e %e", p->imposedw.x, p->imposedw.y );
 #     endif
-      printf( " %e\n", p->imposedw.z );    
-#   endif
+      printf( " %e\n", p->imposedw.z );
+    }    
   }
   int intpts = p->Interior.n;
   int bdpts = p->reduced_domain.n;  
@@ -415,20 +422,20 @@ void print_particle( particle const* p, char const* poshift )
 
 
 
-/** Prints all particle data */
+/** Prints all RigidBody* data */
 //----------------------------------------------------------------------------
-void print_all_particles( particle const* allparticles, const size_t n,
+void print_all_rigidbodies( RigidBody const* allrbs, const size_t nrb,
 	char const* oshift )
 //----------------------------------------------------------------------------
 {
-  if ( pid() == 0 ) printf( "%sTotal number of particles = %lu\n", oshift, 
-  	NPARTICLES );
+  if ( pid() == 0 ) printf( "%sNumber of rigid bodies / particles = %lu %lu\n",
+  	oshift, nbRigidBodies, nbParticles );
   char poshift[20]="   ";
   strcat( poshift, oshift );
-  for (size_t k=0;k<n;k++)
+  for (size_t k=0;k<nrb;k++)
   { 
     if ( pid() == 0 ) printf( "%sParticle %lu\n", oshift, k );    
-    print_particle( &(allparticles[k]), &poshift[0] );
+    print_rigidbody( &(allrbs[k]), &poshift[0] );
   }
 } 
 
@@ -436,11 +443,11 @@ void print_all_particles( particle const* allparticles, const size_t n,
 
 
 /** Tags the cells that contain a DLMFD boundary point, i.e. assign the point 
-number to the x component of the index field and the particle number to the y 
+number to the x component of the index field and the RigidBody* number to the y 
 component of the index field. If there is no DLMFD boundary point, index.x is
 set to -1 */
 //----------------------------------------------------------------------------
-void fill_DLM_Index( const SolidBodyBoundary dlm_bd, vector Index, 
+void fill_DLM_Index( const RigidBodyBoundary dlm_bd, vector Index, 
 	const size_t kk ) 
 //----------------------------------------------------------------------------
 {  
@@ -465,7 +472,7 @@ void fill_DLM_Index( const SolidBodyBoundary dlm_bd, vector Index,
 	
       foreach_cache(fdlocal[i]) 
       {
-	/* Tag cell only if it was not tagged by another particle */
+	/* Tag cell only if it was not tagged by another RigidBody* */
 	if ( Index.x[] < 0 )
 	{
 	  Index.x[] = i;
@@ -504,7 +511,7 @@ non-ghost cells on this process that have been tagged to belong to a Lagrange
 multiplier stencil and the foreach_neighbor() loops on the neighbors of the 
 non-ghost cells in a 5^dim stencil. */
 //----------------------------------------------------------------------------
-double reversed_weight( particle* pp, const coord weightcellpos, 
+double reversed_weight( RigidBody* pp, const coord weightcellpos, 
 	const coord lambdacellpos, const coord lambdapos, const double delta ) 
 //----------------------------------------------------------------------------
 {
@@ -565,53 +572,53 @@ double reversed_weight( particle* pp, const coord weightcellpos,
 
 
 //----------------------------------------------------------------------------
-void remove_too_close_multipliers( particle* p, vector DLM_Index) 
+void remove_too_close_multipliers( RigidBody* p, vector DLM_Index ) 
 //----------------------------------------------------------------------------
 {   
-  for (size_t k = 0; k < NPARTICLES; k++) {
-
-    SolidBodyBoundary dlm_lambda_to_desactivate;
+  for (size_t k = 0; k < nbRigidBodies; k++) 
+  {
+    RigidBodyBoundary dlm_lambda_to_desactivate;
     int allocated = 1;
-    allocate_SolidBodyBoundary (&dlm_lambda_to_desactivate, allocated*BSIZE);
+    allocate_RigidBodyBoundary (&dlm_lambda_to_desactivate, allocated*BSIZE);
     int countalloc = 0;
     int other_part;
-    int is_in_other_particle;
+    int is_in_other_rigidbody;
     foreach_level(depth()) {
       
-      int direct_neigh = 0;  is_in_other_particle = 0; other_part = -1;
+      int direct_neigh = 0;  is_in_other_rigidbody = 0; other_part = -1;
       if (((int)DLM_Index.x[] > -1)  && level == depth() && is_leaf(cell) 
       	&& (p[k].pnum == (int)DLM_Index.y[])) {
 
-	/* check here if this multiplier is not in another particle's
+	/* check here if this multiplier is not in another RigidBody*'s
 	   domain, if yes desactive it */
 	
-	for (size_t l = 0; l < NPARTICLES; l++) {
+	for (size_t l = 0; l < nbRigidBodies; l++) {
 	  if (l != p[k].pnum) {
-      	    particle * other_particle = &(p[l]);
-      	    /* printf("thread %d, this is particle %zu checkin on particle 
-	    %zu iteration %d\n", pid(), p[k].pnum, other_particle->pnum, l); */
+      	    RigidBody* other_rb = &(p[l]);
+      	    /* printf("thread %d, this is RigidBody* %zu checkin on RigidBody* 
+	    %zu iteration %d\n", pid(), p[k].pnum, other_rb->pnum, l); */
 
-      	    /* Check particle's type */
-      	    if ( other_particle->shape == CUBE ) {
-//       	      compute_principal_vectors_Cube( other_particle );
-//       	      coord u = other_particle->g.pgp->u1;
-//       	      coord v = other_particle->g.pgp->v1;
-//       	      coord w = other_particle->g.pgp->w1;
-//       	      coord mins = other_particle->g.pgp->mins;
-//       	      coord maxs = other_particle->g.pgp->maxs;
+      	    /* Check RigidBody*'s type */
+      	    if ( other_rb->shape == CUBE ) {
+//       	      compute_principal_vectors_Cube( other_rb );
+//       	      coord u = other_rb->g.pgp->u1;
+//       	      coord v = other_rb->g.pgp->v1;
+//       	      coord w = other_rb->g.pgp->w1;
+//       	      coord mins = other_rb->g.pgp->mins;
+//       	      coord maxs = other_rb->g.pgp->maxs;
 // 
 //       	      /* current cell's position */
 //       	      coord checkpt = {x, y, z};
 //       	      if ( is_in_Cube( &u, &v, &w, &mins, &maxs, &checkpt ) ) {
-//       		is_in_other_particle = 1; other_part =  other_particle->pnum;
+//       		is_in_other_rigidbody = 1; other_part =  other_rb->pnum;
 // 		break;
 //       	      }
       	    }
       	    /* if sphere */
       	    else {
-      	      GeomParameter gp = other_particle->g;
+      	      GeomParameter gp = other_rb->g;
       	      if (is_in_Sphere (x, y, z, gp)) {
-      		is_in_other_particle = 1; other_part =  other_particle->pnum;
+      		is_in_other_rigidbody = 1; other_part =  other_rb->pnum;
 		break;
       	      }
       	    }
@@ -619,14 +626,14 @@ void remove_too_close_multipliers( particle* p, vector DLM_Index)
 	  
 	}
 
-	if (is_in_other_particle) {
-	  /* printf("thread %d, this is particle %zu which has a cell 
-	  in particle %d\n", pid(), p[k].pnum, other_part); */
+	if (is_in_other_rigidbody) {
+	  /* printf("thread %d, this is RigidBody* %zu which has a cell 
+	  in RigidBody* %d\n", pid(), p[k].pnum, other_part); */
 	  DLM_Index.x[] = -1; DLM_Index.y[] = other_part;
 	}
 	
 	/* Check if two (or more) Lagrange multipliers (from different
-	   particles) are in the same neighborhoods (i.e a 5x5 stencil
+	   rigid bodies) are in the same neighborhoods (i.e a 5x5 stencil
 	   in 2D), if yes desactivate them. Otherwise the cells of
 	   their stencils may be located in each other's domain */
 	direct_neigh = 0;
@@ -640,7 +647,7 @@ void remove_too_close_multipliers( particle* p, vector DLM_Index)
 	    that we can't modify the cell within a foreach_neighbor loop */
 	    if (countalloc >= allocated*BSIZE) {
 	      allocated ++;
-	      reallocate_SolidBodyBoundary (&dlm_lambda_to_desactivate, 
+	      reallocate_RigidBodyBoundary (&dlm_lambda_to_desactivate, 
 	      	allocated*BSIZE);
 	    }
 	    dlm_lambda_to_desactivate.x[countalloc] = x;
@@ -674,7 +681,7 @@ void remove_too_close_multipliers( particle* p, vector DLM_Index)
 
     /* if (pid() == 0) */
     /*   for (int i = 0; i < size; i++) */
-    /* 	printf("particle %d, this is root receiving %d elements 
+    /* 	printf("RigidBody* %d, this is root receiving %d elements 
     by thread %d\n",k, counts[i], i); */
 
     /* Displacements in the receive buffer for MPI_GATHERV */
@@ -736,10 +743,10 @@ void remove_too_close_multipliers( particle* p, vector DLM_Index)
     
 /*     for (int i = 0; i < m; i++) { */
 /* #if dimension == 2  */
-/*       printf("thread %d: particle %d, coord of the multiplier %d to be 
+/*       printf("thread %d: RigidBody* %d, coord of the multiplier %d to be 
 	removed (%g,%g,%g)\n", pid(), k, i, alldatax[i], alldatay[i], 0.); */
 /* #elif dimension ==3 */
-/*       printf("thread %d: particle %d, coord of the multiplier %d to be 
+/*       printf("thread %d: RigidBody* %d, coord of the multiplier %d to be 
 	removed (%g,%g,%g)\n", pid(), k, i, alldatax[i], alldatay[i], 
 	alldataz[i]); */
 /* #endif */
@@ -788,8 +795,8 @@ void remove_too_close_multipliers( particle* p, vector DLM_Index)
     /* printf("thread %d: removed %d multipliers \n", pid(), counter); */
 
     free(c.p);
-    free_SolidBodyBoundary(&dlm_lambda_to_desactivate);
-  } /* End loop NPARTICLES */
+    free_RigidBodyBoundary(&dlm_lambda_to_desactivate);
+  } /* End loop nbRigidBodies */
 
   synchronize((scalar*) {DLM_Index});
 }
@@ -800,11 +807,11 @@ void remove_too_close_multipliers( particle* p, vector DLM_Index)
 /** Tag cells that belong to a 3^dim stencil associated to a Lagrange multiplier
 point of the rigid body boundary. */
 //----------------------------------------------------------------------------
-void reverse_fill_DLM_Flag( particle* allparticles, const size_t n, scalar Flag, 
+void reverse_fill_DLM_Flag( RigidBody* allrbs, const size_t nrb, scalar Flag, 
 	vector Index, const int cacheflag ) 
 //----------------------------------------------------------------------------
 {
-  for (size_t k = 0; k < n; k++) 
+  for (size_t k = 0; k < nrb; k++) 
   {  
     coord rel = {0., 0., 0.};
     coord relnl = {0., 0., 0.};
@@ -814,9 +821,9 @@ void reverse_fill_DLM_Flag( particle* allparticles, const size_t n, scalar Flag,
     coord lambdapos = {0., 0., 0.};
     coord localcellpos = {0., 0., 0.};
  
-    SolidBodyBoundary dlm_lambda = allparticles[k].s;
-    GeomParameter gcb = allparticles[k].g;
-    Cache* reduced_domain = &(allparticles[k].reduced_domain);
+    RigidBodyBoundary dlm_lambda = allrbs[k].s;
+    GeomParameter gcb = allrbs[k].g;
+    Cache* reduced_domain = &(allrbs[k].reduced_domain);
         
     foreach_level(depth()) 
     {      
@@ -826,13 +833,17 @@ void reverse_fill_DLM_Flag( particle* allparticles, const size_t n, scalar Flag,
         localcellpos.z = z;
 #     endif
 
-      // IMPORTANT REMARK: we initialize the goflag variable to 0 outside 
-      // the foreach_neighbor() because a cell might belong to 2 or more 
-      // different Lagrange multiplier stencils but we want to tag it and add 
-      // it to the reduced domain cache once only. Later, when we compute the 
-      // contribution of this cell to the different stencils in 
-      // DLM_Uzawa_velocity with the function reversed_weight, the contribution
-      // of this cell to each stencil will be properly computed      
+      /* IMPORTANT REMARK: we initialize the goflag variable to 0 outside 
+      the foreach_neighbor() because a cell might belong to 2 or more 
+      different Lagrange multiplier stencils of a given rigid body but we 
+      want to flag it and add it to the reduced domain cache once only. 
+      If a cell is not flagged in assign_weight_id_quad_outward, the
+      value of goflag is unchanged (and not set to 0), so once goflag is set 
+      to 1 by one of the calls to assign_weight_id_quad_outward within the 
+      foreach_neighbor loop, it stays at 1.      
+      Later, when we compute the contribution of this cell to the different 
+      stencils in DLM_Uzawa_velocity with the function reversed_weight, the 
+      contribution of this cell to each stencil will be properly computed. */    
       goflag = 0; 
              
       // Check if there is a Lagrange multiplier in the neigborhood of this 
@@ -840,7 +851,7 @@ void reverse_fill_DLM_Flag( particle* allparticles, const size_t n, scalar Flag,
       foreach_neighbor() 
       {
 	if ( (int)Index.x[] > -1 && level == depth() 
-		&& is_leaf(cell) && allparticles[k].pnum == (int)Index.y[] ) 
+		&& is_leaf(cell) && allrbs[k].pnum == (int)Index.y[] ) 
 	{
 	  lambdacellpos.x = x; 
 	  lambdacellpos.y = y; 
@@ -859,8 +870,8 @@ void reverse_fill_DLM_Flag( particle* allparticles, const size_t n, scalar Flag,
 	  the boundary are those of the master rigid body, i.e., they are not 
 	  shifted for each periodic clone. Therefore we may have a case where 
 	  the cell and the position of the Lagrange multiplier are on opposite 
-	  side of the domain. The solution is to subtract the periodic domain 
-	  length L0 when this happens */
+	  side of the domain. The solution is to subtract/add the periodic 
+	  domain length L0 when this happens */
           foreach_dimension()
           {
             if ( rel.x > L0/2. ) rel.x = rel.x - L0;
@@ -879,7 +890,7 @@ void reverse_fill_DLM_Flag( particle* allparticles, const size_t n, scalar Flag,
 
           /* Assign quadrant number NCX given by the direction of the normal 
 	  over the geometric boundary of the rigid body */ 
-          assign_dial_fd_boundary( &allparticles[k], lambdapos, gcbdum, Delta, 
+          assign_dial_fd_boundary( &allrbs[k], lambdapos, gcbdum, Delta, 
 	  	&NCX );
 
           /* Compute relative vector from the cell to the cell that contains 
@@ -889,11 +900,11 @@ void reverse_fill_DLM_Flag( particle* allparticles, const size_t n, scalar Flag,
 	  /* Assign weight id if this cell is flagged ( goflag = 1 ) */
 	  assign_weight_id_quad_outward( NCX, CX, relnl, Delta, &weight_id, 
 	  	&goflag );
-	} // end if (lambda.x[] > -1)
+	} // end if (Index.x[] > -1)
       } // end foreach_neigboor loop
 
       /* If the cell belongs to at least one stencil of a Lagrange multiplier 
-      tag it and add it the reduced domain of this particle to optimize the 
+      tag it and add it the reduced domain of this RigidBody to optimize the 
       stencil-traversal cost */
       if ( goflag == 1 ) 
       {
@@ -901,19 +912,19 @@ void reverse_fill_DLM_Flag( particle* allparticles, const size_t n, scalar Flag,
 	if ( cacheflag == 1 )
 	  cache_append( reduced_domain, point, 0 );
       }
-    }
+    }  
+  } // end loop on rigid body id 
   
-    synchronize({Flag});    
-  } // end loop on particles id 
+  synchronize({Flag});     
 }
 
 
 
 
-/** Creates DLM/FD boundary points of a given particle. Sets the
+/** Creates DLM/FD boundary points of a given rigid body. Sets the
 PeriodicRefCenter field only if setPeriodicRefCenter is true */
 //----------------------------------------------------------------------------
-void create_boundary_points( particle* p, vector* pPeriodicRefCenter,
+void create_boundary_points( RigidBody* p, vector* pPeriodicRefCenter,
 	const bool setPeriodicRefCenter )
 //----------------------------------------------------------------------------
 {  
@@ -925,49 +936,49 @@ void create_boundary_points( particle* p, vector* pPeriodicRefCenter,
   {
     case SPHERE:
       compute_nboundary_Sphere( gci, &m );
-      allocate_SolidBodyBoundary( &(p->s), m );
+      allocate_RigidBodyBoundary( &(p->s), m );
       create_FD_Boundary_Sphere( gci, &(p->s), m, pPeriodicRefCenter, 
       		setPeriodicRefCenter );
       break;
 	  
     case CIRCULARCYLINDER2D:
       compute_nboundary_CircularCylinder2D( gci, &m );
-      allocate_SolidBodyBoundary( &(p->s), m );
+      allocate_RigidBodyBoundary( &(p->s), m );
       create_FD_Boundary_CircularCylinder2D( gci, &(p->s), m, 
       		pPeriodicRefCenter, setPeriodicRefCenter );
       break;
 	  
     case CUBE:
       compute_nboundary_Cube( &gci, &m, &lN );
-      allocate_SolidBodyBoundary( &(p->s), m );
+      allocate_RigidBodyBoundary( &(p->s), m );
       create_FD_Boundary_Cube( &gci, &(p->s), m, lN, pPeriodicRefCenter, 
 		setPeriodicRefCenter );
       break;
 	
     case TETRAHEDRON:
       compute_nboundary_Tetrahedron( &gci, &m, &lN );
-      allocate_SolidBodyBoundary( &(p->s), m );
+      allocate_RigidBodyBoundary( &(p->s), m );
       create_FD_Boundary_Tetrahedron( &gci, &(p->s), m, lN, pPeriodicRefCenter, 
 		setPeriodicRefCenter );
       break;
 	
     case OCTAHEDRON:
       compute_nboundary_Octahedron( &gci, &m, &lN );
-      allocate_SolidBodyBoundary( &(p->s), m );
+      allocate_RigidBodyBoundary( &(p->s), m );
       create_FD_Boundary_Octahedron( &gci, &(p->s), m, lN, pPeriodicRefCenter, 
 		setPeriodicRefCenter );
       break;
 
     case ICOSAHEDRON:
       compute_nboundary_Icosahedron( &gci, &m, &lN );
-      allocate_SolidBodyBoundary( &(p->s), m );
+      allocate_RigidBodyBoundary( &(p->s), m );
       create_FD_Boundary_Icosahedron( &gci, &(p->s), m, lN, pPeriodicRefCenter, 
 		setPeriodicRefCenter );
       break;	
 
     case DODECAHEDRON:     
       compute_nboundary_Dodecahedron( &gci, &m, &lN );	
-      allocate_SolidBodyBoundary( &(p->s), m );
+      allocate_RigidBodyBoundary( &(p->s), m );
       create_FD_Boundary_Dodecahedron( &gci, &(p->s), m, lN, pPeriodicRefCenter, 
 		setPeriodicRefCenter );
       break;	
@@ -980,10 +991,10 @@ void create_boundary_points( particle* p, vector* pPeriodicRefCenter,
 
 
 
-/** Initializes the particles and the scalar/vector fields needed to the 
+/** Initializes the rigid bodies and the scalar/vector fields needed to the 
 method */
 //----------------------------------------------------------------------------
-void allocate_and_init_particles( particle* allparticles, const size_t n, 
+void allocate_and_init_rigidbodies( RigidBody* allrbs, const size_t nrb, 
 	vector Index, scalar Flag, scalar FlagMesh, vector PeriodicRefCenter )
 //----------------------------------------------------------------------------
 {  
@@ -991,10 +1002,10 @@ void allocate_and_init_particles( particle* allparticles, const size_t n,
   foreach() 
   {
     Index.x[] = -1;   // DLM/FD boundary point index
-    Index.y[] = -1;   // particle number
-    Index.z[] = -1;   // cell is constrained ? (-1:not constrained)
+    Index.y[] = -1;   // RigidBody* number
+    Index.z[] = -1;   // cell is constrained ? (-1 = not constrained)
     Flag[] = 0;       // Flag
-    FlagMesh[] = 0;   // DLM_FlagMesh
+    FlagMesh[] = 0;   // FlagMesh
     if ( Period.x || Period.y || Period.z )
       foreach_dimension() PeriodicRefCenter.x[] = 0.;
   }
@@ -1002,19 +1013,18 @@ void allocate_and_init_particles( particle* allparticles, const size_t n,
   synchronize({Flag, FlagMesh});
   synchronize((scalar *){Index, PeriodicRefCenter});
 
-
-  for (size_t k = 0; k < n; k++) 
+  for (size_t k = 0; k < nrb; k++) 
   {
     Cache* c = NULL;
 
-#   if debugBD == 0
-      create_boundary_points( &(allparticles[k]), &PeriodicRefCenter, true );
-      fill_DLM_Index( (allparticles[k].s), Index, k );
-      c = &(allparticles[k].reduced_domain);
+#   if !DEACTIVATE_BOUNDARYPOINTS
+      create_boundary_points( &(allrbs[k]), &PeriodicRefCenter, true );
+      fill_DLM_Index( (allrbs[k].s), Index, k );
+      c = &(allrbs[k].reduced_domain);
       initialize_and_allocate_Cache( c );
 #   endif     
-#   if debugInterior == 0
-      c = &(allparticles[k].Interior);
+#   if !DEACTIVATE_INTERIORPOINTS
+      c = &(allrbs[k].Interior);
       initialize_and_allocate_Cache( c );
 #   endif
   }
@@ -1025,38 +1035,38 @@ void allocate_and_init_particles( particle* allparticles, const size_t n,
 
 
 
-/** Creates boundary points of all particles but does not set the 
+/** Creates boundary points of all rigid bodies but does not set the 
 PeriodicRefCenter field */
 //----------------------------------------------------------------------------
-void create_particles_boundary_points( particle* allparticles, const size_t n )
+void create_rigidbodies_boundary_points( RigidBody* allrbs, const size_t nrb )
 //----------------------------------------------------------------------------
 {  
-# if debugBD == 0
-    for (size_t k = 0; k < n; k++) 
-      create_boundary_points( &(allparticles[k]), NULL, false );    
+# if !DEACTIVATE_BOUNDARYPOINTS
+    for (size_t k = 0; k < nrb; k++) 
+      create_boundary_points( &(allrbs[k]), NULL, false );    
 # endif
 }
 
 
 
 
-/** Frees boundary points of all particles  */
+/** Frees boundary points of all rigid bodies */
 //----------------------------------------------------------------------------
-void free_particles_boundary_points( particle* allparticles, const size_t n )
+void free_rigidbodies_boundary_points( RigidBody* allrbs, const size_t nrb )
 //----------------------------------------------------------------------------
 {  
-# if debugBD == 0
-    for (size_t k = 0; k < n; k++) 
-      free_SolidBodyBoundary( &(allparticles[k].s) );   
+# if !DEACTIVATE_BOUNDARYPOINTS
+    for (size_t k = 0; k < nrb; k++) 
+      free_RigidBodyBoundary( &(allrbs[k].s) );   
 # endif
 }
 
 
 
 
-/** Writes headers in particle data output files */
+/** Writes headers in rigid body data output files */
 //----------------------------------------------------------------------------
-void writer_headers( FILE* pdata, FILE* sl ) 
+void writer_headers( FILE* pdata, const bool pdata_is_open, FILE* sl ) 
 //----------------------------------------------------------------------------
 {
   // Comments: 
@@ -1070,15 +1080,18 @@ void writer_headers( FILE* pdata, FILE* sl )
     if ( pid() == 0 )
 # endif
     {
-      /* Write header for particles positions and velocities */
+      /* Write header for rigid body positions and velocities */
 #     if dimension == 2
         // Position and velocity file
-        if ( NSDF > 9 )
-          fprintf( pdata, "#time\t\t\tposition.x\t\tposition.y"
+	if ( pdata_is_open )
+	{
+          if ( NSDF > 9 )
+            fprintf( pdata, "#time\t\t\tposition.x\t\tposition.y"
     		"\t\tU.x\t\t\tU.y\t\t\tw.z\n" );
-        else
-          fprintf( pdata, "#time\t\tposition.x\tposition.y"
+          else
+            fprintf( pdata, "#time\t\tposition.x\tposition.y"
     		"\tU.x\t\tU.y\t\tw.z\n" );
+	}
 
         // Hydro force and torque file
         if ( NSDF > 9 )
@@ -1089,14 +1102,17 @@ void writer_headers( FILE* pdata, FILE* sl )
         fprintf( sl, "%.*e\n", NSDF, 0. );   
 #     elif dimension == 3
         // Position and velocity file
-        if ( NSDF > 9 )
-          fprintf( pdata, "#time\t\t\tposition.x\t\tposition.y\t\tposition.z"
+        if ( pdata_is_open )
+	{
+	  if ( NSDF > 9 )
+            fprintf( pdata, "#time\t\t\tposition.x\t\tposition.y\t\tposition.z"
     		"\t\tU.x\t\t\tU.y\t\t\tU.z"
 		"\t\t\tw.x\t\t\tw.y\t\t\tw.z\n" );
-        else
-          fprintf( pdata, "#time\t\tposition.x\tposition.y\tposition.z"
+          else
+            fprintf( pdata, "#time\t\tposition.x\tposition.y\tposition.z"
     		"\tU.x\t\tU.y\t\tU.z"
 		"\t\tw.x\t\tw.y\t\tw.z\n" );
+	}
 
         // Hydro force and torque file
         if ( NSDF > 9 )
@@ -1117,23 +1133,36 @@ void writer_headers( FILE* pdata, FILE* sl )
 
 
 
-/** Writes particles data in files */
+/** Writes rigid body data in files */
 //----------------------------------------------------------------------------
-void particle_data( particle* allparticles, const size_t n, const double t, 
+void rigidbody_data( RigidBody* allrbs, const size_t nrb, const double t, 
 	const int i, FILE** pdata ) 
 //----------------------------------------------------------------------------
 {  
-  for (size_t k = 0; k < n; k++) 
+  for (size_t k = 0; k < nrb; k++) 
   {
-    GeomParameter* GCi = &(allparticles[k].g);
-#   if DLM_Moving_particle
+    GeomParameter* GCi = &(allrbs[k].g);
+    coord* U;
+    coord* w;    
+    if ( allrbs[k].type != OBSTACLE )
+    {
 #     if TRANSLATION 
-        coord* U = &(allparticles[k].U);
+        U = &(allrbs[k].U);
 #     endif
 #     if ROTATION
-        coord* w =  &(allparticles[k].w);
+        w = &(allrbs[k].w);
 #     endif
-#   endif
+    }
+    else
+    {
+#     if TRANSLATION 
+        U = &(allrbs[k].imposedU);
+#     endif
+#     if ROTATION
+        w = &(allrbs[k].imposedw);
+#     endif
+    }
+    
 #   if dimension == 2
       if ( pid() == 0 ) 
       {
@@ -1141,19 +1170,15 @@ void particle_data( particle* allparticles, const size_t n, const double t,
         fprintf( pdata[k], "%.*e\t", NSDF, (*GCi).center.x );
         fprintf( pdata[k], "%.*e\t", NSDF, (*GCi).center.y );         
         fprintf( pdata[k], "%.*e\t%.*e\t%.*e\n"     
-#       if DLM_Moving_particle
-#         if TRANSLATION
-	    , NSDF, (*U).x, NSDF, (*U).y 
-#         elif TRANSLATION == 0
-	    , NSDF, 0., NSDF, 0.
-#         endif   
-#         if ROTATION
-	    , NSDF, (*w).z
-#         elif ROTATION == 0
-	    , NSDF, 0.
-#         endif
-#       elif DLM_Moving_particle == 0
-	  , NSDF, 0., NSDF, 0., NSDF, 0.
+#       if TRANSLATION
+	  , NSDF, (*U).x, NSDF, (*U).y 
+#       elif TRANSLATION == 0
+	  , NSDF, 0., NSDF, 0.
+#       endif   
+#       if ROTATION
+	  , NSDF, (*w).z
+#       elif ROTATION == 0
+	  , NSDF, 0.
 #       endif
         );      
         fflush(pdata[k]);
@@ -1166,19 +1191,15 @@ void particle_data( particle* allparticles, const size_t n, const double t,
         fprintf( pdata[k], "%.*e\t", NSDF, (*GCi).center.y );      
         fprintf( pdata[k], "%.*e\t", NSDF, (*GCi).center.z );      
         fprintf( pdata[k], "%.*e\t%.*e\t%.*e\t%.*e\t%.*e\t%.*e\n"     
-#       if DLM_Moving_particle
-#         if TRANSLATION
-	    , NSDF, (*U).x, NSDF, (*U).y, NSDF, (*U).z
-#         elif TRANSLATION == 0
-	    , NSDF, 0., NSDF, 0., NSDF, 0.
-#         endif   
-#         if ROTATION
-	    , NSDF, (*w).x, NSDF, (*w).y, NSDF, (*w).z
-#         elif ROTATION == 0
-	    , NSDF, 0., NSDF, 0., NSDF, 0.
-#         endif
-#       elif DLM_Moving_particle == 0
-	  , NSDF, 0., NSDF, 0., NSDF, 0., NSDF, 0., NSDF, 0., NSDF, 0.
+#       if TRANSLATION
+	  , NSDF, (*U).x, NSDF, (*U).y, NSDF, (*U).z
+#       elif TRANSLATION == 0
+	  , NSDF, 0., NSDF, 0., NSDF, 0.
+#       endif   
+#       if ROTATION
+	  , NSDF, (*w).x, NSDF, (*w).y, NSDF, (*w).z
+#       elif ROTATION == 0
+	  , NSDF, 0., NSDF, 0., NSDF, 0.
 #       endif
         );      
         fflush(pdata[k]);      	
@@ -1192,7 +1213,7 @@ void particle_data( particle* allparticles, const size_t n, const double t,
 
 /** Compute hydrodynamic force & torque and write the values in files */
 //----------------------------------------------------------------------------
-void sumLambda( particle* allparticles, const size_t n, FILE** sl, 
+void computeHydroForceTorque( RigidBody* allrbs, const size_t nrb, FILE** sl, 
 	const double t, const double dt, 
 	scalar Flag, vector lambda, vector Index, 
 	const double rho_f, vector prefcenter ) 
@@ -1216,12 +1237,12 @@ void sumLambda( particle* allparticles, const size_t n, FILE** sl,
   coord crossLambdaSumInt;
   coord crossLambdaSumBoundary;
   coord crossLambdaSum; 
-  Cache* Interior[NPARTICLES];
-  Cache* Boundary[NPARTICLES];
-  SolidBodyBoundary * sbm;
+  Cache* Interior[nbRigidBodies];
+  Cache* Boundary[nbRigidBodies];
+  RigidBodyBoundary * sbm;
   
-  /* Loop over all particles */
-  for (size_t k = 0; k < n; k++) 
+  /* Loop over all rigid bodies */
+  for (size_t k = 0; k < nrb; k++) 
   {
     foreach_dimension() 
     {
@@ -1244,25 +1265,24 @@ void sumLambda( particle* allparticles, const size_t n, FILE** sl,
       crossLambdaSum.z = 0.;
 #   endif
 
-    /* Interior domain of the particle */
-    Interior[k] = &(allparticles[k].Interior);
+    /* Interior domain of the RigidBody* */
+    Interior[k] = &(allrbs[k].Interior);
 
-    /* Boundary domain of the particle */
-    Boundary[k] = &(allparticles[k].reduced_domain);
-    sbm = &(allparticles[k].s);
+    /* Boundary domain of the RigidBody* */
+    Boundary[k] = &(allrbs[k].reduced_domain);
+    sbm = &(allrbs[k].s);
     coord lambdapos;
-#   if DLM_Moving_particle
-      double rho_s = allparticles[k].rho_s;
-#     if TRANSLATION
-        double M = allparticles[k].M;
-        coord Unm1 = allparticles[k].Unm1;
-        coord U = allparticles[k].U;
-#     endif
-#     if ROTATION
-        coord wnm1 = allparticles[k].wnm1;
-        coord w = allparticles[k].w;
-        coord Iom, omIom, Idomdt;
-#     endif
+    double rho_s = allrbs[k].rho_s;
+    if ( allrbs[k].type == OBSTACLE ) rho_s = rho_f;
+#   if TRANSLATION
+      double M = allrbs[k].M;
+      coord Unm1 = allrbs[k].Unm1;
+      coord U = allrbs[k].U;
+#   endif
+#   if ROTATION
+      coord wnm1 = allrbs[k].wnm1;
+      coord w = allrbs[k].w;
+      coord Iom, omIom, Idomdt;
 #   endif
     
     // Particle's interior multipliers
@@ -1271,14 +1291,14 @@ void sumLambda( particle* allparticles, const size_t n, FILE** sl,
       if ( Flag[] < 1 && k == Index.y[] ) 
       {
 	/* Compute Fh = <lambda,V>_P */
-	/* For moving particles the additional term +
+	/* For moving rigid body the additional term +
 	   (rho_f/rho_s).M.dU/dt is added after the mpi_calls below */
 	
 	foreach_dimension() 
 	  lambdasumint.x += lambda.x[];
 
 	/* Compute Mh = <lambda,xi^GM>_P */  
-	/* For moving particles, the additional term +
+	/* For moving rigid body, the additional term +
 	   (rho_f/rho_s).(I.dom/dt + om ^ (I.om)) is added after mpi
 	   calls below */
 #       if dimension == 3
@@ -1295,7 +1315,7 @@ void sumLambda( particle* allparticles, const size_t n, FILE** sl,
     // Particle's boundary multipliers
     foreach_cache((*Boundary[k])) 
     {
-      if ( Index.x[] > -1 && allparticles[k].pnum == (int)Index.y[] ) 
+      if ( Index.x[] > -1 && allrbs[k].pnum == (int)Index.y[] ) 
       {
 	lambdapos.x = (*sbm).x[(int)Index.x[]];
 	lambdapos.y = (*sbm).y[(int)Index.x[]];
@@ -1308,7 +1328,7 @@ void sumLambda( particle* allparticles, const size_t n, FILE** sl,
 	foreach_dimension()
 	  lambdasumboundary.x += lambda.x[];
 
-	/* Modify temporerly the particle center position for periodic 
+	/* Modify temporerly the RigidBody* center position for periodic 
 	boundary condition */
 #       if dimension == 3
           crossLambdaSumBoundary.x += 
@@ -1343,69 +1363,61 @@ void sumLambda( particle* allparticles, const size_t n, FILE** sl,
 #     endif
 #   endif
 
-    /* The Force term (rho_f/rho_s)MdU/dt is added here for
-       translating particles */
-    
-#   if DLM_Moving_particle
 
-    /* The Force term (rho_f/rho_s)MdU/dt is added here for
-       translating particles */
+  /* The force term (rho_f/rho_s)MdU/dt and torque term 
+  (rho_f/rho_s)(Idw/dt + w x Iw) are added for all rigid bodies */
 
-#     if TRANSLATION
-        foreach_dimension()
-          lambdasumint.x += ( rho_f / rho_s ) * M * ( U.x - Unm1.x ) / dt;
-#     endif
-    
-    /* The Torque term (rho_f/rho_s).(Idom/dt + om ^ (I.om)) is added
-	 here for rotating particles */
-    
-#     if ROTATION
-        /* I.om term */
-#       if dimension == 3
-          Iom.x = allparticles[k].Ip[0] * w.x 
-	  	+ allparticles[k].Ip[3] * w.y + allparticles[k].Ip[4] * w.z;
-          Iom.y = allparticles[k].Ip[3] * w.x 
-	  	+ allparticles[k].Ip[1] * w.y + allparticles[k].Ip[5] * w.z;
-          Iom.z = allparticles[k].Ip[4] * w.x 
-	  	+ allparticles[k].Ip[5] * w.y + allparticles[k].Ip[2] * w.z;
-#       else
-          Iom.z = allparticles[k].Ip[2] * w.z;
-#       endif	 
-
-        /* om^(I.om) term */
-#       if dimension == 3
-          omIom.x = w.y * Iom.z - w.z * Iom.y;
-          omIom.y = w.z * Iom.x - w.x * Iom.z;
-          omIom.z = w.x * Iom.y - w.y * Iom.x;
-#       else
-          omIom.z = 0.;
-#       endif	  
-
-        /* Idom/dt term */
-#       if dimension == 3	
-          Idomdt.x = allparticles[k].Ip[0] * ( w.x - wnm1.x ) 
-	  	+ allparticles[k].Ip[3] * ( w.y - wnm1.y ) 
-    		+ allparticles[k].Ip[4] * ( w.z - wnm1.z );
-          Idomdt.y = allparticles[k].Ip[3] * ( w.x - wnm1.x ) 
-	  	+ allparticles[k].Ip[1] * ( w.y - wnm1.y ) 
-    		+ allparticles[k].Ip[5] * ( w.z - wnm1.z );
-          Idomdt.z = allparticles[k].Ip[4] * ( w.x - wnm1.x ) 
-	  	+ allparticles[k].Ip[5] * ( w.y - wnm1.y ) 
-    		+ allparticles[k].Ip[2] * ( w.z - wnm1.z );
-#       else
-          Idomdt.z = allparticles[k].Ip[2] * ( w.z - wnm1.z );
-#       endif		
-	
-#       if dimension == 3
-          crossLambdaSumInt.x += ( rho_f / rho_s ) * ( ( Idomdt.x ) / dt 
-		+ omIom.x );
-          crossLambdaSumInt.y += ( rho_f / rho_s ) * ( ( Idomdt.y ) / dt 
-		+ omIom.y );
-#       endif		
-        crossLambdaSumInt.z += ( rho_f / rho_s ) * ( ( Idomdt.z ) / dt 
-		+ omIom.z );
-#     endif	  
+#   if TRANSLATION
+      foreach_dimension()
+        lambdasumint.x += ( rho_f / rho_s ) * M * ( U.x - Unm1.x ) / dt;
 #   endif
+    
+#   if ROTATION
+      /* I.om term */
+#     if dimension == 3
+        Iom.x = allrbs[k].Ip[0] * w.x 
+	  	+ allrbs[k].Ip[3] * w.y + allrbs[k].Ip[4] * w.z;
+        Iom.y = allrbs[k].Ip[3] * w.x 
+	  	+ allrbs[k].Ip[1] * w.y + allrbs[k].Ip[5] * w.z;
+        Iom.z = allrbs[k].Ip[4] * w.x 
+	  	+ allrbs[k].Ip[5] * w.y + allrbs[k].Ip[2] * w.z;
+#     else
+        Iom.z = allrbs[k].Ip[2] * w.z;
+#     endif	 
+
+      /* om^(I.om) term */
+#     if dimension == 3
+        omIom.x = w.y * Iom.z - w.z * Iom.y;
+        omIom.y = w.z * Iom.x - w.x * Iom.z;
+        omIom.z = w.x * Iom.y - w.y * Iom.x;
+#     else
+        omIom.z = 0.;
+#     endif	  
+
+      /* Idom/dt term */
+#     if dimension == 3	
+        Idomdt.x = allrbs[k].Ip[0] * ( w.x - wnm1.x ) 
+	  	+ allrbs[k].Ip[3] * ( w.y - wnm1.y ) 
+    		+ allrbs[k].Ip[4] * ( w.z - wnm1.z );
+        Idomdt.y = allrbs[k].Ip[3] * ( w.x - wnm1.x ) 
+	  	+ allrbs[k].Ip[1] * ( w.y - wnm1.y ) 
+    		+ allrbs[k].Ip[5] * ( w.z - wnm1.z );
+        Idomdt.z = allrbs[k].Ip[4] * ( w.x - wnm1.x ) 
+	  	+ allrbs[k].Ip[5] * ( w.y - wnm1.y ) 
+    		+ allrbs[k].Ip[2] * ( w.z - wnm1.z );
+#     else
+        Idomdt.z = allrbs[k].Ip[2] * ( w.z - wnm1.z );
+#     endif		
+	
+#     if dimension == 3
+        crossLambdaSumInt.x += ( rho_f / rho_s ) * ( ( Idomdt.x ) / dt 
+		+ omIom.x );
+        crossLambdaSumInt.y += ( rho_f / rho_s ) * ( ( Idomdt.y ) / dt 
+		+ omIom.y );
+#     endif		
+      crossLambdaSumInt.z += ( rho_f / rho_s ) * ( ( Idomdt.z ) / dt 
+		+ omIom.z );
+#   endif	  
 
 #   if dimension == 3    
       foreach_dimension() 
@@ -1448,12 +1460,11 @@ void sumLambda( particle* allparticles, const size_t n, FILE** sl,
 
 /** Initialize/open all DLMFD file pointers */
 //----------------------------------------------------------------------------
-void init_file_pointers( const size_t n, FILE** p, FILE** d, FILE** UzawaCV, 
-	FILE** CVT, const size_t rflag ) 
+void init_file_pointers( const size_t nrb, FILE** p, const bool pdata_is_open,
+	FILE** d, FILE** UzawaCV, FILE** CVT, const size_t rflag ) 
 //----------------------------------------------------------------------------
 {
   char name[80] = "";
-  char name2[80] = "";
   char suffix[80] = "";
   char buffer[80] = "";  
 # if _MPI
@@ -1461,63 +1472,59 @@ void init_file_pointers( const size_t n, FILE** p, FILE** d, FILE** UzawaCV,
 # endif
     {
       // Particle data
-      for (size_t k = 0; k < n; k++) 
+      for (size_t k = 0; k < nrb; k++) 
       {
         sprintf( suffix, "_%lu.dat", k );
 
-        strcpy( name, result_dir );
+        if ( pdata_is_open )
+	{
+          strcpy( name, RESULT_DIR );
+          strcat( name, "/" );
+          strcat( name, RESULT_RIGIDBODY_VP_ROOTFILENAME );
+          strcat( name, suffix );
+	  if ( !rflag ) p[k] = fopen( name,  "w" ); 
+	  else p[k] = fopen( name,  "a" );
+	}
+		 	       
+        strcpy( name, RESULT_DIR );
         strcat( name, "/" );
-        strcat( name, result_particle_vp_rootfilename );
-        strcat( name, suffix );
-      
-        strcpy( name2, result_dir );
-        strcat( name2, "/" );
-        strcat( name2, result_particle_hydroFaT_rootfilename );
-        strcat( name2, suffix );      
-
-        if ( !rflag ) 
-        {
-	  p[k] = fopen( name,  "w" ); 
-	  d[k] = fopen( name2, "w" );
+        strcat( name, RESULT_RIGIDBODY_HYDROFAT_ROOTFILENAME );
+        strcat( name, suffix );      
+        if ( !rflag ) d[k] = fopen( name, "w" );
+	else d[k] = fopen( name, "a" );
 	
-	  // Write headers in these files
-	  writer_headers( p[k],  d[k] );
-        }
-        else 
-        {
-	  p[k] = fopen( name,  "a" );
-	  d[k] = fopen( name2, "a" );
-        }
+	// Write headers in these files
+	writer_headers( pdata_is_open ? p[k] : NULL, pdata_is_open, d[k] );
       }
     
       // Uzawa convergence
-      char converge_uzawa_filename_complete_name[80];
-      strcpy( buffer, result_dir );
+      char CONVERGE_UZAWA_FILENAME_complete_name[80];
+      strcpy( buffer, RESULT_DIR );
       strcat( buffer, "/" );
-      strcat( buffer, converge_uzawa_filename );
-      strcpy( converge_uzawa_filename_complete_name, buffer );
+      strcat( buffer, CONVERGE_UZAWA_FILENAME );
+      strcpy( CONVERGE_UZAWA_FILENAME_complete_name, buffer );
       if ( !rflag )
       {
-        *UzawaCV = fopen( converge_uzawa_filename_complete_name, "w" ); 
+        *UzawaCV = fopen( CONVERGE_UZAWA_FILENAME_complete_name, "w" ); 
         fprintf( *UzawaCV, "# Iter \t Uzawa Iter \t ||u-u_imposed||\n" );
       }
       else
-        *UzawaCV = fopen( converge_uzawa_filename_complete_name, "a" );   
+        *UzawaCV = fopen( CONVERGE_UZAWA_FILENAME_complete_name, "a" );   
     
       // Cells, contrained cells and nb of multipliers 
-      char dlmfd_cells_filename_complete_name[80]; 
-      strcpy( buffer, result_dir );
+      char DLMFD_CELLS_FILENAME_complete_name[80]; 
+      strcpy( buffer, RESULT_DIR );
       strcat( buffer, "/" );
-      strcat( buffer, dlmfd_cells_filename );
-      strcpy( dlmfd_cells_filename_complete_name, buffer );
+      strcat( buffer, DLMFD_CELLS_FILENAME );
+      strcpy( DLMFD_CELLS_FILENAME_complete_name, buffer );
       if ( !rflag )
       {
-        *CVT = fopen ( dlmfd_cells_filename_complete_name, "w" ); 
+        *CVT = fopen ( DLMFD_CELLS_FILENAME_complete_name, "w" ); 
         fprintf ( *CVT,"# Iter \t LagMult \t ConstrainedCells \t "
     		"TotalCells\n" );
       }
       else
-        *CVT = fopen( dlmfd_cells_filename_complete_name, "a" );          
+        *CVT = fopen( DLMFD_CELLS_FILENAME_complete_name, "a" );          
     }    
 }
 
@@ -1526,7 +1533,7 @@ void init_file_pointers( const size_t n, FILE** p, FILE** d, FILE** UzawaCV,
 
 /** Close all DLMFD files */
 //----------------------------------------------------------------------------
-void close_file_pointers( const size_t n, FILE** p, FILE** d, FILE* UzawaCV, 
+void close_file_pointers( const size_t nrb, FILE** p, FILE** d, FILE* UzawaCV, 
 	FILE* CVT ) 
 //----------------------------------------------------------------------------
 { 
@@ -1534,8 +1541,8 @@ void close_file_pointers( const size_t n, FILE** p, FILE** d, FILE* UzawaCV,
     if ( pid() == 0 )
 # endif
     {
-      // Particle data
-      for (size_t k = 0; k < n; k++) 
+      // Rigid body data
+      for (size_t k = 0; k < nrb; k++) 
       {
         fclose( p[k] ); 
         fclose( d[k] );
@@ -1575,7 +1582,7 @@ double compute_flowrate_right( const vector u, const int level )
 {
   double flowrate = 0.;
 
-# if !adaptive 
+# if !ADAPTIVE 
     Cache intDomain = {0};
     Point lpoint;
     foreach() 
@@ -1593,7 +1600,7 @@ double compute_flowrate_right( const vector u, const int level )
     free( intDomain.p );
 # endif
 
-# if adaptive
+# if ADAPTIVE
     double hh = L0 / pow(2,level);
     double zi = 0., yj = 0., xval = 0., uinter = 0.;
     int ii = 0, jj = 0;
@@ -1630,7 +1637,7 @@ double compute_flowrate_top( const vector u, const int level )
 {
   double flowrate = 0.;
 
-# if !adaptive 
+# if !ADAPTIVE 
     Cache intDomain = {0};
     Point lpoint;
     foreach() 
@@ -1648,7 +1655,7 @@ double compute_flowrate_top( const vector u, const int level )
     free( intDomain.p );
 # endif
 
-# if adaptive
+# if ADAPTIVE
     double hh = L0 / pow(2,level);
     double zi = 0., yval = 0., xj = 0., uinter = 0.;
     int ii = 0, jj = 0;
@@ -1685,7 +1692,7 @@ double compute_flowrate_front( const vector u, const int level )
 {
   double flowrate = 0.;
 
-# if !adaptive 
+# if !ADAPTIVE 
     Cache intDomain = {0};
     Point lpoint;
     foreach() 
@@ -1703,7 +1710,7 @@ double compute_flowrate_front( const vector u, const int level )
     free( intDomain.p );
 # endif
 
-# if adaptive
+# if ADAPTIVE
     double hh = L0 / pow(2,level);
     double xi = 0., yj = 0., zval = 0., uinter = 0.;
     int ii = 0, jj = 0;
@@ -1833,10 +1840,9 @@ void inverse3by3matrix__( double Matrix[3][3], double inversedMatrix[3][3] )
 
 
 
-#if DLM_Moving_particle
 /** Computes the inverse of the moment of inertia matrix of a rigid body */
 //----------------------------------------------------------------------------
-void compute_inv_inertia( particle* p )
+void compute_inv_inertia( RigidBody* p )
 //----------------------------------------------------------------------------
 {
   /* The inertia tensor is */
@@ -1869,7 +1875,6 @@ void compute_inv_inertia( particle* p )
   // Ip_inv is a 2D 3 by 3 array
   inverse3by3matrix__( Imat, p->Ip_inv );  
 }
-#endif
 
 
 
@@ -1891,18 +1896,18 @@ int totalcells()
 /** Computes and returns the total number of cells related to Distributed
 Lagrange multiplier points for all rigid bodies */
 //----------------------------------------------------------------------------
-int total_dlmfd_cells( particle* allparticles, const size_t np ) 
+int total_dlmfd_cells( RigidBody* allrbs, const size_t nrb ) 
 //----------------------------------------------------------------------------
 {
   int apts = 0;
   
-  for (size_t k = 0; k < np; k++) 
+  for (size_t k = 0; k < nrb; k++) 
   {
-#   if debugInterior == 0
-      apts += allparticles[k].Interior.n;
+#   if !DEACTIVATE_INTERIORPOINTS
+      apts += allrbs[k].Interior.n;
 #   endif
-#   if debugBD == 0
-      apts += allparticles[k].reduced_domain.n;
+#   if !DEACTIVATE_BOUNDARYPOINTS
+      apts += allrbs[k].reduced_domain.n;
 #   endif
   }
 
@@ -1919,25 +1924,25 @@ int total_dlmfd_cells( particle* allparticles, const size_t np )
 /** Computes and returns the total number of Ditributed Lagrange multiplier 
 points for all rigid bodies */
 //----------------------------------------------------------------------------
-int total_dlmfd_multipliers( particle* allparticles, const size_t np ) 
+int total_dlmfd_multipliers( RigidBody* allrbs, const size_t nrb ) 
 //----------------------------------------------------------------------------
 {
   int apts = 0;
   
-# if debugInterior == 0
-    for (size_t k = 0; k < np; k++) 
-      apts += allparticles[k].Interior.n;
+# if !DEACTIVATE_INTERIORPOINTS
+    for (size_t k = 0; k < nrb; k++) 
+      apts += allrbs[k].Interior.n;
   
 #   if _MPI
       mpi_all_reduce (apts, MPI_INT, MPI_SUM);
 #   endif
 # endif
   
-# if debugBD == 0
-    for (int k = 0; k < np; k++) 
+# if !DEACTIVATE_BOUNDARYPOINTS
+    for (int k = 0; k < nrb; k++) 
     {
-      SolidBodyBoundary * bla;
-      bla = &(allparticles[k].s);
+      RigidBodyBoundary * bla;
+      bla = &(allrbs[k].s);
       apts += bla->m;
     }
 # endif
@@ -1980,36 +1985,45 @@ void read_t_restart( char* dirname, double* time, double* deltat, double* ppd )
 
 
 
-/** Allocate number of particles dependent arrays */
+/** Allocate number of rigid body dependent arrays */
 //----------------------------------------------------------------------------
-void allocate_np_dep_arrays( const size_t npart, particle** particles_, 
-	double*** DLMFDtoGS_vel_, double** vpartbuf_, FILE*** pdata_, 
+void allocate_np_dep_arrays( const size_t nrb, const size_t npart,
+	const size_t nrbdata_, RigidBody** allrb_, double*** DLMFDtoGS_vel_, 
+	double** vpartbuf_, FILE*** pdata_, const bool openpdata_, 
 	FILE*** fdata_ )
 //----------------------------------------------------------------------------
 {
-  *particles_ = (particle*) calloc( npart, sizeof(particle) );
-  *DLMFDtoGS_vel_ = (double**) calloc( npart, sizeof(double*) );
-  for (size_t k=0;k<npart;++k)
-    (*DLMFDtoGS_vel_)[k] = (double*) calloc( 6, sizeof(double) );
-  *vpartbuf_ = (double*) calloc( npartdata, npart * sizeof(double) );
-  *pdata_ = (FILE**) calloc( npart, sizeof( FILE* ) );
-  *fdata_ = (FILE**) calloc( npart, sizeof( FILE* ) );    
+  *allrb_ = (RigidBody*) calloc( nrb, sizeof(RigidBody) );
+  if ( npart )
+  {
+    *DLMFDtoGS_vel_ = (double**) calloc( npart, sizeof(double*) );
+    for (size_t k=0;k<npart;++k)
+      (*DLMFDtoGS_vel_)[k] = (double*) calloc( 6, sizeof(double) );
+  }
+  else
+    *DLMFDtoGS_vel_ = NULL;
+  *vpartbuf_ = (double*) calloc( nrbdata_ * nrb, sizeof(double) );
+  if ( openpdata_ ) *pdata_ = (FILE**) calloc( nrb, sizeof( FILE* ) );
+  *fdata_ = (FILE**) calloc( nrb, sizeof( FILE* ) );    
 }
 
 
 
 
-/** Free number of particles dependent arrays */
+/** Free number of rigid body dependent arrays */
 //----------------------------------------------------------------------------
-void free_np_dep_arrays( const size_t npart, particle* particles_, 
+void free_np_dep_arrays( const size_t npart, RigidBody* allrb_, 
 	double** DLMFDtoGS_vel_, double* vpartbuf_, FILE** pdata_, 
-	FILE** fdata_ )
+	const bool pdata_is_open, FILE** fdata_ )
 //----------------------------------------------------------------------------
 {
-  free( particles_ );
-  for (size_t k=0;k<npart;++k) free( DLMFDtoGS_vel_[k] );
-  free( DLMFDtoGS_vel_ );
+  free( allrb_ );
+  if ( npart )
+  {
+    for (size_t k=0;k<npart;++k) free( DLMFDtoGS_vel_[k] );
+    free( DLMFDtoGS_vel_ );
+  }
   free( vpartbuf_ );
-  free( pdata_ );
+  if ( pdata_is_open ) free( pdata_ );
   free( fdata_ );  
 }

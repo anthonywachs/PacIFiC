@@ -23,10 +23,10 @@ bool is_in_Sphere( const double x, const double y, const double z,
 	const GeomParameter gp )
 //----------------------------------------------------------------------------
 {
-  // Check if it is in the master particle
+  // Check if it is in the master rigid body
   bool status = is_in_Sphere_clone( x, y, z, gp );
 
-  // Check if it is in any clone particle
+  // Check if it is in any clone rigid body
   if ( gp.nperclones && !status )
     for (int i = 0; i < gp.nperclones && !status; i++)
     {
@@ -50,7 +50,7 @@ bool in_which_Sphere( double x1, double y1, double z1,
 	const bool setPeriodicRefCenter )
 //----------------------------------------------------------------------------
 {
-  // Check if it is in the master particle
+  // Check if it is in the master rigid body
   bool status = is_in_Sphere_clone( x1, y1, z1, gp );
   if ( status )
   {
@@ -68,7 +68,7 @@ bool in_which_Sphere( double x1, double y1, double z1,
     }
   }
 
-  //  Check if it is in any clone particle
+  //  Check if it is in any clone rigid body
   if ( gp.nperclones && !status )
     for (int i = 0; i < gp.nperclones && !status; i++) 
     {
@@ -117,7 +117,7 @@ void compute_nboundary_Sphere( const GeomParameter gcp, int* nb )
 /** Creates boundary points on the surface of the sphere */
 //----------------------------------------------------------------------------
 void create_FD_Boundary_Sphere( GeomParameter gcp,
-	SolidBodyBoundary* dlm_bd, const int nsphere, 
+	RigidBodyBoundary* dlm_bd, const int nsphere, 
 	vector* pPeriodicRefCenter, const bool setPeriodicRefCenter )
 //----------------------------------------------------------------------------
 {
@@ -230,7 +230,7 @@ void create_FD_Boundary_Sphere( GeomParameter gcp,
 
 /** Finds cells lying inside the sphere */
 //----------------------------------------------------------------------------
-void create_FD_Interior_Sphere( particle* p, vector Index,
+void create_FD_Interior_Sphere( RigidBody* p, vector Index,
 	vector PeriodicRefCenter )
 //----------------------------------------------------------------------------
 {

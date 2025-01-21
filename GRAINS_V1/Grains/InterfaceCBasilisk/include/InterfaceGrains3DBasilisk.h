@@ -10,7 +10,7 @@ extern "C" {
 #endif
 
   void Init_Grains ( char const* inputfile,
-  	double fluid_density, const bool b_restart );
+  	double fluid_rho, const bool b_restart );
   
   void Simu_Grains( const double dt_fluid );
   
@@ -27,7 +27,7 @@ extern "C" {
   
   void SetInitialCycleNumber( int cycle0 );
   
-  size_t NumberOfRigidBodiesInBasilisk();
+  void NumberOfRigidBodiesInBasilisk( size_t* nparticles, size_t* nobstacles );
 
 #ifdef __cplusplus
 }

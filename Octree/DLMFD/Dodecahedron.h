@@ -43,7 +43,7 @@ void compute_nboundary_Dodecahedron( GeomParameter* gcp, int* nb, int* lN )
 /** Creates boundary points on the surface of the dodecahedron */
 //----------------------------------------------------------------------------
 void create_FD_Boundary_Dodecahedron( GeomParameter* gcp,
-	SolidBodyBoundary* dlm_bd, const int m, const int lN, 
+	RigidBodyBoundary* dlm_bd, const int m, const int lN, 
 	vector* pPeriodicRefCenter, const bool setPeriodicRefCenter )
 //----------------------------------------------------------------------------
 {
@@ -213,7 +213,7 @@ void create_FD_Boundary_Dodecahedron( GeomParameter* gcp,
 
 /** Reads geometric parameters of the Dodecahedron */
 //----------------------------------------------------------------------------
-void update_Dodecahedron( GeomParameter* gcp)
+void update_Dodecahedron( GeomParameter* gcp )
 //----------------------------------------------------------------------------
 {
   char* token = NULL;

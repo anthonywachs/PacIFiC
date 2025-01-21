@@ -57,6 +57,11 @@ void GrainsPostProcessing::do_before_time_stepping( DOMElement* rootElement )
 
   // Link all components with the grid
   m_allcomponents.Link( *m_collision );
+  
+  // In case of a periodic simulation, if the linked cell changed from the 
+  // previous simulation or periodic clones were not saved in the restart file,
+  // we need to check that all periodic clones are there
+  if ( m_periodic ) checkClonesReload();  
 
   // Number of particles: inserted and in the system
   m_allcomponents.computeNumberParticles( m_wrapper );

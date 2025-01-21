@@ -6,26 +6,24 @@
 /** Transfers particles velocity into a 2D array to be sent to the 
 granular solver */
 //----------------------------------------------------------------------------
-void UpdateDLMFDtoGS_vel( double** arrayv, particle* p, 
-	const int m )
+void UpdateDLMFDtoGS_vel( double** arrayv, RigidBody* allrb, 
+	const int npart )
 //---------------------------------------------------------------------------- 
 {
   coord U = {0., 0., 0.};
   coord w = {0., 0., 0.};
   
-  for (size_t k=0;k<m;k++) 
-  {
-#   if DLM_Moving_particle
-#     if TRANSLATION
-        U = p[k].U;
-#     endif
-#     if ROTATION
-        w = p[k].w;
-#     endif
-#   else
-      U = p[k].imposedU;
-      w = p[k].imposedw;
+  // We only transfer the particles velocity, i.e. the npart first elements
+  // of the allrb array
+  for (size_t k=0;k<npart;k++) 
+  {    
+#   if TRANSLATION
+      U = allrb[k].U;
 #   endif
+#   if ROTATION
+      w = allrb[k].w;
+#   endif
+ 
     arrayv[k][0] = U.x;
     arrayv[k][1] = U.y;
     arrayv[k][2] = U.z;
@@ -38,12 +36,12 @@ void UpdateDLMFDtoGS_vel( double** arrayv, particle* p,
 
 
 
-/** Updates particles through parsing and reading a C string coming
+/** Updates rigid bodies through parsing and reading a C string coming
 from the granular solver */
 //----------------------------------------------------------------------------
 char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
-	particle* allpart, const size_t npart_, bool fluidCorrectedAcceleration_, 
-	double rhoval_ )
+	RigidBody* allrb, const size_t nrb_, 
+	bool fluidCorrectedAcceleration_, double rho_f_ )
 //----------------------------------------------------------------------------
 {
 # if _MPI
@@ -64,46 +62,56 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
   // Parse the array of character coming from Grains3D
   token = strtok( pstr, " " );  
 
-  // First entry is the number of particles
+  // First entry is the number of rigid bodies
   size_t np = 0;
   sscanf( token, "%lu", &np );
-  if ( np != npart_ )
-    printf ("Error in number of particles in UpdateParticlesBasilisk\n");
+  if ( np != nrb_ )
+    printf ("Error in number of rigid bodies in UpdateParticlesBasilisk\n");
   
-  // Read the parsed array of character for each particle
+  // Read the parsed array of character for each rigid body
   double Ux = 0., Uy = 0., Uz = 0., omx = 0., omy = 0., omz = 0., rhop = 0., 
   	massp  = 0., Ixx = 0., Ixy = 0., Ixz = 0., Iyy = 0., Iyz = 0., Izz = 0.,
 	gx = 0., gy = 0., gz = 0., radiusp = 0.,
 	MRxx = 0., MRxy = 0., MRxz = 0., MRyx = 0., MRyy = 0., MRyz = 0.,
 	MRzx = 0., MRzy = 0., MRzz = 0.;
   int ncornersp = 0;
-  char particleTag[3] = "";
-  char particleDefaultTagPer[] = "PP";    
+  char RBTag[3] = "";
+  char particleDefaultTag[] = "P";
+  char periodicParticleDefaultTag[] = "PP"; 
+  char obstacleDefaultTag[] = "O";       
   int nperclonesp = 0;
   double* vecx = NULL;
   double* vecy = NULL;
   double* vecz = NULL;  
   
-  for (size_t k = 0; k < npart_; k++) 
+  for (size_t k = 0; k < nrb_; k++) 
   { 
-    GeomParameter* gg = &(allpart[k].g);
+    GeomParameter* gg = &(allrb[k].g);
     gg->pgp = NULL;
-#   if DLM_Moving_particle    
-      allpart[k].toygsp = NULL;
-#   endif
+    allrb[k].toygsp = NULL;
     
-    // Read the particle number but assign k
+    // Read the rigid body number but assign k
     token = strtok( NULL, " " );
-    allpart[k].pnum = k;
+    allrb[k].pnum = k;
 
-    // Read the particle's number of corners or tag
+    // Read the rigid body's number of corners or code
     token = strtok( NULL, " " );
     sscanf( token, "%d", &ncornersp ); 
     
-    // Read the particle type: standard, periodic or obstacle (not used for now)
+    // Read the rigid body type: particle, periodic particle or obstacle 
     token = strtok( NULL, " " );
-    sscanf( token, "%s", particleTag );
-        
+    sscanf( token, "%s", RBTag );
+    strcpy( allrb[k].typetag, RBTag );     
+    if ( !strcmp( RBTag, particleDefaultTag ) )
+      allrb[k].type = PARTICLE;
+    else if ( !strcmp( RBTag, periodicParticleDefaultTag ) )
+      allrb[k].type = PERIODICPARTICLE; 
+    else if ( !strcmp( RBTag, obstacleDefaultTag ) )
+      allrb[k].type = OBSTACLE;
+    else
+      printf( "Warning: Unknown rigid body type in the string sent by Grains3D"
+      	"\n" );          
+            
     // Read Ux
     token = strtok( NULL, " " );
     sscanf( token, "%lf", &Ux );
@@ -216,8 +224,8 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
       sscanf( token, "%lf", &gz );
 #   endif                    
 
-    // If particleTag is "PP", read periodic clone vectors
-    if ( !strcmp( particleTag, particleDefaultTagPer ) )
+    // If RBTag is "PP", read periodic clone vectors
+    if ( allrb[k].type == PERIODICPARTICLE )
     {
       // Read the number of clones
       token = strtok( NULL, " " );
@@ -249,53 +257,74 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
     token = strtok( NULL, " " );
     sscanf( token, "%lf", &radiusp );
 
-
-    // Assign the values read to the particle data
-#   if DLM_Moving_particle 
+    // Assign the values read to the rigid body data
+    if ( allrb[k].type != OBSTACLE )
+    {
       // Save previous velocity before updating
 #     if TRANSLATION
-        allpart[k].Unm1 = allpart[k].U;
+        allrb[k].Unm1 = allrb[k].U;
+	foreach_dimension() allrb[k].imposedU.x = 0.;
 #     endif 
 #     if ROTATION   	 
-        allpart[k].wnm1 = allpart[k].w; 
+        allrb[k].wnm1 = allrb[k].w;
+	foreach_dimension() allrb[k].imposedw.x = 0.;
 #     endif
 
 #     if TRANSLATION
-        allpart[k].U.x = Ux;
-        allpart[k].U.y = Uy;	
+        allrb[k].U.x = Ux;
+        allrb[k].U.y = Uy;	
 #       if dimension == 3
-          allpart[k].U.z = Uz;
+          allrb[k].U.z = Uz;
 #       else
-          allpart[k].U.z = 0.;  	  
+          allrb[k].U.z = 0.;  	  
 #       endif       
 #     endif
 #     if ROTATION
-        allpart[k].w.z = omz;
+        allrb[k].w.z = omz;
 #       if dimension == 3
-          allpart[k].w.x = omx;
-          allpart[k].w.y = omy;	
+          allrb[k].w.x = omx;
+          allrb[k].w.y = omy;	
 #       else
-          allpart[k].w.x = 0.;
-          allpart[k].w.y = 0.;	    
+          allrb[k].w.x = 0.;
+          allrb[k].w.y = 0.;	    
 #       endif 	
 #     endif
-#   else
-      allpart[k].imposedU.x = Ux;
-      allpart[k].imposedU.y = Uy;	
-#     if dimension == 3
-        allpart[k].imposedU.z = Uz;
-        allpart[k].imposedw.x = omx;
-        allpart[k].imposedw.y = omy;
-#     else
-        allpart[k].imposedU.z = 0.;
-        allpart[k].imposedw.x = 0.;
-        allpart[k].imposedw.y = 0.;		  
+    }
+    else
+    {
+#     if TRANSLATION
+        allrb[k].Unm1 = allrb[k].imposedU;
+	foreach_dimension() allrb[k].U.x = 0.;
+#     endif 
+#     if ROTATION   	 
+        allrb[k].wnm1 = allrb[k].imposedw;
+	foreach_dimension() allrb[k].w.x = 0.; 
+#     endif 
+   
+#     if TRANSLATION
+        allrb[k].imposedU.x = Ux;
+        allrb[k].imposedU.y = Uy;	
+#       if dimension == 3
+          allrb[k].imposedU.z = Uz;
+#       else
+          allrb[k].imposedU.z = 0.;  	  
+#       endif       
 #     endif
-      allpart[k].imposedw.z = omz; 
-# endif
-    allpart[k].rho_s = rhop;
-    allpart[k].M = massp;
-    allpart[k].Vp = (allpart[k].M)/(allpart[k].rho_s); 
+#     if ROTATION
+        allrb[k].imposedw.z = omz;
+#       if dimension == 3
+          allrb[k].imposedw.x = omx;
+          allrb[k].imposedw.y = omy;	
+#       else
+          allrb[k].imposedw.x = 0.;
+          allrb[k].imposedw.y = 0.;	    
+#       endif 	
+#     endif
+    }
+    
+    allrb[k].rho_s = rhop;
+    allrb[k].M = massp;
+    allrb[k].Vp = (allrb[k].M)/(allrb[k].rho_s); 
     /* Inertia tensor: Grains stores them as */
     /* inertie[0] = Ixx; */
     /* inertie[1] = Ixy; */
@@ -311,40 +340,39 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
     /* Ip[4] = Ixz */
     /* Ip[5] = Iyz */
 #   if dimension == 3
-      allpart[k].Ip[0] = Ixx;
-      allpart[k].Ip[1] = Iyy;
-      allpart[k].Ip[3] = Ixy;
-      allpart[k].Ip[4] = Ixz;
-      allpart[k].Ip[5] = Iyz;      
+      allrb[k].Ip[0] = Ixx;
+      allrb[k].Ip[1] = Iyy;
+      allrb[k].Ip[3] = Ixy;
+      allrb[k].Ip[4] = Ixz;
+      allrb[k].Ip[5] = Iyz;      
 #   else
-      allpart[k].Ip[0] = 0.;
-      allpart[k].Ip[1] = 0.;
-      allpart[k].Ip[3] = 0.;
-      allpart[k].Ip[4] = 0.;
-      allpart[k].Ip[5] = 0.;
+      allrb[k].Ip[0] = 0.;
+      allrb[k].Ip[1] = 0.;
+      allrb[k].Ip[3] = 0.;
+      allrb[k].Ip[4] = 0.;
+      allrb[k].Ip[5] = 0.;
 #   endif
-    allpart[k].Ip[2] = Izz;
+    allrb[k].Ip[2] = Izz;
 #   if dimension == 3
-      allpart[k].RotMat[0][0] = MRxx;
-      allpart[k].RotMat[0][1] = MRxy;
-      allpart[k].RotMat[0][2] = MRxz;
-      allpart[k].RotMat[1][0] = MRyx;
-      allpart[k].RotMat[1][1] = MRyy;
-      allpart[k].RotMat[1][2] = MRyz;
-      allpart[k].RotMat[2][0] = MRzx;
-      allpart[k].RotMat[2][1] = MRzy;                        
+      allrb[k].RotMat[0][0] = MRxx;
+      allrb[k].RotMat[0][1] = MRxy;
+      allrb[k].RotMat[0][2] = MRxz;
+      allrb[k].RotMat[1][0] = MRyx;
+      allrb[k].RotMat[1][1] = MRyy;
+      allrb[k].RotMat[1][2] = MRyz;
+      allrb[k].RotMat[2][0] = MRzx;
+      allrb[k].RotMat[2][1] = MRzy;                        
 #   else
-      allpart[k].RotMat[0][0] = 0.;
-      allpart[k].RotMat[0][1] = 0.;
-      allpart[k].RotMat[0][2] = 0.;
-      allpart[k].RotMat[1][0] = 0.;
-      allpart[k].RotMat[1][1] = 0.;
-      allpart[k].RotMat[1][2] = 0.;
-      allpart[k].RotMat[2][0] = 0.;
-      allpart[k].RotMat[2][1] = 0.;
+      allrb[k].RotMat[0][0] = 0.;
+      allrb[k].RotMat[0][1] = 0.;
+      allrb[k].RotMat[0][2] = 0.;
+      allrb[k].RotMat[1][0] = 0.;
+      allrb[k].RotMat[1][1] = 0.;
+      allrb[k].RotMat[1][2] = 0.;
+      allrb[k].RotMat[2][0] = 0.;
+      allrb[k].RotMat[2][1] = 0.;
 #   endif
-    allpart[k].RotMat[2][2] = MRzz;        
-    strcpy( allpart[k].tag, particleTag ); 
+    allrb[k].RotMat[2][2] = MRzz;        
     gg->center.x = gx;
     gg->center.y = gy;
 #   if dimension == 3
@@ -377,18 +405,50 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
     
     // DLMFD coupling factor
     // If fluidCorrectedAcceleration_ == true, DLMFD_couplingFactor = 
-    //   ( 1 - rhoval / rho_s )
+    //   ( 1 - FLUID_DENSITY / rho_s )
     // otherwise DLMFD_couplingFactor = 1
-    allpart[k].DLMFD_couplingfactor = 1. ;
+    allrb[k].DLMFD_couplingfactor = 1. ;
     if ( fluidCorrectedAcceleration_ ) 
-      allpart[k].DLMFD_couplingfactor -= rhoval_ / allpart[k].rho_s ;
+      allrb[k].DLMFD_couplingfactor -= rho_f_ / allrb[k].rho_s ;
 
-#   if DLM_Moving_particle      
-      // Compute the inverse of the moment of inertia matrix
-      compute_inv_inertia( &(allpart[k]) );
-#   endif
+    // In case rigid bodies are treated as fixed obstacles
+    if ( RIGIDBODIES_AS_FIXED_OBSTACLES )
+    {
+      strcpy( allrb[k].typetag, obstacleDefaultTag ); 
+      allrb[k].type = OBSTACLE; 
+      allrb[k].imposedU.x = 0.;
+      allrb[k].imposedU.y = 0.;	
+#     if dimension == 3
+        allrb[k].imposedU.z = 0.;
+        allrb[k].imposedw.x = 0.;
+        allrb[k].imposedw.y = 0.;
+#     else
+        allrb[k].imposedU.z = 0.;
+        allrb[k].imposedw.x = 0.;
+        allrb[k].imposedw.y = 0.;		  
+#     endif
+      allrb[k].imposedw.z = 0.; 
+#     if TRANSLATION
+        foreach_dimension() 
+	{
+	  allrb[k].U.x = 0.;
+	  allrb[k].Unm1.x = 0.;
+	}
+#     endif 
+#     if ROTATION   	 
+        foreach_dimension() 
+	{
+	  allrb[k].w.x = 0.;
+	  allrb[k].wnm1.x = 0.; 
+	}
+#     endif           
+    }
+      
+    // Compute the inverse of the moment of inertia matrix
+    if ( allrb[k].type != OBSTACLE )
+      compute_inv_inertia( &(allrb[k]) );
     
-    // Read the additional geometric features of the particle
+    // Read the additional geometric features of the rigid body
     // Note that the C function strtok keeps track of the pointer to 
     // the last C string, which explains why we do not need to pass any
     // parameter to the functions below 
@@ -396,36 +456,36 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
     {
 #     if dimension == 3
         case 1: 
-          allpart[k].shape = SPHERE;
+          allrb[k].shape = SPHERE;
 	  update_Sphere( gg ); 
           break;
 
         // For now, we assume that all 4-corner polyhedrons are tetrahedrons
 	case 4: 
-          allpart[k].shape = TETRAHEDRON;
+          allrb[k].shape = TETRAHEDRON;
 	  update_Tetrahedron( gg );
           break;
 	  
         // For now, we assume that all 8-corner polyhedrons are cubes
 	case 8: 
-          allpart[k].shape = CUBE;
+          allrb[k].shape = CUBE;
 	  update_Cube( gg );
           break;
 	  
        // For now, we assume that all 12-corner polyhedrons are icosahedrons
        case 12: 
-         allpart[k].shape = ICOSAHEDRON;
+         allrb[k].shape = ICOSAHEDRON;
 	 update_Icosahedron( gg );
          break;  
           
        // For now, we assume that all 20-corner polyhedrons are dodecahedrons
        case 20: 
-         allpart[k].shape = DODECAHEDRON;
+         allrb[k].shape = DODECAHEDRON;
 	 update_Dodecahedron( gg );
          break;      	  
 #     else
         case 1: 
-          allpart[k].shape = CIRCULARCYLINDER2D;
+          allrb[k].shape = CIRCULARCYLINDER2D;
 	  update_CircularCylinder2D( gg );
           break;
 #     endif	  	  

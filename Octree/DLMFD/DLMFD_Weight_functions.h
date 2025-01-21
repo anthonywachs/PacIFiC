@@ -3494,7 +3494,7 @@ size_t is_in_cubic_boundingbox( const double x, const double y,
 /** Finds the normal to the fictitious domain and 
 assign the dial accordingly */
 //----------------------------------------------------------------------------
-void assign_dial_fd_boundary( particle* p, const coord posb, 
+void assign_dial_fd_boundary( RigidBody* p, const coord posb, 
 	const GeomParameter gp, const double Delta, int* NCX ) 
 //----------------------------------------------------------------------------
 {

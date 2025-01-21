@@ -33,7 +33,7 @@ to solve directly. One has to deal with three main difficulties:
 
   * an advection-diffusion equation
   * the imcompressibility constraint with the pressure $p$ as unknown 
-  * the particle's solid body's constraint with the Lagrange
+  * the rigid body's constraint with the Lagrange
 multipliers as unknow.
 
 The classic strategy is to split the problem into subproblems and
@@ -43,47 +43,32 @@ solve them successively. We chose here a two-steps time-spliting.
 # define BGHOSTS 2
 # define BSIZE 128
 
-# ifndef DLM_Moving_particle 
-#   define DLM_Moving_particle 0
+# ifndef TRANSLATION
+#   define TRANSLATION 1
 # endif
 
-# if ( ! DLM_Moving_particle ) 
-#   ifdef TRANSLATION
-#     undef TRANSLATION
-#   endif
-#   define TRANSLATION 0
-#   ifdef ROTATION
-#     undef ROTATION
-#   endif
-#   define ROTATION 0
-# else
-#   ifdef TRANSLATION
-#     undef TRANSLATION
-#   endif
-#   define TRANSLATION 1
-#   ifdef ROTATION
-#     undef ROTATION
-#   endif
+# ifndef ROTATION
 #   define ROTATION 1
 # endif
 
-# ifndef DLM_alpha_coupling
-#   define DLM_alpha_coupling 0
+# ifndef DLM_ALPHA_COUPLING
+#   define DLM_ALPHA_COUPLING 0
 # endif
 
-# ifndef debugBD
-#   define debugBD 0     // set 1 to desactivate boundary points
+# ifndef DEACTIVATE_BOUNDARYPOINTS
+#   define DEACTIVATE_BOUNDARYPOINTS 0
 # endif
-# ifndef debugInterior
-#   define debugInterior 0  // set 1 to desactivate interior points
+
+# ifndef DEACTIVATE_INTERIORPOINTS
+#   define DEACTIVATE_INTERIORPOINTS 0
 # endif
 
 # ifndef DLMFD_OPT
 #   define DLMFD_OPT 1     // use optimized version of DLMFD below
 # endif
 
-# ifndef PARTICLE_VERBOSE
-#   define PARTICLE_VERBOSE 0     // print particle features
+# ifndef RIGIDBODY_VERBOSE
+#   define RIGIDBODY_VERBOSE 0     // print rigid body features
 # endif
 
 # ifndef BRINKMANN_DIRICHLET_PENALIZATION
@@ -92,24 +77,24 @@ solve them successively. We chose here a two-steps time-spliting.
 
 # if ( TRANSLATION && ROTATION )
 #   if dimension == 3
-#     define npartdata 6
+#     define NRBDATA 6
 #   else
-#     define npartdata 3
+#     define NRBDATA 3
 #   endif     
 # elif TRANSLATION
 #   if dimension == 3 
-#     define npartdata 3
+#     define NRBDATA 3
 #   else
-#     define npartdata 2
+#     define NRBDATA 2
 #   endif 
 # elif ROTATION
 #   if dimension == 3 
-#     define npartdata 3
+#     define NRBDATA 3
 #   else
-#     define npartdata 1
+#     define NRBDATA 1
 #   endif 
 # else
-#   define npartdata 0  
+#   define NRBDATA 0  
 # endif
 
 
@@ -130,7 +115,7 @@ vector DLM_w[];
 vector DLM_v[];
 vector DLM_qu[];
 vector DLM_tu[];
-# if DLM_alpha_coupling
+# if DLM_ALPHA_COUPLING
     vector DLM_explicit[];
 # endif
 # if BRINKMANN_DIRICHLET_PENALIZATION
@@ -139,8 +124,8 @@ vector DLM_tu[];
     double eta_s = 1.;    
 # endif
 
-/** Number of particles dependent arrays */
-particle* particles = NULL;
+/** Number of rigid body dependent arrays */
+RigidBody* allRigidBodies = NULL;
 double** DLMFDtoGS_vel = NULL;
 double* vpartbuf = NULL;
 FILE** pdata = NULL;
@@ -221,30 +206,31 @@ timing dlmfd_globaltiming = {0.};
 
 
 
-// Construction of particles for the DLMFD problem
+// Construction of rigid bodies for the DLMFD problem
 //----------------------------------------------------------------------------
-void DLMFD_construction( particle* p ) 
+void DLMFD_construction() 
 //----------------------------------------------------------------------------
 {
-# if PARTICLE_VERBOSE
+# if RIGIDBODY_VERBOSE
     char outputshift[7]="      ";
 # endif
 
-  // Allocate and initialize particles
-  allocate_and_init_particles( p, NPARTICLES, DLM_Index, DLM_Flag, 
-  	DLM_FlagMesh, DLM_PeriodicRefCenter );
+  // Allocate and initialize rigid bodies
+  allocate_and_init_rigidbodies( allRigidBodies, nbRigidBodies, DLM_Index, 
+  	DLM_Flag, DLM_FlagMesh, DLM_PeriodicRefCenter );
 
 	
-  // In case 2 particles are too close, sort out their boundary points
-  if ( NPARTICLES > 1 )
-    remove_too_close_multipliers( p, DLM_Index );
+  // In case 2 rigid bodies are too close, sort out their boundary points
+  if ( nbRigidBodies > 1 )
+    remove_too_close_multipliers( allRigidBodies, DLM_Index );
 
 
   // Tag the cells belonging to the stencil of the boundary-multipliers 
   // points, i.e. set DLM_Flag to 1
-# if debugBD == 0   
-#   if DLM_Moving_particle
-      reverse_fill_DLM_Flag( p, NPARTICLES, DLM_FlagMesh, DLM_Index, 0 );
+# if !DEACTIVATE_BOUNDARYPOINTS   
+#   if !RIGIDBODIES_AS_FIXED_OBSTACLES
+      reverse_fill_DLM_Flag( allRigidBodies, nbRigidBodies, DLM_FlagMesh, 
+      	DLM_Index, 0 );
 #   endif
   
     /* Consider fictitious domain's boundary points only if they are far
@@ -256,7 +242,7 @@ void DLMFD_construction( particle* p )
     {
       foreach_level (depth())
       {
-        twodelta = 2.*Delta;
+        twodelta = 2. * Delta;
 
         if ( !Period.x )
           if ( x > L0 - twodelta + X0 || x  < twodelta + X0 )
@@ -278,47 +264,49 @@ void DLMFD_construction( particle* p )
     }
     synchronize((scalar*) {DLM_Index});
 
-    reverse_fill_DLM_Flag( p, NPARTICLES, DLM_Flag, DLM_Index, 1 );
+    reverse_fill_DLM_Flag( allRigidBodies, nbRigidBodies, DLM_Flag, 
+    	DLM_Index, 1 );
 # endif	
 
 
   // Create fictitious-domain's cache for the interior domain
-# if debugInterior == 0 
-    for (size_t k = 0; k < NPARTICLES; k++) 
+# if !DEACTIVATE_INTERIORPOINTS 
+    for (size_t k = 0; k < nbRigidBodies; k++) 
     {
-      switch( p[k].shape )
+      switch( allRigidBodies[k].shape )
       {
         case SPHERE:
-	  create_FD_Interior_Sphere( &p[k], DLM_Index, DLM_PeriodicRefCenter );
+	  create_FD_Interior_Sphere( &allRigidBodies[k], DLM_Index, 
+	  	DLM_PeriodicRefCenter );
 	  break;
 	  
 	case CIRCULARCYLINDER2D:
-	  create_FD_Interior_CircularCylinder2D( &p[k], DLM_Index, 
+	  create_FD_Interior_CircularCylinder2D( &allRigidBodies[k], DLM_Index, 
 	  	DLM_PeriodicRefCenter );
 	  break;
 	  
 	case CUBE:
-	  create_FD_Interior_Polyhedron( &p[k], DLM_Index, 
+	  create_FD_Interior_Polyhedron( &allRigidBodies[k], DLM_Index, 
 	  	DLM_PeriodicRefCenter );
 	  break;
 	  
         case TETRAHEDRON:
-	  create_FD_Interior_Polyhedron( &p[k], DLM_Index, 
+	  create_FD_Interior_Polyhedron( &allRigidBodies[k], DLM_Index, 
 	  	DLM_PeriodicRefCenter );
 	  break;
 	  
         case OCTAHEDRON:
-	  create_FD_Interior_Polyhedron( &p[k], DLM_Index, 
+	  create_FD_Interior_Polyhedron( &allRigidBodies[k], DLM_Index, 
 	  	DLM_PeriodicRefCenter );
 	  break;
 	  		  
         case ICOSAHEDRON:
-	  create_FD_Interior_Polyhedron( &p[k], DLM_Index, 
+	  create_FD_Interior_Polyhedron( &allRigidBodies[k], DLM_Index, 
 	  	DLM_PeriodicRefCenter );
 	  break;
 
         case DODECAHEDRON:
-	  create_FD_Interior_Polyhedron( &p[k], DLM_Index, 
+	  create_FD_Interior_Polyhedron( &allRigidBodies[k], DLM_Index, 
 	  	DLM_PeriodicRefCenter );
 	  break;	  		  
 	  
@@ -330,45 +318,60 @@ void DLMFD_construction( particle* p )
 
   synchronize((scalar*) {DLM_PeriodicRefCenter});
   
-# if PARTICLE_VERBOSE
-    print_all_particles( p, NPARTICLES, &outputshift[0] );
+# if RIGIDBODY_VERBOSE
+    print_all_rigidbodies( allRigidBodies, nbRigidBodies, &outputshift[0] );
 # endif
 
 # if BRINKMANN_DIRICHLET_PENALIZATION
-#   if debugInterior == 0    
+#   if !DEACTIVATE_INTERIORPOINTS    
       foreach() Xi[] = 0.;
-      for (size_t k = 0; k < NPARTICLES; k++) 
-        foreach_cache(p[k].Interior) 
+      for (size_t k = 0; k < nbRigidBodies; k++) 
+        foreach_cache(allRigidBodies[k].Interior) 
           if ( DLM_Flag[] < 1 && (int)DLM_Index.y[] == k ) 
           {
 	    Xi[] = 1.;
-#           if DLM_Moving_particle
-	      foreach_dimension() Usolid.x[] = p[k].U.x;
+            if ( allRigidBodies[k].type != OBSTACLE )
+	    {
+	      foreach_dimension() Usolid.x[] = allRigidBodies[k].U.x;
 #             if dimension == 3
 	        // w_y*r_z - w_z*r_y
-	        Usolid.x[] += p[k].w.y * ( z - DLM_PeriodicRefCenter.z[])
-			- p[k].w.z * ( y - DLM_PeriodicRefCenter.y[]);
+	        Usolid.x[] += 
+		allRigidBodies[k].w.y * ( z - DLM_PeriodicRefCenter.z[])
+		- allRigidBodies[k].w.z * ( y - DLM_PeriodicRefCenter.y[]);
 	        // w_z*r_x - w_x*r_z
-	        Usolid.y[] += p[k].w.z * ( x - DLM_PeriodicRefCenter.x[])
-			- p[k].w.x * ( z - DLM_PeriodicRefCenter.z[]);
+	        Usolid.y[] += 
+		allRigidBodies[k].w.z * ( x - DLM_PeriodicRefCenter.x[])
+		- allRigidBodies[k].w.x * ( z - DLM_PeriodicRefCenter.z[]);
 #             endif
 	      // w_x*r_y - w_y*r_x
-	      Usolid.z[] += p[k].w.x * ( y - DLM_PeriodicRefCenter.y[])
-			- p[k].w.y * ( x - DLM_PeriodicRefCenter.x[]);
-#           else
-	      foreach_dimension() Usolid.x[] = p[k].imposedU.x;	
+	      Usolid.z[] += 
+	      	allRigidBodies[k].w.x * ( y - DLM_PeriodicRefCenter.y[])
+		- allRigidBodies[k].w.y * ( x - DLM_PeriodicRefCenter.x[]);
+            }          
+            else
+	    {
+	      foreach_dimension() Usolid.x[] = allRigidBodies[k].imposedU.x;	
 #             if dimension == 3
 	        // w_y*r_z - w_z*r_y
-	        Usolid.x[] += p[k].imposedw.y * ( z - DLM_PeriodicRefCenter.z[])
-			- p[k].imposedw.z * ( y - DLM_PeriodicRefCenter.y[]);
+	        Usolid.x[] += 
+			allRigidBodies[k].imposedw.y 
+				* ( z - DLM_PeriodicRefCenter.z[])
+			- allRigidBodies[k].imposedw.z 
+				* ( y - DLM_PeriodicRefCenter.y[]);
 	        // w_z*r_x - w_x*r_z
-	        Usolid.y[] += p[k].imposedw.z * ( x - DLM_PeriodicRefCenter.x[])
-			- p[k].imposedw.x * ( z - DLM_PeriodicRefCenter.z[]);
+	        Usolid.y[] += 
+			allRigidBodies[k].imposedw.z 
+				* ( x - DLM_PeriodicRefCenter.x[])
+			- allRigidBodies[k].imposedw.x 
+				* ( z - DLM_PeriodicRefCenter.z[]);
 #             endif
 	      // w_x*r_y - w_y*r_x
-	      Usolid.z[] += p[k].imposedw.x * ( y - DLM_PeriodicRefCenter.y[])
-			- p[k].imposedw.y * ( x - DLM_PeriodicRefCenter.x[]);
-#           endif    
+	      Usolid.z[] += 
+	      	allRigidBodies[k].imposedw.x 
+			* ( y - DLM_PeriodicRefCenter.y[])
+		- allRigidBodies[k].imposedw.y 
+			* ( x - DLM_PeriodicRefCenter.x[]);
+#           }    
           }
       synchronize((scalar*) {Usolid,Xi});        
 #   endif
@@ -383,7 +386,7 @@ void DLMFD_construction( particle* p )
 // 1) only u, tu, lambda and w need to be explicitly synchronized, 
 // all other fields are local to each thread
 //----------------------------------------------------------------------------
-void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f ) 
+void DLMFD_Uzawa_velocity( const int i ) 
 //----------------------------------------------------------------------------
 {
   /* Timers and Timings */
@@ -393,60 +396,53 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
   double DLM_alpha = 0., DLM_beta = 0.;
   double DLM_tol = 1.e-5, DLM_nr2 = 0., DLM_nr2_km1 = 0., DLM_wv = 0.;
   int ki = 0, DLM_maxiter = 200, allpts = 0, lm = 0, tcells = 0;
+  double rho_f = FLUID_DENSITY;
 
-# if ( _MPI && DLM_Moving_particle )
+# if  _MPI
     int counter = 0;
 # endif 
-# if !DLM_Moving_particle
-    coord imposedU;
-    coord imposedw;
-# endif   
 
 
   // Below we tranfer pointers in local arrays for ease of notation only  
-# if debugInterior == 0
-    Cache * Interior[NPARTICLES];
+# if !DEACTIVATE_INTERIORPOINTS
+    Cache* Interior[nbRigidBodies];
 # endif
 
-# if debugBD == 0
-    Cache * Boundary[NPARTICLES];
-    SolidBodyBoundary * sbm[NPARTICLES];
+# if !DEACTIVATE_BOUNDARYPOINTS
+    Cache* Boundary[nbRigidBodies];
+    RigidBodyBoundary* sbm[nbRigidBodies];
 # endif
   
-# if DLM_Moving_particle
-#   if TRANSLATION
-      coord * qU[NPARTICLES];
-      coord * U[NPARTICLES];
-      coord * tU[NPARTICLES];
-#   endif
-#   if ROTATION
-      coord * qw[NPARTICLES];
-      coord * w[NPARTICLES];
-      coord * tw[NPARTICLES];
-#   endif
+# if TRANSLATION
+    coord* qU[nbRigidBodies];
+    coord* U[nbRigidBodies];
+    coord* tU[nbRigidBodies];
+# endif
+# if ROTATION
+    coord* qw[nbRigidBodies];
+    coord* w[nbRigidBodies];
+    coord* tw[nbRigidBodies];
 # endif
   
-  for (size_t k = 0; k < NPARTICLES; k++) 
+  for (size_t k = 0; k < nbRigidBodies; k++) 
   {    
-#   if debugInterior == 0
-      Interior[k] = &(p[k].Interior);
+#   if !DEACTIVATE_INTERIORPOINTS
+      Interior[k] = &(allRigidBodies[k].Interior);
 #   endif
-#   if debugBD == 0 
-      Boundary[k] = &(p[k].reduced_domain);
-      sbm[k] = &(p[k].s);
+#   if !DEACTIVATE_BOUNDARYPOINTS 
+      Boundary[k] = &(allRigidBodies[k].reduced_domain);
+      sbm[k] = &(allRigidBodies[k].s);
 #   endif
     
-#   if DLM_Moving_particle
-#     if TRANSLATION
-        qU[k] = &(p[k].qU);
-        U[k] = &(p[k].U);
-        tU[k] = &(p[k].tU);
-#     endif
-#     if ROTATION
-        qw[k] = &(p[k].qw);
-        w[k] = &(p[k].w);
-        tw[k] = &(p[k].tw);
-#     endif
+#   if TRANSLATION
+      qU[k] = &(allRigidBodies[k].qU);
+      U[k] = &(allRigidBodies[k].U);
+      tU[k] = &(allRigidBodies[k].tU);
+#   endif
+#   if ROTATION
+      qw[k] = &(allRigidBodies[k].qw);
+      w[k] = &(allRigidBodies[k].w);
+      tw[k] = &(allRigidBodies[k].tw);
 #   endif
   }
 
@@ -465,7 +461,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
     Point ppp;
     initialize_and_allocate_Cache( &Traversal_rvwlambda );
     // Interior points
-    for (size_t m = 0; m < NPARTICLES; m++)
+    for (size_t m = 0; m < nbRigidBodies; m++)
     {     
       bbb = 0; 
       foreach_cache((*Interior[m])) 
@@ -482,7 +478,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
       }
     }
     // Boundary points
-    for (size_t m = 0; m < NPARTICLES; m++) 
+    for (size_t m = 0; m < nbRigidBodies; m++) 
     { 
       bbb = 0;
       foreach_cache((*Boundary[m])) 
@@ -503,7 +499,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
     Cache Traversal_uqutu;
     initialize_and_allocate_Cache( &Traversal_uqutu );
     // Interior points
-    for (size_t m = 0; m < NPARTICLES; m++)
+    for (size_t m = 0; m < nbRigidBodies; m++)
     {     
       bbb = 0; 
       foreach_cache((*Interior[m])) 
@@ -551,44 +547,42 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
 
 
   // Statistics of number of Lagrange multiplier points  
-  lm = total_dlmfd_multipliers (p, NPARTICLES);
+  lm = total_dlmfd_multipliers( allRigidBodies, nbRigidBodies );
   /* Get track of the number of multipliers for statistics */
-  for (size_t k = 0; k < NPARTICLES; k++)
-    p[k].tmultipliers += lm;
+  for (size_t k = 0; k < nbRigidBodies; k++)
+    allRigidBodies[k].tmultipliers += lm;
 
-  allpts = total_dlmfd_cells (p, NPARTICLES);
+  allpts = total_dlmfd_cells( allRigidBodies, nbRigidBodies );
   /* Get track of the number of cells involved in the dlmfd solver for 
   statistics */
-  for (size_t k = 0; k < NPARTICLES; k++)
-    p[k].tcells += allpts;
+  for (size_t k = 0; k < nbRigidBodies; k++)
+    allRigidBodies[k].tcells += allpts;
 
   if ( pid() == 0 )
   {
-    printf( "      DLM points = %d, constrained cells = %d\n", lm, allpts );
+    printf( "   DLMFD Uzawa: Points = %d, Cells = %d, ", lm, allpts );
     fprintf( cellvstime, "%d \t %d \t \t %d \t \t \t %d \n", i, lm, allpts, 
   	tcells );
     fflush( cellvstime );
   } 
   
 
-  // Nullify the qU, tU, qw and tw vectors of all particles
-# if DLM_Moving_particle
-#   if TRANSLATION
-      for (size_t k = 0; k < NPARTICLES; k++) 
-        foreach_dimension()
-        {
-	  (*qU[k]).x = 0.; 
-	  (*tU[k]).x = 0.;
-        }
-#   endif
-#   if ROTATION
-      for (size_t k = 0; k < NPARTICLES; k++) 
-        foreach_dimension()
-        {
-	  (*qw[k]).x = 0.; 
-	  (*tw[k]).x = 0.;
-        }
-#   endif
+  // Nullify the qU, tU, qw and tw vectors of all rigid bodies
+# if TRANSLATION
+    for (size_t k = 0; k < nbRigidBodies; k++) 
+      foreach_dimension()
+      {
+	(*qU[k]).x = 0.; 
+	(*tU[k]).x = 0.;
+      }
+# endif
+# if ROTATION
+    for (size_t k = 0; k < nbRigidBodies; k++) 
+      foreach_dimension()
+      {
+	(*qw[k]).x = 0.; 
+	(*tw[k]).x = 0.;
+      }
 # endif
 
 
@@ -623,7 +617,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
     {
       DLM_qu.x[] = rho_f * dlmfd_dv() * u.x[] / dt;
 
-#     if DLM_alpha_coupling
+#     if DLM_ALPHA_COUPLING
         DLM_qu.x[] += DLM_explicit.x[];
         DLM_explicit.x[] = 0.;
 #     endif
@@ -647,8 +641,8 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
   /* For moving particles the fU and fw parts are added after the
      scalar product (for mpi purpose) */
 
-# if debugInterior == 0
-    for (size_t k = 0; k < NPARTICLES; k++) 
+# if !DEACTIVATE_INTERIORPOINTS
+    for (size_t k = 0; k < nbRigidBodies; k++) 
     {
       foreach_cache((*Interior[k])) 
       {
@@ -657,7 +651,8 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
 	  foreach_dimension() 
 	    DLM_qu.x[] -= DLM_lambda.x[];
 	
-#         if DLM_Moving_particle
+          if ( allRigidBodies[k].type != OBSTACLE )
+	  {
 #           if TRANSLATION
               foreach_dimension()
 	        (*qU[k]).x += DLM_lambda.x[];
@@ -678,7 +673,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
 	      (*qw[k]).z += DLM_lambda.y[] * ( x - DLM_PeriodicRefCenter.x[])
 		- DLM_lambda.x[] * ( y - DLM_PeriodicRefCenter.y[]); 
 #           endif
-#         endif
+          }
         }
       }
     }
@@ -688,7 +683,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
   /* Boundary points qU = fU -(M_U^T)*lambda^0 */
   /* Boundary points qw = fw -(M_w^T)*lambda^0 */
   
-# if debugBD == 0
+# if !DEACTIVATE_BOUNDARYPOINTS
     double weight = 0.;
     coord weightcellpos = {0., 0., 0.};
     coord lambdacellpos = {0., 0., 0.};
@@ -703,9 +698,9 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
       double* quz_ = NULL;
 #   endif
  
-    for (size_t k = 0; k < NPARTICLES; k++) 
+    for (size_t k = 0; k < nbRigidBodies; k++) 
     {
-      particle * pp = &p[k];
+      RigidBody* pp = &allRigidBodies[k];
     
       foreach_cache ((*Boundary[k])) 
       {
@@ -762,18 +757,18 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
 	  }
         }
 
-        // -= here as one fluid cell can be affected by multiples particle's
+        // -= here as one fluid cell can be affected by multiples rigid body's
         // boundary multipliers 
 	foreach_dimension() 
 	  DLM_qu.x[] -= sum.x; 
       }
     }
     
-#   if DLM_Moving_particle
-      for (size_t k = 0; k < NPARTICLES; k++) 
+    for (size_t k = 0; k < nbRigidBodies; k++)
+    { 
+      if ( allRigidBodies[k].type != OBSTACLE )
       {
-        particle * pp = &p[k];
-    
+        RigidBody* pp = &allRigidBodies[k];
         foreach_cache ((*Boundary[k])) 
         {
           if ( DLM_Index.x[] > -1 && (int)DLM_Index.y[] == pp->pnum ) 
@@ -810,16 +805,17 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
           }      
         }
       }
-#   endif
+    }
 # endif
   
 
-# if DLM_Moving_particle
+  if ( nbParticles )
+  {
 #   if _MPI /* _MPI Reduction */
       // Reduce to master
       // Pack data
       counter = 0;  
-      for (size_t k = 0; k < NPARTICLES; k++) 
+      for (size_t k = 0; k < nbRigidBodies; k++) 
       {
 #       if TRANSLATION
           vpartbuf[counter] = (*qU[k]).x;
@@ -846,13 +842,13 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
   
       // Perform reduction on Master
       MPI_Reduce( pid() ? vpartbuf : MPI_IN_PLACE, vpartbuf, 
-      	npartdata*NPARTICLES, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD );
+      	NRBDATA*nbRigidBodies, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD );
 
       if ( pid() == 0 )
       {
         // Unpack data    
         counter = 0;
-        for (size_t k = 0; k < NPARTICLES; k++) 
+        for (size_t k = 0; k < nbRigidBodies; k++) 
         {
 #         if TRANSLATION
             (*qU[k]).x = vpartbuf[counter];
@@ -879,77 +875,84 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
 #   endif  /* end of _MPI Reduction */    
     
         // Perform the inversion (on master when in MPI)
-        for (size_t k = 0; k < NPARTICLES; k++) 
+        for (size_t k = 0; k < nbRigidBodies; k++) 
         {
-#         if TRANSLATION
-            /* Add here fU to qU */
-	    foreach_dimension()
-              (*qU[k]).x += ( 1. - ( rho_f / p[k].rho_s ) ) *
-    		p[k].M * ( p[k].gravity.x + p[k].addforce.x ) 
-		+ p[k].DLMFD_couplingfactor * p[k].M * (*U[k]).x / dt ;
+          if ( allRigidBodies[k].type != OBSTACLE )
+	  {
+#           if TRANSLATION
+              /* Add here fU to qU */
+	      foreach_dimension()
+                (*qU[k]).x += ( 1. - ( rho_f / allRigidBodies[k].rho_s ) ) *
+    			allRigidBodies[k].M * ( GRAVITY_VECTOR.x 
+				+ allRigidBodies[k].addforce.x ) 
+			+ allRigidBodies[k].DLMFD_couplingfactor 
+				* allRigidBodies[k].M * (*U[k]).x / dt ;
 	
-            /* Solution of M * DLMFD_couplingfactor * U / dt = qU */
-            /* U = ( dt * qU ) / ( DLMFD_couplingfactor * M ) */
-            foreach_dimension() 
-	      (*U[k]).x = ( dt / ( p[k].DLMFD_couplingfactor * p[k].M ) ) 
-	      	* (*qU[k]).x ;
-#         endif
-#         if ROTATION
-            /* Add here fw to qw */
-            /* The inertia tensor is */
-            /*  Ixx  Ixy  Ixz */
-            /*  Iyx  Iyy  Iyz */
-            /*  Izx  Izy  Izz */ 
-            /* with */
-            /* Ip[0] = Ixx */
-            /* Ip[1] = Iyy */
-            /* Ip[2] = Izz */
-            /* Ip[3] = Ixy */
-            /* Ip[4] = Ixz */
-            /* Ip[5] = Iyz */
-#           if dimension == 3
-              (*qw[k]).x += p[k].DLMFD_couplingfactor * 
-	      		( (p[k].Ip[0]) * (*w[k]).x
-    			- (p[k].Ip[3]) * (*w[k]).y 
-			- (p[k].Ip[4]) * (*w[k]).z ) / dt;
-              (*qw[k]).y += p[k].DLMFD_couplingfactor * 
-	      		( - (p[k].Ip[3]) * (*w[k]).x
-    			+ (p[k].Ip[1]) * (*w[k]).y 
-			- (p[k].Ip[5]) * (*w[k]).z ) / dt;
+              /* Solution of M * DLMFD_couplingfactor * U / dt = qU */
+              /* U = ( dt * qU ) / ( DLMFD_couplingfactor * M ) */
+              foreach_dimension() 
+	        (*U[k]).x = ( dt / ( allRigidBodies[k].DLMFD_couplingfactor 
+			* allRigidBodies[k].M ) ) * (*qU[k]).x ;
 #           endif
-            (*qw[k]).z += p[k].DLMFD_couplingfactor * 
-	    	( - (p[k].Ip[4]) * (*w[k]).x 
-    		- (p[k].Ip[5]) * (*w[k]).y 
-		+ (p[k].Ip[2]) * (*w[k]).z ) / dt;   
+#           if ROTATION
+              /* Add here fw to qw */
+              /* The inertia tensor is */
+              /*  Ixx  Ixy  Ixz */
+              /*  Iyx  Iyy  Iyz */
+              /*  Izx  Izy  Izz */ 
+              /* with */
+              /* Ip[0] = Ixx */
+              /* Ip[1] = Iyy */
+              /* Ip[2] = Izz */
+              /* Ip[3] = Ixy */
+              /* Ip[4] = Ixz */
+              /* Ip[5] = Iyz */
+#             if dimension == 3
+                (*qw[k]).x += allRigidBodies[k].DLMFD_couplingfactor * 
+	      		( (allRigidBodies[k].Ip[0]) * (*w[k]).x
+    			- (allRigidBodies[k].Ip[3]) * (*w[k]).y 
+			- (allRigidBodies[k].Ip[4]) * (*w[k]).z ) 
+			/ dt;
+                (*qw[k]).y += allRigidBodies[k].DLMFD_couplingfactor * 
+	      		( - (allRigidBodies[k].Ip[3]) * (*w[k]).x
+    			+ (allRigidBodies[k].Ip[1]) * (*w[k]).y 
+			- (allRigidBodies[k].Ip[5]) * (*w[k]).z ) 
+			/ dt;
+#             endif
+              (*qw[k]).z += allRigidBodies[k].DLMFD_couplingfactor * 
+	    	( - (allRigidBodies[k].Ip[4]) * (*w[k]).x 
+    		- (allRigidBodies[k].Ip[5]) * (*w[k]).y 
+		+ (allRigidBodies[k].Ip[2]) * (*w[k]).z ) / dt;   
 
-            /* Solution of Ip * DLMFD_couplingfactor * w / dt = qw */
-            /* w = ( dt / ( DLMFD_couplingfactor ) * Ip_inv * qw 
-            /* where Ip_inv is the inverse of Ip */        
-#           if dimension == 3
-              (*w[k]).x = ( dt / p[k].DLMFD_couplingfactor ) * 
-    		( (p[k].Ip_inv)[0][0] * (*qw[k]).x 
-		+ (p[k].Ip_inv)[0][1] * (*qw[k]).y 
-    		+ (p[k].Ip_inv)[0][2] * (*qw[k]).z );
-              (*w[k]).y = ( dt / p[k].DLMFD_couplingfactor ) * 
-    		( (p[k].Ip_inv)[1][0] * (*qw[k]).x 
-		+ (p[k].Ip_inv)[1][1] * (*qw[k]).y 
-    		+ (p[k].Ip_inv)[1][2] * (*qw[k]).z );
-              (*w[k]).z = ( dt / p[k].DLMFD_couplingfactor ) * 
-    		( (p[k].Ip_inv)[2][0] * (*qw[k]).x 
-		+ (p[k].Ip_inv)[2][1] * (*qw[k]).y 
-    		+ (p[k].Ip_inv)[2][2] * (*qw[k]).z );
-#           else
-              (*w[k]).z = ( dt / p[k].DLMFD_couplingfactor ) * 
-		(p[k].Ip_inv)[2][2] * (*qw[k]).z ;		
-#           endif		
-#         endif
+              /* Solution of Ip * DLMFD_couplingfactor * w / dt = qw */
+              /* w = ( dt / ( DLMFD_couplingfactor ) * Ip_inv * qw 
+              /* where Ip_inv is the inverse of Ip */        
+#             if dimension == 3
+                (*w[k]).x = ( dt / allRigidBodies[k].DLMFD_couplingfactor ) * 
+    			( (allRigidBodies[k].Ip_inv)[0][0] * (*qw[k]).x 
+			+ (allRigidBodies[k].Ip_inv)[0][1] * (*qw[k]).y 
+    			+ (allRigidBodies[k].Ip_inv)[0][2] * (*qw[k]).z );
+                (*w[k]).y = ( dt / allRigidBodies[k].DLMFD_couplingfactor ) * 
+    			( (allRigidBodies[k].Ip_inv)[1][0] * (*qw[k]).x 
+			+ (allRigidBodies[k].Ip_inv)[1][1] * (*qw[k]).y 
+    			+ (allRigidBodies[k].Ip_inv)[1][2] * (*qw[k]).z );
+                (*w[k]).z = ( dt / allRigidBodies[k].DLMFD_couplingfactor ) * 
+    			( (allRigidBodies[k].Ip_inv)[2][0] * (*qw[k]).x 
+			+ (allRigidBodies[k].Ip_inv)[2][1] * (*qw[k]).y 
+    			+ (allRigidBodies[k].Ip_inv)[2][2] * (*qw[k]).z );
+#             else
+                (*w[k]).z = ( dt / allRigidBodies[k].DLMFD_couplingfactor ) * 
+			(allRigidBodies[k].Ip_inv)[2][2] * (*qw[k]).z ;		
+#             endif		
+#           endif
+          }
         }  
 
 #   if _MPI /* _MPI Broadcast */
         // Broadcast U and w
         // Pack data
         counter = 0;  
-        for (size_t k = 0; k < NPARTICLES; k++) 
+        for (size_t k = 0; k < nbRigidBodies; k++) 
         {
 #         if TRANSLATION
             vpartbuf[counter] = (*U[k]).x;
@@ -976,12 +979,12 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
       } /* End of "if pid() == 0" */    
   
       // Perform the broadcast from the master to the other processes
-      MPI_Bcast( vpartbuf, npartdata*NPARTICLES, 
+      MPI_Bcast( vpartbuf, NRBDATA*nbRigidBodies, 
     	MPI_DOUBLE, 0, MPI_COMM_WORLD );
 
       // Unpack data    
       counter = 0;
-      for (size_t k = 0; k < NPARTICLES; k++) 
+      for (size_t k = 0; k < nbRigidBodies; k++) 
       {
 #       if TRANSLATION
           (*U[k]).x = vpartbuf[counter];
@@ -1006,9 +1009,9 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
 #       endif
       }  
 #   endif /* end of _MPI Broadcast */ 
-# endif /* end of DLM_Moving_particle */
+  } /* end of nbParticles */
 
-  
+   
   /* Invert L*u^0 = qu with L=dv*rho/dt*Identity_Matrix */
   foreach()
     foreach_dimension()
@@ -1031,22 +1034,18 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
 
   /* Interior points: r^0 = G - M_u*u^0 - M_U*U^0 - M_w*w^0 */
   /* So r^0 = G -<alpha, u>_P(t) + <alpha, U>_P(t) + <alpha, w^r_GM>_P(t) */
-# if debugInterior == 0
-    for (size_t k = 0; k < NPARTICLES; k++) 
+# if !DEACTIVATE_INTERIORPOINTS
+    for (size_t k = 0; k < nbRigidBodies; k++) 
     {        
-#     if !DLM_Moving_particle
-        imposedU = (p[k]).imposedU;
-        imposedw = (p[k]).imposedw;
-#     endif
-
       foreach_cache((*Interior[k])) 
       {      
-        if ((DLM_Flag[]  < 1) && ((int)DLM_Index.y[] == k)) 
+        if ( DLM_Flag[]  < 1 && (int)DLM_Index.y[] == k ) 
         {
 	  foreach_dimension() 
 	    DLM_r.x[] = - u.x[];
  
-#         if DLM_Moving_particle
+          if ( (allRigidBodies[k]).type != OBSTACLE )
+	  {
 #           if TRANSLATION
               foreach_dimension() 
 	        DLM_r.x[] += (*U[k]).x;			
@@ -1064,48 +1063,52 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
 	      DLM_r.z[] += (*w[k]).x * ( y - DLM_PeriodicRefCenter.y[])
 			- (*w[k]).y * ( x - DLM_PeriodicRefCenter.x[]);
 #           endif
-#         else
+          }
+          else
+	  {
 	    foreach_dimension()   
-	      DLM_r.x[] += imposedU.x;
+	      DLM_r.x[] += allRigidBodies[k].imposedU.x;
 
 #           if dimension == 3
-	      DLM_r.x[] += imposedw.y * ( z - DLM_PeriodicRefCenter.z[])
-		- imposedw.z * ( y - DLM_PeriodicRefCenter.y[]);
-	      DLM_r.y[] += imposedw.z * ( x - DLM_PeriodicRefCenter.x[])
-		- imposedw.x * ( z - DLM_PeriodicRefCenter.z[]);
+	      DLM_r.x[] += allRigidBodies[k].imposedw.y 
+	      			* ( z - DLM_PeriodicRefCenter.z[])
+		- allRigidBodies[k].imposedw.z 
+				* ( y - DLM_PeriodicRefCenter.y[]);
+	      DLM_r.y[] += allRigidBodies[k].imposedw.z 
+	      			* ( x - DLM_PeriodicRefCenter.x[])
+		- allRigidBodies[k].imposedw.x 
+				* ( z - DLM_PeriodicRefCenter.z[]);
 #           endif
-	    DLM_r.z[] += imposedw.x * ( y - DLM_PeriodicRefCenter.y[])
-		- imposedw.y * ( x - DLM_PeriodicRefCenter.x[]);	      
-#         endif	
+	    DLM_r.z[] += allRigidBodies[k].imposedw.x 
+	    			* ( y - DLM_PeriodicRefCenter.y[])
+		- allRigidBodies[k].imposedw.y 
+				* ( x - DLM_PeriodicRefCenter.x[]);	      
+          }	
         }
       }
     }
 # endif
 
-  
+   
   /* Boundary points: r^0 = G - M_u*u^0 - M_U*U^0 - M_w*w^0 */
   /* So r^0 = G -<alpha, u>_P(t) + <alpha, U>_P(t) + <alpha, w^r_GM>_P(t) */
-# if debugBD == 0
+# if !DEACTIVATE_BOUNDARYPOINTS
     double testweight = 0.;
     synchronize((scalar*){u});
 #   if DLMFD_OPT
       int ndof = 0;
 #   endif  
 
-    for (size_t k = 0; k < NPARTICLES; k++) 
+    for (size_t k = 0; k < nbRigidBodies; k++) 
     {
-      particle* pp = &p[k];
-#     if !DLM_Moving_particle
-        imposedU = (p[k]).imposedU;
-        imposedw = (p[k]).imposedw;
-#     endif      
+      RigidBody* pp = &allRigidBodies[k];    
       
       foreach_cache((*Boundary[k])) 
       {
 #       if DLMFD_OPT
           ndof = 0;
 #       endif      
-        if (DLM_Index.x[] > -1 && ((int)DLM_Index.y[] == pp->pnum)) 
+        if ( DLM_Index.x[] > -1 && (int)DLM_Index.y[] == pp->pnum ) 
         {
 	  lambdacellpos.x = x; 
 	  lambdacellpos.y = y; 
@@ -1175,7 +1178,8 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
 #           endif			
 #         endif
 			
-#         if DLM_Moving_particle
+          if ( pp->type != OBSTACLE )
+	  {
 #           if TRANSLATION
 	      foreach_dimension()
 	        DLM_r.x[] += (*U[k]).x;
@@ -1198,22 +1202,30 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
 	      	(*w[k]).x * ( lambdapos.y - DLM_PeriodicRefCenter.y[] ) 
 		- (*w[k]).y * ( lambdapos.x - DLM_PeriodicRefCenter.x[] ); 
 #           endif
-#         else
+          }
+          else
+	  {
 	    foreach_dimension()
-	      DLM_r.x[] += imposedU.x;
+	      DLM_r.x[] += allRigidBodies[k].imposedU.x;
 
 #           if dimension == 3	
 	      DLM_r.x[] += 
-	    	imposedw.y * ( lambdapos.z - DLM_PeriodicRefCenter.z[] ) 
-		- imposedw.z * ( lambdapos.y - DLM_PeriodicRefCenter.y[] );
+	    	allRigidBodies[k].imposedw.y 
+			* ( lambdapos.z - DLM_PeriodicRefCenter.z[] ) 
+		- allRigidBodies[k].imposedw.z 
+			* ( lambdapos.y - DLM_PeriodicRefCenter.y[] );
 	      DLM_r.y[] +=  
-	    	imposedw.z * ( lambdapos.x - DLM_PeriodicRefCenter.x[] ) 
-		- imposedw.x * ( lambdapos.z - DLM_PeriodicRefCenter.z[] );
+	    	allRigidBodies[k].imposedw.z 
+			* ( lambdapos.x - DLM_PeriodicRefCenter.x[] ) 
+		- allRigidBodies[k].imposedw.x 
+			* ( lambdapos.z - DLM_PeriodicRefCenter.z[] );
 #           endif
 	    DLM_r.z[] +=  
-	    	imposedw.x * ( lambdapos.y - DLM_PeriodicRefCenter.y[] ) 
-		- imposedw.y * ( lambdapos.x - DLM_PeriodicRefCenter.x[] );
-#         endif
+	    	allRigidBodies[k].imposedw.x 
+			* ( lambdapos.y - DLM_PeriodicRefCenter.y[] ) 
+		- allRigidBodies[k].imposedw.y 
+			* ( lambdapos.x - DLM_PeriodicRefCenter.x[] );
+          }
         }
       }
     }
@@ -1269,8 +1281,9 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
         }    
 #   endif   
     
-#   if DLM_Moving_particle
-      for (size_t k = 0; k < NPARTICLES; k++) 
+    for (size_t k = 0; k < nbRigidBodies; k++) 
+    {
+      if ( (allRigidBodies[k]).type != OBSTACLE )
       {
 #       if TRANSLATION
           foreach_dimension()
@@ -1287,23 +1300,24 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
           (*qw[k]).z = 0.; (*tw[k]).z = 0.;
 #       endif
       }
-#   endif
+    }
      
     /* Interior points qu = (M_u^T)*w =   <DLM_w, v>_P(t) */
     /* Interior points qU = (M_U^T)*w = - <DLM_w, V>_P(t) */
     /* Interior points qw = (M_w^T)*w = - <DLM_w, xi^r_GM>_P(t) */
     /* -<DLM_w, xi^r_GM>_P(t)=-<r_GM, DLM_w^xi>_P(t)=-<xi, r_GM^DLM_w>_P(t) */
-#   if debugInterior == 0
-      for (size_t k = 0; k < NPARTICLES; k++) 
+#   if !DEACTIVATE_INTERIORPOINTS
+      for (size_t k = 0; k < nbRigidBodies; k++) 
       {
         foreach_cache((*Interior[k])) 
         {
-          if ((DLM_Flag[]  < 1) && ((int)DLM_Index.y[] == k)) 
+          if ( DLM_Flag[]  < 1 && (int)DLM_Index.y[] == k ) 
           {
 	    foreach_dimension() 
 	      DLM_qu.x[] = DLM_w.x[];
 	  
-#           if DLM_Moving_particle
+	    if ( (allRigidBodies[k]).type != OBSTACLE )
+	    {
 #             if TRANSLATION
                 foreach_dimension() 
 		  (*qU[k]).x += -DLM_w.x[];
@@ -1321,7 +1335,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
 	          (*qw[k]).z -=  DLM_w.y[] * ( x - DLM_PeriodicRefCenter.x[] ) 
 			- DLM_w.x[] * ( y - DLM_PeriodicRefCenter.y[] );
 #             endif
-#           endif
+            }
           }
         }
       }
@@ -1332,7 +1346,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
     /* Boundary points qU = (M_U^T)*w = - <w, V>_P(t) */
     /* Boundary points qw = (M_w^T)*w = - <w, xi^r_GM>_P(t) */
     /* -<DLM_w, xi^r_GM>_P(t)=-<r_GM, w^xi>_P(t)=-<xi, r_GM^w>_P(t) */  
-#   if debugBD == 0
+#   if !DEACTIVATE_BOUNDARYPOINTS
 #     if DLMFD_OPT
         // Use of the fast loop for the computations of 
         // qu = (M_u^T)*w = <w, v>_P(t) over the boundary points
@@ -1349,9 +1363,9 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
         }
 #     else
         synchronize((scalar*){DLM_w, DLM_qu});    
-        for (size_t k = 0; k < NPARTICLES; k++) 
+        for (size_t k = 0; k < nbRigidBodies; k++) 
         {
-          particle * pp = &p[k];
+          RigidBody* pp = &allRigidBodies[k];
           foreach_cache((*Boundary[k])) 
           {
             weightcellpos.x = x; 
@@ -1386,7 +1400,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
             }
       
             // += here as one fluid cell can be affected by multiples 
-	    // particle's boundary multipliers
+	    // rigid body's boundary multipliers
             foreach_dimension() 
 	      DLM_qu.x[] += sum.x;
           }
@@ -1394,10 +1408,11 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
 #     endif
 
 	
-#     if DLM_Moving_particle
-        for (size_t k = 0; k < NPARTICLES; k++) 
-        {
-          particle * pp = &p[k];
+      for (size_t k = 0; k < nbRigidBodies; k++) 
+      {
+        RigidBody* pp = &allRigidBodies[k];
+        if ( pp->type != OBSTACLE )
+	{	  
           foreach_cache((*Boundary[k])) 
           {
             if ( DLM_Index.x[] > -1 && (int)DLM_Index.y[] == pp->pnum ) 
@@ -1433,17 +1448,18 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
 #             endif
             }
           }
-        }
-#     endif  
+	}
+      }
 #   endif
     
 
-#   if DLM_Moving_particle
+    if ( nbParticles )
+    {
 #     if _MPI /* _MPI Reduction */
         // Reduce to master
         // Pack data
         counter = 0;  
-        for (size_t k = 0; k < NPARTICLES; k++) 
+        for (size_t k = 0; k < nbRigidBodies; k++) 
         {
 #         if TRANSLATION
             vpartbuf[counter] = (*qU[k]).x;
@@ -1470,13 +1486,14 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
   
         // Perform reduction on Master
         MPI_Reduce( pid() ? vpartbuf : MPI_IN_PLACE, vpartbuf, 
-      		npartdata*NPARTICLES, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD );	
+      		NRBDATA*nbRigidBodies, MPI_DOUBLE, MPI_SUM, 0, 
+		MPI_COMM_WORLD );	
 
         if ( pid() == 0 )
         {
           // Unpack data    
           counter = 0;
-          for (size_t k = 0; k < NPARTICLES; k++) 
+          for (size_t k = 0; k < nbRigidBodies; k++) 
           {
 #           if TRANSLATION
               (*qU[k]).x = vpartbuf[counter];
@@ -1503,44 +1520,48 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
 #     endif  /* end of _MPI Reduction */    
     
           // Perform the inversion (on master when in MPI)
-          for (size_t k = 0; k < NPARTICLES; k++) 
+          for (size_t k = 0; k < nbRigidBodies; k++) 
           {
-#           if TRANSLATION
-              /* Solution of M * DLMFD_couplingfactor * tU / dt = qU */
-              /* tU = ( dt * qU ) / ( DLMFD_couplingfactor * M ) */
-              foreach_dimension()              
-                (*tU[k]).x = ( (*qU[k]).x * dt ) / 
-	      		( p[k].DLMFD_couplingfactor * p[k].M );	   
-#           endif
-#           if ROTATION
-              /* Solution of Ip * DLMFD_couplingfactor * tw / dt = qw */
-              /* tw = ( dt / ( DLMFD_couplingfactor ) * Ip_inv * qw 
-              /* where Ip_inv is the inverse of Ip */      
-#             if dimension == 3              
-	        (*tw[k]).x = ( dt / p[k].DLMFD_couplingfactor ) * 
-    			( (p[k].Ip_inv)[0][0] * (*qw[k]).x 
-			+ (p[k].Ip_inv)[0][1] * (*qw[k]).y 
-    			+ (p[k].Ip_inv)[0][2] * (*qw[k]).z );
-                (*tw[k]).y = ( dt / p[k].DLMFD_couplingfactor ) * 
-    			( (p[k].Ip_inv)[1][0] * (*qw[k]).x 
-			+ (p[k].Ip_inv)[1][1] * (*qw[k]).y 
-    			+ (p[k].Ip_inv)[1][2] * (*qw[k]).z );
-                (*tw[k]).z = ( dt / p[k].DLMFD_couplingfactor ) * 
-    			( (p[k].Ip_inv)[2][0] * (*qw[k]).x 
-			+ (p[k].Ip_inv)[2][1] * (*qw[k]).y 
-    			+ (p[k].Ip_inv)[2][2] * (*qw[k]).z );
-#             else
-                (*tw[k]).z = ( dt / p[k].DLMFD_couplingfactor ) * 
-    			(p[k].Ip_inv)[2][2] * (*qw[k]).z ;
-#             endif			
-#           endif
+            if ( allRigidBodies[k].type != OBSTACLE )
+	    {
+#             if TRANSLATION
+                /* Solution of M * DLMFD_couplingfactor * tU / dt = qU */
+                /* tU = ( dt * qU ) / ( DLMFD_couplingfactor * M ) */
+                foreach_dimension()              
+                  (*tU[k]).x = ( (*qU[k]).x * dt ) / 
+	      		( allRigidBodies[k].DLMFD_couplingfactor 
+				* allRigidBodies[k].M );	   
+#             endif
+#             if ROTATION
+                /* Solution of Ip * DLMFD_couplingfactor * tw / dt = qw */
+                /* tw = ( dt / ( DLMFD_couplingfactor ) * Ip_inv * qw 
+                /* where Ip_inv is the inverse of Ip */      
+#               if dimension == 3              
+	          (*tw[k]).x = ( dt / allRigidBodies[k].DLMFD_couplingfactor ) *
+    			( (allRigidBodies[k].Ip_inv)[0][0] * (*qw[k]).x 
+			+ (allRigidBodies[k].Ip_inv)[0][1] * (*qw[k]).y 
+    			+ (allRigidBodies[k].Ip_inv)[0][2] * (*qw[k]).z );
+                  (*tw[k]).y = ( dt / allRigidBodies[k].DLMFD_couplingfactor ) *
+    			( (allRigidBodies[k].Ip_inv)[1][0] * (*qw[k]).x 
+			+ (allRigidBodies[k].Ip_inv)[1][1] * (*qw[k]).y 
+    			+ (allRigidBodies[k].Ip_inv)[1][2] * (*qw[k]).z );
+                  (*tw[k]).z = ( dt / allRigidBodies[k].DLMFD_couplingfactor ) *
+    			( (allRigidBodies[k].Ip_inv)[2][0] * (*qw[k]).x 
+			+ (allRigidBodies[k].Ip_inv)[2][1] * (*qw[k]).y 
+    			+ (allRigidBodies[k].Ip_inv)[2][2] * (*qw[k]).z );
+#               else
+                  (*tw[k]).z = ( dt / allRigidBodies[k].DLMFD_couplingfactor ) *
+    			(allRigidBodies[k].Ip_inv)[2][2] * (*qw[k]).z ;
+#               endif			
+#             endif
+            }
           }  
 
 #     if _MPI /* _MPI Broadcast */
           // Broadcast tU and tw
           // Pack data
           counter = 0;  
-          for (size_t k = 0; k < NPARTICLES; k++) 
+          for (size_t k = 0; k < nbRigidBodies; k++) 
           {
 #           if TRANSLATION
               vpartbuf[counter] = (*tU[k]).x;
@@ -1567,12 +1588,12 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
         } /* End of "if pid() == 0" */    
   
         // Perform the broadcast from the master to the other processes
-        MPI_Bcast( vpartbuf, npartdata*NPARTICLES, 
+        MPI_Bcast( vpartbuf, NRBDATA*nbRigidBodies, 
     		MPI_DOUBLE, 0, MPI_COMM_WORLD );
 
         // Unpack data    
         counter = 0;
-        for (size_t k = 0; k < NPARTICLES; k++) 
+        for (size_t k = 0; k < nbRigidBodies; k++) 
         {
 #         if TRANSLATION
             (*tU[k]).x = vpartbuf[counter];
@@ -1597,7 +1618,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
 #         endif
         }  
 #     endif /* end of _MPI Broadcast */ 
-#   endif /* end of DLM_Moving_particle */
+    } /* end of nbParticles */
 
 
     /* (2) Invert L*t = qu with L=rho*dV/dt*I */
@@ -1615,20 +1636,21 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
        Sign error in eq (A.9) in J.Eng. Math, 2011 
        Written -M*t, should be +M*t */    
 
-#   if debugInterior == 0
+#   if !DEACTIVATE_INTERIORPOINTS
       /* Interior points: y = M*t  */
       /* Interior points: y = M_u*tu + M_U*tU + M_w*tw */
       /* So y = <alpha, tu>_P(t) - <alpha, tU>_P(t) - <alpha, tw^r_GM>_P(t) */
-      for (size_t k = 0; k < NPARTICLES; k++) 
+      for (size_t k = 0; k < nbRigidBodies; k++) 
       {
         foreach_cache((*Interior[k])) 
         {
-	  if ((DLM_Flag[]  < 1) && ((int)DLM_Index.y[] == k)) 
+	  if ( DLM_Flag[]  < 1 && (int)DLM_Index.y[] == k ) 
 	  {
 	    foreach_dimension() 
 	      DLM_v.x[] = DLM_tu.x[];
 
-#           if DLM_Moving_particle
+            if ( allRigidBodies[k].type != OBSTACLE )
+            {
 #             if TRANSLATION
 	        foreach_dimension() 
 		  DLM_v.x[] -= (*tU[k]).x;
@@ -1646,13 +1668,13 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
 	        DLM_v.z[] -= (*tw[k]).x * ( y - DLM_PeriodicRefCenter.y[] ) 
 	  		- (*tw[k]).y * ( x - DLM_PeriodicRefCenter.x[] ); 
 #             endif
-#           endif
+            }
 	  }
         }
       } 
 #   endif
     
-#   if debugBD == 0
+#   if !DEACTIVATE_BOUNDARYPOINTS
       /* Boundary points: y = M*t */
       /* Boundary points: y = M_u*tu + M_U*tU + M_w*tw */
       /* So y = <alpha, tu>_P(t) - <alpha, tU>_P(t) - <alpha, tw^r_GM>_P(t) */
@@ -1678,13 +1700,13 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
           pos += RUloop.ndof[k];              
         }
 #     else
-        for (size_t k = 0; k < NPARTICLES; k++) 
+        for (size_t k = 0; k < nbRigidBodies; k++) 
         {
-          particle * pp = &p[k];
+          RigidBody * pp = &allRigidBodies[k];
       
           foreach_cache((*Boundary[k])) 
           {
-	    if (DLM_Index.x[] > -1 && ((int)DLM_Index.y[] == pp->pnum)) 
+	    if ( DLM_Index.x[] > -1 && (int)DLM_Index.y[] == pp->pnum ) 
 	    {
 	      lambdacellpos.x = x; 
 	      lambdacellpos.y = y;
@@ -1729,14 +1751,14 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
         }
 #     endif
     
-#     if DLM_Moving_particle
-        for (size_t k = 0; k < NPARTICLES; k++) 
+      for (size_t k = 0; k < nbRigidBodies; k++) 
+      {
+        RigidBody* pp = &allRigidBodies[k];
+	if ( pp->type != OBSTACLE )
         {
-          particle * pp = &p[k];
-      
           foreach_cache((*Boundary[k])) 
           {
-	    if (DLM_Index.x[] > -1 && ((int)DLM_Index.y[] == pp->pnum)) 
+	    if ( DLM_Index.x[] > -1 && (int)DLM_Index.y[] == pp->pnum ) 
 	    {    
 	      lambdapos.x = (*sbm[k]).x[(int)DLM_Index.x[]];
 	      lambdapos.y = (*sbm[k]).y[(int)DLM_Index.x[]];
@@ -1769,8 +1791,8 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
 #             endif
 	    }
           }
-        }
-#      endif
+	}
+      }
 #   endif
      
     /* (4) Compute alpha = r^(k-1)*r^(k-1) / DLM_w.y */
@@ -1816,8 +1838,9 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
         foreach_dimension()
           u.x[] += DLM_alpha * DLM_tu.x[];
 
-#   if DLM_Moving_particle
-      for (size_t k = 0; k < NPARTICLES; k++) 
+    for (size_t k = 0; k < nbRigidBodies; k++) 
+    {
+      if ( allRigidBodies[k].type != OBSTACLE )
       {
 #       if TRANSLATION
           foreach_dimension() 
@@ -1833,7 +1856,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
 #         endif
 #       endif
       }
-#   endif
+    }
    
     /* (8) Compute beta = nr2^k / nr2^(k-1) */
     DLM_nr2 = 0.;
@@ -1866,7 +1889,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
 #   endif
         foreach_dimension()
           DLM_w.x[] = DLM_r.x[] + DLM_beta * DLM_w.x[];
-
+ 
   }  /* End of Iterative loop */
 
 
@@ -1875,20 +1898,20 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
   // Once algorithm has converged
   if ( pid() == 0 )
   {
-    printf( "      niter = %d residual = %8.5e\n", ki, sqrt(DLM_nr2) );
+    printf( "niter = %d, Res = %8.5e\n", ki, sqrt(DLM_nr2) );
     fprintf( converge,"%d \t %d \t \t %10.8e\n", i, ki, sqrt(DLM_nr2) );
     fflush( converge );
   }
 
   
-  /* Compute the explicit term here */
-# if DLM_alpha_coupling 
+  /* Compute the explicit term */
+# if DLM_ALPHA_COUPLING 
     synchronize((scalar*) {DLM_lambda});
 
-    for (size_t k = 0; k < NPARTICLES; k++) 
+    for (size_t k = 0; k < nbRigidBodies; k++) 
     {
-#     if debugBD == 0
-        particle * pp = &p[k];
+#     if !DEACTIVATE_BOUNDARYPOINTS
+        RigidBody* pp = &allRigidBodies[k];
     
         foreach_cache ((*Boundary[k])) 
         {
@@ -1903,8 +1926,8 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
 
           foreach_neighbor() 
           {
-	    if (((int)DLM_Index.x[] > -1) && (level == depth()) && 
-		is_leaf(cell) && ((int)DLM_Index.y[]) == k) 
+	    if ( (int)DLM_Index.x[] > -1 && level == depth() && 
+		is_leaf(cell) && (int)DLM_Index.y[] == k ) 
 	    {
 	      lambdacellpos.x = x;
 	      lambdacellpos.y = y;
@@ -1928,7 +1951,7 @@ void DLMFD_Uzawa_velocity( particle* p, const int i, const double rho_f )
         }
 #     endif
     
-#     if debugInterior == 0
+#     if !DEACTIVATE_INTERIORPOINTS
         foreach_cache ((*Interior[k])) 
         {
           if ((DLM_Flag[]  < 1) && ((int)DLM_Index.y[] == k))
@@ -2011,7 +2034,7 @@ void initialize_DLMFD_fields_to_zero( void )
       DLM_v.x[] = 0. ;
       DLM_qu.x[] = 0. ;
       DLM_tu.x[] = 0. ;
-#     if DLM_alpha_coupling
+#     if DLM_ALPHA_COUPLING
         DLM_explicit.x[] = 0. ;
 #     endif    
     }

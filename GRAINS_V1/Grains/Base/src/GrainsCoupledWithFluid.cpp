@@ -882,22 +882,19 @@ void GrainsCoupledWithFluid::doPostProcessing( size_t indent_width )
 }	
 // ----------------------------------------------------------------------------
 // Number of rigid bodies to be sent to the fluid flow solver */
-size_t GrainsCoupledWithFluid::numberOfRBToFluid() const
-{
-  size_t nrb = 0;
-  
+void GrainsCoupledWithFluid::numberOfRBToFluid( size_t* nparticles, 
+	size_t* nobstacles ) const
+{  
   if ( m_processorIsActive )
   {
     list<Particle*> const* particles = m_allcomponents.getActiveParticles();
     list<Obstacle*> obstaclesToFluid = m_allcomponents.getObstaclesToFluid();
     list<Particle*>::const_iterator particle;
-    size_t nparticles = 0;
+    *nparticles = 0;
     for (particle=particles->begin();particle!=particles->end();particle++)
-      if ( (*particle)->getTag() < 2 ) nparticles++;
-    nrb = nparticles + obstaclesToFluid.size();
+      if ( (*particle)->getTag() < 2 ) (*nparticles)++;
+    *nobstacles = obstaclesToFluid.size();
   }  
-
-  return ( nrb );
 }
 
 

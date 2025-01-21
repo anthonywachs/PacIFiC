@@ -22,10 +22,10 @@ bool is_in_CircularCylinder2D( const double x, const double y,
 	const GeomParameter gp )
 //----------------------------------------------------------------------------
 {
-  // Check if it is in the master particle
+  // Check if it is in the master rigid body
   bool status = is_in_CircularCylinder2D_clone( x, y, gp );
 
-  // Check if it is in any clone particle
+  // Check if it is in any clone rigid body
   if ( gp.nperclones && !status )
     for (int i = 0; i < gp.nperclones && !status; i++)
     {
@@ -49,7 +49,7 @@ bool in_which_CircularCylinder2D( double x1, double y1,
 	const bool setPeriodicRefCenter )
 //----------------------------------------------------------------------------
 {
-  // Check if it is in the master particle
+  // Check if it is in the master rigid body
   bool status = is_in_CircularCylinder2D_clone( x1, y1, gp );
   if ( status )
   {
@@ -67,7 +67,7 @@ bool in_which_CircularCylinder2D( double x1, double y1,
     }
   }
 
-  //  Check if it is in any clone particle
+  //  Check if it is in any clone rigid body
   if ( gp.nperclones && !status )
     for (int i = 0; i < gp.nperclones && !status; i++) 
     {
@@ -118,7 +118,7 @@ void compute_nboundary_CircularCylinder2D( const GeomParameter gcp, int* nb )
 /** Creates boundary points on the surface of the 2D circular cylinder */
 //----------------------------------------------------------------------------
 void create_FD_Boundary_CircularCylinder2D( GeomParameter gcp,
-	SolidBodyBoundary* dlm_bd, const int nsphere, 
+	RigidBodyBoundary* dlm_bd, const int nsphere, 
 	vector* pPeriodicRefCenter, const bool setPeriodicRefCenter  ) 
 //----------------------------------------------------------------------------
 {
@@ -192,7 +192,7 @@ void create_FD_Boundary_CircularCylinder2D( GeomParameter gcp,
 
 /** Finds cells lying inside the 2D circular cylinder */
 //----------------------------------------------------------------------------
-void create_FD_Interior_CircularCylinder2D( particle* p, vector Index,
+void create_FD_Interior_CircularCylinder2D( RigidBody* p, vector Index,
 	vector PeriodicRefCenter )
 //----------------------------------------------------------------------------
 {

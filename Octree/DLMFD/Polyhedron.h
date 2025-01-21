@@ -52,7 +52,7 @@ void periodic_correction( GeomParameter* gcp, coord* pos,
 /** Distributes points over an edge of the polyhedron */
 //----------------------------------------------------------------------------
 void distribute_points_edge( GeomParameter* gcp, coord const corner1, 
-	coord const corner2, SolidBodyBoundary* dlm_bd, int const lN, 
+	coord const corner2, RigidBodyBoundary* dlm_bd, int const lN, 
 	int const istart, vector* pPeriodicRefCenter, 
 	const bool setPeriodicRefCenter )
 //----------------------------------------------------------------------------
@@ -203,12 +203,12 @@ bool is_in_Polyhedron( double x1, double y1, double z1,
 	const GeomParameter gp )
 //----------------------------------------------------------------------------
 {
-  // Check if it is in the master particle
+  // Check if it is in the master rigid body
   bool status = is_in_Polyhedron_clone( x1, y1, z1, gp );
   
   double x2, y2, z2;
 
-  // Check if it is in any periodic clone particle
+  // Check if it is in any periodic clone rigid body
   if ( gp.nperclones && !status )
     for (int i = 0; i < gp.nperclones && !status; i++)
     {
@@ -235,7 +235,7 @@ bool in_which_Polyhedron( double x1, double y1, double z1,
 	const bool setPeriodicRefCenter )
 //----------------------------------------------------------------------------
 {
-  // Check if it is in the master particle
+  // Check if it is in the master rigid body
   bool status = is_in_Polyhedron_clone( x1, y1, z1, gp );    
   if ( status && setPeriodicRefCenter )
   {
@@ -255,7 +255,7 @@ bool in_which_Polyhedron( double x1, double y1, double z1,
 
   double x2, y2, z2;
 
-  // Check if it is in any clone particle
+  // Check if it is in any clone rigid body
   if ( gp.nperclones && !status )
     for (int i = 0; i < gp.nperclones && !status; i++) 
     {
@@ -290,13 +290,13 @@ bool in_which_Polyhedron( double x1, double y1, double z1,
 
 /** Finds cells lying inside the polyhedron */
 //----------------------------------------------------------------------------
-void create_FD_Interior_Polyhedron( particle* p, vector Index, 
+void create_FD_Interior_Polyhedron( RigidBody* p, vector Index, 
 	vector PeriodicRefCenter )
 //----------------------------------------------------------------------------
 {
   Cache * c;
 
-  /** Create the cache of the interior points for a cube */
+  /** Create the cache of the interior points of the polyhedron */
   c = &(p->Interior);
 
   GeomParameter gp = p->g;
@@ -305,7 +305,7 @@ void create_FD_Interior_Polyhedron( particle* p, vector Index,
     if ( in_which_Polyhedron( x, y, z, gp, &PeriodicRefCenter, true ) )
     {
       cache_append ( c, point, 0 );
-      /* tag cell with the number of the particle */
+      /* tag cell with the number of the rigid body */
       if ( (int)Index.y[] == -1 )
         Index.y[] = p->pnum;
     }

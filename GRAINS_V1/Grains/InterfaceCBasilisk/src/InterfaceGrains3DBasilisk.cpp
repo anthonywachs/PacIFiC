@@ -16,7 +16,7 @@ extern "C" {
 
   
   void Init_Grains ( char const* inputfile, 
-  	double fluid_density, const bool b_restart ) 
+  	double fluid_rho, const bool b_restart ) 
   {
     string simulation_file( inputfile );
     
@@ -28,7 +28,7 @@ extern "C" {
     DOMElement* rootNode = ReaderXML::getRoot( simulation_file_exe );
     
     grains = GrainsBuilderFactory::createCoupledWithFluid( rootNode, 
-    	fluid_density );
+    	fluid_rho );
     if ( b_restart ) grains->setReloadSame();
     grains->do_before_time_stepping( rootNode );
     ReaderXML::terminate();
@@ -130,9 +130,9 @@ extern "C" {
   
   
      
-  size_t NumberOfRigidBodiesInBasilisk()
+  void NumberOfRigidBodiesInBasilisk( size_t* nparticles, size_t* nobstacles )
   {
-    return ( grains->numberOfRBToFluid() );
+    grains->numberOfRBToFluid( nparticles, nobstacles );
   }
   
 #ifdef __cplusplus

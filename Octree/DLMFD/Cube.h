@@ -41,7 +41,7 @@ void compute_nboundary_Cube( GeomParameter* gcp, int* nb, int* lN )
 /** Creates boundary points on the surface of the cube */
 //----------------------------------------------------------------------------
 void create_FD_Boundary_Cube( GeomParameter* gcp,
-	SolidBodyBoundary* dlm_bd, const int m, const int lN, 
+	RigidBodyBoundary* dlm_bd, const int m, const int lN, 
 	vector* pPeriodicRefCenter, const bool setPeriodicRefCenter )
 //----------------------------------------------------------------------------
 {

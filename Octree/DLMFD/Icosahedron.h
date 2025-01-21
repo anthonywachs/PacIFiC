@@ -41,7 +41,7 @@ void compute_nboundary_Icosahedron( GeomParameter* gcp, int* nb, int* lN )
 /** Creates boundary points on the surface of the icosahedron */
 //----------------------------------------------------------------------------
 void create_FD_Boundary_Icosahedron( GeomParameter* gcp,
-	SolidBodyBoundary* dlm_bd, const int m, const int lN, 
+	RigidBodyBoundary* dlm_bd, const int m, const int lN, 
 	vector* pPeriodicRefCenter, const bool setPeriodicRefCenter )
 //----------------------------------------------------------------------------
 {

@@ -48,9 +48,9 @@ void save_data( scalar* list, vector* vlist, double const time )
   char suffix[80] = "";
 
   // Write the VTU file
-  sprintf( filename_vtu, "%s", result_dir );
+  sprintf( filename_vtu, "%s", RESULT_DIR );
   strcat( filename_vtu, "/" );  
-  strcat( filename_vtu, result_fluid_rootfilename );
+  strcat( filename_vtu, RESULT_FLUID_ROOTFILENAME );
   
   sprintf( suffix, "_T%d_%d.vtu", cycle_number, pid() );
   strcat( filename_vtu, suffix );
@@ -63,15 +63,15 @@ void save_data( scalar* list, vector* vlist, double const time )
   // Write the PVTU file  
   if ( pid() == 0 ) 
   {
-    sprintf( filename_pvtu, "%s", result_dir );
+    sprintf( filename_pvtu, "%s", RESULT_DIR );
     strcat( filename_pvtu, "/" );  
-    strcat( filename_pvtu, result_fluid_rootfilename );    
+    strcat( filename_pvtu, RESULT_FLUID_ROOTFILENAME );    
     sprintf( suffix, "_T%d.pvtu", cycle_number );
     strcat( filename_pvtu, suffix );
 
     fpvtk = fopen( filename_pvtu, "w" );
     
-    sprintf( filename_vtu, "%s", result_fluid_rootfilename );
+    sprintf( filename_vtu, "%s", RESULT_FLUID_ROOTFILENAME );
     sprintf( suffix, "_T%d", cycle_number );
     strcat( filename_vtu, suffix );
     if ( PARAVIEW_BINFILE ) output_pvtu_bin( list, vlist, fpvtk, filename_vtu );
@@ -84,9 +84,9 @@ void save_data( scalar* list, vector* vlist, double const time )
   if ( pid() == 0 ) 
   {  
     char filename_pvd[80] = "";
-    sprintf( filename_pvd, "%s", result_dir );
+    sprintf( filename_pvd, "%s", RESULT_DIR );
     strcat( filename_pvd, "/" );  
-    strcat( filename_pvd, result_fluid_rootfilename );
+    strcat( filename_pvd, RESULT_FLUID_ROOTFILENAME );
     strcat( filename_pvd, ".pvd" ); 
 
     fpvtk = fopen( filename_pvd, "w" );
@@ -96,7 +96,7 @@ void save_data( scalar* list, vector* vlist, double const time )
     sprintf( suffix, "\"%.4e\"", time );
     strcat( time_line, suffix );
     strcat( time_line, " group=\"\" part=\"0\" file=\"" );
-    strcpy( filename_pvtu, result_fluid_rootfilename );    
+    strcpy( filename_pvtu, RESULT_FLUID_ROOTFILENAME );    
     sprintf( suffix, "_T%d.pvtu", cycle_number );
     strcat( filename_pvtu, suffix );
     strcat( time_line, filename_pvtu );        
@@ -111,9 +111,9 @@ void save_data( scalar* list, vector* vlist, double const time )
   if ( pid() == 0 ) 
   {
     char filename_lcn[256] = ""; 
-    sprintf( filename_lcn, "%s", result_dir );
+    sprintf( filename_lcn, "%s", RESULT_DIR );
     strcat( filename_lcn, "/" );  
-    strcat( filename_lcn, result_fluid_rootfilename );
+    strcat( filename_lcn, RESULT_FLUID_ROOTFILENAME );
     strcat( filename_lcn, "_lcn_vtk.txt" );
 
     fpvtk = fopen( filename_lcn, "w" );    
@@ -135,9 +135,9 @@ void reinitialize_vtk_restart( void )
 {
   // Get the last cycle cumber from previous simulation
   char filename_lcn[80] = "";
-  sprintf( filename_lcn, "%s", result_dir );
+  sprintf( filename_lcn, "%s", RESULT_DIR );
   strcat( filename_lcn, "/" );  
-  strcat( filename_lcn, result_fluid_rootfilename );
+  strcat( filename_lcn, RESULT_FLUID_ROOTFILENAME );
   strcat( filename_lcn, "_lcn_vtk.txt" );
 
   FILE * fpvtk = fopen( filename_lcn, "r" );    
@@ -154,9 +154,9 @@ void reinitialize_vtk_restart( void )
     char time_line[256] = "";
     char start[9] = ""; 
     char start_ref[20] = "<DataSet";    
-    sprintf( filename_pvd, "%s", result_dir );
+    sprintf( filename_pvd, "%s", RESULT_DIR );
     strcat( filename_pvd, "/" );  
-    strcat( filename_pvd, result_fluid_rootfilename );
+    strcat( filename_pvd, RESULT_FLUID_ROOTFILENAME );
     strcat( filename_pvd, ".pvd" ); 
 
     fpvtk = fopen( filename_pvd, "r" ); 
@@ -181,15 +181,15 @@ void reinitialize_vtk_restart( void )
 
 
 //----------------------------------------------------------------------------
-void output_vtu_dlmfd_bpts( particle const* allpart, const int np,
+void output_vtu_dlmfd_bpts( RigidBody const* allrb, const int np,
 	char const* fname )
 //----------------------------------------------------------------------------
 {
-# if debugBD == 0
+# if DEACTIVATE_BOUNDARYPOINTS == 0
     if ( pid() == 0 ) 
     {
       char filename[80] = ""; 
-      sprintf( filename, "%s", result_dir );
+      sprintf( filename, "%s", RESULT_DIR );
       strcat( filename, "/" );  
       strcat( filename, fname );
       strcat( filename, ".vtu" );
@@ -197,7 +197,7 @@ void output_vtu_dlmfd_bpts( particle const* allpart, const int np,
       int total_boundary_points = 0;
       for (int k = 0; k < np; k++) 
       {
-        SolidBodyBoundary const* sbb = &(allpart[k].s);
+        RigidBodyBoundary const* sbb = &(allrb[k].s);
         total_boundary_points += sbb->m;
       }     
   
@@ -214,7 +214,7 @@ void output_vtu_dlmfd_bpts( particle const* allpart, const int np,
       	"format=\"ascii\">\n", fdlm );
       for (int k = 0; k < np; k++) 
       {
-        SolidBodyBoundary const* sbb = &(allpart[k].s);
+        RigidBodyBoundary const* sbb = &(allrb[k].s);
 	int m = sbb->m;
 	for (int j = 0; j < m; j++)
 	{  
@@ -261,11 +261,11 @@ void output_vtu_dlmfd_bpts( particle const* allpart, const int np,
 
 
  //----------------------------------------------------------------------------
-void output_vtu_dlmfd_intpts( particle const* allpart, const int np,
+void output_vtu_dlmfd_intpts( RigidBody const* allrb, const int np,
 	char const* fname )
 //----------------------------------------------------------------------------
 {
-# if debugBD == 0
+# if DEACTIVATE_BOUNDARYPOINTS == 0
     int my_rank = 0, my_size = 1;
 
 #   if _MPI
@@ -363,7 +363,7 @@ void output_vtu_dlmfd_intpts( particle const* allpart, const int np,
       }
     
       char filename[80] = ""; 
-      sprintf( filename, "%s", result_dir );
+      sprintf( filename, "%s", RESULT_DIR );
       strcat( filename, "/" );  
       strcat( filename, fname );
       strcat( filename, ".vtu" );
@@ -383,7 +383,7 @@ void output_vtu_dlmfd_intpts( particle const* allpart, const int np,
       for (int k = 0; k < np; k++) 
       {
         printf( "Interior points are %d, and our counts are: %d", 
-		allpart[k].Interior.n, total_interior_points );
+		allrb[k].Interior.n, total_interior_points );
 	for(int i = 0; i < total_interior_points; i++)
      	{
           fprintf( fdlm, "%g %g", All_interior_coordx[i], 

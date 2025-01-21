@@ -6,7 +6,7 @@ char dlmfd_perf_complete_name[80];
 
 /** Outputs the performance of the DLMFD solver */
 //----------------------------------------------------------------------------
-void output_dlmfd_perf (const timing d, const int i, particle * p) 
+void output_dlmfd_perf( const timing d, const int i, RigidBody* p ) 
 //----------------------------------------------------------------------------
 {
   double mpitimings[npe()];
@@ -17,9 +17,9 @@ void output_dlmfd_perf (const timing d, const int i, particle * p)
   if ( iii == 0 )
   {  
     char buffer[80] = "";
-    strcpy( buffer, result_dir );
+    strcpy( buffer, RESULT_DIR );
     strcat( buffer, "/" );
-    strcat( buffer, dlmfd_perf_filename );
+    strcat( buffer, DLMFD_PERF_FILENAME );
     strcpy( dlmfd_perf_complete_name, buffer );
     ++iii;     
   }  

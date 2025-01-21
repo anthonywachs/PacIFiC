@@ -38,15 +38,10 @@ void compute_nboundary_Octahedron( GeomParameter* gcp, int* nb, int* lN )
 
 
 
-
-
-
-
-
 /** Creates boundary points on the surface of the octahedron */
 //----------------------------------------------------------------------------
 void create_FD_Boundary_Octahedron( GeomParameter* gcp,
-	SolidBodyBoundary* dlm_bd, const int m, const int lN, 
+	RigidBodyBoundary* dlm_bd, const int m, const int lN, 
 	vector* pPeriodicRefCenter, const bool setPeriodicRefCenter )
 //----------------------------------------------------------------------------
 {

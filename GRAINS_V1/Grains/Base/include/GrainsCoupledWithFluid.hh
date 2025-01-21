@@ -72,8 +72,10 @@ class GrainsCoupledWithFluid : virtual public Grains
 
     /** @name Methods */
     //@{
-    /** @brief Number of rigid bodies to be sent to the fluid flow solver */
-    size_t numberOfRBToFluid() const;
+    /** @brief Number of rigid bodies to be sent to the fluid flow solver 
+    @param nparticles number of particles 
+    @param nobstacles number of obstacles */
+    void numberOfRBToFluid( size_t* nparticles, size_t* nobstacles ) const;
 
     /** @brief Writes features of moving rigid bodies in a stream to be used
     by the fluid flow solver
