@@ -180,7 +180,7 @@ bool is_in_Polyhedron_clone( double x1, double y1, double z1,
 	        &cornerThree, &checkpt );
   }
 
-  bool isin=false;
+  bool isin = false;
   int all_position = 0;
   for (int i = 0; i < nfaces; i++) all_position += position[i] ;
 

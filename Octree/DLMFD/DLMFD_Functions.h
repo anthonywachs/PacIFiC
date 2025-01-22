@@ -216,7 +216,7 @@ void initialize_and_allocate_Cache( Cache* p )
 {
   p->n = 0;
   p->nm = 1;
-  p->p = (Index *) calloc( 1, sizeof(Index) );
+  p->p = (Index*) calloc( 1, sizeof(Index) );
 }
 
 
@@ -443,7 +443,7 @@ void print_all_rigidbodies( RigidBody const* allrbs, const size_t nrb,
 
 
 /** Tags the cells that contain a DLMFD boundary point, i.e. assign the point 
-number to the x component of the index field and the RigidBody* number to the y 
+number to the x component of the index field and the rigid body number to the y 
 component of the index field. If there is no DLMFD boundary point, index.x is
 set to -1 */
 //----------------------------------------------------------------------------
@@ -455,7 +455,7 @@ void fill_DLM_Index( const RigidBodyBoundary dlm_bd, vector Index,
   int i;
   Cache* fdlocal;
    
-  fdlocal = (Cache *){calloc(dlm_bd.m, sizeof(Cache))};
+  fdlocal = (Cache*){calloc(dlm_bd.m, sizeof(Cache))};
   
   for (i=0;i<dlm_bd.m;i++) 
   {
@@ -472,7 +472,7 @@ void fill_DLM_Index( const RigidBodyBoundary dlm_bd, vector Index,
 	
       foreach_cache(fdlocal[i]) 
       {
-	/* Tag cell only if it was not tagged by another RigidBody* */
+	/* Tag cell only if it was not tagged by another rigid body */
 	if ( Index.x[] < 0 )
 	{
 	  Index.x[] = i;
@@ -808,7 +808,7 @@ void remove_too_close_multipliers( RigidBody* p, vector DLM_Index )
 point of the rigid body boundary. */
 //----------------------------------------------------------------------------
 void reverse_fill_DLM_Flag( RigidBody* allrbs, const size_t nrb, scalar Flag, 
-	vector Index, const int cacheflag ) 
+	const vector Index, const int cacheflag ) 
 //----------------------------------------------------------------------------
 {
   for (size_t k = 0; k < nrb; k++) 
@@ -882,7 +882,7 @@ void reverse_fill_DLM_Flag( RigidBody* allrbs, const size_t nrb, scalar Flag,
 	  NCX = 0; CX = 0; weight_id = 0;
 
           /* Assign quadrant number CX defining relative position of the 
-	  Lagrange point with respect to the center of the cell it belongs to */ 
+	  Lagrange point with respect to the center of the cell it belongs to */
           assign_dial( rel, &CX );
 
 	  GeomParameter gcbdum;
@@ -1003,7 +1003,6 @@ void allocate_and_init_rigidbodies( RigidBody* allrbs, const size_t nrb,
   {
     Index.x[] = -1;   // DLM/FD boundary point index
     Index.y[] = -1;   // RigidBody* number
-    Index.z[] = -1;   // cell is constrained ? (-1 = not constrained)
     Flag[] = 0;       // Flag
     FlagMesh[] = 0;   // FlagMesh
     if ( Period.x || Period.y || Period.z )
