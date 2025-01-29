@@ -55,12 +55,12 @@ solve them successively. We chose here a two-steps time-spliting.
 #   define DLM_ALPHA_COUPLING 0
 # endif
 
-# ifndef DEACTIVATE_BOUNDARYPOINTS
-#   define DEACTIVATE_BOUNDARYPOINTS 0
+# ifndef DLMFD_BOUNDARYPOINTS
+#   define DLMFD_BOUNDARYPOINTS 1
 # endif
 
-# ifndef DEACTIVATE_INTERIORPOINTS
-#   define DEACTIVATE_INTERIORPOINTS 0
+# ifndef DLMFD_INTERIORPOINTS
+#   define DLMFD_INTERIORPOINTS 1
 # endif
 
 # ifndef DLMFD_OPT
@@ -134,6 +134,8 @@ FILE** fdata = NULL;
 FILE* converge = NULL;
 FILE* cellvstime = NULL;
 
+dynUIarray deactivatedBPindices;
+dynPDBarray deactivatedIndexFieldValues;
 
 /**
 ## First sub-problem: Navier Stokes problem
@@ -215,62 +217,39 @@ void DLMFD_construction()
     char outputshift[7]="      ";
 # endif
 
-  // Allocate and initialize rigid bodies
-  allocate_and_init_rigidbodies( allRigidBodies, nbRigidBodies, DLM_Index, 
-  	DLM_Flag, DLM_FlagMesh, DLM_PeriodicRefCenter );
-
-	
-  // In case 2 rigid bodies are too close, sort out their boundary points
-  if ( nbRigidBodies > 1 )
-    remove_too_close_multipliers( allRigidBodies, DLM_Index );
-
-
-  // Tag the cells belonging to the stencil of the boundary-multipliers 
-  // points, i.e. set DLM_Flag to 1
-# if !DEACTIVATE_BOUNDARYPOINTS   
-#   if !RIGIDBODIES_AS_FIXED_OBSTACLES
-      reverse_fill_DLM_Flag( allRigidBodies, nbRigidBodies, DLM_FlagMesh, 
-      	DLM_Index, 0 );
-#   endif
+  // Allocate and initialize the array of deactivated boundary point indices
+  initialize_and_allocate_dynUIarray( &deactivatedBPindices, DYNARRAYBLOCK );
   
-    /* Consider fictitious domain's boundary points only if they are far
-    enough of the domain's boundary (i.e a distance greater than
-    2*Delta, with Delta being the smallest cell size) */
-    double twodelta;
+  // Allocate and initialize the array of pointers to field Index values to 
+  // be reset to -1
+  initialize_and_allocate_dynPDBarray( &deactivatedIndexFieldValues, 
+    	DYNARRAYBLOCK );    
 
-    if ( !Period.x || !Period.y || !Period.z )
-    {
-      foreach_level (depth())
-      {
-        twodelta = 2. * Delta;
+  // Allocate and initialize rigid bodies
+  // Initialize the fields DLM_Index, DLM_Flag, DLM_FlagMesh and 
+  // DLM_PeriodicRefCenter, determine rigid body boundary points and link them
+  // to the grid via DLM_Index
+  allocate_and_init_rigidbodies( allRigidBodies, nbRigidBodies, DLM_Index, 
+  	DLM_Flag, DLM_FlagMesh, DLM_PeriodicRefCenter, &deactivatedBPindices );
 
-        if ( !Period.x )
-          if ( x > L0 - twodelta + X0 || x  < twodelta + X0 )
-            if ( DLM_Index.x[] > -1. )
-    	      DLM_Index.x[] = -1.;
+  // Tag the grid along rigid body boundaries two cell layers into the fluid
+  fill_FlagMesh( DLM_FlagMesh, DLM_Index, allRigidBodies );
+	
 
-        if ( !Period.y )
-          if ( y > L0 - twodelta + Y0 || y < twodelta + Y0 )
-            if ( DLM_Index.x[] > -1. )
-    	      DLM_Index.x[] = -1.;
-
-#       if dimension == 3
-          if ( ! Period.z )
-            if ( z > L0 - twodelta + Z0 || z < twodelta + Z0 )
-              if ( DLM_Index.x[] > -1. )
-                DLM_Index.x[] = -1.;
-#       endif
-      }
-    }
-    synchronize((scalar*) {DLM_Index});
-
+  // Deactivate boundary points that are too close either to a rigid wall
+  // domain boundary or to another rigid body
+  // Tag the cells belonging to the stencil of the boundary multiplier 
+  // points, i.e. set DLM_Flag to 1
+# if DLMFD_BOUNDARYPOINTS         
+    deactivate_critical_boundary_points( allRigidBodies, nbRigidBodies, 
+    	DLM_Index, &deactivatedBPindices, &deactivatedIndexFieldValues );
     reverse_fill_DLM_Flag( allRigidBodies, nbRigidBodies, DLM_Flag, 
     	DLM_Index, 1 );
 # endif	
 
 
   // Create fictitious-domain's cache for the interior domain
-# if !DEACTIVATE_INTERIORPOINTS 
+# if DLMFD_INTERIORPOINTS 
     for (size_t k = 0; k < nbRigidBodies; k++) 
     {
       switch( allRigidBodies[k].shape )
@@ -323,7 +302,7 @@ void DLMFD_construction()
 # endif
 
 # if BRINKMANN_DIRICHLET_PENALIZATION
-#   if !DEACTIVATE_INTERIORPOINTS    
+#   if DLMFD_INTERIORPOINTS    
       foreach() Xi[] = 0.;
       for (size_t k = 0; k < nbRigidBodies; k++) 
         foreach_cache(allRigidBodies[k].Interior) 
@@ -376,6 +355,12 @@ void DLMFD_construction()
       synchronize((scalar*) {Usolid,Xi});        
 #   endif
 # endif
+
+  // Free the array of deactivated boundary point indices
+  free_dynUIarray( &deactivatedBPindices ); 
+  
+  // Free the array of pointers to field Index values
+  free_dynPDBarray( &deactivatedIndexFieldValues );  
 }
 
 
@@ -404,11 +389,11 @@ void DLMFD_Uzawa_velocity( const int i )
 
 
   // Below we tranfer pointers in local arrays for ease of notation only  
-# if !DEACTIVATE_INTERIORPOINTS
+# if DLMFD_INTERIORPOINTS
     Cache* Interior[nbRigidBodies];
 # endif
 
-# if !DEACTIVATE_BOUNDARYPOINTS
+# if DLMFD_BOUNDARYPOINTS
     Cache* Boundary[nbRigidBodies];
     RigidBodyBoundary* sbm[nbRigidBodies];
 # endif
@@ -426,11 +411,11 @@ void DLMFD_Uzawa_velocity( const int i )
   
   for (size_t k = 0; k < nbRigidBodies; k++) 
   {    
-#   if !DEACTIVATE_INTERIORPOINTS
+#   if DLMFD_INTERIORPOINTS
       Interior[k] = &(allRigidBodies[k].Interior);
 #   endif
-#   if !DEACTIVATE_BOUNDARYPOINTS 
-      Boundary[k] = &(allRigidBodies[k].reduced_domain);
+#   if DLMFD_BOUNDARYPOINTS 
+      Boundary[k] = &(allRigidBodies[k].Boundary);
       sbm[k] = &(allRigidBodies[k].s);
 #   endif
     
@@ -641,13 +626,14 @@ void DLMFD_Uzawa_velocity( const int i )
   /* For moving particles the fU and fw parts are added after the
      scalar product (for mpi purpose) */
 
-# if !DEACTIVATE_INTERIORPOINTS
+# if DLMFD_INTERIORPOINTS
     for (size_t k = 0; k < nbRigidBodies; k++) 
     {
       foreach_cache((*Interior[k])) 
       {
         if ( DLM_Flag[] < 1 && (int)DLM_Index.y[] == k ) 
         {
+	  if ( z < 0.09 ) printf( "Uzawa Z = %8.5e\n", z );
 	  foreach_dimension() 
 	    DLM_qu.x[] -= DLM_lambda.x[];
 	
@@ -683,7 +669,7 @@ void DLMFD_Uzawa_velocity( const int i )
   /* Boundary points qU = fU -(M_U^T)*lambda^0 */
   /* Boundary points qw = fw -(M_w^T)*lambda^0 */
   
-# if !DEACTIVATE_BOUNDARYPOINTS
+# if DLMFD_BOUNDARYPOINTS
     double weight = 0.;
     coord weightcellpos = {0., 0., 0.};
     coord lambdacellpos = {0., 0., 0.};
@@ -1034,12 +1020,12 @@ void DLMFD_Uzawa_velocity( const int i )
 
   /* Interior points: r^0 = G - M_u*u^0 - M_U*U^0 - M_w*w^0 */
   /* So r^0 = G -<alpha, u>_P(t) + <alpha, U>_P(t) + <alpha, w^r_GM>_P(t) */
-# if !DEACTIVATE_INTERIORPOINTS
+# if DLMFD_INTERIORPOINTS
     for (size_t k = 0; k < nbRigidBodies; k++) 
     {        
       foreach_cache((*Interior[k])) 
       {      
-        if ( DLM_Flag[]  < 1 && (int)DLM_Index.y[] == k ) 
+        if ( DLM_Flag[] < 1 && (int)DLM_Index.y[] == k ) 
         {
 	  foreach_dimension() 
 	    DLM_r.x[] = - u.x[];
@@ -1092,7 +1078,7 @@ void DLMFD_Uzawa_velocity( const int i )
    
   /* Boundary points: r^0 = G - M_u*u^0 - M_U*U^0 - M_w*w^0 */
   /* So r^0 = G -<alpha, u>_P(t) + <alpha, U>_P(t) + <alpha, w^r_GM>_P(t) */
-# if !DEACTIVATE_BOUNDARYPOINTS
+# if DLMFD_BOUNDARYPOINTS
     double testweight = 0.;
     synchronize((scalar*){u});
 #   if DLMFD_OPT
@@ -1306,7 +1292,7 @@ void DLMFD_Uzawa_velocity( const int i )
     /* Interior points qU = (M_U^T)*w = - <DLM_w, V>_P(t) */
     /* Interior points qw = (M_w^T)*w = - <DLM_w, xi^r_GM>_P(t) */
     /* -<DLM_w, xi^r_GM>_P(t)=-<r_GM, DLM_w^xi>_P(t)=-<xi, r_GM^DLM_w>_P(t) */
-#   if !DEACTIVATE_INTERIORPOINTS
+#   if DLMFD_INTERIORPOINTS
       for (size_t k = 0; k < nbRigidBodies; k++) 
       {
         foreach_cache((*Interior[k])) 
@@ -1346,7 +1332,7 @@ void DLMFD_Uzawa_velocity( const int i )
     /* Boundary points qU = (M_U^T)*w = - <w, V>_P(t) */
     /* Boundary points qw = (M_w^T)*w = - <w, xi^r_GM>_P(t) */
     /* -<DLM_w, xi^r_GM>_P(t)=-<r_GM, w^xi>_P(t)=-<xi, r_GM^w>_P(t) */  
-#   if !DEACTIVATE_BOUNDARYPOINTS
+#   if DLMFD_BOUNDARYPOINTS
 #     if DLMFD_OPT
         // Use of the fast loop for the computations of 
         // qu = (M_u^T)*w = <w, v>_P(t) over the boundary points
@@ -1636,7 +1622,7 @@ void DLMFD_Uzawa_velocity( const int i )
        Sign error in eq (A.9) in J.Eng. Math, 2011 
        Written -M*t, should be +M*t */    
 
-#   if !DEACTIVATE_INTERIORPOINTS
+#   if DLMFD_INTERIORPOINTS
       /* Interior points: y = M*t  */
       /* Interior points: y = M_u*tu + M_U*tU + M_w*tw */
       /* So y = <alpha, tu>_P(t) - <alpha, tU>_P(t) - <alpha, tw^r_GM>_P(t) */
@@ -1644,7 +1630,7 @@ void DLMFD_Uzawa_velocity( const int i )
       {
         foreach_cache((*Interior[k])) 
         {
-	  if ( DLM_Flag[]  < 1 && (int)DLM_Index.y[] == k ) 
+	  if ( DLM_Flag[] < 1 && (int)DLM_Index.y[] == k ) 
 	  {
 	    foreach_dimension() 
 	      DLM_v.x[] = DLM_tu.x[];
@@ -1674,7 +1660,7 @@ void DLMFD_Uzawa_velocity( const int i )
       } 
 #   endif
     
-#   if !DEACTIVATE_BOUNDARYPOINTS
+#   if DLMFD_BOUNDARYPOINTS
       /* Boundary points: y = M*t */
       /* Boundary points: y = M_u*tu + M_U*tU + M_w*tw */
       /* So y = <alpha, tu>_P(t) - <alpha, tU>_P(t) - <alpha, tw^r_GM>_P(t) */
@@ -1910,7 +1896,7 @@ void DLMFD_Uzawa_velocity( const int i )
 
     for (size_t k = 0; k < nbRigidBodies; k++) 
     {
-#     if !DEACTIVATE_BOUNDARYPOINTS
+#     if DLMFD_BOUNDARYPOINTS
         RigidBody* pp = &allRigidBodies[k];
     
         foreach_cache ((*Boundary[k])) 
@@ -1951,10 +1937,10 @@ void DLMFD_Uzawa_velocity( const int i )
         }
 #     endif
     
-#     if !DEACTIVATE_INTERIORPOINTS
+#     if DLMFD_INTERIORPOINTS
         foreach_cache ((*Interior[k])) 
         {
-          if ((DLM_Flag[]  < 1) && ((int)DLM_Index.y[] == k))
+          if ( DLM_Flag[]  < 1 && (int)DLM_Index.y[] == k )
 	    foreach_dimension() 
 	      DLM_explicit.x[] = DLM_lambda.x[];
         }

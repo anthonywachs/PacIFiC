@@ -170,3 +170,14 @@ event GranularSolver_updateVelocity (t < -1.)
     	B_SPLIT_EXPLICIT_ACCELERATION );
   }
 }
+
+
+
+
+/** Overloading of the granular solver result saving event */
+//----------------------------------------------------------------------------
+event GranularSolver_saveResults (t < -1.)
+//----------------------------------------------------------------------------
+{
+  if ( pid() == 0 ) SaveResults_Grains();  
+}

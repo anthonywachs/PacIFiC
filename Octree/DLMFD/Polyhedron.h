@@ -294,22 +294,19 @@ void create_FD_Interior_Polyhedron( RigidBody* p, vector Index,
 	vector PeriodicRefCenter )
 //----------------------------------------------------------------------------
 {
-  Cache * c;
+  Cache* c;
 
   /** Create the cache of the interior points of the polyhedron */
   c = &(p->Interior);
 
   GeomParameter gp = p->g;
   foreach()
-  {
     if ( in_which_Polyhedron( x, y, z, gp, &PeriodicRefCenter, true ) )
-    {
-      cache_append ( c, point, 0 );
-      /* tag cell with the number of the rigid body */
       if ( (int)Index.y[] == -1 )
-        Index.y[] = p->pnum;
-    }
-  }
+      {
+        cache_append( c, point, 0 );
+	Index.y[] = p->pnum;
+      }
 
   cache_shrink( c );
 }

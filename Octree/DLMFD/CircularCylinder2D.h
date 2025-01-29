@@ -51,7 +51,7 @@ bool in_which_CircularCylinder2D( double x1, double y1,
 {
   // Check if it is in the master rigid body
   bool status = is_in_CircularCylinder2D_clone( x1, y1, gp );
-  if ( status )
+  if ( status && setPeriodicRefCenter )
   {
     Cache poscache = {0};
     Point lpoint;
@@ -201,17 +201,12 @@ void create_FD_Interior_CircularCylinder2D( RigidBody* p, vector Index,
 
   /** Create the cache for the interior points */
   foreach()
-  {
-    bool in_clone;
-    in_clone = in_which_CircularCylinder2D( x, y, gci, PeriodicRefCenter, 
-    	true );
-    if ( in_clone )
-    {
-      cache_append( fd, point, 0 );
+    if ( in_which_CircularCylinder2D( x, y, gci, PeriodicRefCenter, true ) )
       if ( (int)Index.y[] == -1 )
+      {
+        cache_append( fd, point, 0 );
         Index.y[] = p->pnum;
-    }
-  }
+      }
 
   cache_shrink( fd );
 }

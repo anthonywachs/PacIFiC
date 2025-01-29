@@ -20,7 +20,7 @@
 #   define RESULT_RIGIDBODY_HYDROFAT_ROOTFILENAME "rigidbody_hydroFaT"
 # endif
 # ifndef RESULT_FLUID_ROOTFILENAME
-#   define RESULT_FLUID_ROOTFILENAME "fluid_basilisk"
+#   define RESULT_FLUID_ROOTFILENAME "fluid"
 # endif
 
 # ifndef RESULT_DIR
@@ -28,7 +28,7 @@
 # endif
 
 # ifndef CONVERGE_UZAWA_FILENAME 
-#   define CONVERGE_UZAWA_FILENAME "converge_uzawa.dat"
+#   define CONVERGE_UZAWA_FILENAME "convergence_uzawa_velocity.dat"
 # endif
 # ifndef DLMFD_CELLS_FILENAME 
 #   define DLMFD_CELLS_FILENAME "dlmfd_cells.dat"
@@ -39,6 +39,14 @@
 
 # ifndef ROUNDDOUBLECOEF
 #   define ROUNDDOUBLECOEF (1.e-4)
+# endif
+
+# ifndef TINTERVALOUTPUT
+#   define TINTERVALOUTPUT (1.)
+# endif
+
+# ifndef SIMUTIMEINTERVAL
+#   define SIMUTIMEINTERVAL (1.)
 # endif
 
 # ifndef FIGS_DIR
@@ -97,9 +105,64 @@
 #   endif
 # endif
 
+# ifndef LAMBDA2
+#   define LAMBDA2 0
+# endif
+
+# ifndef VORTICITY
+#   define VORTICITY 0
+# endif
+
+# ifndef PARAVIEW
+#   define PARAVIEW 0
+# endif
+
+# ifndef PARAVIEW_SCALAR_LIST
+#   define PARAVIEW_SCALAR_LIST p
+# endif
+
+# ifndef PARAVIEW_VECTOR_LIST
+#   define PARAVIEW_VECTOR_LIST u
+# endif
+
+# ifndef BVIEW
+#   define BVIEW 0
+# endif
+
+# ifndef BVIEW_LIST
+#   define BVIEW_LIST u,p
+# endif
+
+# ifndef PARAVIEW_DLMFD_INTPTS
+#   define PARAVIEW_DLMFD_INTPTS 0
+# endif
+
+# if PARAVIEW_DLMFD_INTPTS
+#   ifndef PARAVIEW_DLMFD_INTPTS_FILENAME
+#     define PARAVIEW_DLMFD_INTPTS_FILENAME "dlmfd_interior_points"
+#   endif      
+# endif
+
+# ifndef PARAVIEW_DLMFD_BNDPTS
+#   define PARAVIEW_DLMFD_BNDPTS 0
+# endif
+
+# if PARAVIEW_DLMFD_BNDPTS
+#   ifndef PARAVIEW_DLMFD_BNDPTS_FILENAME
+#     define PARAVIEW_DLMFD_BNDPTS_FILENAME "dlmfd_boundary_points"
+#   endif      
+# endif
+
+
 double deltau;
 int restarted_simu = 0;
-char vtk_times_series[100000] = "";
+char vtk_field_times_series[100000] = "";
+# if PARAVIEW_DLMFD_BNDPTS
+    char vtk_bndpts_times_series[100000] = "";      
+# endif 
+# if PARAVIEW_DLMFD_INTPTS
+    char vtk_intpts_times_series[100000] = "";        
+# endif 
 int init_cycle_number = 0;
 double maxtime = 0.;
 double trestart = 0.;
@@ -119,6 +182,8 @@ size_t NbObstacles = 0;
 /** Paraview output functions */
 # include "save_data_vtu.h"
 
+/** Lambda criterion for visualizing wakes */
+# include "lambda2.h"
 
 
 
@@ -143,6 +208,15 @@ event GranularSolver_predictor (t < -1.)
 /** Generic granular solver velocity update event: TO BE OVERLOADED */
 //----------------------------------------------------------------------------
 event GranularSolver_updateVelocity (t < -1.)
+//----------------------------------------------------------------------------
+{}
+
+
+
+
+/** Generic granular solver result saving event: TO BE OVERLOADED */
+//----------------------------------------------------------------------------
+event GranularSolver_saveResults (t < -1.)
 //----------------------------------------------------------------------------
 {}
 
@@ -406,7 +480,7 @@ event init (i = 0)
 
   
   // Simulation time interval
-  maxtime = trestart + SimuTimeInterval;
+  maxtime = trestart + SIMUTIMEINTERVAL;
   if ( pid() == 0 ) 
     printf( "Simulation time interval: t_start = %f to t_end = %f\n\n", 
     	trestart, maxtime ); 
@@ -417,12 +491,16 @@ event init (i = 0)
   
   
   // By default:
-  // * do NOT DUMP the work fields used in the DLMFD sub-problem and the 
-  // field u_previoustime
-  // * DUMP the DLM_Flag and DLM_explicit fields in the DLMFD sub-problem
+  // * do NOT DUMP the work fields used in the DLMFD sub-problem, the 
+  // field u_previoustime and the pressure field
+  // * DUMP the DLM_explicit field in the DLMFD sub-problem
   u_previoustime.nodump = true ;
-  DLM_Flag.nodump = false;
+  p.nodump = true ;
+  DLM_Flag.nodump = true;
   DLM_FlagMesh.nodump = true ;
+# if BRINKMANN_DIRICHLET_PENALIZATION
+    Xi.nodump = true;   
+# endif  
   foreach_dimension()
   {
     DLM_lambda.x.nodump = true ;
@@ -435,8 +513,16 @@ event init (i = 0)
     DLM_tu.x.nodump = true ;
 #   if DLM_ALPHA_COUPLING
       DLM_explicit.x.nodump = false ;
-#   endif    
-  }  
+#   endif 
+#   if BRINKMANN_DIRICHLET_PENALIZATION
+      Usolid.x.nodump = true ;   
+#   endif   
+  }
+  
+  
+  /* Construction of rigid bodies and their DLMFD features */
+  if ( pid() == 0 ) printf( "Initial DLMFD RB construction\n" ); 
+  DLMFD_construction();    
 }
 
 
@@ -463,6 +549,130 @@ event logfile ( i=0; i++ )
     return 1; 
   }
 }
+
+
+
+
+/** Output post-processing and restart data once */
+//----------------------------------------------------------------------------
+void do_output( char const* mess )
+//----------------------------------------------------------------------------
+{
+  if ( pid() == 0 ) printf ( "Output data at %s %8.6f START\n", mess, t ); 
+
+  scalar* dump_list = NULL;
+
+# if LAMBDA2
+    scalar l2[];
+    lambda2( u, l2 );        
+# endif
+
+# if VORTICITY
+    vector omega[];
+#   if dimension == 2
+      vorticity( u, omega );
+#   else
+      vorticity_3D( u, omega ); 
+#   endif            
+# endif
+
+  // Paraview output for post-processing
+# if PARAVIEW
+    scalar* paraview_scalarlist = {PARAVIEW_SCALAR_LIST
+#   if LAMBDA2
+      , l2
+#   endif         
+    };
+    vector* paraview_vectorlist = {PARAVIEW_VECTOR_LIST
+#   if LAMBDA2
+      , omega
+#   endif         
+    };    
+    save_data( paraview_scalarlist, paraview_vectorlist, allRigidBodies, 
+    	nbRigidBodies, t );
+# endif  
+  
+  // Bview output for post-processing   
+# if BVIEW
+    char dump_name[80] = "";
+    char stime[80] = ""; 
+    strcpy( dump_name, FLUID_DUMP_FILENAME );
+    sprintf( stime, "%6f", t );
+    strcat( dump_name, "_t" );
+    strcat( dump_name, stime );     
+
+    dump_list = (scalar *){BVIEW_LIST
+#   if LAMBDA2
+      , l2
+#   endif     
+#   if LAMBDA2
+      , omega
+#   endif        
+    };
+    dump( file = dump_name, dump_list );  
+# endif
+
+  // Basilisk output for restart
+# if DLM_alpha_coupling
+    dump_list = (scalar *){u, g, DLM_explicit};
+# else
+    dump_list = (scalar *){u, g};    
+# endif     
+  dump( file = FLUID_DUMP_FILENAME, dump_list );    
+   
+  // Granular solver output for both post-processing & restart
+  event( "GranularSolver_saveResults" );
+     
+  if ( pid() == 0 ) printf ( "Output data at %s %8.6f END\n", mess, t );
+}
+
+
+
+
+/** Output post-processing and restart data at regular time intervals */
+//----------------------------------------------------------------------------
+event output_data (t += TINTERVALOUTPUT; 
+ 	t - ( maxtime < ROUNDDOUBLECOEF * TINTERVALOUTPUT ? 1.e20 : maxtime ) 
+	< ROUNDDOUBLECOEF * dt )
+//----------------------------------------------------------------------------	
+{
+  char mess[5] = "TIME";
+  save_data_restart = true;
+
+  // Freeing and reconstructing RB is required here as the remeshing step
+  // might have induced some interpolation errors on the integer fields
+  // DLM Flag, DLM FlagMesh and DLM_Index
+# if DLMFD_INTERIORPOINTS || DLMFD_BOUNDARYPOINTS
+    free_rigidbodies( allRigidBodies, nbRigidBodies );
+    DLMFD_construction();  
+# endif  
+  
+  do_output( mess );
+}
+
+
+
+
+/** Output post-processing and restart data at the last time */
+//----------------------------------------------------------------------------
+event last_output_data (t = end) 
+//----------------------------------------------------------------------------
+{ 
+  DLMFD_construction();
+
+  char mess[10] = "LAST TIME";
+
+  // Freeing and reconstructing RB is required here as the remeshing step
+  // might have induced some interpolation errors on the integer fields
+  // DLM Flag, DLM FlagMesh and DLM_Index
+# if DLMFD_INTERIORPOINTS || DLMFD_BOUNDARYPOINTS
+    free_rigidbodies( allRigidBodies, nbRigidBodies );
+    DLMFD_construction();  
+# endif 
+
+  do_output( mess );    
+  output_dlmfd_perf ( dlmfd_globaltiming, i, allRigidBodies );       
+}	
 
 
 
@@ -514,7 +724,7 @@ event once_timestep_is_determined (i++)
 
   /* Construction of rigid bodies and their DLMFD features */
   if ( pid() == 0 ) printf( "   DLMFD RB construction\n" ); 
-  DLMFD_construction();  
+  DLMFD_construction();   
 }
 
 
@@ -575,7 +785,7 @@ void do_DLMFD( const int i )
   
   /* Save all rigid body data */
   if ( !RIGIDBODIES_AS_FIXED_OBSTACLES )
-    rigidbody_data( allRigidBodies, nbRigidBodies, t + dt, i, pdata ); 
+    rigidbody_data( allRigidBodies, nbRigidBodies, t + dt, i, pdata );     
 }
 
 
@@ -675,7 +885,7 @@ event end_timestep (i++)
   /* Fluid velocity change over the time step */
   deltau = change( u.x, u_previoustime );
   if ( pid() == 0 )
-    printf( "   Velocity change = %8.5e\n", deltau );  
+    printf( "   Velocity change = %8.5e\n", deltau );       
 }
 
 
@@ -699,15 +909,9 @@ event adapt (i++)
       printf( "total = %d, ", totalcell );
     }
 
-#   if RIGIDBODIES_AS_FIXED_OBSTACLES
-      astats s = adapt_wavelet( (scalar *){DLM_Flag, u}, 
+    astats s = adapt_wavelet( (scalar *){DLM_FlagMesh, u}, 
 	(double[]){FLAG_ADAPT_CRIT, UX_ADAPT_CRIT, UY_ADAPT_CRIT, 
-	UZ_ADAPT_CRIT}, maxlevel = MAXLEVEL, minlevel = LEVEL );
-#   else
-      astats s = adapt_wavelet( (scalar *){DLM_FlagMesh, u}, 
-	(double[]){FLAG_ADAPT_CRIT, UX_ADAPT_CRIT, UY_ADAPT_CRIT, 
-	UZ_ADAPT_CRIT}, maxlevel = MAXLEVEL, minlevel = LEVEL );
-#   endif		
+	UZ_ADAPT_CRIT}, maxlevel = MAXLEVEL, minlevel = LEVEL );		
 
     if ( pid() == 0 ) 
       printf( "refined = %d, coarsened = %d\n", s.nf, s.nc );

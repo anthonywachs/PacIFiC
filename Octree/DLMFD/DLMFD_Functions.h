@@ -60,13 +60,13 @@ enum RigidBodyType {
 
  
 
-/** Structure for the coordinates of a rigid body boundary. */
+/** Structure for the rigid body boundary points. */
 typedef struct {
   double* x;
   double* y;
   double* z;
+  bool* deactivated;
   int m;
-  int nm;
 } RigidBodyBoundary;
 
 
@@ -126,9 +126,117 @@ typedef struct {
     coord w, wnm1, qw, tw, imposedw;
 # endif
   Cache Interior;
-  Cache reduced_domain;
+  Cache Boundary;
   long tcells, tmultipliers;
 } RigidBody;
+
+
+
+
+# define DYNARRAYBLOCK 128
+
+/** Structure for a dynamic array of unsigned integers */
+typedef struct {
+  size_t n;
+  size_t nm;   
+  size_t* elem; 
+} dynUIarray;
+
+
+
+
+/** Initialize and allocate a dynUIarray */
+//----------------------------------------------------------------------------
+void initialize_and_allocate_dynUIarray( dynUIarray* a, const int nm ) 
+//----------------------------------------------------------------------------
+{
+  a->elem = (size_t*) calloc( nm, sizeof(size_t) );
+  a->n = 0;
+  a->nm = nm;
+}
+
+
+
+
+/** Free a dynUIarray */
+//----------------------------------------------------------------------------
+void free_dynUIarray( dynUIarray* a ) 
+//----------------------------------------------------------------------------
+{
+  free(a->elem); a->elem = NULL;
+  a->n = 0;
+  a->nm = 0;
+}
+
+
+
+
+/** Append a new element to a dynUIarray */
+//----------------------------------------------------------------------------
+void append_dynUIarray( dynUIarray* a, size_t newelem )
+//----------------------------------------------------------------------------
+{
+  if ( a->n >= a->nm )
+  {
+    a->nm += DYNARRAYBLOCK;
+    a->elem = (size_t*) realloc( a->elem, a->nm*sizeof(size_t) );
+  }      
+  a->elem[a->n] = newelem;
+  a->n += 1;    
+}
+
+
+
+
+/** Structure for a dynamic array of pointers to double */
+typedef struct {
+  size_t n;
+  size_t nm;   
+  double** elem; 
+} dynPDBarray;
+
+
+
+
+/** Initialize and allocate a dynPDBarray */
+//----------------------------------------------------------------------------
+void initialize_and_allocate_dynPDBarray( dynPDBarray* a, const int nm ) 
+//----------------------------------------------------------------------------
+{
+  a->elem = (double**) calloc( nm, sizeof(double*) );
+  a->n = 0;
+  a->nm = nm;
+}
+
+
+
+
+/** Free a dynPDBarray */
+//----------------------------------------------------------------------------
+void free_dynPDBarray( dynPDBarray* a ) 
+//----------------------------------------------------------------------------
+{
+  free(a->elem); a->elem = NULL;
+  a->n = 0;
+  a->nm = 0;
+}
+
+
+
+
+/** Append a new element to a dynPDBarray */
+//----------------------------------------------------------------------------
+void append_dynPDBarray( dynPDBarray* a, double* newelem )
+//----------------------------------------------------------------------------
+{
+  if ( a->n >= a->nm )
+  {
+    a->nm += DYNARRAYBLOCK;
+    a->elem = (double**) realloc( a->elem, a->nm*sizeof(double*) );
+  }      
+  a->elem[a->n] = newelem;
+  a->n += 1;    
+}
 
 
 
@@ -147,15 +255,6 @@ trace void synchronize( scalar* list )
 
 
 
-# include "CircularCylinder2D.h"
-# include "Sphere.h"
-# include "Cube.h"
-# include "Tetrahedron.h"
-# include "Octahedron.h"
-# include "Dodecahedron.h"
-# include "Icosahedron.h"
-
-
 /** Allocates memory for m points in the RigidBodyBoundary structure. */
 //----------------------------------------------------------------------------
 void allocate_RigidBodyBoundary( RigidBodyBoundary* sbm, const int m ) 
@@ -168,7 +267,7 @@ void allocate_RigidBodyBoundary( RigidBodyBoundary* sbm, const int m )
 # else
     sbm->z = NULL;
 # endif
-
+  sbm->deactivated = (bool*) calloc( m, sizeof(bool) );
   sbm->m = m;
 }
 
@@ -184,8 +283,8 @@ void reallocate_RigidBodyBoundary( RigidBodyBoundary* sbm, const int m )
   sbm->y = (double*) realloc( sbm->y, m * sizeof(double) );  
 # if dimension == 3 
     sbm->z = (double*) realloc( sbm->z, m * sizeof(double) );
-# endif    
-  
+# endif 
+  sbm->deactivated = (bool*) realloc( sbm->deactivated, m * sizeof(bool) );       
   sbm->m = m;
 }
 
@@ -202,7 +301,7 @@ void free_RigidBodyBoundary( RigidBodyBoundary* sbm )
 # if dimension == 3 
     free( sbm->z ); sbm->z = NULL;
 # endif 
-
+  free( sbm->deactivated ); sbm->deactivated = NULL;
   sbm->m = 0;  
 }
 
@@ -221,6 +320,14 @@ void initialize_and_allocate_Cache( Cache* p )
 
 
 
+
+# include "CircularCylinder2D.h"
+# include "Sphere.h"
+# include "Cube.h"
+# include "Tetrahedron.h"
+# include "Octahedron.h"
+# include "Dodecahedron.h"
+# include "Icosahedron.h"
 
 /** Frees the rigid body data that were dynamically allocated */
 //----------------------------------------------------------------------------
@@ -241,7 +348,7 @@ void free_rigidbodies( RigidBody* allrbs, const size_t nrb )
     Cache* c = &(allrbs[k].Interior);
     free( c->p );
     c->p = NULL;
-    c = &(allrbs[k].reduced_domain);
+    c = &(allrbs[k].Boundary);
     free( c->p );
     c->p = NULL;    
     
@@ -405,7 +512,7 @@ void print_rigidbody( RigidBody const* p, char const* poshift )
     }    
   }
   int intpts = p->Interior.n;
-  int bdpts = p->reduced_domain.n;  
+  int bdpts = p->Boundary.n;  
 # if _MPI
     mpi_all_reduce( intpts, MPI_INT, MPI_SUM );
     mpi_all_reduce( bdpts, MPI_INT, MPI_SUM );
@@ -448,7 +555,7 @@ component of the index field. If there is no DLMFD boundary point, index.x is
 set to -1 */
 //----------------------------------------------------------------------------
 void fill_DLM_Index( const RigidBodyBoundary dlm_bd, vector Index, 
-	const size_t kk ) 
+	const size_t kk, dynUIarray* deactivatedBPindices_ ) 
 //----------------------------------------------------------------------------
 {  
   Point lpoint;
@@ -471,21 +578,34 @@ void fill_DLM_Index( const RigidBodyBoundary dlm_bd, vector Index,
       cache_append( &fdlocal[i], lpoint, 0 );
 	
       foreach_cache(fdlocal[i]) 
-      {
-	/* Tag cell only if it was not tagged by another rigid body */
+      {	
+	/* Tag cell only if it was not tagged by another rigid body, else
+	reinitialize to -1 and store the indices of the BP to be deactivated 
+	in both rigid bodies */
 	if ( Index.x[] < 0 )
 	{
 	  Index.x[] = i;
 	  Index.y[] = kk;
-	  if ( level != depth() ) 
-	  {
-	    printf( "On thread %d, point dlmfd %d at (%f, %f, %f) is in a"
-		" cell that has not the maximum level of refinnement %d, it "
-		"is on level %d \n", pid(), i, x, y, z, depth(), level );
-	  }
+	}
+	else
+	{
+	  append_dynUIarray( deactivatedBPindices_, Index.y[] );
+	  append_dynUIarray( deactivatedBPindices_, Index.x[] );	  
+	  append_dynUIarray( deactivatedBPindices_, kk );
+	  append_dynUIarray( deactivatedBPindices_, i );	  	  	
+	  Index.x[] = - 1;
+	  Index.y[] = - 1;
 	}
       }
     }
+    else if ( (lpoint.level) != - 1 ) 
+      printf( "On thread %d, point dlmfd %d at (%f, %f, %f) is in a"
+	" cell that has not the maximum level of refinnement %d, it "
+	"is on level %d \n", pid(), i, dlm_bd.x[i], dlm_bd.y[i], 
+        # if dimension == 3 
+            dlm_bd.z[i], 
+        # endif	
+	depth(), lpoint.level );    
   }
    
   for (i=0;i<dlm_bd.m;i++)
@@ -496,6 +616,90 @@ void fill_DLM_Index( const RigidBodyBoundary dlm_bd, vector Index,
   synchronize((scalar*) {Index});
 }
 
+
+
+
+/** Returns whether a point lies inside a rigid body */
+//----------------------------------------------------------------------------
+bool is_in_rigidbody( RigidBody const* p, double x, double y, double z )
+//----------------------------------------------------------------------------
+{
+  bool is_in = false;
+  GeomParameter gci = p->g;
+  switch ( p->shape )
+  {
+    case SPHERE:
+      is_in = is_in_Sphere( x, y, z, gci );
+      break;
+	  
+    case CIRCULARCYLINDER2D:
+      is_in = is_in_CircularCylinder2D( x, y, gci );        
+      break;
+	  
+    case CUBE:
+      is_in = is_in_Polyhedron( x, y, z, gci );        
+      break;
+	
+    case TETRAHEDRON:
+      is_in = is_in_Polyhedron( x, y, z, gci );             
+      break;
+	
+    case OCTAHEDRON:
+      is_in = is_in_Polyhedron( x, y, z, gci );             
+      break;
+	
+    case ICOSAHEDRON:
+      is_in = is_in_Polyhedron( x, y, z, gci );             
+      break;
+
+    case DODECAHEDRON:
+      is_in = is_in_Polyhedron( x, y, z, gci );             
+      break;
+	  
+    default:
+      fprintf( stderr,"Unknown Rigid Body shape !!\n" );
+  }
+
+  return ( is_in );
+}
+
+
+
+
+/** Tags the grid along rigid body boundaries two cell layers into the fluid */
+//----------------------------------------------------------------------------
+void fill_FlagMesh( scalar Flag, vector const Index, RigidBody const* allrbs )
+//----------------------------------------------------------------------------
+{
+  foreach() Flag[] = 0;  
+  
+  bool goflag = false;
+  double xc, yc, zc = 0.;
+  
+  foreach_level(depth()) 
+  {      
+    goflag = false;
+    if ( (int)Index.x[] > -1 ) goflag = true;
+    else
+    {
+      xc = x;
+      yc = y;
+#     if dimension == 3
+        zc = z;
+#     endif      
+      foreach_neighbor()
+        if ( !goflag ) 
+          if ( is_leaf(cell) )
+	    if ( (int)Index.x[] > -1 )
+	      if ( !is_in_rigidbody( &(allrbs[(int)Index.y[]]), xc, yc, zc ) ) 
+	        goflag = true;
+    }
+
+    if ( goflag ) Flag[] = 1;
+  }
+  
+  synchronize((scalar*) {Flag});    
+}  
 
 
 
@@ -571,234 +775,177 @@ double reversed_weight( RigidBody* pp, const coord weightcellpos,
 
 
 
+/** Deactivate boundary points that are too close either to a rigid wall
+domain boundary or to another rigid body */
 //----------------------------------------------------------------------------
-void remove_too_close_multipliers( RigidBody* p, vector DLM_Index ) 
+void deactivate_critical_boundary_points( RigidBody* allrbs, const size_t nrb, 
+	vector Index, dynUIarray* deactivatedBPindices_,
+	dynPDBarray* deactivatedIndexFieldValues_ ) 
 //----------------------------------------------------------------------------
 {   
-  for (size_t k = 0; k < nbRigidBodies; k++) 
+  bool domain_has_rigid_walls = !Period.x || !Period.y || !Period.z;
+  double critical_distance = 2. * L0 / (double)(1 << MAXLEVEL) ;
+  bool at_least_one_deactivated = false, deactivate = false;
+  size_t RBid0 = 0, RBid1 = 0, PTid0 = 0, PTid1 = 0;
+  double x0, y0, z0;  
+
+  // Distance to rigid walls
+  if ( domain_has_rigid_walls )
+    foreach_level(depth()) 
+    {      
+      if ( (int)Index.x[] > -1 )
+      {
+        deactivate = false;
+	if ( !Period.x )
+          if ( allrbs[(size_t)Index.y[]].s.x[(size_t)Index.x[]] 
+	  		> L0 - critical_distance + X0 
+		|| allrbs[(size_t)Index.y[]].s.x[(size_t)Index.x[]]  
+	  		< critical_distance + X0 )
+	    deactivate = true;
+	    	    	    
+        if ( !Period.y )
+          if ( allrbs[(size_t)Index.y[]].s.y[(size_t)Index.x[]] 
+	  		> L0 - critical_distance + Y0 
+		|| allrbs[(size_t)Index.y[]].s.y[(size_t)Index.x[]] 
+			< critical_distance + Y0 )
+	    deactivate = true;
+
+#       if dimension == 3
+          if ( !Period.z )
+            if ( allrbs[(size_t)Index.y[]].s.z[(size_t)Index.x[]] 
+	    		> L0 - critical_distance + Z0 
+		|| allrbs[(size_t)Index.y[]].s.z[(size_t)Index.x[]] 
+			< critical_distance + Z0 )
+	      deactivate = true;
+#       endif 
+
+        if ( deactivate )
+	{
+    	  append_dynUIarray( deactivatedBPindices_, (size_t)Index.y[] );
+	  append_dynUIarray( deactivatedBPindices_, (size_t)Index.x[] );
+	  append_dynPDBarray( deactivatedIndexFieldValues_, &(Index.x[]) );
+	  append_dynPDBarray( deactivatedIndexFieldValues_, &(Index.y[]) );
+	  at_least_one_deactivated = true;
+	} 
+      }     
+    }
+ 
+  // Proximity of rigid bodies
+  if ( nrb > 1 )
   {
-    RigidBodyBoundary dlm_lambda_to_desactivate;
-    int allocated = 1;
-    allocate_RigidBodyBoundary (&dlm_lambda_to_desactivate, allocated*BSIZE);
-    int countalloc = 0;
-    int other_part;
-    int is_in_other_rigidbody;
-    foreach_level(depth()) {
-      
-      int direct_neigh = 0;  is_in_other_rigidbody = 0; other_part = -1;
-      if (((int)DLM_Index.x[] > -1)  && level == depth() && is_leaf(cell) 
-      	&& (p[k].pnum == (int)DLM_Index.y[])) {
-
-	/* check here if this multiplier is not in another RigidBody*'s
-	   domain, if yes desactive it */
+    foreach_level(depth()) 
+      if ( (int)Index.x[] > -1 )
+      {
+	RBid0 = (size_t)Index.y[];
+	PTid0 = (size_t)Index.x[];
+        x0 = allrbs[RBid0].s.x[PTid0]; 
+	y0 = allrbs[RBid0].s.y[PTid0]; 
+#       if dimension == 3	
+	  z0 = allrbs[RBid0].s.z[PTid0];
+#       endif 	  
+	deactivate = false;
 	
-	for (size_t l = 0; l < nbRigidBodies; l++) {
-	  if (l != p[k].pnum) {
-      	    RigidBody* other_rb = &(p[l]);
-      	    /* printf("thread %d, this is RigidBody* %zu checkin on RigidBody* 
-	    %zu iteration %d\n", pid(), p[k].pnum, other_rb->pnum, l); */
-
-      	    /* Check RigidBody*'s type */
-      	    if ( other_rb->shape == CUBE ) {
-//       	      compute_principal_vectors_Cube( other_rb );
-//       	      coord u = other_rb->g.pgp->u1;
-//       	      coord v = other_rb->g.pgp->v1;
-//       	      coord w = other_rb->g.pgp->w1;
-//       	      coord mins = other_rb->g.pgp->mins;
-//       	      coord maxs = other_rb->g.pgp->maxs;
-// 
-//       	      /* current cell's position */
-//       	      coord checkpt = {x, y, z};
-//       	      if ( is_in_Cube( &u, &v, &w, &mins, &maxs, &checkpt ) ) {
-//       		is_in_other_rigidbody = 1; other_part =  other_rb->pnum;
-// 		break;
-//       	      }
-      	    }
-      	    /* if sphere */
-      	    else {
-      	      GeomParameter gp = other_rb->g;
-      	      if (is_in_Sphere (x, y, z, gp)) {
-      		is_in_other_rigidbody = 1; other_part =  other_rb->pnum;
-		break;
-      	      }
-      	    }
-      	  }
-	  
-	}
-
-	if (is_in_other_rigidbody) {
-	  /* printf("thread %d, this is RigidBody* %zu which has a cell 
-	  in RigidBody* %d\n", pid(), p[k].pnum, other_part); */
-	  DLM_Index.x[] = -1; DLM_Index.y[] = other_part;
-	}
-	
-	/* Check if two (or more) Lagrange multipliers (from different
-	   rigid bodies) are in the same neighborhoods (i.e a 5x5 stencil
-	   in 2D), if yes desactivate them. Otherwise the cells of
-	   their stencils may be located in each other's domain */
-	direct_neigh = 0;
-	foreach_neighbor() {
-	  if (((int)DLM_Index.x[] > -1)  && level == depth() 
-	  	&& is_leaf(cell) && (p[k].pnum != (int)DLM_Index.y[])) {
-
-	    direct_neigh = 1;
-	    /* We may catch and identical multiplier more than once here */
-	    /* Add the multiplier(s) indices to a list because MPI imposes 
-	    that we can't modify the cell within a foreach_neighbor loop */
-	    if (countalloc >= allocated*BSIZE) {
-	      allocated ++;
-	      reallocate_RigidBodyBoundary (&dlm_lambda_to_desactivate, 
-	      	allocated*BSIZE);
+        foreach_neighbor()
+          if ( is_leaf(cell) )
+	    if ( (int)Index.x[] > - 1 )
+	    {
+	      RBid1 = (size_t)Index.y[];
+	      if ( RBid1 != RBid0 )
+	      {
+		PTid1 = (size_t)Index.x[];
+// 		if ( sqrt( 
+// 			sq( allrbs[RBid1].s.x[PTid1] - x0 ) 
+// 			+ sq( allrbs[RBid1].s.y[PTid1] - y0 )
+// #                 if dimension == 3	
+// 	            	+ sq( allrbs[RBid1].s.z[PTid1] - z0 )
+// #                 endif
+//                   ) < critical_distance )
+// 		  deactivate = true;
+		  
+		if ( abs( allrbs[RBid1].s.x[PTid1] - x0 ) < critical_distance 
+			|| abs( allrbs[RBid1].s.y[PTid1] - y0 ) < critical_distance
+#                 if dimension == 3	
+	            || abs( allrbs[RBid1].s.z[PTid1] - z0 ) < critical_distance
+#                 endif
+                  ) deactivate = true;		  		 
+              }
 	    }
-	    dlm_lambda_to_desactivate.x[countalloc] = x;
-	    dlm_lambda_to_desactivate.y[countalloc] = y;
-#if dimension == 3
-	    dlm_lambda_to_desactivate.z[countalloc] = z;
-#endif
-	    countalloc ++;
-	  }
-	}
-	/* Desactivate the local multiplier here  */
-	if (direct_neigh) {
-	DLM_Index.x[] = -1; DLM_Index.y[] = -1;
+	          
+        if ( deactivate ) 
+	{
+          append_dynUIarray( deactivatedBPindices_, (size_t)Index.y[] );
+	  append_dynUIarray( deactivatedBPindices_, (size_t)Index.x[] );	  
+	  append_dynPDBarray( deactivatedIndexFieldValues_, &(Index.x[]) );
+	  append_dynPDBarray( deactivatedIndexFieldValues_, &(Index.y[]) );
+          at_least_one_deactivated = true;
 	}
       }
-    }
-    /* if (countalloc > 0) */
-    /*   printf("there is %d points to desactivate on thread %d\n", 
-    countalloc, pid()); */
+  }
 
-    Cache c = {0};
-    Point lpoint;
-    
-#if _MPI
-    int size = npe();
-    int counts[size];
-    
-    /* Each thread tells the root how many multipliers it holds  */
-    MPI_Gather(&countalloc, 1, MPI_INT, &counts, 1, MPI_INT, 0, 
-    	MPI_COMM_WORLD);
-
-    /* if (pid() == 0) */
-    /*   for (int i = 0; i < size; i++) */
-    /* 	printf("RigidBody* %d, this is root receiving %d elements 
-    by thread %d\n",k, counts[i], i); */
-
-    /* Displacements in the receive buffer for MPI_GATHERV */
-    int disps[size];
-     /* Displacement for the first chunk of data - 0 */
-    for (int i = 0; i < size; i++)
-      disps[i] = (i > 0) ? (disps[i-1] + counts[i-1]) : 0;
-
-    double * alldatax = NULL;
-    double * alldatay = NULL;
-#if dimension == 3 
-    double * alldataz = NULL;
-#endif
-
-    int m = 0;
-    /* Threads 0 allocates and compute the total number of multipliers */
-    if (pid() == 0) {
-      /* disps[size-1] + counts[size-1] == total number of elements */
-      /* printf("thread %d : disps[size-1]+counts[size-1]  = %d\n", pid(), 
-      disps[size-1]+counts[size-1]); */
-      m = disps[size-1] + counts[size-1];
-      alldatax = (double*) calloc (m, sizeof(double));
-      alldatay = (double*) calloc (m, sizeof(double));
-#if dimension == 3
-      alldataz = (double*) calloc (m, sizeof(double));
-#endif
-    }
-
-    /* Gather on thread 0 the coordinates of the multipliers */ 
-    MPI_Gatherv (&dlm_lambda_to_desactivate.x[0], countalloc, MPI_DOUBLE, 
-    	&alldatax[0], counts, disps, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    MPI_Gatherv (&dlm_lambda_to_desactivate.y[0], countalloc, MPI_DOUBLE, 
-    	&alldatay[0], counts, disps, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-#if dimension == 3 
-    MPI_Gatherv (&dlm_lambda_to_desactivate.z[0], countalloc, MPI_DOUBLE, 
-    	&alldataz[0], counts, disps, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-#endif
-    
-    /* send the total number of multipliers to all threads */
-    mpi_all_reduce (m, MPI_INT, MPI_MAX);
-
-    /* allocate now alldatax, alldatay, alldataz on threads !=0 */
-    if (pid() != 0) {
-      alldatax = (double*) calloc (m, sizeof(double));
-      alldatay = (double*) calloc (m, sizeof(double));
-#if dimension == 3
-      alldataz = (double*) calloc (m, sizeof(double));
-#endif
-    }
-
+#   if  _MPI
+      int local = at_least_one_deactivated, global;
+      MPI_Allreduce( &local, &global, 
+      	1, MPI_INT, MPI_SUM, MPI_COMM_WORLD ); 
+      if ( global > 0 ) at_least_one_deactivated = true;
+#   endif
   
-    /* Now broadcast alldatax,alldatay,alldataz from thread 0 
-    to other threads */
-    MPI_Bcast (alldatax, m, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    MPI_Bcast (alldatay, m, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-#if dimension == 3 
-    MPI_Bcast (alldataz, m, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-#endif
-    
-/*     for (int i = 0; i < m; i++) { */
-/* #if dimension == 2  */
-/*       printf("thread %d: RigidBody* %d, coord of the multiplier %d to be 
-	removed (%g,%g,%g)\n", pid(), k, i, alldatax[i], alldatay[i], 0.); */
-/* #elif dimension ==3 */
-/*       printf("thread %d: RigidBody* %d, coord of the multiplier %d to be 
-	removed (%g,%g,%g)\n", pid(), k, i, alldatax[i], alldatay[i], 
-	alldataz[i]); */
-/* #endif */
-/*     } */
-    
-    for (int i = 0; i < m; i++) {
-#if dimension == 2 
-      lpoint = locate(alldatax[i], alldatay[i]); 
-#elif dimension == 3
-      lpoint = locate(alldatax[i], alldatay[i], alldataz[i]); 
-#endif
-      if (lpoint.level > -1)  cache_append(&c, lpoint, 0);
-    }
+  if ( at_least_one_deactivated )
+  {
+    size_t total_size = 0;
+    size_t* alldeactivatedBPindices = NULL;
 
-    free(alldatax);
-    free(alldatay);
-#if dimension == 3 
-    free(alldataz);
-#endif
+    // In MPI concatenate the arrays of deactivated boundary points
+#   if  _MPI
+      int* deactivated_count = NULL;
+      int* deactivated_displace = NULL;
+      int nb_ranks;
+      MPI_Comm_size( MPI_COMM_WORLD, &nb_ranks );
+      
+      deactivated_count = (int*) calloc( nb_ranks, sizeof(int) );
+      deactivated_displace = (int*) calloc( nb_ranks, sizeof(int) );
+      
+      int nn = (int)deactivatedBPindices_->n;
+      MPI_Allgather( &nn, 1, MPI_INT, deactivated_count, 1, MPI_INT, 
+      	MPI_COMM_WORLD );
 
-#elif _MPI == 0
-
-    for (int i = 0; i < countalloc; i++) {
-#if dimension == 2 
-      lpoint = locate(dlm_lambda_to_desactivate.x[i], 
-      	dlm_lambda_to_desactivate.y[i]); 
-#elif dimension == 3
-      lpoint = locate(dlm_lambda_to_desactivate.x[i], 
-      	dlm_lambda_to_desactivate.y[i], dlm_lambda_to_desactivate.z[i]); 
-#endif
-      if (lpoint.level > -1)  cache_append(&c, lpoint, 0);
-    }
-
-#endif   /* End if _MPI */
-
-    /* Finally desactivate the multiplicators */
-    int counter = 0;
-    foreach_cache(c) {
-      if (DLM_Index.x[] > -1 && DLM_Index.y[] > -1) {
-	DLM_Index.x[] = -1;
-	DLM_Index.y[] = -1;
-	counter ++;
+      int temp = 0;
+      for (size_t i = 0; i < nb_ranks; i++)
+      {
+         deactivated_displace[i] = temp;
+         temp += deactivated_count[i];
       }
-    }
-    
-    /* printf("thread %d: removed %d multipliers \n", pid(), counter); */
+	  		
+      MPI_Allreduce( &(deactivatedBPindices_->n), &total_size, 
+      	1, MPI_UNSIGNED_LONG, MPI_SUM, MPI_COMM_WORLD ); 
+   
+      alldeactivatedBPindices = (size_t*) calloc( total_size, 
+    	sizeof(size_t) );
+	
+      MPI_Allgatherv( deactivatedBPindices_->elem, deactivatedBPindices_->n, 
+    	MPI_UNSIGNED_LONG, alldeactivatedBPindices, deactivated_count, 
+	deactivated_displace, MPI_UNSIGNED_LONG, MPI_COMM_WORLD );	
+#   else
+      total_size = deactivatedBPindices_->n;
+      alldeactivatedBPindices = deactivatedBPindices_->elem;
+#   endif
 
-    free(c.p);
-    free_RigidBodyBoundary(&dlm_lambda_to_desactivate);
-  } /* End loop nbRigidBodies */
+    // Deactivate boundary points in the rigid bodies
+    for (size_t i=0;i<total_size;i+=2)
+      allrbs[alldeactivatedBPindices[i]].s.deactivated[
+      	alldeactivatedBPindices[i+1]] = true;
 
-  synchronize((scalar*) {DLM_Index});
+#   if  _MPI
+      free( deactivated_count );
+      free( deactivated_displace );
+      free( alldeactivatedBPindices );
+#   endif 
+
+    // Set the stored Index values to - 1
+    for (size_t i=0;i<deactivatedIndexFieldValues_->n;++i)
+      *(deactivatedIndexFieldValues_->elem[i]) = - 1;     
+
+    synchronize((scalar*) {Index});
+  }
 }
 
 
@@ -823,7 +970,7 @@ void reverse_fill_DLM_Flag( RigidBody* allrbs, const size_t nrb, scalar Flag,
  
     RigidBodyBoundary dlm_lambda = allrbs[k].s;
     GeomParameter gcb = allrbs[k].g;
-    Cache* reduced_domain = &(allrbs[k].reduced_domain);
+    Cache* Boundary = &(allrbs[k].Boundary);
         
     foreach_level(depth()) 
     {      
@@ -909,8 +1056,7 @@ void reverse_fill_DLM_Flag( RigidBody* allrbs, const size_t nrb, scalar Flag,
       if ( goflag == 1 ) 
       {
 	Flag[] = 1;
-	if ( cacheflag == 1 )
-	  cache_append( reduced_domain, point, 0 );
+	if ( cacheflag == 1 ) cache_append( Boundary, point, 0 );
       }
     }  
   } // end loop on rigid body id 
@@ -995,34 +1141,31 @@ void create_boundary_points( RigidBody* p, vector* pPeriodicRefCenter,
 method */
 //----------------------------------------------------------------------------
 void allocate_and_init_rigidbodies( RigidBody* allrbs, const size_t nrb, 
-	vector Index, scalar Flag, scalar FlagMesh, vector PeriodicRefCenter )
+	vector Index, scalar Flag, scalar FlagMesh, vector PeriodicRefCenter,
+	dynUIarray* deactivatedBPindices_ )
 //----------------------------------------------------------------------------
 {  
   /* Initialize fields */
   foreach() 
   {
-    Index.x[] = -1;   // DLM/FD boundary point index
-    Index.y[] = -1;   // RigidBody* number
-    Flag[] = 0;       // Flag
-    FlagMesh[] = 0;   // FlagMesh
-    if ( Period.x || Period.y || Period.z )
-      foreach_dimension() PeriodicRefCenter.x[] = 0.;
+    Index.x[] = - 1;   // DLM/FD boundary point index
+    Index.y[] = - 1;   // rigid body number
+    Flag[] = 0;        // Flag
+    FlagMesh[] = 0;    // FlagMesh
+    foreach_dimension() PeriodicRefCenter.x[] = 0.;
   }
-  
-  synchronize({Flag, FlagMesh});
-  synchronize((scalar *){Index, PeriodicRefCenter});
 
   for (size_t k = 0; k < nrb; k++) 
   {
     Cache* c = NULL;
 
-#   if !DEACTIVATE_BOUNDARYPOINTS
+#   if DLMFD_BOUNDARYPOINTS
       create_boundary_points( &(allrbs[k]), &PeriodicRefCenter, true );
-      fill_DLM_Index( (allrbs[k].s), Index, k );
-      c = &(allrbs[k].reduced_domain);
+      fill_DLM_Index( (allrbs[k].s), Index, k, deactivatedBPindices_ );
+      c = &(allrbs[k].Boundary);
       initialize_and_allocate_Cache( c );
 #   endif     
-#   if !DEACTIVATE_INTERIORPOINTS
+#   if DLMFD_INTERIORPOINTS
       c = &(allrbs[k].Interior);
       initialize_and_allocate_Cache( c );
 #   endif
@@ -1040,7 +1183,7 @@ PeriodicRefCenter field */
 void create_rigidbodies_boundary_points( RigidBody* allrbs, const size_t nrb )
 //----------------------------------------------------------------------------
 {  
-# if !DEACTIVATE_BOUNDARYPOINTS
+# if DLMFD_BOUNDARYPOINTS
     for (size_t k = 0; k < nrb; k++) 
       create_boundary_points( &(allrbs[k]), NULL, false );    
 # endif
@@ -1054,7 +1197,7 @@ void create_rigidbodies_boundary_points( RigidBody* allrbs, const size_t nrb )
 void free_rigidbodies_boundary_points( RigidBody* allrbs, const size_t nrb )
 //----------------------------------------------------------------------------
 {  
-# if !DEACTIVATE_BOUNDARYPOINTS
+# if DLMFD_BOUNDARYPOINTS
     for (size_t k = 0; k < nrb; k++) 
       free_RigidBodyBoundary( &(allrbs[k].s) );   
 # endif
@@ -1268,7 +1411,7 @@ void computeHydroForceTorque( RigidBody* allrbs, const size_t nrb, FILE** sl,
     Interior[k] = &(allrbs[k].Interior);
 
     /* Boundary domain of the RigidBody* */
-    Boundary[k] = &(allrbs[k].reduced_domain);
+    Boundary[k] = &(allrbs[k].Boundary);
     sbm = &(allrbs[k].s);
     coord lambdapos;
     double rho_s = allrbs[k].rho_s;
@@ -1565,10 +1708,8 @@ void vorticity_3D( const vector u, vector omega )
 {  
   foreach()
     foreach_dimension()
-      omega.x[] = ( (u.z[0,1,0] - u.z[0,-1,0]) 
-      	- (u.y[0,0,1] - u.y[0,0,-1]) )/2.*Delta;
-  
-  synchronize((scalar *){omega});
+      omega.x[] = ( ( u.z[0,1,0] - u.z[0,-1,0] )  
+      	- ( u.y[0,0,1] - u.y[0,0,-1] ) ) / ( 2. * Delta );
 }
 
 
@@ -1895,18 +2036,18 @@ int totalcells()
 /** Computes and returns the total number of cells related to Distributed
 Lagrange multiplier points for all rigid bodies */
 //----------------------------------------------------------------------------
-int total_dlmfd_cells( RigidBody* allrbs, const size_t nrb ) 
+int total_dlmfd_cells( RigidBody const* allrbs, const size_t nrb ) 
 //----------------------------------------------------------------------------
 {
   int apts = 0;
   
   for (size_t k = 0; k < nrb; k++) 
   {
-#   if !DEACTIVATE_INTERIORPOINTS
+#   if DLMFD_INTERIORPOINTS
       apts += allrbs[k].Interior.n;
 #   endif
-#   if !DEACTIVATE_BOUNDARYPOINTS
-      apts += allrbs[k].reduced_domain.n;
+#   if DLMFD_BOUNDARYPOINTS
+      apts += allrbs[k].Boundary.n;
 #   endif
   }
 
@@ -1923,12 +2064,12 @@ int total_dlmfd_cells( RigidBody* allrbs, const size_t nrb )
 /** Computes and returns the total number of Ditributed Lagrange multiplier 
 points for all rigid bodies */
 //----------------------------------------------------------------------------
-int total_dlmfd_multipliers( RigidBody* allrbs, const size_t nrb ) 
+int total_dlmfd_multipliers( RigidBody const* allrbs, const size_t nrb ) 
 //----------------------------------------------------------------------------
 {
   int apts = 0;
   
-# if !DEACTIVATE_INTERIORPOINTS
+# if DLMFD_INTERIORPOINTS
     for (size_t k = 0; k < nrb; k++) 
       apts += allrbs[k].Interior.n;
   
@@ -1937,12 +2078,12 @@ int total_dlmfd_multipliers( RigidBody* allrbs, const size_t nrb )
 #   endif
 # endif
   
-# if !DEACTIVATE_BOUNDARYPOINTS
+# if DLMFD_BOUNDARYPOINTS
     for (int k = 0; k < nrb; k++) 
     {
-      RigidBodyBoundary * bla;
-      bla = &(allrbs[k].s);
-      apts += bla->m;
+      RigidBodyBoundary const* sbb = &(allrbs[k].s);
+      for (size_t j = 0; j < sbb->m; j++)
+	if ( sbb->deactivated[j] == 0 ) ++apts;      
     }
 # endif
   

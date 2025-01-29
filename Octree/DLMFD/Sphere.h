@@ -52,7 +52,7 @@ bool in_which_Sphere( double x1, double y1, double z1,
 {
   // Check if it is in the master rigid body
   bool status = is_in_Sphere_clone( x1, y1, z1, gp );
-  if ( status )
+  if ( status && setPeriodicRefCenter )
   {
     Cache poscache = {0};
     Point lpoint;
@@ -239,16 +239,12 @@ void create_FD_Interior_Sphere( RigidBody* p, vector Index,
 
   /** Create the cache for the interior points */
   foreach()
-  {
-    bool in_clone;
-    in_clone = in_which_Sphere( x, y, z, gci, PeriodicRefCenter, true );
-    if ( in_clone )
-    {
-      cache_append( fd, point, 0 );
+    if ( in_which_Sphere( x, y, z, gci, PeriodicRefCenter, true ) )
       if ( (int)Index.y[] == -1 )
+      {
+        cache_append( fd, point, 0 );
         Index.y[] = p->pnum;
-    }
-  }
+      } 
 
   cache_shrink( fd );
 }
