@@ -498,9 +498,6 @@ event init (i = 0)
   p.nodump = true ;
   DLM_Flag.nodump = true;
   DLM_FlagMesh.nodump = true ;
-# if BRINKMANN_DIRICHLET_PENALIZATION
-    Xi.nodump = true;   
-# endif  
   foreach_dimension()
   {
     DLM_lambda.x.nodump = true ;
@@ -514,9 +511,6 @@ event init (i = 0)
 #   if DLM_ALPHA_COUPLING
       DLM_explicit.x.nodump = false ;
 #   endif 
-#   if BRINKMANN_DIRICHLET_PENALIZATION
-      Usolid.x.nodump = true ;   
-#   endif   
   }
   
   

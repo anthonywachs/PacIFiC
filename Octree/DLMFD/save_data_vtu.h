@@ -126,10 +126,9 @@ void output_vtu_dlmfd_intpts( RigidBody const* allrb, const int np,
     int number_interior_points = 0;
     int total_interior_points = 0;
     
-    for (int k = 0; k < np; k++) 
-      foreach(serial)
-        if ( DLM_Flag[] < 1 && (int)DLM_Index.y[] == k )
-       	  number_interior_points += 1;
+    foreach(serial)
+      if ( DLM_Flag[] < 1 && (int)DLM_Index.y[] > - 1 )
+       	number_interior_points += 1;  
      	
     double* interior_coordx = (double*) calloc( number_interior_points, 
     	sizeof(double) ); 
@@ -143,15 +142,14 @@ void output_vtu_dlmfd_intpts( RigidBody const* allrb, const int np,
     int* interior_count = (int*) calloc( nb_ranks, sizeof(int) );    
 
     int counter = 0;
-    for (int k = 0; k < np; k++) 
-      foreach(serial)
-     	if ( DLM_Flag[] < 1 && (int)DLM_Index.y[] == k ) 
-       	{
-          interior_coordx[counter] = x;
-          interior_coordy[counter] = y;
-          interior_coordz[counter] = z;
-          counter++;
-        }
+    foreach(serial)
+      if ( DLM_Flag[] < 1 && (int)DLM_Index.y[] > - 1 )
+      {
+        interior_coordx[counter] = x;
+        interior_coordy[counter] = y;
+        interior_coordz[counter] = z;
+        counter++;
+      }
       
 #   if _MPI
       int* interior_displace = (int*) calloc( nb_ranks, sizeof(int) );

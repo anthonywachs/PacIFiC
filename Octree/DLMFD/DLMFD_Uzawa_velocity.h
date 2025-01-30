@@ -71,10 +71,6 @@ solve them successively. We chose here a two-steps time-spliting.
 #   define RIGIDBODY_VERBOSE 0     // print rigid body features
 # endif
 
-# ifndef BRINKMANN_DIRICHLET_PENALIZATION
-#   define BRINKMANN_DIRICHLET_PENALIZATION 0      
-# endif
-
 # if ( TRANSLATION && ROTATION )
 #   if dimension == 3
 #     define NRBDATA 6
@@ -117,11 +113,6 @@ vector DLM_qu[];
 vector DLM_tu[];
 # if DLM_ALPHA_COUPLING
     vector DLM_explicit[];
-# endif
-# if BRINKMANN_DIRICHLET_PENALIZATION
-    scalar Xi[] = 0.;
-    vector Usolid[];
-    double eta_s = 1.;    
 # endif
 
 /** Number of rigid body dependent arrays */
@@ -299,61 +290,6 @@ void DLMFD_construction()
   
 # if RIGIDBODY_VERBOSE
     print_all_rigidbodies( allRigidBodies, nbRigidBodies, &outputshift[0] );
-# endif
-
-# if BRINKMANN_DIRICHLET_PENALIZATION
-#   if DLMFD_INTERIORPOINTS    
-      foreach() Xi[] = 0.;
-      for (size_t k = 0; k < nbRigidBodies; k++) 
-        foreach_cache(allRigidBodies[k].Interior) 
-          if ( DLM_Flag[] < 1 && (int)DLM_Index.y[] == k ) 
-          {
-	    Xi[] = 1.;
-            if ( allRigidBodies[k].type != OBSTACLE )
-	    {
-	      foreach_dimension() Usolid.x[] = allRigidBodies[k].U.x;
-#             if dimension == 3
-	        // w_y*r_z - w_z*r_y
-	        Usolid.x[] += 
-		allRigidBodies[k].w.y * ( z - DLM_PeriodicRefCenter.z[])
-		- allRigidBodies[k].w.z * ( y - DLM_PeriodicRefCenter.y[]);
-	        // w_z*r_x - w_x*r_z
-	        Usolid.y[] += 
-		allRigidBodies[k].w.z * ( x - DLM_PeriodicRefCenter.x[])
-		- allRigidBodies[k].w.x * ( z - DLM_PeriodicRefCenter.z[]);
-#             endif
-	      // w_x*r_y - w_y*r_x
-	      Usolid.z[] += 
-	      	allRigidBodies[k].w.x * ( y - DLM_PeriodicRefCenter.y[])
-		- allRigidBodies[k].w.y * ( x - DLM_PeriodicRefCenter.x[]);
-            }          
-            else
-	    {
-	      foreach_dimension() Usolid.x[] = allRigidBodies[k].imposedU.x;	
-#             if dimension == 3
-	        // w_y*r_z - w_z*r_y
-	        Usolid.x[] += 
-			allRigidBodies[k].imposedw.y 
-				* ( z - DLM_PeriodicRefCenter.z[])
-			- allRigidBodies[k].imposedw.z 
-				* ( y - DLM_PeriodicRefCenter.y[]);
-	        // w_z*r_x - w_x*r_z
-	        Usolid.y[] += 
-			allRigidBodies[k].imposedw.z 
-				* ( x - DLM_PeriodicRefCenter.x[])
-			- allRigidBodies[k].imposedw.x 
-				* ( z - DLM_PeriodicRefCenter.z[]);
-#             endif
-	      // w_x*r_y - w_y*r_x
-	      Usolid.z[] += 
-	      	allRigidBodies[k].imposedw.x 
-			* ( y - DLM_PeriodicRefCenter.y[])
-		- allRigidBodies[k].imposedw.y 
-			* ( x - DLM_PeriodicRefCenter.x[]);
-#           }    
-          }
-      synchronize((scalar*) {Usolid,Xi});        
-#   endif
 # endif
 
   // Free the array of deactivated boundary point indices
@@ -605,10 +541,6 @@ void DLMFD_Uzawa_velocity( const int i )
 #     if DLM_ALPHA_COUPLING
         DLM_qu.x[] += DLM_explicit.x[];
         DLM_explicit.x[] = 0.;
-#     endif
-#     if BRINKMANN_DIRICHLET_PENALIZATION
-        DLM_qu.x[] += rho_f * Xi[] * ( u.x[] - Usolid.x[] ) * dlmfd_dv() 
-		/ eta_s;
 #     endif
     }
   }

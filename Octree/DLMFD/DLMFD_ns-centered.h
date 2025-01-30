@@ -30,7 +30,7 @@ for viscosity. */
 #if EMBED
 # include "viscosity-embed.h"
 #else
-# include "DLMFD_Brinkmann_viscosity.h"
+# include "viscosity.h"
 #endif
 
 /**
@@ -360,27 +360,9 @@ time $t+\Delta t$. */
 event viscous_term (i++,last)
 {
   if (constant(mu.x) != 0.) {
-  # if BRINKMANN_DIRICHLET_PENALIZATION
-    /** Brinkmann penalization */
-    foreach()
-      foreach_dimension()
-        u.x[] += dt * Xi[] * Usolid.x[] / eta_s ;
-  # endif
-
-    foreach()
-      foreach_dimension()
-        # if BRINKMANN_DIRICHLET_PENALIZATION
-          if ( Xi[] < 0.9 )
-        # endif	 
-	u.x[] += dt*g.x[];    
-    
+    correction (dt);
     mgu = viscosity (u, mu, rho, dt, mgu.nrelax);
-    foreach()
-      foreach_dimension()
-        # if BRINKMANN_DIRICHLET_PENALIZATION
-          if ( Xi[] < 0.9 )
-        # endif
-	u.x[] -= dt*g.x[];         
+    correction (-dt);        
   }
 
   /**
