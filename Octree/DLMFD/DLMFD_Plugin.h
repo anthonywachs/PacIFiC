@@ -305,6 +305,11 @@ event init (i = 0)
   	fdata, &converge, &cellvstime, restarted_simu );      
 
 
+  /* Construction of rigid bodies and their DLMFD features */
+  if ( pid() == 0 ) printf( "Initial DLMFD RB construction\n" ); 
+  DLMFD_construction();
+
+
   // Perform initial refinement around rigid bodies and write rigid body data
   int totalcell = 0;
 
@@ -376,8 +381,8 @@ event init (i = 0)
 	      
 #     else 
      
-        // Create rigid body boundary points
-        create_rigidbodies_boundary_points( allRigidBodies, nbRigidBodies );
+//         // Create rigid body boundary points
+//         create_rigidbodies_boundary_points( allRigidBodies, nbRigidBodies );
       
         // Create caches per rigid body boundary point
         Cache** stencil = (Cache **) calloc( nbRigidBodies, sizeof(Cache*) );
@@ -466,10 +471,6 @@ event init (i = 0)
         }
         free(stencil);     
       
-        // No need to free the rigid body boundary points, there will be freed
-        // in the once_timestep_is_determined event by the free_rigidbodies 
-	// function
-      
 #     endif
 #   endif
     
@@ -512,11 +513,6 @@ event init (i = 0)
       DLM_explicit.x.nodump = false ;
 #   endif 
   }
-  
-  
-  /* Construction of rigid bodies and their DLMFD features */
-  if ( pid() == 0 ) printf( "Initial DLMFD RB construction\n" ); 
-  DLMFD_construction();    
 }
 
 
@@ -613,7 +609,7 @@ void do_output( char const* mess )
     dump_list = (scalar *){u, g};    
 # endif     
   dump( file = FLUID_DUMP_FILENAME, dump_list );    
-   
+
   // Granular solver output for both post-processing & restart
   event( "GranularSolver_saveResults" );
      
@@ -637,11 +633,11 @@ event output_data (t += TINTERVALOUTPUT;
   // might have induced some interpolation errors on the integer fields
   // DLM Flag, DLM FlagMesh and DLM_Index
 # if DLMFD_INTERIORPOINTS || DLMFD_BOUNDARYPOINTS
-    free_rigidbodies( allRigidBodies, nbRigidBodies );
+    free_rigidbodies( allRigidBodies, nbRigidBodies, false );
     DLMFD_construction();  
 # endif  
-  
-  do_output( mess );
+
+  do_output( mess );  
 }
 
 
@@ -660,7 +656,7 @@ event last_output_data (t = end)
   // might have induced some interpolation errors on the integer fields
   // DLM Flag, DLM FlagMesh and DLM_Index
 # if DLMFD_INTERIORPOINTS || DLMFD_BOUNDARYPOINTS
-    free_rigidbodies( allRigidBodies, nbRigidBodies );
+    free_rigidbodies( allRigidBodies, nbRigidBodies, false );
     DLMFD_construction();  
 # endif 
 
@@ -695,13 +691,13 @@ event once_timestep_is_determined (i++)
   // We free dynamic features of rigid bodies from the previous time step
   // or from initialization at the start of the current time step 
   // (run with -events to understand)
-  free_rigidbodies( allRigidBodies, nbRigidBodies );  
+  free_rigidbodies( allRigidBodies, nbRigidBodies, true );  
   
   // In case of a periodic flow, we add the imposed pressure drop
 # if IMPOSED_PERIODICFLOW
 #   if IMPOSED_PERIODICFLOW_DIRECTION == 0 
       const face vector dp[] = { 
-		imposed_periodicpressuredrop / ( L0 * FLUID_DENSITY ), 0., 0. };  
+		imposed_periodicpressuredrop / ( L0 * FLUID_DENSITY ), 0., 0. };
 #   elif IMPOSED_PERIODICFLOW_DIRECTION == 1
       const face vector dp[] = { 0.,
 		imposed_periodicpressuredrop / ( L0 * FLUID_DENSITY ), 0. };  	
@@ -734,7 +730,7 @@ event cleanup (t = end)
   // once_timestep_is_determined)
   // Since at the very end, there is no next time step, dynamic features 
   // of rigid bodies are not freed by start_timestep and hence are freed here
-  free_rigidbodies( allRigidBodies, nbRigidBodies ); 
+  free_rigidbodies( allRigidBodies, nbRigidBodies, true ); 
   free_np_dep_arrays( nbParticles, allRigidBodies, DLMFDtoGS_vel, vpartbuf, 
   	pdata, !RIGIDBODIES_AS_FIXED_OBSTACLES, fdata );
 }

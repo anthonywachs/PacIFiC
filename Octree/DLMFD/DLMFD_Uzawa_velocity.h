@@ -210,7 +210,7 @@ void DLMFD_construction()
 
   // Allocate and initialize the array of deactivated boundary point indices
   initialize_and_allocate_dynUIarray( &deactivatedBPindices, DYNARRAYBLOCK );
-  
+
   // Allocate and initialize the array of pointers to field Index values to 
   // be reset to -1
   initialize_and_allocate_dynPDBarray( &deactivatedIndexFieldValues, 
@@ -296,7 +296,7 @@ void DLMFD_construction()
   free_dynUIarray( &deactivatedBPindices ); 
   
   // Free the array of pointers to field Index values
-  free_dynPDBarray( &deactivatedIndexFieldValues );  
+  free_dynPDBarray( &deactivatedIndexFieldValues ); 
 }
 
 

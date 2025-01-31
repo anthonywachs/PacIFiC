@@ -331,19 +331,15 @@ void initialize_and_allocate_Cache( Cache* p )
 
 /** Frees the rigid body data that were dynamically allocated */
 //----------------------------------------------------------------------------
-void free_rigidbodies( RigidBody* allrbs, const size_t nrb ) 
+void free_rigidbodies( RigidBody* allrbs, const size_t nrb, bool full_free ) 
 //----------------------------------------------------------------------------
 {
   for (size_t k=0;k<nrb;k++) 
-  {        
+  {            
     // Free the boundary point coordinate arrays
     RigidBodyBoundary* sbm = &(allrbs[k].s);
     free_RigidBodyBoundary( sbm );
-    
-    // Free the periodic clones position vector
-    if ( allrbs[k].g.nperclones ) 
-      free( allrbs[k].g.perclonecenters ); 
-    
+
     // Free the caches 
     Cache* c = &(allrbs[k].Interior);
     free( c->p );
@@ -351,48 +347,55 @@ void free_rigidbodies( RigidBody* allrbs, const size_t nrb )
     c = &(allrbs[k].Boundary);
     free( c->p );
     c->p = NULL;    
-    
-    // Free the toy granular solver parameter structure
-    if ( allrbs[k].toygsp )
+
+    if ( full_free )
     {
-      free( allrbs[k].toygsp );
-      allrbs[k].toygsp = NULL;
-    }     
+      // Free the periodic clones position vector
+      if ( allrbs[k].g.nperclones ) 
+        free( allrbs[k].g.perclonecenters ); 
 
-    // Free the additional geometric features of the RigidBody*
-    switch ( allrbs[k].shape )
-    {
-      case SPHERE:
-        free_Sphere( &(allrbs[k].g) );
-	break;
-	  
-      case CIRCULARCYLINDER2D:
-        free_CircularCylinder2D( &(allrbs[k].g) );
-	break;
-	  
-      case CUBE:
-        free_Cube( &(allrbs[k].g) );
-	break;
+      // Free the toy granular solver parameter structure
+      if ( allrbs[k].toygsp )
+      {
+        free( allrbs[k].toygsp );
+        allrbs[k].toygsp = NULL;
+      }     
 
-      case TETRAHEDRON:
-        free_Tetrahedron( &(allrbs[k].g) );
-	break;
+      // Free the additional geometric features of the rigid body
+      switch ( allrbs[k].shape )
+      {
+        case SPHERE:
+          free_Sphere( &(allrbs[k].g) );
+	  break;
+	  
+        case CIRCULARCYLINDER2D:
+          free_CircularCylinder2D( &(allrbs[k].g) );
+	  break;
+	  
+        case CUBE:
+          free_Cube( &(allrbs[k].g) );
+	  break;
+
+        case TETRAHEDRON:
+          free_Tetrahedron( &(allrbs[k].g) );
+	  break;
 	
-      case OCTAHEDRON:
-	free_Octahedron( &(allrbs[k].g) );
-	break;
+        case OCTAHEDRON:
+	  free_Octahedron( &(allrbs[k].g) );
+	  break;
 	
-      case ICOSAHEDRON:
-	free_Icosahedron( &(allrbs[k].g) );
-	break;
+        case ICOSAHEDRON:
+	  free_Icosahedron( &(allrbs[k].g) );
+	  break;
 
-      case DODECAHEDRON:
-	free_Dodecahedron( &(allrbs[k].g) );
-	break;	
+        case DODECAHEDRON:
+	  free_Dodecahedron( &(allrbs[k].g) );
+	  break;	
 	  
-      default:
-        fprintf( stderr,"Unknown Rigid Body shape !!\n" );
-    }                               
+        default:
+          fprintf( stderr,"Unknown Rigid Body shape !!\n" );
+      }
+    }                                      
   }
 }
 
@@ -1170,7 +1173,7 @@ void allocate_and_init_rigidbodies( RigidBody* allrbs, const size_t nrb,
       initialize_and_allocate_Cache( c );
 #   endif
   }
-  
+
   synchronize((scalar*) {Index});
 }
 
