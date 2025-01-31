@@ -161,7 +161,7 @@ double SpheroCyl::getVolume() const
 // Output operator
 void SpheroCyl::writeShape( ostream& fileOut ) const
 {
-  fileOut << "*SpheroCyl " << m_radius << " " << m_height << " *END";
+  fileOut << "*SpheroCylinder " << m_radius << " " << m_height << " *END";
 }
 
 

@@ -36,7 +36,7 @@ Convex* ConvexBuilderFactory::create( DOMNode* root )
   else if ( type == "Rectangle" ) convex = new Rectangle( element );
   else if ( type == "TrapezoidalPrism" ) 
     convex = new TrapezoidalPrism( element );  
-  else if ( type == "SpheroCylinder" ) 
+  else if ( type == "SpheroCylinder" || type == "SpheroCyl" ) 
     convex = new SpheroCyl( element ); 
   else if ( type == "SpheroCylindricalPrism" ) 
     convex = new SpheroCylindricalPrism( element );     
@@ -67,7 +67,7 @@ Convex* ConvexBuilderFactory::create( string& type, istream& fileIn )
   else if ( type == "*Rectangle" ) convex = new Rectangle( fileIn );
   else if ( type == "*TrapezoidalPrism" ) 
     convex = new TrapezoidalPrism( fileIn ); 
-  else if ( type == "*SpheroCylinder" ) 
+  else if ( type == "*SpheroCylinder" || type == "*SpheroCyl" ) 
     convex = new SpheroCyl( fileIn );
   else if ( type == "*SpheroCylindricalPrism" ) 
     convex = new SpheroCylindricalPrism( fileIn );            

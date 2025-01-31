@@ -167,7 +167,7 @@ double SpheroCylindricalPrism::getVolume() const
 // Output operator
 void SpheroCylindricalPrism::writeShape( ostream& fileOut ) const
 {
-  fileOut << "*SpheroCyl " << m_radius << " " << m_length 
+  fileOut << "*SpheroCylindricalPrism " << m_radius << " " << m_length 
   	<< " " << m_height << " *END";
 }
 
