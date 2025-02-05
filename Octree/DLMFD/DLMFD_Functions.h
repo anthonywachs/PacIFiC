@@ -558,7 +558,9 @@ component of the index field. If there is no DLMFD boundary point, index.x is
 set to -1 */
 //----------------------------------------------------------------------------
 void fill_DLM_Index( const RigidBodyBoundary dlm_bd, vector Index, 
-	const size_t kk, dynUIarray* deactivatedBPindices_ ) 
+	const size_t kk, dynUIarray* deactivatedBPindices_,
+	dynPDBarray* deactivatedIndexFieldValues_,
+	bool* at_least_one_deactivated_ ) 
 //----------------------------------------------------------------------------
 {  
   Point lpoint;
@@ -596,15 +598,16 @@ void fill_DLM_Index( const RigidBodyBoundary dlm_bd, vector Index,
 	  append_dynUIarray( deactivatedBPindices_, Index.x[] );	  
 	  append_dynUIarray( deactivatedBPindices_, kk );
 	  append_dynUIarray( deactivatedBPindices_, i );	  	  	
-	  Index.x[] = - 1;
-	  Index.y[] = - 1;
+	  append_dynPDBarray( deactivatedIndexFieldValues_, &(Index.x[]) );
+	  append_dynPDBarray( deactivatedIndexFieldValues_, &(Index.y[]) );
+	  *at_least_one_deactivated_ = true;
 	}
       }
     }
     else if ( (lpoint.level) != - 1 ) 
-      printf( "On thread %d, point dlmfd %d at (%f, %f, %f) is in a"
-	" cell that has not the maximum level of refinnement %d, it "
-	"is on level %d \n", pid(), i, dlm_bd.x[i], dlm_bd.y[i], 
+      printf( "On thread %d, point dlmfd %d of RB %lu at (%f, %f, %f) is in a"
+	" cell that has not the maximum level of refinement %d, it "
+	"is on level %d \n", pid(), i, kk, dlm_bd.x[i], dlm_bd.y[i], 
         # if dimension == 3 
             dlm_bd.z[i], 
         # endif	
@@ -783,12 +786,13 @@ domain boundary or to another rigid body */
 //----------------------------------------------------------------------------
 void deactivate_critical_boundary_points( RigidBody* allrbs, const size_t nrb, 
 	vector Index, dynUIarray* deactivatedBPindices_,
-	dynPDBarray* deactivatedIndexFieldValues_ ) 
+	dynPDBarray* deactivatedIndexFieldValues_,
+	bool* at_least_one_deactivated_ ) 
 //----------------------------------------------------------------------------
 {   
   bool domain_has_rigid_walls = !Period.x || !Period.y || !Period.z;
   double critical_distance = 2. * L0 / (double)(1 << MAXLEVEL) ;
-  bool at_least_one_deactivated = false, deactivate = false;
+  bool deactivate = false;
   size_t RBid0 = 0, RBid1 = 0, PTid0 = 0, PTid1 = 0;
   double x0, y0, z0;  
 
@@ -828,7 +832,7 @@ void deactivate_critical_boundary_points( RigidBody* allrbs, const size_t nrb,
 	  append_dynUIarray( deactivatedBPindices_, (size_t)Index.x[] );
 	  append_dynPDBarray( deactivatedIndexFieldValues_, &(Index.x[]) );
 	  append_dynPDBarray( deactivatedIndexFieldValues_, &(Index.y[]) );
-	  at_least_one_deactivated = true;
+	  *at_least_one_deactivated_ = true;
 	} 
       }     
     }
@@ -880,19 +884,19 @@ void deactivate_critical_boundary_points( RigidBody* allrbs, const size_t nrb,
 	  append_dynUIarray( deactivatedBPindices_, (size_t)Index.x[] );	  
 	  append_dynPDBarray( deactivatedIndexFieldValues_, &(Index.x[]) );
 	  append_dynPDBarray( deactivatedIndexFieldValues_, &(Index.y[]) );
-          at_least_one_deactivated = true;
+          *at_least_one_deactivated_ = true;
 	}
       }
   }
 
 #   if  _MPI
-      int local = at_least_one_deactivated, global;
+      int local = *at_least_one_deactivated_, global;
       MPI_Allreduce( &local, &global, 
       	1, MPI_INT, MPI_SUM, MPI_COMM_WORLD ); 
-      if ( global > 0 ) at_least_one_deactivated = true;
+      if ( global > 0 ) *at_least_one_deactivated_ = true;
 #   endif
   
-  if ( at_least_one_deactivated )
+  if ( *at_least_one_deactivated_ )
   {
     size_t total_size = 0;
     size_t* alldeactivatedBPindices = NULL;
@@ -1145,7 +1149,9 @@ method */
 //----------------------------------------------------------------------------
 void allocate_and_init_rigidbodies( RigidBody* allrbs, const size_t nrb, 
 	vector Index, scalar Flag, scalar FlagMesh, vector PeriodicRefCenter,
-	dynUIarray* deactivatedBPindices_ )
+	dynUIarray* deactivatedBPindices_,
+	dynPDBarray* deactivatedIndexFieldValues_,
+	bool* at_least_one_deactivated_ )
 //----------------------------------------------------------------------------
 {  
   /* Initialize fields */
@@ -1164,7 +1170,8 @@ void allocate_and_init_rigidbodies( RigidBody* allrbs, const size_t nrb,
 
 #   if DLMFD_BOUNDARYPOINTS
       create_boundary_points( &(allrbs[k]), &PeriodicRefCenter, true );
-      fill_DLM_Index( (allrbs[k].s), Index, k, deactivatedBPindices_ );
+      fill_DLM_Index( (allrbs[k].s), Index, k, deactivatedBPindices_,
+      	deactivatedIndexFieldValues_, at_least_one_deactivated_ );
       c = &(allrbs[k].Boundary);
       initialize_and_allocate_Cache( c );
 #   endif     
