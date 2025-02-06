@@ -379,11 +379,7 @@ event init (i = 0)
 		"%d\n\n", k, totalcell );
         }
 	      
-#     else 
-     
-//         // Create rigid body boundary points
-//         create_rigidbodies_boundary_points( allRigidBodies, nbRigidBodies );
-      
+#     else       
         // Create caches per rigid body boundary point
         Cache** stencil = (Cache **) calloc( nbRigidBodies, sizeof(Cache*) );
         for (size_t k = 0; k < nbRigidBodies; k++)

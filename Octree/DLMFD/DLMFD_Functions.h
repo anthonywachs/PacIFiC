@@ -351,8 +351,11 @@ void free_rigidbodies( RigidBody* allrbs, const size_t nrb, bool full_free )
     if ( full_free )
     {
       // Free the periodic clones position vector
-      if ( allrbs[k].g.nperclones ) 
-        free( allrbs[k].g.perclonecenters ); 
+      if ( allrbs[k].g.nperclones )
+      { 
+        free( allrbs[k].g.perclonecenters );
+	allrbs[k].g.perclonecenters = NULL;
+      }
 
       // Free the toy granular solver parameter structure
       if ( allrbs[k].toygsp )

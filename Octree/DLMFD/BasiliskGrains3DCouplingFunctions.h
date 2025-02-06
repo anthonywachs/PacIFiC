@@ -86,6 +86,7 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
   
   for (size_t k = 0; k < nrb_; k++) 
   { 
+    nperclonesp = 0;
     GeomParameter* gg = &(allrb[k].g);
     gg->pgp = NULL;
     allrb[k].toygsp = NULL;
