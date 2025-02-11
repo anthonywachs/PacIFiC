@@ -1290,9 +1290,7 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 	  if ( nStruct )
 	  {
 	    m_InsertionArray = new struct StructArrayInsertion;
-            m_InsertionArray->box.ftype = WINDOW_BOX;
-            m_InsertionArray->box.radius = m_InsertionArray->box.height = 0. ;
-            m_InsertionArray->box.axisdir = NONE ;
+	    Point3 ptA, ptB;
 
             DOMNode* nBox = ReaderXML::getNode( nStruct, "Box" );
             if ( nBox )
@@ -1300,18 +1298,13 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
               DOMNodeList* points = ReaderXML::getNodes( nBox );
               DOMNode* pointA = points->item( 0 );
               DOMNode* pointB = points->item( 1 );
-              m_InsertionArray->box.ptA[X] =
-            	ReaderXML::getNodeAttr_Double( pointA, "X" );
-              m_InsertionArray->box.ptA[Y] =
-            	ReaderXML::getNodeAttr_Double( pointA, "Y" );
-              m_InsertionArray->box.ptA[Z] =
-            	ReaderXML::getNodeAttr_Double( pointA, "Z" );
-              m_InsertionArray->box.ptB[X] =
-            	ReaderXML::getNodeAttr_Double( pointB, "X" );
-              m_InsertionArray->box.ptB[Y] =
-            	ReaderXML::getNodeAttr_Double( pointB, "Y" );
-              m_InsertionArray->box.ptB[Z] =
-            	ReaderXML::getNodeAttr_Double( pointB, "Z" );
+              ptA[X] = ReaderXML::getNodeAttr_Double( pointA, "X" );
+              ptA[Y] = ReaderXML::getNodeAttr_Double( pointA, "Y" );
+              ptA[Z] = ReaderXML::getNodeAttr_Double( pointA, "Z" );
+              ptB[X] = ReaderXML::getNodeAttr_Double( pointB, "X" );
+              ptB[Y] = ReaderXML::getNodeAttr_Double( pointB, "Y" );
+              ptB[Z] = ReaderXML::getNodeAttr_Double( pointB, "Z" );
+	      m_InsertionArray->box.setAsBox( ptA, ptB );
             }
 	    else
 	    {
@@ -1342,13 +1335,9 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 	    {
 	      cout << GrainsExec::m_shift9 << "Structured array" << endl;
               cout << GrainsExec::m_shift12 << "Point3 min = " <<
-	    	m_InsertionArray->box.ptA[X] << " " <<
-		m_InsertionArray->box.ptA[Y] << " " <<
-                m_InsertionArray->box.ptA[Z] << endl;
+	    	ptA[X] << " " << ptA[Y] << " " << ptA[Z] << endl;
               cout << GrainsExec::m_shift12 << "Point3 max = " <<
-	    	m_InsertionArray->box.ptB[X] << " " <<
-		m_InsertionArray->box.ptB[Y] << " " <<
-                m_InsertionArray->box.ptB[Z] << endl;
+	    	ptB[X] << " " << ptB[Y] << " " << ptB[Z] << endl;
               cout << GrainsExec::m_shift12 << "Array = " <<
 	    	m_InsertionArray->NX << " x " <<
 		m_InsertionArray->NY << " x " <<
@@ -1368,7 +1357,9 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 	      {
 	        DOMNode* nWindow = allWindows->item( i );
                 Window iwindow;
-		      readWindow( nWindow, iwindow, GrainsExec::m_shift12 );
+		bool ok = iwindow.readWindow( nWindow, 
+			GrainsExec::m_shift12, m_rank );
+		if ( !ok ) grainsAbort();	
 	        m_insertion_windows.insert( m_insertion_windows.begin(), 
 			iwindow );
               }
@@ -1552,37 +1543,36 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 
  	DOMNode* pointA = nWindowPoints->item( 0 );
  	DOMNode* pointB = nWindowPoints->item( 1 );
+	Point3 ptA, ptB;
 
  	Window PPWindow;
-	PPWindow.ftype = WINDOW_BOX;
-	PPWindow.radius = PPWindow.radius_int = PPWindow.height = 0. ;
-	PPWindow.axisdir = NONE ;
- 	PPWindow.ptA[X] = ReaderXML::getNodeAttr_Double( pointA, "X" );
-	PPWindow.ptA[Y] = ReaderXML::getNodeAttr_Double( pointA, "Y" );
-	PPWindow.ptA[Z] = ReaderXML::getNodeAttr_Double( pointA, "Z" );
-	PPWindow.ptB[X] = ReaderXML::getNodeAttr_Double( pointB, "X" );
-	PPWindow.ptB[Y] = ReaderXML::getNodeAttr_Double( pointB, "Y" );
-	PPWindow.ptB[Z] = ReaderXML::getNodeAttr_Double( pointB, "Z" );
+ 	ptA[X] = ReaderXML::getNodeAttr_Double( pointA, "X" );
+	ptA[Y] = ReaderXML::getNodeAttr_Double( pointA, "Y" );
+	ptA[Z] = ReaderXML::getNodeAttr_Double( pointA, "Z" );
+	ptB[X] = ReaderXML::getNodeAttr_Double( pointB, "X" );
+	ptB[Y] = ReaderXML::getNodeAttr_Double( pointB, "Y" );
+	ptB[Z] = ReaderXML::getNodeAttr_Double( pointB, "Z" );
+	PPWindow.setAsBox( ptA, ptB );
 
 	double Ox, Oy, Oz, lx, ly, lz;
 	bool b_X = false, b_Y = false, b_Z = false, b_PPWindow = false;
 	App::get_local_domain_origin( Ox, Oy, Oz );
 	App::get_local_domain_size( lx, ly, lz );
 
-	if ( ( PPWindow.ptA[X] >= Ox && PPWindow.ptA[X] < Ox + lx )
-		|| ( PPWindow.ptB[X] >= Ox && PPWindow.ptB[X] < Ox + lx )
-		|| ( Ox > PPWindow.ptA[X] && Ox < PPWindow.ptB[X] )
-		|| ( Ox > PPWindow.ptB[X] && Ox < PPWindow.ptA[X] ) )
+	if ( ( ptA[X] >= Ox && ptA[X] < Ox + lx )
+		|| ( ptB[X] >= Ox && ptB[X] < Ox + lx )
+		|| ( Ox > ptA[X] && Ox < ptB[X] )
+		|| ( Ox > ptB[X] && Ox < ptA[X] ) )
 	  b_X = true;
-	if ( ( PPWindow.ptA[Y] >= Oy && PPWindow.ptA[Y] < Oy + ly )
-		|| ( PPWindow.ptB[Y] >= Oy && PPWindow.ptB[Y] < Oy + ly )
-		|| ( Oy > PPWindow.ptA[Y] && Oy < PPWindow.ptB[Y] )
-		|| ( Oy > PPWindow.ptB[Y] && Oy < PPWindow.ptA[Y] ) )
+	if ( ( ptA[Y] >= Oy && ptA[Y] < Oy + ly )
+		|| ( ptB[Y] >= Oy && ptB[Y] < Oy + ly )
+		|| ( Oy > ptA[Y] && Oy < ptB[Y] )
+		|| ( Oy > ptB[Y] && Oy < ptA[Y] ) )
 	  b_Y = true;
-	if ( ( PPWindow.ptA[Z] >= Oz && PPWindow.ptA[Z] < Oz + lz )
-		|| ( PPWindow.ptB[Z] >= Oz && PPWindow.ptB[Z] < Oz + lz )
-		|| ( Oz > PPWindow.ptA[Z] && Oz < PPWindow.ptB[Z] )
-		|| ( Oz > PPWindow.ptB[Z] && Oz < PPWindow.ptA[Z] ) )
+	if ( ( ptA[Z] >= Oz && ptA[Z] < Oz + lz )
+		|| ( ptB[Z] >= Oz && ptB[Z] < Oz + lz )
+		|| ( Oz > ptA[Z] && Oz < ptB[Z] )
+		|| ( Oz > ptB[Z] && Oz < ptA[Z] ) )
 	  b_Z = true;
 
 	if ( b_X && b_Y && b_Z ) b_PPWindow = true;
@@ -1595,11 +1585,11 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 	{
 	  cout << GrainsExec::m_shift9 << "Domain" << endl;
           cout << GrainsExec::m_shift12 << "Point3 A = " <<
-		PPWindow.ptA[X] << " " << PPWindow.ptA[Y] << " " <<
-		PPWindow.ptA[Z] << endl;
+		ptA[X] << " " << ptA[Y] << " " <<
+		ptA[Z] << endl;
           cout << GrainsExec::m_shift12 << "Point3 B = " <<
-		PPWindow.ptB[X] << " " << PPWindow.ptB[Y] << " " <<
-		PPWindow.ptB[Z] << endl;
+		ptB[X] << " " << ptB[Y] << " " <<
+		ptB[Z] << endl;
 	}
       }
       else
@@ -1803,92 +1793,7 @@ Point3 Grains::getInsertionPoint()
     }
 
     // Random position in the selected insertion window
-    double r = 0., theta = 0., axiscoor = 0.;
-    switch( m_insertion_windows[nWindow].ftype )
-    {
-      case WINDOW_BOX:
-        P[X] = m_insertion_windows[nWindow].ptA[X]
-      		+ ( double(random()) / double(INT_MAX) )
-		* ( m_insertion_windows[nWindow].ptB[X]
-			- m_insertion_windows[nWindow].ptA[X] );
-        P[Y] = m_insertion_windows[nWindow].ptA[Y]
-      		+ ( double(random()) / double(INT_MAX) )
-		* ( m_insertion_windows[nWindow].ptB[Y]
-			- m_insertion_windows[nWindow].ptA[Y] );
-      	P[Z] = m_insertion_windows[nWindow].ptA[Z]
-      		+ ( double(random()) / double(INT_MAX) )
-		* ( m_insertion_windows[nWindow].ptB[Z]
-			- m_insertion_windows[nWindow].ptA[Z] );
-        break;
-
-      case WINDOW_CYLINDER:
-        r = ( double(random()) / double(INT_MAX) )
-      		* m_insertion_windows[nWindow].radius;
-        theta = ( double(random()) / double(INT_MAX) ) * 2. * PI;
-        axiscoor = ( double(random()) / double(INT_MAX) )
-      		* m_insertion_windows[nWindow].height;
-        switch ( m_insertion_windows[nWindow].axisdir )
-        {
-          case X:
-	    P[X] = m_insertion_windows[nWindow].ptA[X] + axiscoor;
-	    P[Y] = m_insertion_windows[nWindow].ptA[Y] + r * cos( theta );
-	    P[Z] = m_insertion_windows[nWindow].ptA[Z] + r * sin( theta );
-	    break;
-
-          case Y:
-	    P[X] = m_insertion_windows[nWindow].ptA[X] + r * sin( theta );
-	    P[Y] = m_insertion_windows[nWindow].ptA[Y] + axiscoor;
-	    P[Z] = m_insertion_windows[nWindow].ptA[Z] + r * cos( theta );
-	    break;
-
-          default:
-	    P[X] = m_insertion_windows[nWindow].ptA[X] + r * cos( theta );
-	    P[Y] = m_insertion_windows[nWindow].ptA[Y] + r * sin( theta );
-	    P[Z] = m_insertion_windows[nWindow].ptA[Z] + axiscoor;
-	    break;
-        }
-        break;
-
-      case WINDOW_ANNULUS:
-        r = m_insertion_windows[nWindow].radius_int
-      		+ ( double(random()) / double(INT_MAX) )
-      		* ( m_insertion_windows[nWindow].radius
-			- m_insertion_windows[nWindow].radius_int );
-        theta = ( double(random()) / double(INT_MAX) ) * 2. * PI;
-        axiscoor = ( double(random()) / double(INT_MAX) )
-      		* m_insertion_windows[nWindow].height;
-        switch ( m_insertion_windows[nWindow].axisdir )
-        {
-          case X:
-	    P[X] = m_insertion_windows[nWindow].ptA[X] + axiscoor;
-	    P[Y] = m_insertion_windows[nWindow].ptA[Y] + r * cos( theta );
-	    P[Z] = m_insertion_windows[nWindow].ptA[Z] + r * sin( theta );
-	    break;
-
-          case Y:
-	    P[X] = m_insertion_windows[nWindow].ptA[X] + r * sin( theta );
-	    P[Y] = m_insertion_windows[nWindow].ptA[Y] + axiscoor;
-	    P[Z] = m_insertion_windows[nWindow].ptA[Z] + r * cos( theta );
-	    break;
-
-          default:
-	    P[X] = m_insertion_windows[nWindow].ptA[X] + r * cos( theta );
-	    P[Y] = m_insertion_windows[nWindow].ptA[Y] + r * sin( theta );
-	    P[Z] = m_insertion_windows[nWindow].ptA[Z] + axiscoor;
-	    break;
-        }
-        break;
-
-      case WINDOW_LINE:
-        P = m_insertion_windows[nWindow].ptA
-      		+ ( double(random()) / double(INT_MAX) )
-      		* ( m_insertion_windows[nWindow].ptB
-			- m_insertion_windows[nWindow].ptA );
-        break;
-
-      default:
-        break;
-    }
+    P = m_insertion_windows[nWindow].getInsertionPoint();
   }
 
   return ( P );
@@ -2126,12 +2031,11 @@ size_t Grains::setPositionParticlesArray()
   size_t k, l, m, nnewpart = 0, error = 0;
   list< pair<Particle*,size_t> >::const_iterator il;
   Point3 position;
-  double deltax = ( m_InsertionArray->box.ptB[X]
-  	- m_InsertionArray->box.ptA[X] ) / double(m_InsertionArray->NX) ;
-  double deltay = ( m_InsertionArray->box.ptB[Y]
-  	- m_InsertionArray->box.ptA[Y] ) / double(m_InsertionArray->NY) ;
-  double deltaz = ( m_InsertionArray->box.ptB[Z]
-  	- m_InsertionArray->box.ptA[Z] ) / double(m_InsertionArray->NZ) ;
+  Point3 ptA = *(m_InsertionArray->box.getPointA());
+  Point3 ptB = *(m_InsertionArray->box.getPointB());  
+  double deltax = ( ptB[X] - ptA[X] ) / double(m_InsertionArray->NX) ;
+  double deltay = ( ptB[Y] - ptA[Y] ) / double(m_InsertionArray->NY) ;
+  double deltaz = ( ptB[Z] - ptA[Z] ) / double(m_InsertionArray->NZ) ;
 
   // Checks that number of positions equals the number of new particles 
   // to insert
@@ -2153,12 +2057,9 @@ size_t Grains::setPositionParticlesArray()
       for (l=0;l<m_InsertionArray->NY;++l)
         for (m=0;m<m_InsertionArray->NZ;++m)
         {
-          position[X] = m_InsertionArray->box.ptA[X]
-		+ ( double(k) + 0.5 ) * deltax;
-          position[Y] = m_InsertionArray->box.ptA[Y]
-		+ ( double(l) + 0.5 ) * deltay;
-          position[Z] = m_InsertionArray->box.ptA[Z]
-		+ ( double(m) + 0.5 ) * deltaz;
+          position[X] = ptA[X] + ( double(k) + 0.5 ) * deltax;
+          position[Y] = ptA[Y] + ( double(l) + 0.5 ) * deltay;
+          position[Z] = ptA[Z] + ( double(m) + 0.5 ) * deltaz;
           m_insertion_position->push_back( position );
         }
   }
@@ -2309,180 +2210,6 @@ void Grains::display_used_memory() const
 // Synchronizes the PPWindow boolean relative to each sub-domain
 void Grains::synchronize_PPWindow()
 {}
-
-
-
-
-// ----------------------------------------------------------------------------
-// Reads a window
-void Grains::readWindow( DOMNode* nWindow, Window& iwindow,
-	string const& oshift )
-{
-  // Insertion window type
-  string iwindow_type = "Box";
-  if ( ReaderXML::hasNodeAttr( nWindow, "Type" ) )
-    iwindow_type = ReaderXML::getNodeAttr_String( nWindow,
-		  	"Type" );
-
-  if ( iwindow_type == "Cylinder" )
-    iwindow.ftype = WINDOW_CYLINDER;
-  else if ( iwindow_type == "Annulus" )
-    iwindow.ftype = WINDOW_ANNULUS;
-  else if ( iwindow_type == "Line" )
-    iwindow.ftype = WINDOW_LINE;
-  else if ( iwindow_type == "Box" )
-    iwindow.ftype = WINDOW_BOX;
-  else iwindow.ftype = WINDOW_NONE;
-
-  DOMNodeList* points = NULL;
-  DOMNode* pointA = NULL;
-  DOMNode* pointB = NULL;
-  DOMNode* cylGeom = NULL;
-  DOMNode* annGeom = NULL;
-  string axisdir_str = "W";
-
-  // Read features depending on the type
-  switch( iwindow.ftype )
-  {
-    case WINDOW_BOX:
-      points = ReaderXML::getNodes( nWindow );
-      pointA = points->item( 0 );
-      pointB = points->item( 1 );
-
-      iwindow.radius = iwindow.radius_int = iwindow.height = 0. ;
-      iwindow.axisdir = NONE ;
-      iwindow.ptA[X] = ReaderXML::getNodeAttr_Double( pointA, "X" );
-      iwindow.ptA[Y] = ReaderXML::getNodeAttr_Double( pointA, "Y" );
-      iwindow.ptA[Z] = ReaderXML::getNodeAttr_Double( pointA, "Z" );
-      iwindow.ptB[X] = ReaderXML::getNodeAttr_Double( pointB, "X" );
-      iwindow.ptB[Y] = ReaderXML::getNodeAttr_Double( pointB, "Y" );
-      iwindow.ptB[Z] = ReaderXML::getNodeAttr_Double( pointB, "Z" );
-
-      if ( m_rank == 0 )
-      {
-        cout << oshift << "Type = " << iwindow_type << endl;
-	cout << oshift << GrainsExec::m_shift3 << "Point3 min = " <<
-		iwindow.ptA[X] << " " << iwindow.ptA[Y] << " " <<
-		iwindow.ptA[Z] << endl;
-        cout << oshift << GrainsExec::m_shift3 << "Point3 max = " <<
-		iwindow.ptB[X] << " " << iwindow.ptB[Y] << " " <<
-		iwindow.ptB[Z] << endl;
-      }
-      break;
-
-    case WINDOW_CYLINDER:
-      pointA = ReaderXML::getNode( nWindow, "BottomCentre" );
-      iwindow.ptA[X] = ReaderXML::getNodeAttr_Double( pointA, "X" );
-      iwindow.ptA[Y] = ReaderXML::getNodeAttr_Double( pointA, "Y" );
-      iwindow.ptA[Z] = ReaderXML::getNodeAttr_Double( pointA, "Z" );
-      iwindow.ptB[X] = iwindow.ptB[Y] = iwindow.ptB[Z] = 0.;
-      cylGeom = ReaderXML::getNode( nWindow, "Cylinder" );
-      iwindow.radius = ReaderXML::getNodeAttr_Double( cylGeom, "Radius" );
-      iwindow.radius_int = 0.;
-      iwindow.height = ReaderXML::getNodeAttr_Double( cylGeom, "Height" );
-      axisdir_str = ReaderXML::getNodeAttr_String( cylGeom, "Direction" );
-      if ( axisdir_str == "X" ) iwindow.axisdir = X;
-      else if ( axisdir_str == "Y" ) iwindow.axisdir = Y;
-      else if ( axisdir_str == "Z" ) iwindow.axisdir = Z;
-      else
-      {
-	if ( m_rank == 0 )
-          cout << "Wrong axis direction in cylindrical "
-		<< "insertion window; values: X, Y or Z" << endl;
-        grainsAbort();
-      }
-
-      if ( m_rank == 0 )
-      {
-	cout << oshift << "Type = " << iwindow_type << endl;
-        cout << oshift << GrainsExec::m_shift3 << "Bottom centre = " <<
-		iwindow.ptA[X] << " " << iwindow.ptA[Y] << " " <<
-		iwindow.ptA[Z] << endl;
-	cout << oshift << GrainsExec::m_shift3 << "Radius = " <<
-	  	iwindow.radius << endl;
-        cout << oshift << GrainsExec::m_shift3 << "Height = " <<
-		iwindow.height << endl;
-        cout << oshift << GrainsExec::m_shift3 << "Direction = " <<
-		axisdir_str << endl;
-      }
-      break;
-
-    case WINDOW_ANNULUS:
-      pointA = ReaderXML::getNode( nWindow, "BottomCentre" );
-      iwindow.ptA[X] = ReaderXML::getNodeAttr_Double( pointA, "X" );
-      iwindow.ptA[Y] = ReaderXML::getNodeAttr_Double( pointA, "Y" );
-      iwindow.ptA[Z] = ReaderXML::getNodeAttr_Double( pointA, "Z" );
-      iwindow.ptB[X] = iwindow.ptB[Y] = iwindow.ptB[Z] = 0.;
-      annGeom = ReaderXML::getNode( nWindow, "Annulus" );
-      iwindow.radius = ReaderXML::getNodeAttr_Double( annGeom,
-	  	"RadiusExt" );
-      iwindow.radius_int = ReaderXML::getNodeAttr_Double( annGeom,
-		"RadiusInt" );
-      iwindow.height = ReaderXML::getNodeAttr_Double( annGeom,
-		"Height" );
-      axisdir_str = ReaderXML::getNodeAttr_String( annGeom,
-		"Direction" );
-      if ( axisdir_str == "X" ) iwindow.axisdir = X;
-      else if ( axisdir_str == "Y" ) iwindow.axisdir = Y;
-      else if ( axisdir_str == "Z" ) iwindow.axisdir = Z;
-      else
-      {
-        if ( m_rank == 0 )
-          cout << "Wrong axis direction in cylindrical "
-		<< "insertion window; values: X, Y or Z" << endl;
-        grainsAbort();
-      }
-
-      if ( m_rank == 0 )
-      {
-	cout << oshift << "Type = " << iwindow_type << endl;
-        cout << oshift << GrainsExec::m_shift3 << "Bottom centre = " <<
-		iwindow.ptA[X] << " " << iwindow.ptA[Y] << " " <<
-		iwindow.ptA[Z] << endl;
-	cout << oshift << GrainsExec::m_shift3 << "External radius = " <<
-		iwindow.radius << endl;
-        cout << oshift << GrainsExec::m_shift3 << "Internal radius = " <<
-		iwindow.radius_int << endl;
-        cout << oshift << GrainsExec::m_shift3 << "Height = " <<
-		iwindow.height << endl;
-        cout << oshift << GrainsExec::m_shift3 << "Direction = " <<
-		axisdir_str << endl;
-      }
-      break;
-
-    case WINDOW_LINE:
-      points = ReaderXML::getNodes( nWindow );
-      pointA = points->item( 0 );
-      pointB = points->item( 1 );
-
-      iwindow.radius = iwindow.radius_int = iwindow.height = 0. ;
-      iwindow.axisdir = NONE ;
-      iwindow.ptA[X] = ReaderXML::getNodeAttr_Double( pointA, "X" );
-      iwindow.ptA[Y] = ReaderXML::getNodeAttr_Double( pointA, "Y" );
-      iwindow.ptA[Z] = ReaderXML::getNodeAttr_Double( pointA, "Z" );
-      iwindow.ptB[X] = ReaderXML::getNodeAttr_Double( pointB, "X" );
-      iwindow.ptB[Y] = ReaderXML::getNodeAttr_Double( pointB, "Y" );
-      iwindow.ptB[Z] = ReaderXML::getNodeAttr_Double( pointB, "Z" );
-
-      if ( m_rank == 0 )
-      {
-        cout << oshift << "Type = " << iwindow_type << endl;
-        cout << oshift << GrainsExec::m_shift3 << "Point3 A = " <<
-		iwindow.ptA[X] << " " << iwindow.ptA[Y] << " " <<
-		iwindow.ptA[Z] << endl;
-        cout << oshift << GrainsExec::m_shift3 << "Point3 B = " <<
-		iwindow.ptB[X] << " " << iwindow.ptB[Y] << " " <<
-		iwindow.ptB[Z] << endl;
-      }
-      break;
-
-    default:
-      if ( m_rank == 0 ) cout << "Unknown insertion window "
-		"type" << endl;
-      grainsAbort();
-      break;
-  }
-}
 
 
 

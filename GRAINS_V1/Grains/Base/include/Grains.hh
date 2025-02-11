@@ -280,12 +280,6 @@ class Grains : public ComputingTime, public SolverComputingTime
     @param vrot particle rotational velocity */
     void computeInitVit( Vector3& vtrans, Vector3& vrot ) const;
     
-    /** @brief Reads a window 
-    @param nWindow root XML node of the window 
-    @param iwindow the window 
-    @param oshift empty string to shift the output */
-    void readWindow( DOMNode* nWindow, Window& iwindow, string const& oshift );
-    
     /** @brief Computes particle forces and torques */
     void computeParticlesForceAndTorque();
 	

@@ -29,7 +29,9 @@ GrainsCoupledWithFluid::GrainsCoupledWithFluid( double fluid_density_ )
 // ----------------------------------------------------------------------------
 // Destructor
 GrainsCoupledWithFluid::~GrainsCoupledWithFluid()
-{}
+{
+  m_orderedParticles.clear();
+}
 
 
 
@@ -76,6 +78,15 @@ void GrainsCoupledWithFluid::do_before_time_stepping( DOMElement* rootElement )
   // Allocate hydro force and torque arrays in the AppPRSHydroFT app
   if ( m_PRSHydroFT ) m_PRSHydroFT->allocateHydroFT( 
   	m_allcomponents.getNumberActiveParticlesOnProc() );
+	
+  // Allocate the vector of particles ordered by their ID number 
+  size_t nparticles = m_allcomponents.getTotalNumberPhysicalParticles();
+  if ( nparticles )
+  {
+    m_orderedParticles.reserve( nparticles );
+    Particle* pp = NULL;
+    for (size_t i=0;i<nparticles;++i) m_orderedParticles.push_back( pp );
+  }
 
   cout << "Initialization completed" << endl << endl;                           
 }
@@ -659,37 +670,36 @@ void GrainsCoupledWithFluid::AdditionalFeatures( DOMElement* rootElement )
 	 
  	DOMNode* pointA = nWindowPoints->item( 0 );
  	DOMNode* pointB = nWindowPoints->item( 1 );
+	Point3 ptA, ptB;
 
  	Window PPWindow;
-	PPWindow.ftype = WINDOW_BOX;
-	PPWindow.radius = PPWindow.radius_int = PPWindow.height = 0. ;
-	PPWindow.axisdir = NONE ;	
- 	PPWindow.ptA[X] = ReaderXML::getNodeAttr_Double( pointA, "X" );
-	PPWindow.ptA[Y] = ReaderXML::getNodeAttr_Double( pointA, "Y" );
-	PPWindow.ptA[Z] = ReaderXML::getNodeAttr_Double( pointA, "Z" );
-	PPWindow.ptB[X] = ReaderXML::getNodeAttr_Double( pointB, "X" );
-	PPWindow.ptB[Y] = ReaderXML::getNodeAttr_Double( pointB, "Y" );
-	PPWindow.ptB[Z] = ReaderXML::getNodeAttr_Double( pointB, "Z" );
+ 	ptA[X] = ReaderXML::getNodeAttr_Double( pointA, "X" );
+	ptA[Y] = ReaderXML::getNodeAttr_Double( pointA, "Y" );
+	ptA[Z] = ReaderXML::getNodeAttr_Double( pointA, "Z" );
+	ptB[X] = ReaderXML::getNodeAttr_Double( pointB, "X" );
+	ptB[Y] = ReaderXML::getNodeAttr_Double( pointB, "Y" );
+	ptB[Z] = ReaderXML::getNodeAttr_Double( pointB, "Z" );
+	PPWindow.setAsBox( ptA, ptB );
 	
 	double Ox, Oy, Oz, lx, ly, lz;
 	bool b_X = false, b_Y = false, b_Z = false, b_PPWindow = false;
 	App::get_local_domain_origin( Ox, Oy, Oz );
 	App::get_local_domain_size( lx, ly, lz );
 	
-	if ( ( PPWindow.ptA[X] >= Ox && PPWindow.ptA[X] < Ox + lx )
-		|| ( PPWindow.ptB[X] >= Ox && PPWindow.ptB[X] < Ox + lx )
-		|| ( Ox > PPWindow.ptA[X] && Ox < PPWindow.ptB[X] )
-		|| ( Ox > PPWindow.ptB[X] && Ox < PPWindow.ptA[X] ) )
+	if ( ( ptA[X] >= Ox && ptA[X] < Ox + lx )
+		|| ( ptB[X] >= Ox && ptB[X] < Ox + lx )
+		|| ( Ox > ptA[X] && Ox < ptB[X] )
+		|| ( Ox > ptB[X] && Ox < ptA[X] ) )
 	  b_X = true;
-	if ( ( PPWindow.ptA[Y] >= Oy && PPWindow.ptA[Y] < Oy + ly )
-		|| ( PPWindow.ptB[Y] >= Oy && PPWindow.ptB[Y] < Oy + ly )
-		|| ( Oy > PPWindow.ptA[Y] && Oy < PPWindow.ptB[Y] )
-		|| ( Oy > PPWindow.ptB[Y] && Oy < PPWindow.ptA[Y] ) )
+	if ( ( ptA[Y] >= Oy && ptA[Y] < Oy + ly )
+		|| ( ptB[Y] >= Oy && ptB[Y] < Oy + ly )
+		|| ( Oy > ptA[Y] && Oy < ptB[Y] )
+		|| ( Oy > ptB[Y] && Oy < ptA[Y] ) )
 	  b_Y = true;
-	if ( ( PPWindow.ptA[Z] >= Oz && PPWindow.ptA[Z] < Oz + lz )
-		|| ( PPWindow.ptB[Z] >= Oz && PPWindow.ptB[Z] < Oz + lz )
-		|| ( Oz > PPWindow.ptA[Z] && Oz < PPWindow.ptB[Z] )
-		|| ( Oz > PPWindow.ptB[Z] && Oz < PPWindow.ptA[Z] ) )
+	if ( ( ptA[Z] >= Oz && ptA[Z] < Oz + lz )
+		|| ( ptB[Z] >= Oz && ptB[Z] < Oz + lz )
+		|| ( Oz > ptA[Z] && Oz < ptB[Z] )
+		|| ( Oz > ptB[Z] && Oz < ptA[Z] ) )
 	  b_Z = true;
 	  
 	if ( b_X && b_Y && b_Z ) b_PPWindow = true;
@@ -702,11 +712,11 @@ void GrainsCoupledWithFluid::AdditionalFeatures( DOMElement* rootElement )
 	{
 	  cout << GrainsExec::m_shift9 << "Domain" << endl;
           cout << GrainsExec::m_shift12 << "Point3 A = " << 
-		PPWindow.ptA[X] << " " << PPWindow.ptA[Y] << " " <<
-		PPWindow.ptA[Z] << endl;
+		ptA[X] << " " << ptA[Y] << " " <<
+		ptA[Z] << endl;
           cout << GrainsExec::m_shift12 << "Point3 B = " << 
-		PPWindow.ptB[X] << " " << PPWindow.ptB[Y] << " " <<
-		PPWindow.ptB[Z] << endl;		  	
+		ptB[X] << " " << ptB[Y] << " " <<
+		ptB[Z] << endl;		  	
 	}
       }
       else
@@ -887,12 +897,8 @@ void GrainsCoupledWithFluid::numberOfRBToFluid( size_t* nparticles,
 {  
   if ( m_processorIsActive )
   {
-    list<Particle*> const* particles = m_allcomponents.getActiveParticles();
     list<Obstacle*> obstaclesToFluid = m_allcomponents.getObstaclesToFluid();
-    list<Particle*>::const_iterator particle;
-    *nparticles = 0;
-    for (particle=particles->begin();particle!=particles->end();particle++)
-      if ( (*particle)->getTag() < 2 ) (*nparticles)++;
+    *nparticles = m_allcomponents.getTotalNumberPhysicalParticles(); 
     *nobstacles = obstaclesToFluid.size();
   }  
 }
@@ -902,7 +908,7 @@ void GrainsCoupledWithFluid::numberOfRBToFluid( size_t* nparticles,
 // ----------------------------------------------------------------------------
 // Writes features of moving rigid bodies in a stream to be used by the 
 // fluid flow solver
-void GrainsCoupledWithFluid::GrainsToFluid( istringstream &is ) const
+void GrainsCoupledWithFluid::GrainsToFluid( istringstream &is )
 {
   if ( m_processorIsActive )
   {
@@ -927,39 +933,40 @@ void GrainsCoupledWithFluid::GrainsToFluid( istringstream &is ) const
     Particle* periodic_clone = NULL ;
     Vector3 periodicVector;
     
-    // TO DO: the particle number used to communicate with the fluid is 
-    // different from its actual number in Grains. 
-    // This needs to be fixed in the future 
+    // Order the list of particles by their ID num into m_orderedParticles 
+    nparticles = m_allcomponents.getTotalNumberPhysicalParticles();    
     for (particle=particles->begin();particle!=particles->end();particle++)
-      if ( (*particle)->getTag() < 2 ) nparticles++;	          
-    
+      if ( (*particle)->getTag() < 2 ) 
+        m_orderedParticles[(*particle)->getID()-1] = *particle;
+
     // Total number of rigid bodies to send to the fluid flow solver
     particles_features << nparticles + obstaclesToFluid.size() << endl;
 
     // Particle features
-    for (particle=particles->begin(), componentIDinFluid=0; 
-      	particle!=particles->end();particle++)
+    // Note that componentIDinFluid = particleID - 1
+    for (size_t i=0;i<nparticles;++i,++componentIDinFluid)
     {
-      if ( (*particle)->getTag() < 2 ) 
-      {     
-        if ( (*particle)->getActivity() == COMPUTE )      
-        {        
-	  vtrans = (*particle)->getTranslationalVelocity();
-          vrot = (*particle)->getAngularVelocity();
-          centre = (*particle)->getPosition();
-          density = (*particle)->getDensity();
-          mass = (*particle)->getMass();
-          (*particle)->computeInertiaTensorSpaceFixed( inertia );
-          radius = (*particle)->getCircumscribedRadius();
-          ncorners = (*particle)->getNbCorners();
-          particleID = (*particle)->getID();
-	  nclonesper = particlesPeriodicClones->count( particleID ); 
-          particleType = "P";
-          if ( nclonesper ) particleType = "PP";
-          mr = (*particle)->getRigidBody()->getTransform()->getBasis();
+      if ( m_orderedParticles[i]->getActivity() == COMPUTE )      
+      {        
+	vtrans = m_orderedParticles[i]->getTranslationalVelocity();
+        vrot = m_orderedParticles[i]->getAngularVelocity();
+        centre = m_orderedParticles[i]->getPosition();
+        density = m_orderedParticles[i]->getDensity();
+        mass = m_orderedParticles[i]->getMass();
+        m_orderedParticles[i]->computeInertiaTensorSpaceFixed( inertia );
+        radius = m_orderedParticles[i]->getCircumscribedRadius();
+        ncorners = m_orderedParticles[i]->getNbCorners();
+        particleID = m_orderedParticles[i]->getID();
+	if ( componentIDinFluid != particleID - 1 )
+	  cout << "Warning: numbering problem in "
+	  	<< "GrainsCoupledWithFluid::GrainsToFluid" << endl;
+	nclonesper = particlesPeriodicClones->count( particleID ); 
+        particleType = "P";
+        if ( nclonesper ) particleType = "PP";
+        mr = m_orderedParticles[i]->getRigidBody()->getTransform()->getBasis();
 
-          particles_features << componentIDinFluid << " " << ncorners << endl;
-          particles_features << particleType << " " <<
+        particles_features << componentIDinFluid << " " << ncorners << endl;
+        particles_features << particleType << " " <<
 		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			(*vtrans)[X] ) << " " << 
 		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
@@ -1013,41 +1020,38 @@ void GrainsCoupledWithFluid::GrainsToFluid( istringstream &is ) const
 		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			(*centre)[Z] ) << endl;			
 
-          if ( particleType == "PP" )
-          {
-            particles_features << nclonesper << endl;
-	    crange = particlesPeriodicClones->equal_range( particleID );
-	    for (imm=crange.first; imm!=crange.second;imm++)
-	    {
-	      periodic_clone = imm->second;
-              periodicVector = *(periodic_clone->getPosition()) - *centre;
-              particles_features << 
+        if ( particleType == "PP" )
+        {
+          particles_features << nclonesper << endl;
+	  crange = particlesPeriodicClones->equal_range( particleID );
+	  for (imm=crange.first; imm!=crange.second;imm++)
+	  {
+	    periodic_clone = imm->second;
+            periodicVector = *(periodic_clone->getPosition()) - *centre;
+            particles_features << 
 	      	GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			periodicVector[X] ) << " " <<
 		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			periodicVector[Y] ) << " " <<				
 		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			periodicVector[Z] ) << endl;	      
-	    }
-          }
-
-          particles_features << radius ;
-          (*particle)->writePositionInFluid( particles_features );
+	  }
         }
-        else
-        {
-          particles_features << componentIDinFluid << " " << "1" << endl;
-          particles_features << "P " <<
+
+        particles_features << radius ;
+        m_orderedParticles[i]->writePositionInFluid( particles_features );
+      }
+      else
+      {
+        particles_features << componentIDinFluid << " " << "1" << endl;
+        particles_features << "P " <<
 		"0. 0. 0. 0. 0. 0. 1e8 1. " <<
 		"1.  1.  1.  1.  1.  1. " <<
-		"1. 0. 0. 0. 1. 0. 0. 0. 1." 
+		"1. 0. 0. 0. 1. 0. 0. 0. 1. " 
 		"0. 0. 0. " << endl;
-          particles_features << "0.  1"     << endl;
-          particles_features << "0. 0. 0." << endl;
-	  particles_features << "0" << endl;
-        }
-      
-        componentIDinFluid++;
+        particles_features << "0.  1"     << endl;
+        particles_features << "0. 0. 0." << endl;
+	particles_features << "0" << endl;
       }
     }
 
@@ -1130,30 +1134,29 @@ void GrainsCoupledWithFluid::updateParticlesVelocity(
     size_t vecSize = 0, nparticles = 0;
     Vector3 vtrans, vrot;
     
-    // TO DO: the particle number used to communicate with the fluid is 
-    // different from its actual number in Grains. 
-    // This needs to be fixed in the future
-    for (particle=particles->begin();particle!=particles->end();particle++)
-      if ( (*particle)->getTag() < 2 ) nparticles++;
+    nparticles = m_allcomponents.getTotalNumberPhysicalParticles();
 
     if ( m_dimension == 3 )
     {
       if ( velocity_data_array.size() != nparticles )
         cout << "WARNING: numbers of particles in Grains and in the fluid "
-		<< "solver are different" << endl;
+		<< "solver are different in "
+		<< "GrainsCoupledWithFluid::updateParticlesVelocity" << endl;
 
-      for (particle=particles->begin(), id=0; particle!=particles->end();
-       		particle++)
+      for (particle=particles->begin();particle!=particles->end();particle++)
       {
         if ( (*particle)->getActivity() == COMPUTE
     		&& (*particle)->getTag() < 2 )
         {
-          vecSize = (velocity_data_array[id]).size();
+          id = (*particle)->getID() - 1;          
+	  
+	  vecSize = (velocity_data_array[id]).size();
           if ( vecSize != 6 )
 	    cout << "ERROR: the velocity data array does not have the right "
-		<< "size, it is " << vecSize << " while it must be 6" << endl;
-
-          vtrans[X] = velocity_data_array[id][0];
+		<< "size, it is " << vecSize << " while it must be 6 in " 
+		<< "GrainsCoupledWithFluid::updateParticlesVelocity" << endl;
+	  
+	  vtrans[X] = velocity_data_array[id][0];
           vtrans[Y] = velocity_data_array[id][1];
           vtrans[Z] = velocity_data_array[id][2];
           vrot[X] = velocity_data_array[id][3];
@@ -1165,8 +1168,6 @@ void GrainsCoupledWithFluid::updateParticlesVelocity(
 
           if ( b_set_velocity_nm1_and_diff )
             (*particle)->setVelocityAndVelocityDifferencePreviousTime();
-	    
-	  id++;
         }
       }    
     }

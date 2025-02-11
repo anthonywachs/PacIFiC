@@ -80,7 +80,7 @@ class GrainsCoupledWithFluid : virtual public Grains
     /** @brief Writes features of moving rigid bodies in a stream to be used
     by the fluid flow solver
     @param is output stream */
-    void GrainsToFluid( istringstream &is ) const;
+    void GrainsToFluid( istringstream &is );
     
     /** @brief Updates particles velocity with data from the fluid solver
     @param velocity_data_array velocity data array
@@ -144,7 +144,9 @@ class GrainsCoupledWithFluid : virtual public Grains
     size_t m_ndt; /**< number of granular simulation time steps over 
     	a fluid flow simulation time step */ 
     AppPRSHydroFT* m_PRSHydroFT; /**< explicit pointer to the PRS hydro force
-    	and torque application */	       	       
+    	and torque application */
+    vector<Particle*> m_orderedParticles; /**< vector of particles ordered by 
+    	their ID number from 1 to total number of particles */
     //@}
 
 

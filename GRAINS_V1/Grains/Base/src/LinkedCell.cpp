@@ -2459,19 +2459,18 @@ void LinkedCell::checkStructuredArrayPositionsMPI( struct StructArrayInsertion*
     	InsertionArray, GrainsMPIWrapper const* wrapper ) const
 {
   Point3 position;
+  Point3 ptA = *(InsertionArray->box.getPointA());
+  Point3 ptB = *(InsertionArray->box.getPointB());  
   double geoshift = 1.e-12;      
-  double deltax = ( InsertionArray->box.ptB[X]
-  	- InsertionArray->box.ptA[X] ) / double(InsertionArray->NX) ;
-  double deltay = ( InsertionArray->box.ptB[Y]
-  	- InsertionArray->box.ptA[Y] ) / double(InsertionArray->NY) ;
-  double deltaz = ( InsertionArray->box.ptB[Z]
-  	- InsertionArray->box.ptA[Z] ) / double(InsertionArray->NZ) ;
+  double deltax = ( ptB[X] - ptA[X] ) / double(InsertionArray->NX) ;
+  double deltay = ( ptB[Y] - ptA[Y] ) / double(InsertionArray->NY) ;
+  double deltaz = ( ptB[Z] - ptA[Z] ) / double(InsertionArray->NZ) ;
   vector<size_t> coorMatchLocLim( 3, 0 );
   size_t k, l, m;
   
   for (k=0;k<InsertionArray->NX && !coorMatchLocLim[X];++k)
   {
-    position[X] = InsertionArray->box.ptA[X] + ( double(k) + 0.5 ) * deltax;
+    position[X] = ptA[X] + ( double(k) + 0.5 ) * deltax;
     if ( fabs( position[X] - m_LC_local_origin[X] ) < geoshift
     	|| fabs( position[X] - m_LC_local_max[X] ) < geoshift 
 	|| fabs( position[X] - m_domain_local_origin[X] ) < geoshift
@@ -2481,7 +2480,7 @@ void LinkedCell::checkStructuredArrayPositionsMPI( struct StructArrayInsertion*
   
   for (l=0;l<InsertionArray->NY && !coorMatchLocLim[Y];++l)
   {
-    position[Y] = InsertionArray->box.ptA[Y] + ( double(l) + 0.5 ) * deltay;
+    position[Y] = ptA[Y] + ( double(l) + 0.5 ) * deltay;
     if ( fabs( position[Y] - m_LC_local_origin[Y] ) < geoshift
     	|| fabs( position[Y] - m_LC_local_max[Y] ) < geoshift 
 	|| fabs( position[Y] - m_domain_local_origin[Y] ) < geoshift
@@ -2491,7 +2490,7 @@ void LinkedCell::checkStructuredArrayPositionsMPI( struct StructArrayInsertion*
 
   for (m=0;m<InsertionArray->NZ && !coorMatchLocLim[Z];++m)
   {
-    position[Z] = InsertionArray->box.ptA[Z] + ( double(m) + 0.5 ) * deltaz;
+    position[Z] = ptA[Z] + ( double(m) + 0.5 ) * deltaz;
     if ( fabs( position[Z] - m_LC_local_origin[Z] ) < geoshift
     	|| fabs( position[Z] - m_LC_local_max[Z] ) < geoshift 
 	|| fabs( position[Z] - m_domain_local_origin[Z] ) < geoshift
@@ -2500,11 +2499,11 @@ void LinkedCell::checkStructuredArrayPositionsMPI( struct StructArrayInsertion*
   }
   
   coorMatchLocLim[X] = wrapper->max_UNSIGNED_INT( coorMatchLocLim[X] );
-  if ( coorMatchLocLim[X] ) InsertionArray->box.ptA[X] += geoshift;
+  if ( coorMatchLocLim[X] ) InsertionArray->box.shiftWindow( geoshift, X );
   coorMatchLocLim[Y] = wrapper->max_UNSIGNED_INT( coorMatchLocLim[Y] );
-  if ( coorMatchLocLim[Y] ) InsertionArray->box.ptA[Y] += geoshift;  
+  if ( coorMatchLocLim[Y] ) InsertionArray->box.shiftWindow( geoshift, Y );
   coorMatchLocLim[Z] = wrapper->max_UNSIGNED_INT( coorMatchLocLim[Z] );
-  if ( coorMatchLocLim[Z] ) InsertionArray->box.ptA[Z] += geoshift;
+  if ( coorMatchLocLim[Z] ) InsertionArray->box.shiftWindow( geoshift, Z );
   
   if ( ( coorMatchLocLim[X] || coorMatchLocLim[Y] || coorMatchLocLim[Z] )
   	&& wrapper->get_rank() == 0 )

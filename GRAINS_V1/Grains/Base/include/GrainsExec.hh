@@ -7,6 +7,7 @@
 #include "Matrix.hh"
 #include "VertexBase.hh"
 #include "IndexArray.hh"
+#include "Window.hh"
 #include <string>
 #include <fstream>
 #include <list>
@@ -23,34 +24,10 @@ class GrainsMPIWrapper;
 class App;
 
 
-/** @brief Insertion window type */
-enum WindowType
-{
-  WINDOW_BOX, /**< Box */
-  WINDOW_CYLINDER, /**< Cylinder */
-  WINDOW_ANNULUS, /**< Annulus */
-  WINDOW_LINE, /**< Line */
-  WINDOW_NONE /**< unknown */
-};
-
-
-/** @brief Insertion window feature */
-struct Window
-{
-  WindowType ftype; /**< Window type */
-  Point3 ptA; /**< Box 1st corner or center of lower disk of the cylinder */
-  Point3 ptB; /**< Box 2nd corner */
-  double radius; /**< Cylinder radius */
-  double radius_int; /**< Inner cylinder radius in case of annulus */
-  double height; /**< Cylinder height */
-  Direction axisdir; /**< Cylinder axis direction */
-};
-
-
 /** @brief Structured array of positions */
 struct StructArrayInsertion
 {
-  struct Window box; /**< Window */
+  Window box; /**< Window */
   size_t NX; /**< Number of positions in x */
   size_t NY; /**< Number of positions in y */
   size_t NZ; /**< Number of positions in z */

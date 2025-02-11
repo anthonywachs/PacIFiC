@@ -364,7 +364,7 @@ void ParaviewPostProcessingWriter::PostProcessing_start(
     ++m_ParaviewCycleNumber;                
   }
   
-  // Windows d'insertion
+  // Insertion windows and periodic boundaries
   if ( m_rank == 0 ) 
   {
     writeInsertion_Paraview( insert_windows, 
@@ -1278,139 +1278,9 @@ void ParaviewPostProcessingWriter::writeInsertion_Paraview(
   vector<Window>::const_iterator iv;
   list<RigidBody*> iwlist;
   list<RigidBody*>::iterator il = iwlist.begin(); 
-  Transform gcwindow; 
-  Convex* ccw = NULL;
-  RigidBody* ffw = NULL;
-  Vector3 v_axis;
-  Matrix mrot;
-  double Le = 0., Lh = 0., Lt = 0., angle = 0., 
-  	mean_radius = 0., thickness = 0. ;
-  Point3 panelCenter, center;
-  size_t nbPanels = 32;
-  double polygonAngle = 2. * PI / double(nbPanels);
   
   for (iv=insert_windows.begin();iv!=insert_windows.end();iv++)
-  {
-    switch( iv->ftype )
-    {
-      case WINDOW_BOX:
-        gcwindow.setOrigin( 0.5 * ( iv->ptA + iv->ptB ) );
-        ccw = new Box( 0.5 * ( iv->ptB - iv->ptA ) );
-        ffw = new RigidBody( ccw, gcwindow );
-        iwlist.push_back( ffw );
-        break;
-      
-      case WINDOW_CYLINDER:
-        switch ( iv->axisdir )
-        {
-          case X: 
-            v_axis[X] = iv->height; 
-            mrot.setValue( cos( 0.5 * PI ), -sin( 0.5 * PI ), 0.,
-                sin( 0.5 * PI ), cos( 0.5 * PI ), 0.,
-                0., 0., 1. );
-            break;
-
-          case Y: 
-            v_axis[Y] = iv->height; 
-            break;
-  
-          default: 
-            v_axis[Z] = iv->height; 
-            mrot.setValue( 1., 0., 0.,
-                0., cos( 0.5 * PI ), -sin( 0.5 * PI ),
-                0., sin( 0.5 * PI ), cos( 0.5 * PI ) );
-            break;
-        }
-        gcwindow.setOrigin( iv->ptA + 0.5 * v_axis );
-        ccw = new Cylinder( iv->radius, iv->height );
-        ffw = new RigidBody( ccw, gcwindow );
-        ffw->getTransform()->setBasis( mrot );
-        iwlist.push_back( ffw );
-        break;	
-
-      case WINDOW_ANNULUS:
-        mean_radius = iv->radius_int + 0.5 * ( iv->radius - iv->radius_int ) ;
-        thickness = iv->radius - iv->radius_int	;
-        center = iv->ptA;
-        Le = thickness;       
-        Lt = iv->radius * tan( polygonAngle ); 
-        Lh = iv->height;
-        switch ( iv->axisdir )
-        {
-          case X: 
-            center[X] += 0.5 * iv->height;
-            for (size_t iNb=0; iNb!=nbPanels; iNb++)
-            {
-              angle = 2. * PI * double(iNb) / double(nbPanels);
-              panelCenter[X] = center[X];
-              panelCenter[Y] = center[Y] + mean_radius * cos(angle);
-              panelCenter[Z] = center[Z] + mean_radius * sin(angle);
-              gcwindow.setOrigin( panelCenter );
- 
-              mrot.setValue( 1., 0., 0.,
-                  0., cos(angle), -sin(angle),
-                  0., sin(angle), cos(angle) );
-              gcwindow.setBasis( mrot );
-              ccw = new Box( Lh, Le, Lt );
-              ffw = new RigidBody( ccw, gcwindow );
-              iwlist.push_back( ffw );
-            }
-            break;
-
-          case Y: 
-            center[Y] += 0.5 * iv->height;
-            for (size_t iNb=0; iNb!=nbPanels; iNb++)
-            {
-              angle = 2. * PI * double(iNb) / double(nbPanels);
-              panelCenter[X] = center[X] + mean_radius * sin(angle);
-              panelCenter[Y] = center[Y];
-              panelCenter[Z] = center[Z] + mean_radius * cos(angle);
-              gcwindow.setOrigin( panelCenter );
-
-              mrot.setValue( cos(angle), 0., sin(angle),
-                  0., 1., 0.,
-                  -sin(angle), 0., cos(angle) );
-              gcwindow.setBasis( mrot );
-              ccw = new Box( Lt, Lh, Le );
-              ffw = new RigidBody( ccw, gcwindow );
-              iwlist.push_back( ffw );
-            }
-            break;
-
-          default:
-            center[Z] += 0.5 * iv->height;
-            for (size_t iNb=0; iNb!=nbPanels; iNb++)
-            {
-              angle = 2. * PI * double(iNb) / double(nbPanels);
-              panelCenter[X] = center[X] + mean_radius * cos(angle);
-              panelCenter[Y] = center[Y] + mean_radius * sin(angle);
-              panelCenter[Z] = center[Z];
-              gcwindow.setOrigin( panelCenter );
-
-              mrot.setValue( cos(angle), -sin(angle), 0.,
-                  sin(angle), cos(angle), 0.,
-                  0., 0., 1. );
-              gcwindow.setBasis( mrot );
-              ccw = new Box( Le, Lt, Lh );
-              ffw = new RigidBody( ccw, gcwindow );
-              iwlist.push_back( ffw );
-            }
-            break;
-        }
-        break;
-
-      case WINDOW_LINE:
-        gcwindow = Segment::computeTransform( 
-            0.5 * ( iv->ptB - iv->ptA ), 0.5 * ( iv->ptA + iv->ptB ) );
-        ccw = new Segment( Norm( iv->ptB - iv->ptA ) );
-        ffw = new RigidBody( ccw, gcwindow );
-        iwlist.push_back( ffw );
-        break;
-
-      default:
-        break;
-    }
-  }
+    iv->addAsRigidBody( iwlist );
 
   ofstream f( ( m_ParaviewFilename_dir + "/" + partFilename + ".vtu" ).c_str(),
       ios::out );
