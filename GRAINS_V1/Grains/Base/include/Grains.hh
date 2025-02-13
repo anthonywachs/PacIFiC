@@ -5,6 +5,7 @@
 #include "GrainsMPIWrapper.hh"
 #include "GrainsExec.hh"
 #include "AllComponents.hh"
+#include "AllInsertionWindows.hh"
 #include "App.hh"
 #include "solvercomputingtime.hh"
 #include "computingtime.hh"
@@ -157,7 +158,7 @@ class Grains : public ComputingTime, public SolverComputingTime
     InitialAngularPosition m_init_angpos; /**< Initial angular position of 
     	inserted particles */
     RandomGeneratorSeed m_randomseed; /**< Random generator seed */
-    vector<Window> m_insertion_windows; /**< Insertion windows */  
+    AllInsertionWindows m_insertion_windows; /**< Insertion windows */  
     string m_position; /**< External position file name or structured array */
     string m_angular_position; /**< External angular position file name */    
     struct StructArrayInsertion* m_InsertionArray; /**< Structured array 

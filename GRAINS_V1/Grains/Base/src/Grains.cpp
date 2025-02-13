@@ -300,8 +300,9 @@ void Grains::Simulation( double time_interval )
 
       // Insertion of particles
       SCT_set_start( "ParticlesInsertion" );      
-      m_npwait_nm1 = m_allcomponents.getNumberPhysicalParticlesToInsert();      
-      if ( m_insertion_mode == IM_OVERTIME )
+      m_npwait_nm1 = m_allcomponents.getNumberPhysicalParticlesToInsert();
+      m_insertion_windows.Move( m_time, m_dt );     
+      if ( m_insertion_mode == IM_OVERTIME ) 
         insertParticle( m_insertion_order );      
       m_allcomponents.computeNumberParticles( m_wrapper );
       if ( m_npwait_nm1 
@@ -385,7 +386,8 @@ void Grains::Simulation( double time_interval )
 	saveReload( m_time );
 
 	// Write postprocessing files
-        m_allcomponents.PostProcessing( m_time, m_dt, m_collision );
+        m_allcomponents.PostProcessing( m_time, m_dt, m_collision, 
+		m_insertion_windows );
 
 	SCT_get_elapsed_time( "OutputResults" );
       }
@@ -1360,8 +1362,7 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 		bool ok = iwindow.readWindow( nWindow, 
 			GrainsExec::m_shift12, m_rank );
 		if ( !ok ) grainsAbort();	
-	        m_insertion_windows.insert( m_insertion_windows.begin(), 
-			iwindow );
+	        m_insertion_windows.addWindow( iwindow );
               }
 	    }
             else
@@ -1521,6 +1522,32 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 	}
       }
     }
+    
+    
+    // Insertion windows motion
+    DOMNode* nIWMotion = ReaderXML::getNode( root,
+    	"InsertionWindowMotion" );
+    if ( nIWMotion )
+    {
+      if ( m_rank == 0 )
+        cout << GrainsExec::m_shift6 << "Insertion Window Motion" << endl;
+
+      DOMNodeList* allIWMs = ReaderXML::getNodes( nIWMotion );
+      for (XMLSize_t i=0; i<allIWMs->getLength(); i++)
+      {
+        DOMNode* nIWM = allIWMs->item( i );
+	ObstacleImposedVelocity* motion = new ObstacleImposedVelocity(
+	  	nIWM, m_dt, m_rank, error );
+	if ( error != 0 || motion->getType() == "ConstantRotation" ) 
+	{
+          if ( m_rank == 0 ) cout << GrainsExec::m_shift6 <<
+		"Problem in insertion window motion (note that rotational"
+		<< " motion is not allowed)" << endl;	  
+	  grainsAbort();
+	}
+	else m_insertion_windows.LinkImposedMotion( motion );
+      }
+    }    
 
 
     // Post-processing writers
@@ -1781,19 +1808,11 @@ Point3 Grains::getInsertionPoint()
   // Insertion windows
   else
   {
-    int nWindow = 0;
-    int nbreWindows = int( m_insertion_windows.size() );
-
-    // Random selection of an insertion window
-    if ( nbreWindows != 1 )
-    {
-      double n = double(random()) / double(INT_MAX);
-      nWindow = int( n * nbreWindows );
-      if ( nWindow == nbreWindows ) nWindow--;
-    }
+    // Random selection of the window
+    Window const* pw = m_insertion_windows.getRandomWindow();
 
     // Random position in the selected insertion window
-    P = m_insertion_windows[nWindow].getInsertionPoint();
+    P = pw->getInsertionPoint();
   }
 
   return ( P );

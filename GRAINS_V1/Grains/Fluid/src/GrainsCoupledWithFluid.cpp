@@ -884,7 +884,8 @@ void GrainsCoupledWithFluid::doPostProcessing( size_t indent_width )
   if ( m_processorIsActive )
   {
     // Write postprocessing files    
-    m_allcomponents.PostProcessing( m_time, m_dt, m_collision );
+    m_allcomponents.PostProcessing( m_time, m_dt, m_collision, 
+    	m_insertion_windows );
 
     // Write reload files
     saveReload( m_time );

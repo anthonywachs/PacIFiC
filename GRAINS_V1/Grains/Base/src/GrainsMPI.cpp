@@ -223,7 +223,7 @@ void GrainsMPI::Simulation( double time_interval )
 
 	  // Write postprocessing files
           m_allcomponents.PostProcessing( m_time, m_dt, m_collision,
-		m_rank, m_nprocs, m_wrapper );
+		m_insertion_windows, m_rank, m_nprocs, m_wrapper );
 
 	  // Write reload files
 	  saveReload( m_time );

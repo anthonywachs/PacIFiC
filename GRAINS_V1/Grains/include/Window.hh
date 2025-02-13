@@ -68,7 +68,19 @@ class Window
     specified direction
     @param geoshift magnitude of the shift
     @param dir direction of the shift (x, y or z) */
-    void shiftWindow( double const& geoshift, Direction dir );        
+    void shiftWindow( double const& geoshift, Direction dir ); 
+    
+    /** @brief Associates the imposed velocity to the window
+    @param impvel imposed velocity */
+    bool LinkImposedMotion( ObstacleImposedVelocity* impvel ); 
+    
+    /** @brief Moves the window if it has an imposed motion
+    @param time physical time 
+    @param dt time step magnitude */
+    void Move( double time, double dt );
+    
+    /** @brief Resets kinematics to 0 */
+    void resetKinematics();                  
     //@}
 
 

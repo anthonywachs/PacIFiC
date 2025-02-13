@@ -53,7 +53,7 @@ class RawDataPostProcessingWriter : public PostProcessingWriter
 	vector<Particle*> const* referenceParticles,
 	Obstacle* obstacle,
 	LinkedCell const* LC,
-	vector<Window> const& insert_windows );
+	AllInsertionWindows const& insert_windows );
 
     /** @brief Writes data
     @param time physical time
@@ -63,7 +63,8 @@ class RawDataPostProcessingWriter : public PostProcessingWriter
     @param periodic_clones periodic particles
     @param referenceParticles reference particles
     @param obstacle obstacles 
-    @param LC linked-cell grid */
+    @param LC linked-cell grid
+    @param insert_windows insertion windows */
     virtual void PostProcessing( double const& time,
   	double const& dt,
   	list<Particle*> const* particles,
@@ -71,7 +72,8 @@ class RawDataPostProcessingWriter : public PostProcessingWriter
 	list<Particle*> const* periodic_clones,		
 	vector<Particle*> const* referenceParticles,
 	Obstacle* obstacle,
-	LinkedCell const* LC );
+	LinkedCell const* LC,
+	AllInsertionWindows const& insert_windows );
 
     /** @brief Finalizes writing data */
     virtual void PostProcessing_end();

@@ -1,6 +1,7 @@
 #include "GrainsMPIWrapper.hh"
 #include "GrainsExec.hh"
 #include "AllComponents.hh"
+#include "AllInsertionWindows.hh"
 #include "App.hh"
 #include "AppCollision.hh"
 #include "RigidBodyWithCrust.hh"
@@ -171,7 +172,7 @@ void AllComponents::LinkImposedMotion( ObstacleImposedVelocity* impvel )
 
 
 // ----------------------------------------------------------------------------
-// Associates the imposed velocity to the obstacle
+// Associates the imposed force to the obstacle
 void AllComponents::LinkImposedMotion( ObstacleImposedForce* load )
 {
   m_obstacle->LinkImposedMotion( load );
@@ -1621,7 +1622,7 @@ ostream& operator << ( ostream& f, AllComponents const& EC )
 // ----------------------------------------------------------------------------
 // Writes components for Post-Processing at the start of the simulation
 void AllComponents::PostProcessing_start( double time, double dt,
-	LinkedCell const* LC, vector<Window> const& insert_windows,
+	LinkedCell const* LC, AllInsertionWindows const& insert_windows,
 	int rank, int nprocs,
 	GrainsMPIWrapper const* wrapper )
 {
@@ -1691,8 +1692,8 @@ void AllComponents::PostProcessing_start( double time, double dt,
 // ----------------------------------------------------------------------------
 // Writes components for Post-Processing over the simulation
 void AllComponents::PostProcessing( double time, double dt,
-	LinkedCell const* LC, int rank,
-	int nprocs, GrainsMPIWrapper const* wrapper )
+	LinkedCell const* LC, AllInsertionWindows const& insert_windows,
+	int rank, int nprocs, GrainsMPIWrapper const* wrapper )
 {
   list<Particle*>* postProcessingPeriodic = NULL;
   list<PostProcessingWriter*>::iterator pp;
@@ -1732,7 +1733,7 @@ void AllComponents::PostProcessing( double time, double dt,
   for (pp=m_postProcessors.begin();pp!=m_postProcessors.end();pp++)
     (*pp)->PostProcessing( time, dt, &m_ActiveParticles,
 	&m_RemovedParticles, postProcessingPeriodic,
-	&m_ReferenceParticles, m_obstacle, LC );
+	&m_ReferenceParticles, m_obstacle, LC, insert_windows );
 
   // Destruction of local containers
   if ( GrainsExec::m_periodic )

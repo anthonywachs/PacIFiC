@@ -28,7 +28,7 @@ ParaviewPostProcessingWriter::ParaviewPostProcessingWriter()
 // ----------------------------------------------------------------------------
 // Constructor with XML node, rank and number of processes as input parameters
 ParaviewPostProcessingWriter::ParaviewPostProcessingWriter( DOMNode* dn,
-    int const& rank_, int const& nbranks_, bool const& verbose )
+	int const& rank_, int const& nbranks_, bool const& verbose )
   : PostProcessingWriter( dn, rank_, nbranks_ )
   , m_ParaviewCycleNumber( 0 )
   , m_binary( false )
@@ -95,12 +95,8 @@ ParaviewPostProcessingWriter::ParaviewPostProcessingWriter( DOMNode* dn,
 // ----------------------------------------------------------------------------
 // Constructor with input parameters 
 ParaviewPostProcessingWriter::ParaviewPostProcessingWriter(
-    int const& rank_,
-    int const& nbranks_,
-    const string &name_,
-    const string &root_,
-    const bool &isBinary,
-    bool const& verbose )
+	int const& rank_, int const& nbranks_, const string &name_, 
+	const string &root_, const bool &isBinary, bool const& verbose )
   : PostProcessingWriter( rank_, nbranks_ )
   , m_ParaviewFilename_dir( root_ )
   , m_ParaviewFilename( name_ )
@@ -154,15 +150,13 @@ ParaviewPostProcessingWriter::~ParaviewPostProcessingWriter()
 // ----------------------------------------------------------------------------
 // Initializes the post-processing writer
 void ParaviewPostProcessingWriter::PostProcessing_start(
-    double const& time, 
-    double const& dt,
-    list<Particle*> const* particles,
-    list<Particle*> const* inactiveparticles,
-    list<Particle*> const* periodic_clones,
-    vector<Particle*> const* referenceParticles,
-    Obstacle *obstacle,
-    LinkedCell const* LC,
-    vector<Window> const& insert_windows )
+	double const& time, double const& dt,
+	list<Particle*> const* particles,
+	list<Particle*> const* inactiveparticles,
+	list<Particle*> const* periodic_clones,
+	vector<Particle*> const* referenceParticles,
+	Obstacle *obstacle, LinkedCell const* LC,
+	AllInsertionWindows const& insert_windows )
 {
   size_t nbParticleTypes = referenceParticles->size() ;
   size_t nbPPTypes = m_pertype ? nbParticleTypes : 1;  
@@ -227,7 +221,20 @@ void ParaviewPostProcessingWriter::PostProcessing_start(
 			
         m_Paraview_savePeriodicCloneParticles_pvd << ">" << endl;	
         m_Paraview_savePeriodicCloneParticles_pvd << "<Collection>" << endl; 
-      }             
+      }
+      
+      // Insertion windows
+      m_Paraview_saveInsertionWindow_pvd << "<?xml version=\"1.0\"?>" << endl;
+      m_Paraview_saveInsertionWindow_pvd << 
+	"<VTKFile type=\"Collection\" version=\"0.1\""
+	<< " byte_order=\"LittleEndian\"";
+	      
+      if ( m_binary ) 
+	m_Paraview_saveInsertionWindow_pvd 
+		<< " compressor=\"vtkZLibDataCompressor\"";
+		
+      m_Paraview_saveInsertionWindow_pvd<< ">" << endl; 
+      m_Paraview_saveInsertionWindow_pvd << "<Collection>" << endl;                   
 
       if ( LC )
       {
@@ -275,7 +282,7 @@ void ParaviewPostProcessingWriter::PostProcessing_start(
 		
 	  m_Paraview_saveContactForceChains_pvd<< ">" << endl; 
 	  m_Paraview_saveContactForceChains_pvd << "<Collection>" << endl; 
-	}
+	} 	
 	
         // Linked cell grid 
 	if ( m_nprocs > 1 && !m_mpiio_singlefile )
@@ -296,7 +303,7 @@ void ParaviewPostProcessingWriter::PostProcessing_start(
     } 
            
     one_output( time, dt, particles, periodic_clones, referenceParticles,
-  	obstacle, LC );
+  	obstacle, LC, insert_windows );
   }
   else
   {
@@ -337,6 +344,11 @@ void ParaviewPostProcessingWriter::PostProcessing_start(
        	+ "_PeriodicCloneParticles.pvd", 
 	m_Paraview_savePeriodicCloneParticles_pvd );
 
+      // Insertion windows
+      readPVDFile( m_ParaviewFilename_dir + "/" + m_ParaviewFilename
+	+ "_InsertionWindows.pvd", 
+	m_Paraview_saveInsertionWindow_pvd );            
+
       if ( LC )
       {
         // Particle translational and angular velocity vectors
@@ -364,16 +376,11 @@ void ParaviewPostProcessingWriter::PostProcessing_start(
     ++m_ParaviewCycleNumber;                
   }
   
-  // Insertion windows and periodic boundaries
-  if ( m_rank == 0 ) 
-  {
-    writeInsertion_Paraview( insert_windows, 
-    	m_ParaviewFilename + "_InsertionWindows" );
-	
+  // Periodic boundaries
+  if ( m_rank == 0 ) 	
     if ( GrainsExec::m_periodic == true && LC )
       writePeriodicBoundary_Paraview(
-  	LC, m_ParaviewFilename + "_PeriodicBoundaries" );
-  }	
+  	LC, m_ParaviewFilename + "_PeriodicBoundaries" );	
 }
 
 
@@ -458,17 +465,16 @@ int ParaviewPostProcessingWriter::getPreviousCycleNumber() const
 // ----------------------------------------------------------------------------
 // Writes data
 void ParaviewPostProcessingWriter::PostProcessing(
-    double const& time, 
-    double const& dt,
-    list<Particle*> const* particles,
-    list<Particle*> const* inactiveparticles,
-    list<Particle*> const* periodic_clones,
-    vector<Particle*> const* referenceParticles,
-    Obstacle* obstacle,
-    LinkedCell const* LC )
+	double const& time, double const& dt,
+	list<Particle*> const* particles,
+	list<Particle*> const* inactiveparticles,
+	list<Particle*> const* periodic_clones,
+	vector<Particle*> const* referenceParticles,
+	Obstacle* obstacle, LinkedCell const* LC,
+	AllInsertionWindows const& insert_windows )
 {
   one_output( time, dt, particles, periodic_clones, referenceParticles,
-  	obstacle, LC );
+  	obstacle, LC, insert_windows );
 }
 
 
@@ -485,13 +491,12 @@ void ParaviewPostProcessingWriter::PostProcessing_end()
 // ----------------------------------------------------------------------------
 // Writes data at one physical time
 void ParaviewPostProcessingWriter::one_output(
-    double const& time,
-    double const& dt,
-    list<Particle*> const* particles,
-    list<Particle*> const* periodic_clones,
-    vector<Particle*> const* referenceParticles,
-    Obstacle* obstacle,
-    LinkedCell const* LC )
+	double const& time, double const& dt,
+	list<Particle*> const* particles,
+	list<Particle*> const* periodic_clones,
+	vector<Particle*> const* referenceParticles,
+	Obstacle* obstacle, LinkedCell const* LC,
+	AllInsertionWindows const& insert_windows )
 {
   size_t nbParticleTypes = referenceParticles->size() ;
   size_t nbPPTypes = m_pertype ? nbParticleTypes : 1;  
@@ -769,6 +774,24 @@ void ParaviewPostProcessingWriter::one_output(
 	  PostProcessingWriter::m_bPPWindow[m_rank] );
     }
   }
+  
+  // Insertion windows
+  if ( m_rank == 0 ) 
+  {       
+    string IWFilename = m_ParaviewFilename + "_InsertionWindows_T" 
+    	+ ossCN.str() + ".vtu";
+    m_Paraview_saveInsertionWindow_pvd << "<DataSet timestep=\"" << time 
+      	<< "\" " << "group=\"\" part=\"0\" file=\"" << IWFilename << "\"/>\n"; 
+	              
+    ofstream f( ( m_ParaviewFilename_dir + "/" + m_ParaviewFilename
+       	+ "_InsertionWindows.pvd" ).c_str(), ios::out );	 
+    f << m_Paraview_saveInsertionWindow_pvd.str();
+    f << "</Collection>" << endl;
+    f << "</VTKFile>" << endl;
+    f.close();      
+            
+    writeInsertion_Paraview( insert_windows, IWFilename );       
+  }  
    
   if ( LC )
   {
@@ -1272,17 +1295,15 @@ void ParaviewPostProcessingWriter::writeLinked_Paraview(
 // ----------------------------------------------------------------------------
 // Writes insertion windows data
 void ParaviewPostProcessingWriter::writeInsertion_Paraview(
-   	vector<Window> const& insert_windows,
-  	string const& partFilename )
+   	AllInsertionWindows const& insert_windows,
+  	string const& IWFilename )
 {
-  vector<Window>::const_iterator iv;
   list<RigidBody*> iwlist;
-  list<RigidBody*>::iterator il = iwlist.begin(); 
+  list<RigidBody*>::iterator il; 
   
-  for (iv=insert_windows.begin();iv!=insert_windows.end();iv++)
-    iv->addAsRigidBody( iwlist );
+  insert_windows.convertToRigidBodies( iwlist );
 
-  ofstream f( ( m_ParaviewFilename_dir + "/" + partFilename + ".vtu" ).c_str(),
+  ofstream f( ( m_ParaviewFilename_dir + "/" + IWFilename ).c_str(),
       ios::out );
   
   f << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" "

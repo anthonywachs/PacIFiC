@@ -71,7 +71,7 @@ class ParaviewPostProcessingWriter : public PostProcessingWriter
 	vector<Particle*> const* referenceParticles,
 	Obstacle* obstacle,
 	LinkedCell const* LC,
-	vector<Window> const& insert_windows );
+	AllInsertionWindows const& insert_windows );
 
     /** @brief Writes data
     @param time physical time
@@ -81,7 +81,8 @@ class ParaviewPostProcessingWriter : public PostProcessingWriter
     @param periodic_clones periodic particles
     @param referenceParticles reference particles
     @param obstacle obstacles 
-    @param LC linked-cell grid */
+    @param LC linked-cell grid 
+    @param insert_windows insertion windows */
     void PostProcessing( double const& time,
   	double const& dt,
   	list<Particle*> const* particles,
@@ -89,7 +90,8 @@ class ParaviewPostProcessingWriter : public PostProcessingWriter
 	list<Particle*> const* periodic_clones,		
 	vector<Particle*> const* referenceParticles,
 	Obstacle* obstacle,
-	LinkedCell const* LC );
+	LinkedCell const* LC,
+	AllInsertionWindows const& insert_windows );
 
     /** @brief Finalizes writing data */
     void PostProcessing_end();
@@ -144,7 +146,9 @@ class ParaviewPostProcessingWriter : public PostProcessingWriter
     ostringstream m_Paraview_saveContactForceVectors_pvd; /**< contact force 
     	output stream */		
     ostringstream m_Paraview_saveContactForceChains_pvd; /**< force chain 
-    	network output stream */		
+    	network output stream */
+    ostringstream m_Paraview_saveInsertionWindow_pvd; /**< insertion window
+    	output stream */			
     int m_ParaviewCycleNumber; /**< cycle number */
     bool m_binary; /**< whether to write data in binary */
     bool m_postProcessObstacle; /**< whether to write obstacles data */
@@ -170,14 +174,16 @@ class ParaviewPostProcessingWriter : public PostProcessingWriter
     @param periodic_clones periodic particles
     @param referenceParticles reference particles
     @param obstacle obstacles 
-    @param LC linked-cell grid */
+    @param LC linked-cell grid
+    @param insert_windows insertion windows */
     void one_output( double const& time,
   	double const& dt,
 	list<Particle*> const* particles,
 	list<Particle*> const* periodic_clones,
 	vector<Particle*> const* referenceParticles,
   	Obstacle* obstacle,
-	LinkedCell const* LC ); 
+	LinkedCell const* LC,
+	AllInsertionWindows const& insert_windows ); 
 
     /** @brief Writes obstacles data
     @param allObstacles list of simple obstcales 
@@ -255,10 +261,10 @@ class ParaviewPostProcessingWriter : public PostProcessingWriter
 
     /** @brief Writes insertion windows data
     @param insert_windows insertion windows
-    @param partFilename output file name */
+    @param IWFilename output file name */
     void writeInsertion_Paraview(
-   	vector<Window> const& insert_windows,
-  	string const& partFilename );
+   	AllInsertionWindows const& insert_windows,
+  	string const& IWFilename );
 	
     /** @brief Writes periodic boundary data
     @param LC linked-cell grid

@@ -139,7 +139,7 @@ Quaternion const* ObstacleKinematicsVelocity::getQuaternionRotationOverDt()
 // Returns a pointer to the translation vector over dt
 Vector3 const* ObstacleKinematicsVelocity::getTranslation() const
 {
-  return &m_translationOverTimeStep;
+  return ( &m_translationOverTimeStep );
 }
 
 

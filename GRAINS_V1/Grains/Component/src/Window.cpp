@@ -70,6 +70,11 @@ bool Window::readWindow( DOMNode* nWindow, string const& oshift,
   else if ( iwindow_type == "Box" )
     m_ftype = WINDOW_BOX;
   else m_ftype = WINDOW_NONE;
+  
+  // Insertion window name
+  if ( ReaderXML::hasNodeAttr( nWindow, "Name" ) )
+    m_name = ReaderXML::getNodeAttr_String( nWindow,
+		  	"Name" );    
 
   DOMNodeList* points = NULL;
   DOMNode* pointA = NULL;
@@ -77,6 +82,12 @@ bool Window::readWindow( DOMNode* nWindow, string const& oshift,
   DOMNode* cylGeom = NULL;
   DOMNode* annGeom = NULL;
   string axisdir_str = "W";
+
+  if ( rank == 0 )
+  {
+    cout << oshift << "Name = " << m_name << endl;
+    cout << oshift << "Type = " << iwindow_type << endl;
+  }
 
   // Read features depending on the type
   switch( m_ftype )
@@ -97,7 +108,6 @@ bool Window::readWindow( DOMNode* nWindow, string const& oshift,
 
       if ( rank == 0 )
       {
-        cout << oshift << "Type = " << iwindow_type << endl;
 	cout << oshift << GrainsExec::m_shift3 << "Point3 min = " <<
 		m_ptA[X] << " " << m_ptA[Y] << " " <<
 		m_ptA[Z] << endl;
@@ -131,8 +141,7 @@ bool Window::readWindow( DOMNode* nWindow, string const& oshift,
 
       if ( rank == 0 )
       {
-	cout << oshift << "Type = " << iwindow_type << endl;
-        cout << oshift << GrainsExec::m_shift3 << "Bottom centre = " <<
+	cout << oshift << GrainsExec::m_shift3 << "Bottom centre = " <<
 		m_ptA[X] << " " << m_ptA[Y] << " " <<
 		m_ptA[Z] << endl;
 	cout << oshift << GrainsExec::m_shift3 << "Radius = " <<
@@ -172,8 +181,7 @@ bool Window::readWindow( DOMNode* nWindow, string const& oshift,
 
       if ( rank == 0 )
       {
-	cout << oshift << "Type = " << iwindow_type << endl;
-        cout << oshift << GrainsExec::m_shift3 << "Bottom centre = " <<
+	cout << oshift << GrainsExec::m_shift3 << "Bottom centre = " <<
 		m_ptA[X] << " " << m_ptA[Y] << " " <<
 		m_ptA[Z] << endl;
 	cout << oshift << GrainsExec::m_shift3 << "External radius = " <<
@@ -203,8 +211,7 @@ bool Window::readWindow( DOMNode* nWindow, string const& oshift,
 
       if ( rank == 0 )
       {
-        cout << oshift << "Type = " << iwindow_type << endl;
-        cout << oshift << GrainsExec::m_shift3 << "Point3 A = " <<
+	cout << oshift << GrainsExec::m_shift3 << "Point3 A = " <<
 		m_ptA[X] << " " << m_ptA[Y] << " " <<
 		m_ptA[Z] << endl;
         cout << oshift << GrainsExec::m_shift3 << "Point3 B = " <<
@@ -534,4 +541,48 @@ void Window::shiftWindow( double const& geoshift, Direction dir )
 {
   m_ptA[dir] += geoshift;
   m_ptB[dir] += geoshift;      
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Associates the imposed velocity to the insertion window
+bool Window::LinkImposedMotion( ObstacleImposedVelocity* impvel )
+{
+  bool status = false;
+  if ( m_name == impvel->getObstacleName() )
+  {
+    if ( m_kinematics == NULL ) m_kinematics = new ObstacleKinematicsVelocity();
+    m_kinematics->append( impvel );
+    status = true;
+  }
+
+  return ( status );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Moves the window if it has an imposed motion
+void Window::Move( double time, double dt )
+{
+  if ( m_kinematics )
+    if ( m_kinematics->ImposedMotion( time, dt, m_ptA ) )
+    {
+      Vector3 translation = *(m_kinematics->getTranslation());
+      m_ptA += translation;
+      m_ptB += translation;
+    }    
+} 
+
+
+
+
+// ----------------------------------------------------------------------------
+// Resets kinematics to 0 */
+void Window::resetKinematics()
+{
+  if ( m_kinematics ) m_kinematics->reset();  
 }

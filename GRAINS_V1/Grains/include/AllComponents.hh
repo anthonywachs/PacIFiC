@@ -23,7 +23,7 @@ class ObstacleImposedVelocity;
 class ObstacleImposedForce;
 class GrainsMPIWrapper;
 class PostProcessingWriter;
-struct Window;
+class AllInsertionWindows;
 
 
 /** @brief Insertion order */
@@ -81,7 +81,7 @@ class AllComponents
     @param impvel imposed velocity */
     void LinkImposedMotion( ObstacleImposedVelocity* impvel );
 
-    /** @brief Associates the imposed velocity to the obstacle
+    /** @brief Associates the imposed force to the obstacle
     @param load imposed force */
     void LinkImposedMotion( ObstacleImposedForce* load );
 
@@ -135,22 +135,21 @@ class AllComponents
     @param nprocs number of processes
     @param wrapper MPI wrapper */
     void PostProcessing_start( double time, double dt,
-	LinkedCell const* LC, vector<Window> const& insert_windows,
-	int rank = 0,
-	int nprocs = 1,
+	LinkedCell const* LC, AllInsertionWindows const& insert_windows,
+	int rank = 0, int nprocs = 1,
   	GrainsMPIWrapper const* wrapper = NULL );
 
     /** @brief Writes components for Post-Processing over the simulation
     @param time physical time
     @param dt time step magnitude
     @param LC linked cell grid
+    @param insert_windows insertion windows    
     @param rank process rank
     @param nprocs number of processes
     @param wrapper MPI wrapper */
     void PostProcessing( double time, double dt,
-	LinkedCell const* LC,
-	int rank = 0,
-  	int nprocs = 1,
+	LinkedCell const* LC, AllInsertionWindows const& insert_windows,
+	int rank = 0, int nprocs = 1,
 	GrainsMPIWrapper const* wrapper = NULL );
 
     /** @brief Finalizes Post-Processing at the end of the simulation */
@@ -203,7 +202,7 @@ class AllComponents
     //@}
 
 
-    /**@name Methods Get */
+    /**@name Accessors */
     //@{
     /** @brief Returns an obstacle using its name as an input
     @param name obstacle name */
@@ -318,7 +317,7 @@ class AllComponents
     //@}
 
 
-    /**@name Methods Set */
+    /**@name Set methods */
     //@{
     /** @brief Computes and sets the numbers of particles in the system 
     @param wrapper MPI wrapper */

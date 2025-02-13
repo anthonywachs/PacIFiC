@@ -17,7 +17,7 @@ RawDataPostProcessingWriter::RawDataPostProcessingWriter()
 // ----------------------------------------------------------------------------
 // Constructor with XML node, rank and number of processes as input parameters
 RawDataPostProcessingWriter::RawDataPostProcessingWriter( DOMNode* dn,
-    int const& rank_, int const& nbranks_, bool const& verbose )
+	int const& rank_, int const& nbranks_, bool const& verbose )
   : PostProcessingWriter( dn, rank_, nbranks_ )
   , m_binary( false )
   , m_ndigits( 6 )  
@@ -53,15 +53,13 @@ RawDataPostProcessingWriter::~RawDataPostProcessingWriter()
 // ----------------------------------------------------------------------------
 // Initializes the post-processing writer
 void RawDataPostProcessingWriter::PostProcessing_start(
-    double const& time, 
-    double const& dt,
-    list<Particle*> const* particles,
-    list<Particle*> const* inactiveparticles,
-    list<Particle*> const* periodic_clones,
-    vector<Particle*> const* referenceParticles,
-    Obstacle* obstacle,
-    LinkedCell const* LC,
-    vector<Window> const& insert_windows )
+	double const& time, double const& dt,
+	list<Particle*> const* particles,
+	list<Particle*> const* inactiveparticles,
+	list<Particle*> const* periodic_clones,
+	vector<Particle*> const* referenceParticles,
+	Obstacle* obstacle, LinkedCell const* LC,
+	AllInsertionWindows const& insert_windows )
 {
   // Open files
   if ( m_rank == 0 )
@@ -77,7 +75,7 @@ void RawDataPostProcessingWriter::PostProcessing_start(
 
   // Write data
   PostProcessing( time, dt, particles, inactiveparticles, periodic_clones,
-    referenceParticles, obstacle, LC );
+    referenceParticles, obstacle, LC, insert_windows );
 }
 
 
@@ -86,13 +84,13 @@ void RawDataPostProcessingWriter::PostProcessing_start(
 // ----------------------------------------------------------------------------
 // Writes data
 void RawDataPostProcessingWriter::PostProcessing( double const& time, 
-    double const& dt,
-    list<Particle*> const* particles,
-    list<Particle*> const* inactiveparticles,
-    list<Particle*> const* periodic_clones,
-    vector<Particle*> const* referenceParticles,
-    Obstacle* obstacle,
-    LinkedCell const* LC )
+	double const& dt,
+	list<Particle*> const* particles,
+	list<Particle*> const* inactiveparticles,
+	list<Particle*> const* periodic_clones,
+	vector<Particle*> const* referenceParticles,
+	Obstacle* obstacle, LinkedCell const* LC,
+	AllInsertionWindows const& insert_windows )
 {
   GrainsMPIWrapper const* wrapper = GrainsExec::getComm() ;
   size_t nb_total_part = GrainsExec::getTotalNumberPhysicalParticles() ;
