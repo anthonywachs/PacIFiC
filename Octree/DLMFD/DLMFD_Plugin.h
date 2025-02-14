@@ -281,7 +281,7 @@ event init (i = 0)
     	&imposed_periodicpressuredrop );  
 
     // Re-initialize the VTK writer
-#   if Paraview
+#   if PARAVIEW
       reinitialize_vtk_restart();	
 #   endif	
   }

@@ -1649,7 +1649,8 @@ void init_file_pointers( const size_t nrb, FILE** p, const bool pdata_is_open,
 	else d[k] = fopen( name, "a" );
 	
 	// Write headers in these files
-	writer_headers( pdata_is_open ? p[k] : NULL, pdata_is_open, d[k] );
+	if ( !rflag ) 
+	  writer_headers( pdata_is_open ? p[k] : NULL, pdata_is_open, d[k] );
       }
     
       // Uzawa convergence
