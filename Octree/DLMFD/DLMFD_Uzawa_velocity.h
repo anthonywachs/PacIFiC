@@ -189,8 +189,10 @@ This leads to a saddle-point problem which is solved with an iterative solver
 */
 
 
-/* Timers and Timings */
-timing dlmfd_globaltiming = {0.};
+/* Timings and statistics */
+timing DLMFD_UzawaTiming = {0.};
+timing DLMFD_ConstructionTiming = {0.};
+DLMFDptscells allDLMFDptscells;
 
 # include "DLMFD_Perf.h"
 # if DLMFD_OPT
@@ -204,6 +206,10 @@ timing dlmfd_globaltiming = {0.};
 void DLMFD_construction() 
 //----------------------------------------------------------------------------
 {
+  /* Timers and Timings */
+  timer Construction_timer = timer_start();
+  double mpitimings[npe()];
+
 # if RIGIDBODY_VERBOSE
     char outputshift[7]="      ";
 # endif
@@ -227,8 +233,7 @@ void DLMFD_construction()
 	&deactivatedIndexFieldValues, &at_least_one_deactivated );
 
   // Tag the grid along rigid body boundaries two cell layers into the fluid
-  fill_FlagMesh( DLM_FlagMesh, DLM_Index, allRigidBodies );
-	
+  fill_FlagMesh( DLM_FlagMesh, DLM_Index, allRigidBodies );	
 
   // Deactivate boundary points that are too close either to a rigid wall
   // domain boundary or to another rigid body
@@ -239,9 +244,8 @@ void DLMFD_construction()
     	DLM_Index, &deactivatedBPindices, &deactivatedIndexFieldValues,
 	&at_least_one_deactivated );
     reverse_fill_DLM_Flag( allRigidBodies, nbRigidBodies, DLM_Flag, 
-    	DLM_Index, 1 );
+    	DLM_Index, 1 );	
 # endif	
-
 
   // Create fictitious-domain's cache for the interior domain
 # if DLMFD_INTERIORPOINTS 
@@ -300,7 +304,21 @@ void DLMFD_construction()
   free_dynUIarray( &deactivatedBPindices ); 
   
   // Free the array of pointers to field Index values
-  free_dynPDBarray( &deactivatedIndexFieldValues ); 
+  free_dynPDBarray( &deactivatedIndexFieldValues );
+  
+  /* Timers and Timings */
+  /* Note: give 1 as number of cell so that timer_timing does not compute the 
+  total number of cells. The total number of cell is used to compute the speed 
+  of the solver which does not make sense for a single step here, we will 
+  compute it globally at the end of the run */
+  timing Construction_timing = timer_timing( Construction_timer, 1, 1, 
+  	mpitimings );
+
+  DLMFD_ConstructionTiming.cpu += Construction_timing.cpu;
+  DLMFD_ConstructionTiming.real += Construction_timing.real;
+  DLMFD_ConstructionTiming.min += Construction_timing.min;
+  DLMFD_ConstructionTiming.avg += Construction_timing.avg;
+  DLMFD_ConstructionTiming.max += Construction_timing.max;   
 }
 
 
@@ -315,12 +333,13 @@ void DLMFD_Uzawa_velocity( const int i )
 //----------------------------------------------------------------------------
 {
   /* Timers and Timings */
-  timer dlmfd_timer = timer_start ();
+  timer Uzawa_timer = timer_start();
   double mpitimings[npe()];
   
   double DLM_alpha = 0., DLM_beta = 0.;
   double DLM_tol = 1.e-5, DLM_nr2 = 0., DLM_nr2_km1 = 0., DLM_wv = 0.;
-  int ki = 0, DLM_maxiter = 200, allpts = 0, lm = 0, tcells = 0;
+  int ki = 0, DLM_maxiter = 200, allDLMFDcells = 0, allDLMFDpts = 0, 
+  	total_number_of_cells = 0;
   double rho_f = FLUID_DENSITY;
 
 # if  _MPI
@@ -448,14 +467,14 @@ void DLMFD_Uzawa_velocity( const int i )
     // Only DLM_lambda has not been nullified at the end of the previous
     // call to DLMFD_subproblem as it is needed for the computation of the 
     // hydrodynamic force & torque for post-processing, so we nullify it here
-    foreach(reduction(+:tcells)) tcells++;     
+    foreach(reduction(+:total_number_of_cells)) total_number_of_cells++;     
     foreach()
     { 
       foreach_dimension() 
         DLM_lambda.x[] = 0.; 
     }     
 # else
-    foreach(reduction(+:tcells)) tcells++;
+    foreach(reduction(+:total_number_of_cells)) total_number_of_cells++;
     foreach() 
     {
       foreach_dimension()
@@ -471,23 +490,18 @@ void DLMFD_Uzawa_velocity( const int i )
 # endif  
 
 
-  // Statistics of number of Lagrange multiplier points  
-  lm = total_dlmfd_multipliers( allRigidBodies, nbRigidBodies );
-  /* Get track of the number of multipliers for statistics */
-  for (size_t k = 0; k < nbRigidBodies; k++)
-    allRigidBodies[k].tmultipliers += lm;
-
-  allpts = total_dlmfd_cells( allRigidBodies, nbRigidBodies );
-  /* Get track of the number of cells involved in the dlmfd solver for 
-  statistics */
-  for (size_t k = 0; k < nbRigidBodies; k++)
-    allRigidBodies[k].tcells += allpts;
+  // Statistics of number of Lagrange multiplier points/cells  
+  allDLMFDpts = total_dlmfd_multipliers( allRigidBodies, nbRigidBodies );
+  allDLMFDptscells.total_number_of_DLMFDpts += allDLMFDpts;
+  allDLMFDcells = total_dlmfd_cells( allRigidBodies, nbRigidBodies );
+  allDLMFDptscells.total_number_of_DLMFDcells += allDLMFDcells;
 
   if ( pid() == 0 )
   {
-    printf( "   DLMFD Uzawa: Points = %d, Cells = %d, ", lm, allpts );
-    fprintf( cellvstime, "%d \t %d \t \t %d \t \t \t %d \n", i, lm, allpts, 
-  	tcells );
+    printf( "   DLMFD Uzawa: Points = %d, Cells = %d, ", allDLMFDpts, 
+    	allDLMFDcells );
+    fprintf( cellvstime, "%d \t %d \t %d \t %d \n", i, allDLMFDpts, 
+    	allDLMFDcells, total_number_of_cells );
     fflush( cellvstime );
   } 
   
@@ -1919,18 +1933,17 @@ void DLMFD_Uzawa_velocity( const int i )
 
 
   /* Timers and Timings */
-  /* give 1 as number of cell so that timer_timing does not compute the total
-     number of cells
-     the total number of cell is used to compute the speed of the solver 
-     which does not make sens for a single step here, we will compute it 
-     globally at the end of the run */
-  timing dlmfd_timing = timer_timing (dlmfd_timer, 1, 1, mpitimings);
+  /* Note: give 1 as number of cell so that timer_timing does not compute the 
+  total number of cells. The total number of cell is used to compute the speed 
+  of the solver which does not make sense for a single step here, we will 
+  compute it globally at the end of the run */
+  timing Uzawa_timing = timer_timing( Uzawa_timer, 1, 1, mpitimings );
 
-  dlmfd_globaltiming.cpu += dlmfd_timing.cpu;
-  dlmfd_globaltiming.real += dlmfd_timing.real;
-  dlmfd_globaltiming.min += dlmfd_timing.min;
-  dlmfd_globaltiming.avg += dlmfd_timing.avg;
-  dlmfd_globaltiming.max += dlmfd_timing.max;
+  DLMFD_UzawaTiming.cpu += Uzawa_timing.cpu;
+  DLMFD_UzawaTiming.real += Uzawa_timing.real;
+  DLMFD_UzawaTiming.min += Uzawa_timing.min;
+  DLMFD_UzawaTiming.avg += Uzawa_timing.avg;
+  DLMFD_UzawaTiming.max += Uzawa_timing.max;
 }
 
 

@@ -127,8 +127,16 @@ typedef struct {
 # endif
   Cache Interior;
   Cache Boundary;
-  long tcells, tmultipliers;
 } RigidBody;
+
+
+
+
+/** Total number of DLMFD cells and points for statistics */
+typedef struct {
+  size_t total_number_of_DLMFDcells; 
+  size_t total_number_of_DLMFDpts;  
+} DLMFDptscells;
 
 
 
@@ -1676,7 +1684,7 @@ void init_file_pointers( const size_t nrb, FILE** p, const bool pdata_is_open,
       if ( !rflag )
       {
         *CVT = fopen ( DLMFD_CELLS_FILENAME_complete_name, "w" ); 
-        fprintf ( *CVT,"# Iter \t LagMult \t ConstrainedCells \t "
+        fprintf ( *CVT,"# Iter \t DLMFDPts \t DLMFDCells \t "
     		"TotalCells\n" );
       }
       else
@@ -2088,7 +2096,7 @@ int total_dlmfd_multipliers( RigidBody const* allrbs, const size_t nrb )
       apts += allrbs[k].Interior.n;
   
 #   if _MPI
-      mpi_all_reduce (apts, MPI_INT, MPI_SUM);
+      mpi_all_reduce( apts, MPI_INT, MPI_SUM );
 #   endif
 # endif
   

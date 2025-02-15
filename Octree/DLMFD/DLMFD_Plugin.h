@@ -263,6 +263,10 @@ event init (i = 0)
   
   // Initialize all DLMFD fields
   initialize_DLMFD_fields_to_zero();
+  
+  // Initiliaze the allDLMFDptscells stats to 0
+  allDLMFDptscells.total_number_of_DLMFDpts = 0;  
+  allDLMFDptscells.total_number_of_DLMFDcells = 0;
 
   // If new simulation: set fluid initial condition from user defined case file
   if ( ! restore ( file = FLUID_DUMP_FILENAME ) ) 
@@ -657,7 +661,8 @@ event last_output_data (t = end)
 # endif 
 
   do_output( mess );    
-  output_dlmfd_perf ( dlmfd_globaltiming, i, allRigidBodies );       
+  output_dlmfd_perf ( &DLMFD_UzawaTiming, &DLMFD_ConstructionTiming, i, 
+  	&allDLMFDptscells );       
 }	
 
 
