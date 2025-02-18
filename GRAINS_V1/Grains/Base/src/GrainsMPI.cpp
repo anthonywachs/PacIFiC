@@ -99,6 +99,7 @@ void GrainsMPI::Simulation( double time_interval )
         if ( m_insertion_mode == IM_OVERTIME )
           insertParticle( m_insertion_order );	
         m_allcomponents.computeNumberParticles( m_wrapper );
+	m_insertion_windows.Move( m_time, m_dt );  
 	if ( GrainsExec::m_output_data_at_this_time )
           if ( m_rank == 0 )
 	  {
