@@ -198,7 +198,8 @@ class AllComponents
     /** @brief Updates list of particles in parallel
     @param time physical time 
     @param newBufPart list of new buffer particles */
-    void updateParticleLists( double time, list<Particle*>* newBufPart );    
+    void updateParticleLists( double time, list<Particle*>* newBufPart,
+  	GrainsMPIWrapper const* wrapper = NULL );    
     //@}
 
 
@@ -355,7 +356,12 @@ class AllComponents
     
     /** @brief Sets time integration scheme in all particles using the macro 
     variable GrainsExec::m_TIScheme */
-    void setTimeIntegrationScheme();     
+    void setTimeIntegrationScheme(); 
+    
+    /** @brief Sets the center of mass coordinate in a given direction 
+    at the previous time of all particles to the current value (generally called
+    at the start of a time step) */
+    void setPositionDir_nm1( Direction dir );    
     //@}
 
 

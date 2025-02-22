@@ -34,6 +34,25 @@ struct StructArrayInsertion
 };
 
 
+/** @brief Larger or lower operator */
+enum LargerLowerOp 
+{
+  LLO_LARGER, /**< larger */    
+  LLO_LOWER, /**< lower */    
+  LLO_UNDEF /**< undefined */
+};
+
+
+/** @brief Partial periodicity */
+struct PartialPeriodicity
+{
+  LargerLowerOp comp; /**< comparison operator */
+  Direction dir; /**< Cartesian coordinate direction */
+  double limit; /**< coordinate in direction dir above/below which periodicity
+  	applies */
+};
+
+
 /** @brief The class GrainsExec.
 
     Fully static class that manages global variables.
@@ -44,7 +63,7 @@ struct StructArrayInsertion
 class GrainsExec
 {
   public:
-    /** @name Get methods */
+    /** @name Accessors */
     //@{
     /** @brief Returns a pointer to the MPI wrapper */
     static GrainsMPIWrapper* getComm();
@@ -58,7 +77,10 @@ class GrainsExec
     static size_t getTotalNumberPhysicalParticles();
     
     /** @brief Returns the minimum crust thickness */
-    static double getMinCrustThickness();    
+    static double getMinCrustThickness();
+    
+    /** @brief Returns a pointer to the partial periodicity features */
+    static PartialPeriodicity const* getPartialPeriodicity();        
     //@}
 
 
@@ -80,7 +102,18 @@ class GrainsExec
     
     /** @brief Sets the minimum crust thickness
     @param ct new crust thickness */
-    static void setMinCrustThickness( double const& ct );    
+    static void setMinCrustThickness( double const& ct );
+    
+    /** @brief Initializes partial periodicity */
+    static void initializePartialPeriodicity();
+    
+    /** @brief Sets partial periodicity 
+    @param comp_ comparison operator 
+    @param dir_ Cartesian coordinate direction 
+    @param limit_ coordinate in direction dir_ above/below which periodicity
+	applies */
+    static void setPartialPeriodicity( LargerLowerOp comp_, Direction dir_,
+  	double const& limit_ );            
     //@}
 
 
@@ -207,6 +240,16 @@ class GrainsExec
     @param inertia inertia tensor of the polyhedron */
     static void computeVolumeInertiaContrib( Point3 const& A2, 
     	Point3 const& A3, Point3 const& A4, double &vol, double* inertia );
+	
+    /** @brief Returns whether "(*P)[dir] comp limit" where comp is either < 
+    or > is true or false using the PartialPeriodicity structure data 
+    @param P pointer to a Point3 */    
+    static bool partialPeriodicityCompTest( Point3 const* P );
+    
+    /** @brief Returns whether "coord comp limit" where comp is either < 
+    or > is true or false using the PartialPeriodicity structure data 
+    @param coord coordinate */    
+    static bool partialPeriodicityCompTest( double const& coord );    	
     //@}
 
 
@@ -317,6 +360,8 @@ class GrainsExec
     static int m_ReferenceParticleDefaultID; /**< Default ID number of reference
     	particle */
     static size_t m_time_counter; /**< Discrete time counter */
+    static bool m_partialPer_is_active; /**< true is partial periodicity is
+    	active */    
     //@}
 
 
@@ -341,7 +386,8 @@ class GrainsExec
     static list<vector< vector<int> >*> m_allPolyhedronFacesConnectivity; /**<
   	list of face connectivity in the polyhedrons */
     static double m_minCrustThickness; /**< minimum crust thickness over all 
-    	rigid bodies in the simulation */	
+    	rigid bodies in the simulation */
+    static PartialPeriodicity m_partialPer; /**< partial periodicity */		
     //@}
 
 

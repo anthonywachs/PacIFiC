@@ -307,7 +307,12 @@ class Particle : public Component
     
     /** @brief Sets time integration scheme using the macro variable
     GrainsExec::m_TIScheme */
-    void setTimeIntegrationScheme();     
+    void setTimeIntegrationScheme();
+
+    /** @brief Sets the center of mass coordinate in a given direction 
+    at the previous time to the current value (generally called at the 
+    start of a time step) */      
+    void setPositionDir_nm1( Direction dir );     
     //@}
 
 
@@ -551,6 +556,10 @@ class Particle : public Component
     particles and non-specific composite particle and class name for specific 
     composite particles */
     string getSpecificCompositeShapeName() const;
+    
+    /** @brief Returns the center of mass coordinate in a given direction 
+    at the previous time */    
+    double getPositionDir_nm1() const;      
     //@}
 
 
@@ -698,7 +707,9 @@ class Particle : public Component
     string m_specific_composite_shape; /**< specific composite particle 
     	shape, e.g., SpheroCylinder */
     static int m_maxID; /**< Maximum ID number, particle ID numbers range
-    	from 1 to m_maxID and are therefore always positive */	  
+    	from 1 to m_maxID and are therefore always positive */
+    double m_pos_dir_nm1; /**< center of mass position in a given direction 
+    	at the previous time */	  
     //@}
 
 

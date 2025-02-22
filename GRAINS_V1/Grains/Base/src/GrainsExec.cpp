@@ -54,7 +54,9 @@ Point3 GrainsExec::m_defaultInactivePos = Point3( -1.e10 );
 int GrainsExec::m_CompositeObstacleDefaultID = 0;
 int GrainsExec::m_ReferenceParticleDefaultID = 0;
 size_t GrainsExec::m_time_counter = 0;
+bool GrainsExec::m_partialPer_is_active = false;
 double GrainsExec::m_minCrustThickness = 1.e20;
+PartialPeriodicity GrainsExec::m_partialPer;
 
 
 
@@ -791,4 +793,93 @@ void GrainsExec::computeVolumeInertiaContrib( const Point3 &A2,
 	+ y1 * y1 + y1 * y2 + y2 * y2 
   	+ y1 * y3 + y2 * y3 + y3 * y3
 	+ y1 * y4 + y2 * y4 + y3 * y4 + y4 * y4 ) / 60. ;
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Initializes partial periodicity */
+void GrainsExec::initializePartialPeriodicity()
+{
+  m_partialPer.comp = LLO_UNDEF;
+  m_partialPer.dir = NONE; 
+  m_partialPer.limit = -1.e-20;   
+}
+
+
+
+ 
+// ----------------------------------------------------------------------------
+// Sets partial periodicity
+void GrainsExec::setPartialPeriodicity( LargerLowerOp comp_, Direction dir_,
+  	double const& limit_ )
+{
+  m_partialPer.comp = comp_;
+  m_partialPer.dir = dir_; 
+  m_partialPer.limit = limit_;   
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns a pointer to the partial periodicity features */
+PartialPeriodicity const* GrainsExec::getPartialPeriodicity()
+{
+  return( &m_partialPer );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns whether "(*P)[dir] comp limit" where comp is either < 
+// or > is true or false using the PartialPeriodicity structure data   
+bool GrainsExec::partialPeriodicityCompTest( Point3 const* P )
+{
+  bool res = false;
+  switch( m_partialPer.comp )
+  {
+    case LLO_LARGER:
+      res = (*P)[m_partialPer.dir] > m_partialPer.limit;
+      break;
+      
+    case LLO_LOWER:
+      res = (*P)[m_partialPer.dir] < m_partialPer.limit;
+      break;
+            
+    default:
+      cout << "Warning: Undefined operator in "
+      	"GrainsExec::partialPeriodicityCompTest" << endl;   
+  }
+  
+  return ( res );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns whether "coord comp limit" where comp is either < 
+// or > is true or false using the PartialPeriodicity structure data   
+bool GrainsExec::partialPeriodicityCompTest( double const& coord )
+{
+  bool res = false;
+  switch( m_partialPer.comp )
+  {
+    case LLO_LARGER:
+      res = coord > m_partialPer.limit;
+      break;
+            
+    case LLO_LOWER:
+      res = coord < m_partialPer.limit;
+      break;
+            
+    default:
+      cout << "Warning: Undefined operator in "
+      	"GrainsExec::partialPeriodicityCompTest" << endl;   
+  }
+  
+  return ( res );
 }

@@ -1019,6 +1019,16 @@ void GrainsMPIWrapper::setMPIperiodicVectors( const double& lx,
 
 
 // ----------------------------------------------------------------------------
+// Returns whether a geoposition is periodic on this process
+bool GrainsMPIWrapper::isGeoPositionPeriodic( GeoPosition const& geopos ) const
+{
+  return ( !approxZero( m_MPIperiodes[geopos] ) );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
 // Returns the number of processes in one direction
 int GrainsMPIWrapper::get_nb_procs_direction( int i ) const
 {
@@ -1357,15 +1367,44 @@ void GrainsMPIWrapper::UpdateOrCreateClones_SendRecvLocal_GeoLoc( double time,
   // ------------------------------------------------
   vector<int> nbBufGeoLoc(26,0);
   vector<int>::iterator iv;
-  for (il=particlesBufferzone->begin();il!=particlesBufferzone->end();il++)
+  if ( GrainsExec::m_partialPer_is_active )
   {
-    geoLoc = (*il)->getGeoPosition();
-    contact_map_size = (*il)->getContactMapSize();
-    for (iv=m_particleBufferzoneToNeighboringProcs[geoLoc].begin();
+    bool sendit = false;    
+    for (il=particlesBufferzone->begin();il!=particlesBufferzone->end();il++)
+    {
+      geoLoc = (*il)->getGeoPosition();
+      contact_map_size = (*il)->getContactMapSize();
+      for (iv=m_particleBufferzoneToNeighboringProcs[geoLoc].begin();
     	iv!=m_particleBufferzoneToNeighboringProcs[geoLoc].end();iv++)
-      nbBufGeoLoc[*iv] += NB_DOUBLE_PART + 1 
-      	+ contact_map_size * NB_DOUBLE_PER_CONTACT;
-  }             
+      {
+        sendit = false;
+        if ( update )
+        {
+          if ( GrainsExec::partialPeriodicityCompTest(
+			(*il)->getPositionDir_nm1() )  
+		|| approxZero( m_MPIperiodes[*iv] ) ) sendit = true;		
+        }
+        else
+          if ( GrainsExec::partialPeriodicityCompTest( 
+			(*il)->getPosition() ) 
+		|| approxZero( m_MPIperiodes[*iv] ) ) sendit = true;		
+      
+        if ( sendit )
+	  nbBufGeoLoc[*iv] += NB_DOUBLE_PART + 1 
+      		+ contact_map_size * NB_DOUBLE_PER_CONTACT;
+      }
+    }  
+  }
+  else
+    for (il=particlesBufferzone->begin();il!=particlesBufferzone->end();il++)
+    {
+      geoLoc = (*il)->getGeoPosition();
+      contact_map_size = (*il)->getContactMapSize();
+      for (iv=m_particleBufferzoneToNeighboringProcs[geoLoc].begin();
+    	iv!=m_particleBufferzoneToNeighboringProcs[geoLoc].end();iv++)
+        nbBufGeoLoc[*iv] += NB_DOUBLE_PART + 1 
+      		+ contact_map_size * NB_DOUBLE_PER_CONTACT;
+    }              
 
   // Buffer of doubles: kinematics and configuration as follows 
   // [ID number, class, rank of sending process, translational
@@ -1377,28 +1416,72 @@ void GrainsMPIWrapper::UpdateOrCreateClones_SendRecvLocal_GeoLoc( double time,
   for (i=0;i<26;i++) features[i] = new double[ nbBufGeoLoc[i] ];
   double ParticleID = 0., ParticleClass = 0.;
 
-  for (il=particlesBufferzone->begin(),i=0;il!=particlesBufferzone->end();il++)
+  if ( GrainsExec::m_partialPer_is_active )
   {
-    geoLoc = (*il)->getGeoPosition();
-    ParticleID = double((*il)->getID()) + intTodouble ;
-    ParticleClass = double((*il)->getGeometricType()) + intTodouble ;
-    contact_map_size = (*il)->getContactMapSize();
-    for (iv=m_particleBufferzoneToNeighboringProcs[geoLoc].begin();
-    	iv!=m_particleBufferzoneToNeighboringProcs[geoLoc].end();iv++)
+    bool sendit = false;    
+    for (il=particlesBufferzone->begin(),i=0;il!=particlesBufferzone->end();
+    	il++)
     {
-      j = index[*iv]; 
-      features[*iv][j] = ParticleID;             
-      features[*iv][j+1] = ParticleClass;
-      features[*iv][j+2] = double(m_rank) + intTodouble ;
-      (*il)->copyTranslationalVelocity( features[*iv], j+3 );
-      (*il)->copyQuaternionRotation( features[*iv], j+6 );    
-      (*il)->copyAngularVelocity( features[*iv], j+10 );
-      (*il)->copyTransform( features[*iv], j+13, m_MPIperiodes[*iv] );
-      (*il)->copyContactMap( features[*iv], j+NB_DOUBLE_PART );     
-      index[*iv] += NB_DOUBLE_PART + 1 
+      geoLoc = (*il)->getGeoPosition();
+      ParticleID = double((*il)->getID()) + intTodouble ;
+      ParticleClass = double((*il)->getGeometricType()) + intTodouble ;
+      contact_map_size = (*il)->getContactMapSize();
+      for (iv=m_particleBufferzoneToNeighboringProcs[geoLoc].begin();
+    	iv!=m_particleBufferzoneToNeighboringProcs[geoLoc].end();iv++)
+      {
+        sendit = false;
+        if ( update )
+        {
+          if ( GrainsExec::partialPeriodicityCompTest(
+			(*il)->getPositionDir_nm1() )  
+		|| approxZero( m_MPIperiodes[*iv] ) ) sendit = true;		
+        }
+        else
+          if ( GrainsExec::partialPeriodicityCompTest( 
+			(*il)->getPosition() ) 
+		|| approxZero( m_MPIperiodes[*iv] ) ) sendit = true;
+      
+        if ( sendit )      
+        {
+          j = index[*iv]; 
+          features[*iv][j] = ParticleID;             
+          features[*iv][j+1] = ParticleClass;
+          features[*iv][j+2] = double(m_rank) + intTodouble ;
+          (*il)->copyTranslationalVelocity( features[*iv], j+3 );
+          (*il)->copyQuaternionRotation( features[*iv], j+6 );    
+          (*il)->copyAngularVelocity( features[*iv], j+10 );
+          (*il)->copyTransform( features[*iv], j+13, m_MPIperiodes[*iv] );
+          (*il)->copyContactMap( features[*iv], j+NB_DOUBLE_PART );     
+          index[*iv] += NB_DOUBLE_PART + 1 
+      		+ contact_map_size * NB_DOUBLE_PER_CONTACT;
+        }
+      }
+    }    
+  }
+  else
+    for (il=particlesBufferzone->begin(),i=0;il!=particlesBufferzone->end();
+    	il++)
+    {
+      geoLoc = (*il)->getGeoPosition();
+      ParticleID = double((*il)->getID()) + intTodouble ;
+      ParticleClass = double((*il)->getGeometricType()) + intTodouble ;
+      contact_map_size = (*il)->getContactMapSize();
+      for (iv=m_particleBufferzoneToNeighboringProcs[geoLoc].begin();
+    	iv!=m_particleBufferzoneToNeighboringProcs[geoLoc].end();iv++)
+      {
+        j = index[*iv]; 
+        features[*iv][j] = ParticleID;             
+        features[*iv][j+1] = ParticleClass;
+        features[*iv][j+2] = double(m_rank) + intTodouble ;
+        (*il)->copyTranslationalVelocity( features[*iv], j+3 );
+        (*il)->copyQuaternionRotation( features[*iv], j+6 );    
+        (*il)->copyAngularVelocity( features[*iv], j+10 );
+        (*il)->copyTransform( features[*iv], j+13, m_MPIperiodes[*iv] );
+        (*il)->copyContactMap( features[*iv], j+NB_DOUBLE_PART );     
+        index[*iv] += NB_DOUBLE_PART + 1 
       	+ contact_map_size * NB_DOUBLE_PER_CONTACT;
-    }
-  }           
+      }
+    }          
   SCT_get_elapsed_time("BuffersCopy");
   
   // Communication
@@ -1626,8 +1709,9 @@ void GrainsMPIWrapper::CreateClones(double time,
   // particles but the corresponding clone particle might already exist on the 
   // local process
   // 2) in case of a reloaded simulation, if the linked cell has changed
-  // from the previous simulation (the linked cell size has become larger), 
-  // some periodic clones may not exist and we need te create them 
+  // from the previous simulation (e.g. the linked cell size has become larger), 
+  // or periodic clones were not saved in the reload file, some periodic clones
+  // may not exist and we need te create them 
 
   for( j=0; j<recvsize; )
   {

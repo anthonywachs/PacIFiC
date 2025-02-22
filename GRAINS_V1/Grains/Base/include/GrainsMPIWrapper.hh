@@ -324,6 +324,10 @@ class GrainsMPIWrapper : public SolverComputingTime
     @param dim size of the receive buffer
     @param from rank of the sender */
     void receive( double* &recvbuf, int &dim, int const& from ) const;
+    
+    /** @brief Returns whether a geoposition is periodic on this process
+    @param geopos geoposition */
+    bool isGeoPositionPeriodic( GeoPosition const& geopos ) const;
     //@}  
 
 

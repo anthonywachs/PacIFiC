@@ -49,7 +49,7 @@ void GrainsMPI::Simulation( double time_interval )
   if ( m_processorIsActive )
   {
     double vmax = 0., vmean = 0. ;
-    list<Particle*>* newBufPart = new list<Particle*>;
+    list<Particle*>* newBufPart = new list<Particle*>;  
     bool forcestats = false;    
 
     // Timers
@@ -67,6 +67,12 @@ void GrainsMPI::Simulation( double time_interval )
       {
         m_time += m_dt;
 	GrainsExec::m_time_counter++;
+	
+	// In case of partial periodicity, sets the position of all particles
+	// in direction dir at previous time
+	if ( GrainsExec::m_partialPer_is_active )
+	  m_allcomponents.setPositionDir_nm1( 
+	  	GrainsExec::getPartialPeriodicity()->dir );
 	
 
         // Check whether data are output at this time
@@ -122,7 +128,7 @@ void GrainsMPI::Simulation( double time_interval )
         // x_i+1 = x_i + v_i+1/2 * dt
         // Solve Newton's law and move particles
         SCT_set_start( "Move" );
-        m_allcomponents.Move( m_time, 0.5 * m_dt, m_dt, m_dt, m_collision );
+        m_allcomponents.Move( m_time, 0.5 * m_dt, m_dt, m_dt, m_collision ); 
 
    
         // Update clone particle position and velocity
@@ -152,7 +158,7 @@ void GrainsMPI::Simulation( double time_interval )
         SCT_set_start( "LinkUpdate" );
         m_collision->LinkUpdate( m_time, m_dt, 
       		m_allcomponents.getActiveParticles() );  
-        m_allcomponents.updateParticleLists( m_time, newBufPart ); 
+        m_allcomponents.updateParticleLists( m_time, newBufPart, m_wrapper ); 
 
 
         // Create new clones
@@ -163,7 +169,15 @@ void GrainsMPI::Simulation( double time_interval )
 		m_allcomponents.getReferenceParticles(),
 		m_collision, false, false );
         SCT_get_elapsed_time( "LinkUpdate" );
-      
+
+
+        // Remove periodic clones that do not belong to the periodic subdomain
+	if ( GrainsExec::m_partialPer_is_active )
+	  m_collision->managePartialPeriodicity( m_time,
+		m_allcomponents.getActiveParticles(),
+		m_allcomponents.getCloneParticles(),
+		m_wrapper );      
+
       
         // Compute particle forces and torque
         // Compute f_i+1 and a_i+1 as a function of (x_i+1,v_i+1/2)
@@ -260,7 +274,9 @@ void GrainsMPI::Simulation( double time_interval )
         m_error_occured = true;
         break;
       }
-    }  
+    } 
+    
+    delete newBufPart; 
   }
 }
 

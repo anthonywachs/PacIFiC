@@ -787,6 +787,7 @@ void AllComponents::WaitToActive( bool const& parallel )
     if ( m_wait->getTag() == 1 ) m_ParticlesInBufferzone.push_back( m_wait );
     else if ( m_wait->getTag() == 2 ) m_CloneParticles.push_back( m_wait );
   }
+  m_wait->setPositionDir_nm1( Z ); 
   m_wait = NULL;
 }
 
@@ -2296,12 +2297,13 @@ void AllComponents::computeNumberParticles( GrainsMPIWrapper const* wrapper )
 // ----------------------------------------------------------------------------
 // Updates list of particles in parallel
 void AllComponents::updateParticleLists( double time, 
-	list<Particle*>* newBufPart )
+	list<Particle*>* newBufPart, GrainsMPIWrapper const* wrapper )
 {
   newBufPart->clear();
   
   list<Particle*>::iterator particle;
   int tag = 0, tagnm1 = 0;
+  
   for (particle=m_ActiveParticles.begin();particle!=m_ActiveParticles.end(); 
   	particle++)
   { 
@@ -2315,11 +2317,12 @@ void AllComponents::updateParticleLists( double time,
 	if ( tag == 1 ) 
 	{
 	  m_ParticlesInBufferzone.push_back( *particle);
-	  newBufPart->push_back( *particle);
+	  newBufPart->push_back( *particle );
           if ( GrainsExec::m_MPI_verbose )
 	  {
 	    ostringstream oss;
-	    oss << "   t=" << GrainsExec::doubleToString( time, FORMAT10DIGITS ) <<
+	    oss << "   t=" << GrainsExec::doubleToString( time, 
+	    		FORMAT10DIGITS ) <<
 		" Interior to Buffer (0 -> 1) Id = " <<
       		(*particle)->getID() << " " << *(*particle)->getPosition()
 		<< endl;
@@ -2337,7 +2340,8 @@ void AllComponents::updateParticleLists( double time,
             if ( GrainsExec::m_MPI_verbose )
 	    {
               ostringstream oss;
-              oss << "   t=" << GrainsExec::doubleToString( time, FORMAT10DIGITS )
+              oss << "   t=" << GrainsExec::doubleToString( time, 
+	      		FORMAT10DIGITS )
       		<< " Buffer to Interior (1 -> 0) Id = " <<
       		(*particle)->getID() << " " << *(*particle)->getPosition()
 		<< endl;
@@ -2350,11 +2354,12 @@ void AllComponents::updateParticleLists( double time,
 	    if ( (*particle)->getGeoPosition() 
 	    	!= (*particle)->getGeoPositionNm1() )
 	    {
-	      newBufPart->push_back( *particle);
+	      newBufPart->push_back( *particle );
               if ( GrainsExec::m_MPI_verbose )
 	      {
                 ostringstream oss;
-                oss << "   t=" << GrainsExec::doubleToString( time, FORMAT10DIGITS )
+                oss << "   t=" << GrainsExec::doubleToString( time, 
+			FORMAT10DIGITS )
       		<< " Buffer to Buffer (1 -> 1)   Id = " <<
       		(*particle)->getID() << " " << *(*particle)->getPosition()
 		<< endl;
@@ -2364,17 +2369,42 @@ void AllComponents::updateParticleLists( double time,
 			(*particle)->getGeoPosition()) << endl;
                 GrainsMPIWrapper::addToMPIString( oss.str() );
 	      } 
-	    }	      	  
+	    }
+	    else if ( GrainsExec::m_partialPer_is_active )
+	    { 
+	      if ( wrapper->isGeoPositionPeriodic( 
+	      	(*particle)->getCell()->getGeoPosition() ) )
+	        if ( GrainsExec::partialPeriodicityCompTest( 
+			(*particle)->getPosition() ) &&
+		!GrainsExec::partialPeriodicityCompTest(
+			(*particle)->getPositionDir_nm1() ) )
+	        {
+	          newBufPart->push_back( *particle );
+                  if ( GrainsExec::m_MPI_verbose )
+	          {
+                    ostringstream oss;
+                    oss << "   t=" << GrainsExec::doubleToString( time, 
+			FORMAT10DIGITS )
+      		  	<< " Buffer to Buffer (1 -> 1)   Id = " <<
+      			(*particle)->getID() << " " << 
+			*(*particle)->getPosition() << endl;
+		    oss << "                Periodic transition zone" << endl;
+                    GrainsMPIWrapper::addToMPIString( oss.str() );
+	          } 
+	        }
+	    }	    
+	    	      	  
 	    break;
 	    
 	  // Buffer to clone (1 -> 2)
 	  case 2:
             removeParticleFromList( m_ParticlesInBufferzone, *particle );
-	    m_CloneParticles.push_back( *particle);
+	    m_CloneParticles.push_back( *particle );
 	    if ( GrainsExec::m_MPI_verbose )
             {
               ostringstream oss;
-              oss << "   t=" << GrainsExec::doubleToString( time, FORMAT10DIGITS )
+              oss << "   t=" << GrainsExec::doubleToString( time, 
+	      		FORMAT10DIGITS )
       		<< " Buffer to Clone (1 -> 2)    Id = " <<
       		(*particle)->getID() << " " << *(*particle)->getPosition()
 		<< endl;
@@ -2389,11 +2419,12 @@ void AllComponents::updateParticleLists( double time,
 	if ( tag == 1 ) 
 	{
           removeParticleFromList( m_CloneParticles, *particle );
-	  m_ParticlesInBufferzone.push_back( *particle);          
+	  m_ParticlesInBufferzone.push_back( *particle );          
           if ( GrainsExec::m_MPI_verbose )
 	  {
             ostringstream oss;
-            oss << "   t=" << GrainsExec::doubleToString( time, FORMAT10DIGITS ) <<
+            oss << "   t=" << GrainsExec::doubleToString( time, 
+	    		FORMAT10DIGITS ) <<
       		" Clone to Buffer (2 -> 1)    Id = " <<
       		(*particle)->getID() << " " << *(*particle)->getPosition()
 		<< endl;
@@ -2446,4 +2477,18 @@ void AllComponents::setTimeIntegrationScheme()
   for (particle=m_ActiveParticles.begin();
   	particle!=m_ActiveParticles.end(); particle++)
     (*particle)->setTimeIntegrationScheme(); 
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets the center of mass coordinate in a given direction at the previous time 
+// of all particles to the current value (generally called at the start of a 
+// time step)
+void AllComponents::setPositionDir_nm1( Direction dir )
+{
+  for (list<Particle*>::iterator particle=m_ActiveParticles.begin();
+  	particle!=m_ActiveParticles.end();particle++) 
+    (*particle)->setPositionDir_nm1( dir ); 
 }

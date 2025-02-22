@@ -891,6 +891,15 @@ void App::output_domain_features( ostream& output, string const& oshift )
     if ( m_domain_global_periodicity[Y] ) output << "Y ";    
     if ( m_domain_global_periodicity[Z] ) output << "Z ";
     output << endl;
+    
+    if ( GrainsExec::m_partialPer_is_active )
+    {
+      PartialPeriodicity const* pp = GrainsExec::getPartialPeriodicity(); 
+      output << oshift << "Partial Periodicity = " << 
+      	( pp->dir == X ? "X" : ( pp->dir == Y ? "Y" : "Z" ) ) << 
+	( pp->comp == LLO_LARGER ? " > " : " < " ) <<
+	pp->limit << endl;        
+    }
 
     output << oshift << "Global periodic vectors" << endl;
     for (size_t i=0;i<27;++i)

@@ -1895,3 +1895,25 @@ void Particle::setTimeIntegrationScheme()
 {
   m_kinematics->setTimeIntegrationScheme();
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets the center of mass coordinate in a given direction at the previous 
+// time to the current value (generally called at the start of a time step)
+void Particle::setPositionDir_nm1( Direction dir )
+{
+  m_pos_dir_nm1 = (*m_geoRBWC->getCentre())[dir];
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the center of mass coordinate in a given direction at the previous 
+// time
+double Particle::getPositionDir_nm1() const
+{
+  return ( m_pos_dir_nm1 );
+}

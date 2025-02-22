@@ -55,6 +55,7 @@ Grains::Grains()
   if ( GrainsBuilderFactory::getContext() == DIM_2 ) m_dimension = 2;
   m_insertion_position = new list<Point3>;
   m_insertion_angular_position = new list<Matrix>;
+  GrainsExec::initializePartialPeriodicity();
 }
 
 
@@ -296,6 +297,13 @@ void Grains::Simulation( double time_interval )
         GrainsExec::m_postprocess_forces_at_this_time = true;
 	m_collision->resetPPForceIndex();
       }
+
+
+      // In case of partial periodicity, sets the position of all particles
+      // in direction dir at previous time
+      if ( GrainsExec::m_partialPer_is_active )
+        m_allcomponents.setPositionDir_nm1( 
+	  	GrainsExec::getPartialPeriodicity()->dir );
 	
 
       // Insertion of particles
@@ -369,6 +377,12 @@ void Grains::Simulation( double time_interval )
       if ( GrainsExec::m_output_data_at_this_time )
       {
 	SCT_set_start( "OutputResults" );
+
+	// Update clone particle velocity
+	if ( m_periodic && GrainsExec::m_TIScheme == "SecondOrderLeapFrog" )
+          m_collision->updateDestroyPeriodicClones(
+		m_allcomponents.getActiveParticles(),
+		m_allcomponents.getPeriodicCloneParticles() );
 
 	// Track component max and mean velocity
 	m_allcomponents.ComputeMaxMeanVelocity( vmax, vmean );
@@ -549,6 +563,44 @@ void Grains::Construction( DOMElement* rootElement )
   if ( perx || pery || perz )
     GrainsExec::m_periodic = m_periodic = true;
   App::set_periodicity( m_periodicity );
+
+
+  // Partial periodicity
+  DOMNode* nPartialPeriodicity = ReaderXML::getNode( root, 
+  	"PartialPeriodicity" );
+  if ( nPartialPeriodicity )
+  {
+    LargerLowerOp comp = LLO_UNDEF;
+    Direction dir = NONE;
+    double limit;
+    
+    string scompop = ReaderXML::getNodeAttr_String( nPartialPeriodicity, 
+    	"Comp" );
+    if ( scompop == "Lower" ) comp = LLO_LOWER;
+    else if ( scompop == "Larger" ) comp = LLO_LARGER;
+    else if ( m_rank == 0 )
+    {
+      cout << GrainsExec::m_shift6 <<
+              "Comparison operator " << scompop 
+	      << " unknown in PartialPeriodicity!" << endl;
+      grainsAbort();
+    }
+    string sdir = ReaderXML::getNodeAttr_String( nPartialPeriodicity, "Dir" );
+    if ( sdir == "X" ) dir = X;
+    else if ( sdir == "Y" ) dir = Y;
+    else if ( sdir == "Z" ) dir = Z;    
+    else if ( m_rank == 0 )
+    {
+      cout << GrainsExec::m_shift6 <<
+              "Direction " << sdir 
+	      << " unknown in PartialPeriodicity!" << endl;
+      grainsAbort();
+    }
+    
+    limit = ReaderXML::getNodeAttr_Double( nPartialPeriodicity, "Limit" );
+    GrainsExec::setPartialPeriodicity( comp, dir, limit );
+    GrainsExec::m_partialPer_is_active = true;                    
+  }	   
 
 
   // Domain decomposition
