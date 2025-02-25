@@ -622,77 +622,6 @@ void Grains::Construction( DOMElement* rootElement )
     if ( m_rank == 0 ) cout << GrainsExec::m_shift3 << "Construction" << endl;
 
 
-    // Create the LinkedCell collision detection app
-    m_collision = new LinkedCell();
-    m_collision->setName( "LinkedCell" );
-    m_allApp.push_back( m_collision );
-
-
-    // Reload
-    DOMNode* reload = ReaderXML::getNode( root, "Reload" );
-    if ( reload )
-    {
-      m_restart = true;
-      GrainsExec::m_isReloaded = m_restart;
-
-      // Restart mode
-      string reload_type = ReaderXML::getNodeAttr_String( reload, "Type" );
-      if ( reload_type == "new" || reload_type == "same" )
-        GrainsExec::m_ReloadType = reload_type ;
-
-
-      // Reload file name depending on the restart mode
-      // If the mode is "same", the restart file is the same as the output file
-      // and is determined by searching the RFTable file
-      if ( GrainsExec::m_ReloadType == "new" )
-        restart  = ReaderXML::getNodeAttr_String( reload, "Filename" );
-      else
-      {
-        DOMNode* rootSimu = ReaderXML::getNode( rootElement, "Simulation" );
-        DOMNode* fileRestartOutput = ReaderXML::getNode( rootSimu,
-		"RestartFile" );
-        restart = ReaderXML::getNodeAttr_String( fileRestartOutput, "Name" );
-        restart = GrainsExec::restartFileName_AorB( restart, "_RFTable.txt" );
-        GrainsExec::m_reloadFile_suffix =
-            restart.substr( restart.size()-1, 1 );
-      }
-      restart = GrainsExec::fullResultFileName( restart, false );
-      if ( m_rank == 0 ) cout << GrainsExec::m_shift6 <<
-      	"Simulation reloaded from " << restart << endl;      
-
-      // Extract the reload directory from the reload file
-      GrainsExec::m_ReloadDirectory = GrainsExec::extractRoot( restart );
-
-      // Read the reload file and check the restart format
-      string cle;
-      ifstream simulLoad( restart.c_str() );
-      simulLoad >> cle; 
-      if ( cle == "__Format2024__" ) 
-      { 
-        b2024 = true;
-        simulLoad >> cle >> m_time;
-      }
-      else simulLoad >> m_time;
-      ContactBuilderFactory::reload( simulLoad );
-      if ( !b2024 )
-      {
-        m_allcomponents.read_pre2024( simulLoad, restart, m_wrapper );
-        ContactBuilderFactory::set_materialsForObstaclesOnly_reload(
-          m_allcomponents.getReferenceParticles() );
-      }
-      else
-        npart = m_allcomponents.read( simulLoad, m_insertion_position, 
-		m_rank, m_nprocs );      
-      simulLoad >> cle;
-      assert( cle == "#EndTime" );
-      simulLoad.close();      
-
-      // Whether to reset velocity to 0
-      string reset = ReaderXML::getNodeAttr_String( reload, "Velocity" );
-      m_allcomponents.resetKinematics( reset );
-    }
-
-
     // Collision detection
     DOMNode* collision = 
                       ReaderXML::getNode( root, "CollisionDetectionAlgorithm" );
@@ -783,6 +712,77 @@ void Grains::Construction( DOMElement* rootElement )
       else if ( m_rank == 0 )
         cout << GrainsExec::m_shift6 <<
         "Pre-collision Test with bounding volumes is off." << endl;
+    }
+
+
+    // Create the LinkedCell collision detection app
+    m_collision = new LinkedCell();
+    m_collision->setName( "LinkedCell" );
+    m_allApp.push_back( m_collision );
+
+
+    // Reload
+    DOMNode* reload = ReaderXML::getNode( root, "Reload" );
+    if ( reload )
+    {
+      m_restart = true;
+      GrainsExec::m_isReloaded = m_restart;
+
+      // Restart mode
+      string reload_type = ReaderXML::getNodeAttr_String( reload, "Type" );
+      if ( reload_type == "new" || reload_type == "same" )
+        GrainsExec::m_ReloadType = reload_type ;
+
+
+      // Reload file name depending on the restart mode
+      // If the mode is "same", the restart file is the same as the output file
+      // and is determined by searching the RFTable file
+      if ( GrainsExec::m_ReloadType == "new" )
+        restart  = ReaderXML::getNodeAttr_String( reload, "Filename" );
+      else
+      {
+        DOMNode* rootSimu = ReaderXML::getNode( rootElement, "Simulation" );
+        DOMNode* fileRestartOutput = ReaderXML::getNode( rootSimu,
+		"RestartFile" );
+        restart = ReaderXML::getNodeAttr_String( fileRestartOutput, "Name" );
+        restart = GrainsExec::restartFileName_AorB( restart, "_RFTable.txt" );
+        GrainsExec::m_reloadFile_suffix =
+            restart.substr( restart.size()-1, 1 );
+      }
+      restart = GrainsExec::fullResultFileName( restart, false );
+      if ( m_rank == 0 ) cout << GrainsExec::m_shift6 <<
+      	"Simulation reloaded from " << restart << endl;      
+
+      // Extract the reload directory from the reload file
+      GrainsExec::m_ReloadDirectory = GrainsExec::extractRoot( restart );
+
+      // Read the reload file and check the restart format
+      string cle;
+      ifstream simulLoad( restart.c_str() );
+      simulLoad >> cle; 
+      if ( cle == "__Format2024__" ) 
+      { 
+        b2024 = true;
+        simulLoad >> cle >> m_time;
+      }
+      else simulLoad >> m_time;
+      ContactBuilderFactory::reload( simulLoad );
+      if ( !b2024 )
+      {
+        m_allcomponents.read_pre2024( simulLoad, restart, m_wrapper );
+        ContactBuilderFactory::set_materialsForObstaclesOnly_reload(
+          m_allcomponents.getReferenceParticles() );
+      }
+      else
+        npart = m_allcomponents.read( simulLoad, m_insertion_position, 
+		m_rank, m_nprocs );      
+      simulLoad >> cle;
+      assert( cle == "#EndTime" );
+      simulLoad.close();      
+
+      // Whether to reset velocity to 0
+      string reset = ReaderXML::getNodeAttr_String( reload, "Velocity" );
+      m_allcomponents.resetKinematics( reset );
     }
 
 

@@ -97,7 +97,7 @@ RigidBodyWithCrust::RigidBodyWithCrust( istream& fileIn, string type )
   // Read the rigid body shape
   m_convex = ConvexBuilderFactory::create( cle, fileIn );
   m_boundingVolume = m_convex->
-                        computeBVolume( GrainsExec::m_colDetBoundingVolume );
+	computeBVolume( GrainsExec::m_colDetBoundingVolume );
   fileIn >> cle;
   assert( cle == "*END" );
 
@@ -137,7 +137,7 @@ RigidBodyWithCrust::RigidBodyWithCrust( DOMNode* root )
   m_convex = ConvexBuilderFactory::create( forme );
   m_crustThickness = ReaderXML::getNodeAttr_Double( forme, "CrustThickness" );
   m_boundingVolume = m_convex->
-                          computeBVolume( GrainsExec::m_colDetBoundingVolume );
+	computeBVolume( GrainsExec::m_colDetBoundingVolume );
   GrainsExec::setMinCrustThickness( m_crustThickness );
 
   // Transformation
@@ -306,14 +306,15 @@ PointContact RigidBodyWithCrust::ClosestPoint( RigidBodyWithCrust &neighbor )
     // General case for any pair of convex rigid bodies
     if ( general )
     {
+      // Bounding sphere pre-collision Test
       if ( Norm( *m_transform.getOrigin() 
       		- *neighbor.m_transform.getOrigin() ) 
     	< m_circumscribedRadius + neighbor.m_circumscribedRadius )
       {
-        // Pre-collision Test
-        if ( GrainsExec::m_colDetBoundingVolume && 
-      		!isContactBVolume( *this, neighbor ) )
-	  return ( PointNoContact );
+        // Bounding volume pre-collision Test
+        if ( GrainsExec::m_colDetBoundingVolume )
+      	  if ( !isContactBVolume( *this, neighbor ) )
+	    return ( PointNoContact );
 
         // Distance between the 2 rigid bodies shrunk by their crust thickness
         Transform const* a2w = this->getTransformWithCrust();
