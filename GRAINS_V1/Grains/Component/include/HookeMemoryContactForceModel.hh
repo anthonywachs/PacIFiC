@@ -152,7 +152,7 @@ class Component;
     	m^{-1}\right)\f$
     - \f$e_n\f$: the restitution coefficient (-)
     - \f$\eta_t\f$: the tangential dissipative coefficient 
-    	\f$\left(s^{-1}\right)\f$, automatically computed if not specified and
+    	\f$\left(s^{-1}\right)\f$, automatically computed if not specified or
 	assigned a value of \f$-1\f$
     - \f$\mu_c\f$: the Coulomb tangential friction coefficient (-)
     - \f$k_t\f$: the tangential stiffness coefficient \f$\left(N\cdot 

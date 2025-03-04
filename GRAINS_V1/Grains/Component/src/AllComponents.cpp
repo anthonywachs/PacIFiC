@@ -2419,7 +2419,8 @@ void AllComponents::updateParticleLists( double time,
 	if ( tag == 1 ) 
 	{
           removeParticleFromList( m_CloneParticles, *particle );
-	  m_ParticlesInBufferzone.push_back( *particle );          
+	  m_ParticlesInBufferzone.push_back( *particle );
+	  newBufPart->push_back( *particle );          
           if ( GrainsExec::m_MPI_verbose )
 	  {
             ostringstream oss;

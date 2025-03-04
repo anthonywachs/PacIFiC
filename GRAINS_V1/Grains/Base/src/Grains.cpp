@@ -240,8 +240,21 @@ void Grains::do_after_time_stepping()
       cout << GrainsExec::m_shift3 << "Average overlap = " << omean << endl;
       cout << GrainsExec::m_shift3 << "Time of maximum overlap = " <<
 	timemax << endl;
-      cout << GrainsExec::m_shift3 << "Average number of iterations of GJK = " <<
-    	ngjk << endl << endl;
+      cout << GrainsExec::m_shift3 << "Average number of iterations of GJK = " 
+      	<< ngjk << endl;
+      if ( GrainsExec::m_nb_GJK_narrow_collision_detections )
+      {
+	cout << GrainsExec::m_shift3 << "Number of  "
+		"narrow collision detection tests = " <<
+    		GrainsExec::m_nb_GJK_narrow_collision_detections << endl;
+	cout << GrainsExec::m_shift3 << "Number of  "
+		"GJK calls = " << GrainsExec::m_nb_GJK_calls << endl;		        
+	cout << GrainsExec::m_shift3 << "Percentage of GJK calls avoided by "
+		"bounding volume pre-collision detection test = " <<
+    		100. * ( 1. - double( GrainsExec::m_nb_GJK_calls )
+		/ double( GrainsExec::m_nb_GJK_narrow_collision_detections ) )
+			 << endl << endl;
+      }
     }
 
     // Timer outcome

@@ -306,6 +306,8 @@ PointContact RigidBodyWithCrust::ClosestPoint( RigidBodyWithCrust &neighbor )
     // General case for any pair of convex rigid bodies
     if ( general )
     {
+      ++GrainsExec::m_nb_GJK_narrow_collision_detections;
+      
       // Bounding sphere pre-collision Test
       if ( Norm( *m_transform.getOrigin() 
       		- *neighbor.m_transform.getOrigin() ) 
@@ -315,7 +317,9 @@ PointContact RigidBodyWithCrust::ClosestPoint( RigidBodyWithCrust &neighbor )
         if ( GrainsExec::m_colDetBoundingVolume )
       	  if ( !isContactBVolume( *this, neighbor ) )
 	    return ( PointNoContact );
-
+	    
+        ++GrainsExec::m_nb_GJK_calls;
+	
         // Distance between the 2 rigid bodies shrunk by their crust thickness
         Transform const* a2w = this->getTransformWithCrust();
         Transform const* b2w = neighbor.getTransformWithCrust();
@@ -706,8 +710,7 @@ bool RigidBodyWithCrust::isClose( RigidBodyWithCrust const& neighbor ) const
 // Returns whether there is geometric contact with another rigid
 // body in the sense of ClosestPoint, i.e., if minimal distance
 // between the shrunk rigid bodies < sum of the crust thicknesses
-bool RigidBodyWithCrust::isContact( RigidBodyWithCrust& neighbor,
-	bool checkCGInRec )
+bool RigidBodyWithCrust::isContact( RigidBodyWithCrust& neighbor )
 {
   bool contact = false;
   PointContact pc;
@@ -812,18 +815,28 @@ bool RigidBodyWithCrust::isContact( RigidBodyWithCrust& neighbor,
   // This requires a fix in the future
   if ( general )
   {
-    Point3 pointA, pointB;
-    int nbIterGJK = 0;
-    Transform const* a2w = this->getTransformWithCrust();
-    Transform const* b2w = neighbor.getTransformWithCrust();  
+    ++GrainsExec::m_nb_GJK_narrow_collision_detections;
+    
+    // Bounding sphere pre-collision Test
+    if ( Norm( *m_transform.getOrigin() 
+      		- *neighbor.m_transform.getOrigin() ) 
+    	< m_circumscribedRadius + neighbor.m_circumscribedRadius )
+    {
+      ++GrainsExec::m_nb_GJK_calls;
+      
+      Point3 pointA, pointB;
+      int nbIterGJK = 0;
+      Transform const* a2w = this->getTransformWithCrust();
+      Transform const* b2w = neighbor.getTransformWithCrust();  
    
-    double distanceMin = (*this).m_crustThickness + neighbor.m_crustThickness
+      double distanceMin = (*this).m_crustThickness + neighbor.m_crustThickness
   	- EPSILON;
 
-    double distance = closest_points( *m_convex, *(neighbor.m_convex), *a2w, 
+      double distance = closest_points( *m_convex, *(neighbor.m_convex), *a2w, 
     	*b2w, pointA, pointB, nbIterGJK );
 
-    if ( distance < distanceMin ) contact = true;
+      if ( distance < distanceMin ) contact = true;
+    }
   }
 
   return ( contact );

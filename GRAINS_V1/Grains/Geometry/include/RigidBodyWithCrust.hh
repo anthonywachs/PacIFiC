@@ -106,11 +106,8 @@ class RigidBodyWithCrust : public RigidBody
     /** @brief Returns whether there is geometric contact with another rigid
     body in the sense of ClosestPoint, i.e., if minimal distance
     between the shrunk rigid bodies < sum of the crust thicknesses
-    @param neighbor the other rigid body 
-    @param checkCGInRec in case one of the rigid body is a Rectangle, check 
-    whether the projection of the center of mass of the non Rectangle rigid 
-    body belongs to the rectangle */
-    bool isContact( RigidBodyWithCrust& neighbor, bool checkCGInRec = false );
+    @param neighbor the other rigid body */
+    bool isContact( RigidBodyWithCrust& neighbor );
 
     /** @brief Returns whether the rigid body is close to another rigid body in
     the sense of whether their respective bounding boxes plus their crust

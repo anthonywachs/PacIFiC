@@ -57,8 +57,8 @@ size_t GrainsExec::m_time_counter = 0;
 bool GrainsExec::m_partialPer_is_active = false;
 double GrainsExec::m_minCrustThickness = 1.e20;
 PartialPeriodicity GrainsExec::m_partialPer;
-
-
+unsigned long long int GrainsExec::m_nb_GJK_narrow_collision_detections = 0;
+unsigned long long int GrainsExec::m_nb_GJK_calls = 0;
 
 
 // ----------------------------------------------------------------------------

@@ -197,7 +197,8 @@ class AllComponents
     
     /** @brief Updates list of particles in parallel
     @param time physical time 
-    @param newBufPart list of new buffer particles */
+    @param newBufPart list of new buffer particles 
+    @param wrapper MPI wrapper */
     void updateParticleLists( double time, list<Particle*>* newBufPart,
   	GrainsMPIWrapper const* wrapper = NULL );    
     //@}

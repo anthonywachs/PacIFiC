@@ -361,7 +361,9 @@ class GrainsExec
     	particle */
     static size_t m_time_counter; /**< Discrete time counter */
     static bool m_partialPer_is_active; /**< true is partial periodicity is
-    	active */    
+    	active */ 
+    static unsigned long long int m_nb_GJK_narrow_collision_detections;
+    static unsigned long long int m_nb_GJK_calls;       
     //@}
 
 
