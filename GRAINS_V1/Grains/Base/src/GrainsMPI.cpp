@@ -457,7 +457,11 @@ void GrainsMPI::InsertCreateNewParticles()
   if ( m_position != "" )
   {
     // From a structured array
-    if ( m_position == "STRUCTURED" ) error = setPositionParticlesArray();
+    if ( m_position == "STRUCTURED" ) 
+      error = setPositionParticlesStructuredArray();
+    // From a cylinder array
+    else if ( m_position == "CYLINDER" ) 
+      error = setPositionParticlesCyl();
     // From a file
     else error = setPositionParticlesFromFile();
   }
@@ -534,16 +538,33 @@ size_t GrainsMPI::setAngularPositionParticlesFromFile()
 
 // ----------------------------------------------------------------------------
 // Sets particle initial position with a structured array
-size_t GrainsMPI::setPositionParticlesArray()
+size_t GrainsMPI::setPositionParticlesStructuredArray()
 {
   size_t error = 0;
   
   // Checks that none of the structured array positions is exactly 
   // at a limit of the linked cell grid, otherwise shift by 1e-12
-  m_collision->checkStructuredArrayPositionsMPI( m_InsertionArray, m_wrapper );
+  m_collision->checkStructuredArrayPositionsMPI( m_InsertionLattice, m_wrapper );
   
   // Note: only the master proc computes and stores positions  
-  if ( m_rank == 0 ) error = Grains::setPositionParticlesArray();
+  if ( m_rank == 0 ) error = Grains::setPositionParticlesStructuredArray();
+  error = m_wrapper->Broadcast_UNSIGNED_INT( error );
+
+  return ( error );    
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets particle initial position through filling a cylinder with a regular 
+// array
+size_t GrainsMPI::setPositionParticlesCyl()
+{
+  size_t error = 0;
+  
+  // Note: only the master proc computes and stores positions  
+  if ( m_rank == 0 ) error = Grains::setPositionParticlesCyl();
   error = m_wrapper->Broadcast_UNSIGNED_INT( error );
 
   return ( error );    

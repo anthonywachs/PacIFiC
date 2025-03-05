@@ -60,6 +60,14 @@ class Window
     @param ptB upper-right-front corner */
     void setAsBox( Point3 const& ptA, Point3 const& ptB );
     
+    /** @brief Sets the window as a cylinder
+    @param bottomC bottom centre of the cylinder 
+    @param radius_ cylinder radius
+    @param height_ cylinder height
+    @param axisdir_str axis direction as a string */
+    void setAsCylinder( Point3 const& bottomC, double const& radius_,
+    	 double const& height_, string const& axisdir_str );    
+    
     /** @brief Adds the window as a rigid body to a list of rigid bodies
     @param iwlist list of rigid bodies */
     void addAsRigidBody( list<RigidBody*>& iwlist ) const; 

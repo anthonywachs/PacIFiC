@@ -24,13 +24,15 @@ class GrainsMPIWrapper;
 class App;
 
 
-/** @brief Structured array of positions */
-struct StructArrayInsertion
+/** @brief Array of positions */
+struct InsertionLattice
 {
   Window box; /**< Window */
   size_t NX; /**< Number of positions in x */
   size_t NY; /**< Number of positions in y */
   size_t NZ; /**< Number of positions in z */
+  size_t NN; /**< Total number of positions */
+  Direction FillingDir; /**< cylinder disk filling direction */  
 };
 
 

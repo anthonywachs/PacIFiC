@@ -336,6 +336,25 @@ void Window::setAsBox( Point3 const& ptA, Point3 const& ptB )
 
 
 // ----------------------------------------------------------------------------
+// Sets the window as a cylinder
+void Window::setAsCylinder( Point3 const& bottomC, double const& radius_,
+    	 double const& height_, string const& axisdir_str )
+{
+  m_ftype = WINDOW_CYLINDER;
+  m_ptA = bottomC;
+  m_ptB[X] = m_ptB[Y] = m_ptB[Z] = 0.; 
+  m_radius = radius_;
+  m_radius_int = 0.;
+  m_height = height_;
+  if ( axisdir_str == "X" ) m_axisdir = X;
+  else if ( axisdir_str == "Y" ) m_axisdir = Y;
+  else m_axisdir = Z;
+}
+
+
+
+
+// ----------------------------------------------------------------------------
 // Returns a pointer to point A
 Point3 const* Window::getPointA() const
 {

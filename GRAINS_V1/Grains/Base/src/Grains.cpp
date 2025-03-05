@@ -39,7 +39,7 @@ Grains::Grains()
   , m_initvit_mode( IV_ZERO )
   , m_init_angpos( IAP_FIXED )
   , m_randomseed( RGS_DEFAULT )
-  , m_InsertionArray( NULL )
+  , m_InsertionLattice( NULL )
   , m_insertion_position( NULL )
   , m_insertion_angular_position( NULL )  
   , m_insertion_frequency( 1 )
@@ -65,7 +65,7 @@ Grains::Grains()
 // Destructor
 Grains::~Grains()
 {
-  if ( m_InsertionArray ) delete m_InsertionArray;
+  if ( m_InsertionLattice ) delete m_InsertionLattice;
   list<App*>::iterator app;
   for (app=m_allApp.begin(); app!=m_allApp.end(); app++) delete *app;
   m_newParticles.clear();
@@ -244,11 +244,11 @@ void Grains::do_after_time_stepping()
       	<< ngjk << endl;
       if ( GrainsExec::m_nb_GJK_narrow_collision_detections )
       {
-	cout << GrainsExec::m_shift3 << "Number of  "
+	cout << GrainsExec::m_shift3 << "Number of "
 		"narrow collision detection tests = " <<
     		GrainsExec::m_nb_GJK_narrow_collision_detections << endl;
-	cout << GrainsExec::m_shift3 << "Number of  "
-		"GJK calls = " << GrainsExec::m_nb_GJK_calls << endl;		        
+	cout << GrainsExec::m_shift3 << "Number of "
+		"GJK calls = " << GrainsExec::m_nb_GJK_calls << endl;
 	cout << GrainsExec::m_shift3 << "Percentage of GJK calls avoided by "
 		"bounding volume pre-collision detection test = " <<
     		100. * ( 1. - double( GrainsExec::m_nb_GJK_calls )
@@ -1356,7 +1356,7 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 	  DOMNode* nStruct = ReaderXML::getNode( nPosition, "StructuredArray" );
 	  if ( nStruct )
 	  {
-	    m_InsertionArray = new struct StructArrayInsertion;
+	    m_InsertionLattice = new struct InsertionLattice;
 	    Point3 ptA, ptB;
 
             DOMNode* nBox = ReaderXML::getNode( nStruct, "Box" );
@@ -1371,7 +1371,7 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
               ptB[X] = ReaderXML::getNodeAttr_Double( pointB, "X" );
               ptB[Y] = ReaderXML::getNodeAttr_Double( pointB, "Y" );
               ptB[Z] = ReaderXML::getNodeAttr_Double( pointB, "Z" );
-	      m_InsertionArray->box.setAsBox( ptA, ptB );
+	      m_InsertionLattice->box.setAsBox( ptA, ptB );
             }
 	    else
 	    {
@@ -1383,11 +1383,11 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
             DOMNode* nNumber = ReaderXML::getNode( nStruct, "Number" );
 	    if ( nNumber )
 	    {
-              m_InsertionArray->NX = ReaderXML::getNodeAttr_Int( nNumber,
+              m_InsertionLattice->NX = ReaderXML::getNodeAttr_Int( nNumber,
 	      	"NX" );
-              m_InsertionArray->NY = ReaderXML::getNodeAttr_Int( nNumber,
+              m_InsertionLattice->NY = ReaderXML::getNodeAttr_Int( nNumber,
 	      	"NY" );
-              m_InsertionArray->NZ = ReaderXML::getNodeAttr_Int( nNumber,
+              m_InsertionLattice->NZ = ReaderXML::getNodeAttr_Int( nNumber,
 	      	"NZ" );
 	    }
 	    else
@@ -1398,6 +1398,8 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 	    }
 
             m_position = "STRUCTURED";
+	    m_InsertionLattice->NN = m_InsertionLattice->NX * 
+	    	m_InsertionLattice->NY * m_InsertionLattice->NZ;
 	    if ( m_rank == 0 )
 	    {
 	      cout << GrainsExec::m_shift9 << "Structured array" << endl;
@@ -1406,40 +1408,114 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
               cout << GrainsExec::m_shift12 << "Point3 max = " <<
 	    	ptB[X] << " " << ptB[Y] << " " << ptB[Z] << endl;
               cout << GrainsExec::m_shift12 << "Array = " <<
-	    	m_InsertionArray->NX << " x " <<
-		m_InsertionArray->NY << " x " <<
-            	m_InsertionArray->NZ << endl;
+	    	m_InsertionLattice->NX << " x " <<
+		m_InsertionLattice->NY << " x " <<
+            	m_InsertionLattice->NZ << " = " << 
+		m_InsertionLattice->NN << endl;
 	    }
 	  }
 	  else
 	  {
-	    // Random particle positions from a collection of insertion windows
-	    DOMNode* nWindows = ReaderXML::getNode( nPosition, "Windows" );
-            if ( nWindows )
+	    DOMNode* nCyl = ReaderXML::getNode( nPosition, "CylinderArray" );
+	    if ( nCyl )
 	    {
-	      if ( m_rank == 0 )
-	        cout << GrainsExec::m_shift9 << "Insertion windows" << endl;
-	      DOMNodeList* allWindows = ReaderXML::getNodes( nWindows );
-              for (XMLSize_t i=0; i<allWindows->getLength(); i++)
+	      m_InsertionLattice = new struct InsertionLattice;
+	      Point3 ptBC;
+	      double radius, height;
+	      string axisdir_str, fill_dir;
+	      
+	      DOMNode* nbc = ReaderXML::getNode( nCyl, "BottomCentre" );
+	      if ( nbc )
 	      {
-	        DOMNode* nWindow = allWindows->item( i );
-                Window iwindow;
-		bool ok = iwindow.readWindow( nWindow, 
-			GrainsExec::m_shift12, m_rank );
-		if ( !ok ) grainsAbort();	
-	        m_insertion_windows.addWindow( iwindow );
-              }
-	    }
-            else
-	    {
-              if ( m_insertion_mode != IM_NOINSERT )
-              {
-                if ( m_rank == 0 )
-                  cout << GrainsExec::m_shift6 <<
-            "Insertion positions or windows are mandatory !!" << endl;
+                ptBC[X] = ReaderXML::getNodeAttr_Double( nbc, "X" );
+                ptBC[Y] = ReaderXML::getNodeAttr_Double( nbc, "Y" );
+                ptBC[Z] = ReaderXML::getNodeAttr_Double( nbc, "Z" );
+	      }
+	      else
+	      {
+                if ( m_rank == 0 ) cout << GrainsExec::m_shift6 <<
+		"Node BottomCentre is required in <CylinderArray> !!" << endl;
                 grainsAbort();
-              }
+	      }
+	            
+              DOMNode* cylGeom = ReaderXML::getNode( nCyl, "Cylinder" );
+	      if ( cylGeom )
+	      {
+                radius = ReaderXML::getNodeAttr_Double( cylGeom, 
+	      		"Radius" );
+                height = ReaderXML::getNodeAttr_Double( cylGeom, 
+	      		"Height" );
+                axisdir_str = ReaderXML::getNodeAttr_String( cylGeom, 
+	      		"Direction" );
+		fill_dir = ReaderXML::getNodeAttr_String( cylGeom, 
+	      		"Filling" );	
+	      }
+	      else
+	      {
+                if ( m_rank == 0 ) cout << GrainsExec::m_shift6 <<
+		"Node Cylinder is required in <CylinderArray> !!" << endl;
+                grainsAbort();
+	      }
+	      
+              if ( fill_dir == "X" ) m_InsertionLattice->FillingDir = X;
+	      else if ( fill_dir == "Y" ) m_InsertionLattice->FillingDir = Y;
+	      else if ( fill_dir == "Z" ) m_InsertionLattice->FillingDir = Z;
+	      
+	      if ( axisdir_str == fill_dir )
+	      {
+                if ( m_rank == 0 ) cout << GrainsExec::m_shift6 <<
+		"Axis direction and filling direction must be different"
+		" in <CylinderArray> !!" << endl;
+                grainsAbort();	      
+	      }
+	       
+	      m_InsertionLattice->box.setAsCylinder( ptBC, radius, height, 
+	      	axisdir_str );
+		
+              m_position = "CYLINDER";
+	      if ( m_rank == 0 )
+	      {
+	        cout << GrainsExec::m_shift9 << "Cylinder array" << endl;
+                cout << GrainsExec::m_shift12 << "Bottom centre = " <<
+			ptBC[X] << " " << ptBC[Y] << " " << ptBC[Z] << endl;
+                cout << GrainsExec::m_shift12 << "Radius = " <<
+	    		radius << " Height = " << height << " Direction = " << 
+			axisdir_str << " Filling direction = " <<
+	    		fill_dir << endl;			
+	      }	      		
 	    }
+	    else
+	    {
+	      // Random particle positions from a collection of insertion 
+	      // windows
+	      DOMNode* nWindows = ReaderXML::getNode( nPosition, "Windows" );
+              if ( nWindows )
+	      {
+	        if ( m_rank == 0 )
+	          cout << GrainsExec::m_shift9 << "Insertion windows" << endl;
+	        DOMNodeList* allWindows = ReaderXML::getNodes( nWindows );
+                for (XMLSize_t i=0; i<allWindows->getLength(); i++)
+	        {
+	          DOMNode* nWindow = allWindows->item( i );
+                  Window iwindow;
+		  bool ok = iwindow.readWindow( nWindow, 
+			GrainsExec::m_shift12, m_rank );
+		  if ( !ok ) grainsAbort();	
+	          m_insertion_windows.addWindow( iwindow );
+                }
+	      }
+              else
+	      {
+                if ( m_insertion_mode != IM_NOINSERT )
+                {
+                  if ( m_rank == 0 )
+                    cout << GrainsExec::m_shift6 <<
+            		"Insertion positions or windows are mandatory !!" 
+			<< endl;
+                  grainsAbort();
+                }
+	      }
+	    }  
 	  }
         }
       }
@@ -1810,7 +1886,11 @@ void Grains::InsertCreateNewParticles()
   if ( m_position != "" )
   {
     // From a structured array
-    if ( m_position == "STRUCTURED" ) error = setPositionParticlesArray();
+    if ( m_position == "STRUCTURED" ) 
+      error = setPositionParticlesStructuredArray();
+    // From a cylinder array
+    else if ( m_position == "CYLINDER" ) 
+      error = setPositionParticlesCyl();
     // From a file
     else error = setPositionParticlesFromFile();
   }
@@ -2110,36 +2190,36 @@ size_t Grains::setAngularPositionParticlesFromFile()
 
 // ----------------------------------------------------------------------------
 // Sets particle initial position with a structured array
-size_t Grains::setPositionParticlesArray()
+size_t Grains::setPositionParticlesStructuredArray()
 {
   size_t k, l, m, nnewpart = 0, error = 0;
   list< pair<Particle*,size_t> >::const_iterator il;
   Point3 position;
-  Point3 ptA = *(m_InsertionArray->box.getPointA());
-  Point3 ptB = *(m_InsertionArray->box.getPointB());  
-  double deltax = ( ptB[X] - ptA[X] ) / double(m_InsertionArray->NX) ;
-  double deltay = ( ptB[Y] - ptA[Y] ) / double(m_InsertionArray->NY) ;
-  double deltaz = ( ptB[Z] - ptA[Z] ) / double(m_InsertionArray->NZ) ;
+  Point3 ptA = *(m_InsertionLattice->box.getPointA());
+  Point3 ptB = *(m_InsertionLattice->box.getPointB());  
+  double deltax = ( ptB[X] - ptA[X] ) / double(m_InsertionLattice->NX) ;
+  double deltay = ( ptB[Y] - ptA[Y] ) / double(m_InsertionLattice->NY) ;
+  double deltaz = ( ptB[Z] - ptA[Z] ) / double(m_InsertionLattice->NZ) ;
 
   // Checks that number of positions equals the number of new particles 
   // to insert
   for (il=m_newParticles.cbegin();il!=m_newParticles.cend();il++)
     nnewpart += il->second;
-  if ( nnewpart != m_InsertionArray->NX * m_InsertionArray->NY
-  	* m_InsertionArray->NZ )
+  if ( nnewpart != m_InsertionLattice->NX * m_InsertionLattice->NY
+  	* m_InsertionLattice->NZ )
   {
     cout << "ERR: number of new particles to insert is different from the"
     	<< " number of positions in the structured array: " << nnewpart << 
-	" != " << m_InsertionArray->NX * m_InsertionArray->NY 
-	* m_InsertionArray->NZ << endl;
+	" != " << m_InsertionLattice->NX * m_InsertionLattice->NY 
+	* m_InsertionLattice->NZ << endl;
     error = 1;
   }
   else
   {
     // Compute positions and add them to the list
-    for (k=0;k<m_InsertionArray->NX;++k)
-      for (l=0;l<m_InsertionArray->NY;++l)
-        for (m=0;m<m_InsertionArray->NZ;++m)
+    for (k=0;k<m_InsertionLattice->NX;++k)
+      for (l=0;l<m_InsertionLattice->NY;++l)
+        for (m=0;m<m_InsertionLattice->NZ;++m)
         {
           position[X] = ptA[X] + ( double(k) + 0.5 ) * deltax;
           position[Y] = ptA[Y] + ( double(l) + 0.5 ) * deltay;
@@ -2149,6 +2229,118 @@ size_t Grains::setPositionParticlesArray()
   }
   
   return ( error );  
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets particle initial position through filling a cylinder with a regular 
+// array
+size_t Grains::setPositionParticlesCyl()
+{
+  // Note: we simply perturn positions to avoid positions matching exactly
+  // the limits of the linked cell grid that would be problematic in parallel
+
+  size_t i, j, k, error = 0, nnewpart = 0, maxnpos = 0;
+  list< pair<Particle*,size_t> >::const_iterator il;  
+  vector<bool> directions( 3, false );
+  Direction A = m_InsertionLattice->box.getAxisDirection(),
+  	F = m_InsertionLattice->FillingDir, T;
+  directions[A] = true;
+  directions[F] = true;
+  if ( !directions[0] ) T = X;
+  else if ( !directions[1] ) T = Y;
+  else T = Z; 
+  double cylRadius = m_InsertionLattice->box.getRadius(), 
+  	cylHeight = m_InsertionLattice->box.getHeight(),
+	factor = 1.e6;
+  Point3 position, bottomCentre = *(m_InsertionLattice->box.getPointA());
+  
+  // Compute mesh features 
+  double l = 2. * m_allcomponents.getCircumscribedRadiusMax();
+  double Lfill = sqrt( pow( cylRadius, 2. ) - pow( l / 2., 2. ) );
+  size_t nf = size_t( Lfill / l );
+  double deltaf = Lfill / double(nf);
+  size_t na = size_t( cylHeight / l );
+  double deltaa = cylHeight / double(na);
+  vector<double> posF( nf, 0. ), Lt( nf, 0. ), deltat( nf, 0. );
+  vector<size_t> nt( nf, 0 );
+  
+  // Compute max number of positions
+  posF[0] = - Lfill + deltaf * 0.5 + 
+    	( 2. * (double)rand() / RAND_MAX - 1. ) * l / factor;
+  Lt[0] = sqrt( pow( cylRadius, 2. ) - pow( posF[0] - 0.5 * deltaf, 2. ) );
+  nt[0] = 1;
+  deltat[0] = 2. * Lt[0];   
+  for (j=1;j<nf;++j)
+  {
+    posF[j] = - Lfill + deltaf * ( double(j) + 0.5 ) + 
+    	( 2. * (double)rand() / RAND_MAX - 1. ) * l / factor;
+    Lt[j] = sqrt( pow( cylRadius, 2. ) - pow( posF[j] - 0.5 * deltaf, 2. ) );
+    nt[j] = size_t( 2. * Lt[j] / l );
+    deltat[j] = 2. * Lt[j] / double(nt[j]);
+    maxnpos += nf * nt[j];    
+  }
+  maxnpos *= 2;
+
+  // Checks that number of positions is larger or equal to the number of new 
+  // particles to insert
+  for (il=m_newParticles.cbegin();il!=m_newParticles.cend();il++)
+    nnewpart += il->second;
+  if ( nnewpart > maxnpos )
+  {
+    cout << "ERR: number of new particles to insert " << nnewpart << 
+    	" is larger than number of positions in the cylindrical array " 
+	<< maxnpos << endl;
+    error = 1;
+  }
+  else
+  {
+    // Compute positions and add them to the list
+    // Bottom half of the cylinder in the filling direction
+    size_t counter = 0;
+    for (j=0;j<nf && counter<nnewpart;++j)
+    {
+      position[F] = posF[j] + bottomCentre[F];  
+      for (i=0;i<nt[j] && counter<nnewpart;++i)
+      {
+        position[T] = - Lt[j] + deltat[j] * ( double(i) + 0.5 ) + 
+    		( 2. * (double)rand() / RAND_MAX - 1. ) * l / factor
+		+ bottomCentre[T];
+	for (k=0;k<na && counter<nnewpart;++k)
+	{
+	  position[A] = - 0.5 * cylHeight + deltaa * ( double(k) + 0.5 ) + 
+    		( 2. * (double)rand() / RAND_MAX - 1. ) * l / factor
+		+ bottomCentre[A] + 0.5 * cylHeight;
+          m_insertion_position->push_back( position );
+	  ++counter;
+        }
+      }
+    }
+    
+    // Top half of the cylinder in the filling direction
+    for (j=0;j<nf && counter<nnewpart;++j)
+    {
+      position[F] = - posF[nf-1-j] + bottomCentre[F]; 
+      for (i=0;i<nt[nf-1-j] && counter<nnewpart;++i)
+      {
+        position[T] = - Lt[nf-1-j] + deltat[nf-1-j] * ( double(i) + 0.5 ) + 
+    		( 2. * (double)rand() / RAND_MAX - 1. ) * l / factor
+		+ bottomCentre[T];
+	for (k=0;k<na && counter<nnewpart;++k)
+	{
+	  position[A] = - 0.5 * cylHeight + deltaa * ( double(k) + 0.5 ) + 
+    		( 2. * (double)rand() / RAND_MAX - 1. ) * l / factor
+		+ bottomCentre[A] + 0.5 * cylHeight;
+          m_insertion_position->push_back( position );
+	  ++counter;	  
+        }
+      }
+    }    
+  }  
+  
+  return ( error );
 }
 
 

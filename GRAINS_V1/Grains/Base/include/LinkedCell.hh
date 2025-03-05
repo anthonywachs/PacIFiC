@@ -198,7 +198,7 @@ class LinkedCell : public AppCollision
     at a limit of the linked cell grid, otherwise shift by 1e-12 
     @param InsertionArray structured array positions 
     @param wrapper MPI wrapper */
-    void checkStructuredArrayPositionsMPI( struct StructArrayInsertion* 
+    void checkStructuredArrayPositionsMPI( struct InsertionLattice* 
     	InsertionArray, GrainsMPIWrapper const* wrapper ) const;
 	
     /** @brief Removes periodic clones that do not belong to the periodic 

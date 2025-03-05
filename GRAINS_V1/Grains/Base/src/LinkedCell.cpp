@@ -2508,7 +2508,7 @@ vector<double> LinkedCell::global_coordinates( size_t const& dir ) const
 // Checks that none of the structured array positions is exactly 
 // at a limit of the linked cell grid or of the domain, otherwise shift 
 // by 1e-12 
-void LinkedCell::checkStructuredArrayPositionsMPI( struct StructArrayInsertion* 
+void LinkedCell::checkStructuredArrayPositionsMPI( struct InsertionLattice* 
     	InsertionArray, GrainsMPIWrapper const* wrapper ) const
 {
   Point3 position;
