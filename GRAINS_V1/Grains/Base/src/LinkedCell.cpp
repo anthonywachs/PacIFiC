@@ -1299,6 +1299,39 @@ bool LinkedCell::isCloseWithCrust( Particle const* particle ) const
 
 
 // ----------------------------------------------------------------------------
+// Returns whether a point lies inside any particle in the domain
+bool LinkedCell::isInParticle( Point3 const& pt ) const
+{
+  bool isIn = false;
+
+  int id[3];
+  Cell::GetCell( pt, id );
+  Cell* cell_ = getCell( id[X], id[Y], id[Z] );
+  Cell* neighborc = NULL ;
+
+  if ( cell_ )
+  {
+    // In the local cell
+    isIn = cell_->isInParticle( pt );
+
+    // In the neighboring cells
+    for (int k=-1;k<2 && !isIn;++k)
+      for (int l=-1;l<2 && !isIn;++l)
+        for (int m=-1;m<2 && !isIn;++m)
+          if ( k || l || m )
+	  {
+	    neighborc = getCell( id[X]+k, id[Y]+l, id[Z]+m );
+            if ( neighborc ) isIn = neighborc->isInParticle( pt );
+	  }
+  }
+  
+  return ( isIn );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
 // Links a particle with the linked cell grid without checking if the particle
 // overlaps with another rigid body
 void LinkedCell::Link( Particle* particle )

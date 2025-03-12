@@ -67,6 +67,10 @@ class AppCollision : public App
     using the method Component::isCloseWithCrust
     @param particle particle */
     virtual bool isCloseWithCrust( Particle const* particle ) const;
+    
+    /** @brief Returns whether a point lies inside any particle in the domain
+    @param pt point */
+    virtual bool isInParticle( Point3 const& pt ) const;    
   
     /** @brief Links a particle with the contact detection algorithm 
     @param particle particle */

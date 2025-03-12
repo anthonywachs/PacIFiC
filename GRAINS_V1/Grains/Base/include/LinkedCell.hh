@@ -63,6 +63,10 @@ class LinkedCell : public AppCollision
     using the method Component::isCloseWithCrust
     @param particle particle */
     bool isCloseWithCrust( Particle const* particle ) const;
+    
+    /** @brief Returns whether a point lies inside any particle in the domain
+    @param pt point */
+    bool isInParticle( Point3 const& pt ) const;
 
     /** @brief Links a particle with the linked cell grid without checking if
     the particle overlaps with another rigid body

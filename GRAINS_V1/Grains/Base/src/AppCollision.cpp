@@ -92,6 +92,16 @@ bool AppCollision::isCloseWithCrust( Particle const* particle ) const
 
 
 // ----------------------------------------------------------------------------
+// Returns whether a point lies inside any particle in the domain
+bool AppCollision::isInParticle( Point3 const& pt ) const
+{
+  return ( false );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
 // Links the root obstacle with the contact detection algorithm at
 // the start of the simulation
 void AppCollision::Link( Obstacle* root_obstacle )

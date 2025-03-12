@@ -640,8 +640,8 @@ bool Cell::isInParticle( Point3 const& position ) const
 {
   bool isIn = false;
   
-  for ( list<Particle*>::const_iterator particle = m_particles.begin(); 
-  	particle!=m_particles.end() && !isIn; particle++) 
+  for ( list<Particle*>::const_iterator particle = m_particles.cbegin(); 
+  	particle!=m_particles.cend() && !isIn; particle++) 
    isIn = (*particle)->isIn( position );    
       
   return ( isIn );
