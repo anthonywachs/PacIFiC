@@ -214,6 +214,14 @@ void Obstacle::writeStatic( ostream& fileOut ) const
 
 
 // ----------------------------------------------------------------------------
+// Updates indicator for Paraview post-processing
+void Obstacle::updateIndicator( double time, double dt ) 
+{}
+
+
+
+
+// ----------------------------------------------------------------------------
 // Writes the identity of a component (often id number and address)
 void Obstacle::writeIdentity( ostream& file ) const
 {

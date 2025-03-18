@@ -598,3 +598,15 @@ bool SpheroCyl::equalType_level2( Convex const* other ) const
   
   return ( same );
 } 
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets the number of point per quarter of the elementary cylinder perimeter 
+// for Paraview post-processing, i.e., controls the number of facets in the 
+// sphero-cylinder reconstruction in Paraview
+void SpheroCyl::SetvisuNodeNbPerQar( int nbpts )
+{
+  m_visuNodeNbPerQar = nbpts;
+}

@@ -226,7 +226,7 @@ bool ObstacleKinematicsVelocity::activeAngularMotion( double time, double dt )
   for (il=m_imposedVelocities.cbegin(); 
   	il!=m_imposedVelocities.cend() && !rotation; il++)
     if ( (*il)->isActif( time - dt, time, dt, dtt ) 
-    	&& ( (*il)->getType() == "Rotation" ) ) 
+    	&& ( (*il)->getType() == "ConstantRotation" ) ) 
       rotation = true;
   
   return ( rotation ); 

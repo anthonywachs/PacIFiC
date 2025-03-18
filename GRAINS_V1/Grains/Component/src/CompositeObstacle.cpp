@@ -582,7 +582,7 @@ void CompositeObstacle::updateIndicator( double time, double dt )
   list<Obstacle*>::iterator obstacle;
   
   if ( m_kinematics.activeAngularMotion( time, dt ) )
-      getObstacles().front()->setIndicator( 1. );  
+     getObstacles().front()->setIndicator( 1. );  
   
   for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++)   
     (*obstacle)->updateIndicator( time, dt );

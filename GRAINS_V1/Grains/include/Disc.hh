@@ -106,10 +106,11 @@ class Disc : public Convex
     	list<int>& offsets, list<int>& cellstype, int& firstpoint_globalnumber,
 	int& last_offset ) const; 
 
-    /** @brief Sets the number of points over the perimeter of the disc for 
-    Paraview post-processing
-    @param nbpts number of points over the perimeter */
-    static void SetvisuNodeNb( int nbpts );
+    /** @brief Sets the number of points over the disc perimeter for
+    Paraview post-processing, i.e., controls the number of facets in the
+    disc reconstruction in Paraview
+    @param nbpts number of point over the cylinder perimeter */
+    static void SetvisuNodeNbOverPer( int nbpts ); 
     
     /** @ brief Returns whether a point lies inside the disc
     @param pt point */

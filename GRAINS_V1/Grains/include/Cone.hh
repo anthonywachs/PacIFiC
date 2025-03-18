@@ -120,7 +120,13 @@ class Cone : public Convex {
     /** @brief Performs advanced comparison of the two cones and returns
     whether they match
     @param other the other cone */
-    bool equalType_level2( Convex const* other ) const;        
+    bool equalType_level2( Convex const* other ) const;
+    
+    /** @brief Sets the number of points over the cone perimeter for
+    Paraview post-processing, i.e., controls the number of facets in the
+    cone reconstruction in Paraview
+    @param nbpts number of point over the cone perimeter */
+    static void SetvisuNodeNbOverPer( int nbpts );             
     //@}
   
 

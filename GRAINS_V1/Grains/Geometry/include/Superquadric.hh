@@ -129,7 +129,13 @@ class Superquadric : public Convex
     /** @brief Performs advanced comparison of the two superquadrics and returns
     whether they match
     @param other the other superquadric */
-    bool equalType_level2( Convex const* other ) const;     
+    bool equalType_level2( Convex const* other ) const;
+    
+    /** @brief Sets the number of points per quarter of the equator line for
+    Paraview post-processing, i.e., controls the number of facets in the 
+    superquadric reconstruction in Paraview
+    @param nbpts number of point per quarter of the equator line */
+    static void SetvisuNodeNbPerQar( int nbpts );         
     //@}
 
 
@@ -141,8 +147,9 @@ class Superquadric : public Convex
     double m_c; /**< scale parameter along the z-axis */
     double m_n1; /**< first exponent */
     double m_n2; /**< second exponent */
-    static int visuNodeNbOnPer; /**< number of latitudes/longitudes
-   	 (spherical coordinates) for Paraview post-processing */
+    static int m_visuNodeNbPerQar; /**< number of latitudes/longitudes
+	(in spherical coordinates) per quarter of the equator line for Paraview 
+	post-processing */
     //@}
 
 

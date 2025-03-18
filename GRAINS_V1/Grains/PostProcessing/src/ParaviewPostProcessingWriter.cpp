@@ -10,6 +10,13 @@
 #include "Segment.hh"
 #include "Cell.hh"
 #include "Vector3.hh"
+#include "Sphere.hh"
+#include "Disc.hh"
+#include "Cylinder.hh"
+#include "Cone.hh"
+#include "Superquadric.hh"
+#include "SpheroCyl.hh"
+#include "SpheroCylindricalPrism.hh"
 #include <zlib.h>
 using namespace solid;
 
@@ -41,6 +48,7 @@ ParaviewPostProcessingWriter::ParaviewPostProcessingWriter( DOMNode* dn,
   , ALLOCATED( 0 )
   , OFFSET( 0 )
 {
+  // General parameters
   m_ParaviewFilename = ReaderXML::getNodeAttr_String( dn, "RootName" );
   m_ParaviewFilename_dir = ReaderXML::getNodeAttr_String( dn, "Directory" );
   if ( ReaderXML::hasNodeAttr( dn, "InitialCycleNumber" ) )
@@ -67,8 +75,46 @@ ParaviewPostProcessingWriter::ParaviewPostProcessingWriter( DOMNode* dn,
   { 
     string sm_pertype = ReaderXML::getNodeAttr_String( dn, "PerType" );
     if ( sm_pertype == "False" ) m_pertype = false; 
-  }    
-  
+  }
+      
+  // Parameters specific to polyhedral reconstruction
+  if ( ReaderXML::hasNodeAttr( dn, "NbPtsPerSphereQuarter" ) )
+  { 
+    int nnn = ReaderXML::getNodeAttr_Int( dn, "NbPtsPerSphereQuarter" );
+    Sphere::SetvisuNodeNbPerQar( nnn );
+  }  
+  if ( ReaderXML::hasNodeAttr( dn, "NbPtsPerDiscPer" ) )
+  { 
+    int nnn = ReaderXML::getNodeAttr_Int( dn, "NbPtsPerDiscPer" );
+    Disc::SetvisuNodeNbOverPer( nnn );
+  }
+  if ( ReaderXML::hasNodeAttr( dn, "NbPtsPerCylPer" ) )
+  { 
+    int nnn = ReaderXML::getNodeAttr_Int( dn, "NbPtsPerCylPer" );
+    Cylinder::SetvisuNodeNbOverPer( nnn );
+  }
+  if ( ReaderXML::hasNodeAttr( dn, "NbPtsPerConePer" ) )
+  { 
+    int nnn = ReaderXML::getNodeAttr_Int( dn, "NbPtsPerConePer" );
+    Cone::SetvisuNodeNbOverPer( nnn );
+  } 
+  if ( ReaderXML::hasNodeAttr( dn, "NbPtsPerSQQuarter" ) )
+  { 
+    int nnn = ReaderXML::getNodeAttr_Int( dn, "NbPtsPerSQQuarter" );
+    Superquadric::SetvisuNodeNbPerQar( nnn );
+  }
+  if ( ReaderXML::hasNodeAttr( dn, "NbPtsPerSCQuarter" ) )
+  { 
+    int nnn = ReaderXML::getNodeAttr_Int( dn, "NbPtsPerSCQuarter" );
+    SpheroCyl::SetvisuNodeNbPerQar( nnn );
+  }
+  if ( ReaderXML::hasNodeAttr( dn, "NbPtsPerSCPHalf" ) )
+  { 
+    int nnn = ReaderXML::getNodeAttr_Int( dn, "NbPtsPerSCPHalf" );
+    SpheroCylindricalPrism::SetvisuNodeNbOverHalfPer( nnn );
+  }          
+    
+  // Output to screen
   if ( m_rank == 0 && verbose )
   {
     cout << GrainsExec::m_shift9 << "Type = Paraview" << endl;

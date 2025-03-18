@@ -127,7 +127,14 @@ class SpheroCyl : public Convex
     /** @brief Performs advanced comparison of the spherocylinders and 
     returns whether they match
     @param other the other spherocylinder */
-    bool equalType_level2( Convex const* other ) const;    
+    bool equalType_level2( Convex const* other ) const;
+    
+    /** @brief Sets the number of points per quarter of the elementary cylinder 
+    perimeter for Paraview post-processing, i.e., controls the number of facets
+    in the sphero-cylinder reconstruction in Paraview
+    @param nbpts number of point per quarter of the elementary cylinder 
+    perimeter */
+    static void SetvisuNodeNbPerQar( int nbpts );        
     //@}
 
 

@@ -568,3 +568,15 @@ bool SpheroCylindricalPrism::equalType_level2( Convex const* other ) const
   
   return ( same );
 } 
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets the number of points over the half cylinder perimeter for Paraview 
+// post-processing, i.e., controls the number of facets in the spherocylindrical
+// prism reconstruction in Paraview
+void SpheroCylindricalPrism::SetvisuNodeNbOverHalfPer( int nbpts )
+{ 
+  m_visuNodeNbPerHalf = nbpts; 
+}

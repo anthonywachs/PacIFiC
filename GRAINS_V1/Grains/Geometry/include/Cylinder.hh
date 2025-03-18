@@ -128,7 +128,13 @@ class Cylinder : public Convex
     /** @brief Performs advanced comparison of the two cylinders and returns
     whether they match
     @param other the other cylinder */
-    bool equalType_level2( Convex const* other ) const;    
+    bool equalType_level2( Convex const* other ) const; 
+    
+    /** @brief Sets the number of points over the cylinder perimeter for
+    Paraview post-processing, i.e., controls the number of facets in the
+    cylinder reconstruction in Paraview
+    @param nbpts number of point over the cylinder perimeter */
+    static void SetvisuNodeNbOverPer( int nbpts );       
     //@}
 
     /** @name Friend methods */
@@ -139,9 +145,7 @@ class Cylinder : public Convex
     @param a2w transformation of the 1st cylinder
     @param b2w transformation of the 2nd cylinder */
     friend PointContact intersect( Cylinder const& a,
-                                   Cylinder const& b,
-                                   Transform const& a2w, 
-                                   Transform const& b2w );
+	Cylinder const& b, Transform const& a2w, Transform const& b2w );
     //@}
 
     

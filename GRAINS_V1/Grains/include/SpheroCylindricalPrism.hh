@@ -128,15 +128,21 @@ class SpheroCylindricalPrism : public Convex
     /** @brief Performs advanced comparison of the spherocylindrical prisms and 
     returns whether they match
     @param other the other spherocylindrical prism */
-    bool equalType_level2( Convex const* other ) const;    
+    bool equalType_level2( Convex const* other ) const; 
+    
+    /** @brief Sets the number of points over the half cylinder perimeter for 
+    Paraview post-processing, i.e., controls the number of facets
+    in the spherocylindrical prism reconstruction in Paraview
+    @param nbpts number of point over the half cylinder perimeter */
+    static void SetvisuNodeNbOverHalfPer( int nbpts );       
     //@}
 
 
   protected:
     /**@name Methods */
     //@{
-    /** @brief Returns the circumscribed radius of the reference trapezoidal 
-    prism, i.e., without applying any transformation */
+    /** @brief Returns the circumscribed radius of the reference 
+    spherocylindrical prism, i.e., without applying any transformation */
     double computeCircumscribedRadius() const;
     //@}
 

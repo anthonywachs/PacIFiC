@@ -362,7 +362,7 @@ class Obstacle : public Component
     /** @brief Updates indicator for Paraview post-processing
     @param time physical time
     @param dt time step magnitude */
-    virtual void updateIndicator( double time, double dt ) {}
+    virtual void updateIndicator( double time, double dt );
 
     /** @brief Returns the number of points to write the obstacle in a
     Paraview format */

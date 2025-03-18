@@ -18,7 +18,7 @@ GrainsCoupledWithFluid::GrainsCoupledWithFluid( double fluid_density_ )
   , m_forceReloadSame( false )
   , m_PRSHydroFT( NULL )
 {
-  Disc::SetvisuNodeNb( 40 );
+  Disc::SetvisuNodeNbOverPer( 40 );
   Sphere::SetvisuNodeNbPerQar( 5 );
   Particle::setFluidDensity( m_fluid_density ); 
 }

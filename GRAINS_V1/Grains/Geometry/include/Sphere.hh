@@ -118,7 +118,7 @@ class Sphere : public Convex
     	list<int>& offsets, list<int>& cellstype, int& firstpoint_globalnumber,
 	int& last_offset ) const;
 
-    /** @brief Sets the number of point per quarter of the equator line for
+    /** @brief Sets the number of points per quarter of the equator line for
     Paraview post-processing, i.e., controls the number of facets in the sphere
     reconstruction in Paraview
     @param nbpts number of point per quarter of the equator line */

@@ -407,6 +407,18 @@ BVolume* Cylinder::computeBVolume( unsigned int type ) const
 
 
 // ----------------------------------------------------------------------------
+// Sets the number of point over the cylinder perimeter for Paraview 
+// post-processing, i.e., controls the number of facets in the cylinder 
+// reconstruction in Paraview
+void Cylinder::SetvisuNodeNbOverPer( int nbpts )
+{
+  m_visuNodeNbOnPer = nbpts;
+}
+
+
+
+
+// ----------------------------------------------------------------------------
 // LOW-LEVEL ROUTINES FOR CYLINDERS CONTACTS
 // ----------------------------------------------------------------------------
 // Sign function

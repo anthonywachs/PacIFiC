@@ -259,9 +259,10 @@ void Disc::write_polygonsStr_PARAVIEW( list<int>& connectivity,
 
 
 // ----------------------------------------------------------------------------
-// Sets the number of points over the perimeter of the disc for 
-// Paraview post-processing
-void Disc::SetvisuNodeNb( int nbpts )
+// Sets the number of point over the disc perimeter for Paraview 
+// post-processing, i.e., controls the number of facets in the disc 
+// reconstruction in Paraview
+void Disc::SetvisuNodeNbOverPer( int nbpts )
 { 
   m_visuNodeNb = nbpts; 
 }

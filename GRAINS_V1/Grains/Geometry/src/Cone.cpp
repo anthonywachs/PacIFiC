@@ -380,4 +380,16 @@ bool Cone::equalType_level2( Convex const* other ) const
 	&& fabs( m_sinAngle - other_->m_sinAngle ) <  LOWEPS );
   
   return ( same );
-} 
+}
+
+
+
+ 
+// ----------------------------------------------------------------------------
+// Sets the number of point over the cylinder perimeter for Paraview 
+// post-processing, i.e., controls the number of facets in the cylinder 
+// reconstruction in Paraview
+void Cone::SetvisuNodeNbOverPer( int nbpts )
+{
+  m_visuNodeNbOnPer = nbpts;
+}
