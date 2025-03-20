@@ -345,12 +345,6 @@ PointContact RigidBodyWithCrust::ClosestPoint( RigidBodyWithCrust &neighbor )
       // otherwise no contact
       distance -= m_crustThickness + neighbor.m_crustThickness;
 
-      // if ( distance > 0. )
-      // {
-      //   cout << "distance: " << distance << endl;
-      //   BVCheck = isContactBVolume( *this, neighbor );
-      // }
-
       return ( PointContact( contact, overlap_vector, distance, nbIterGJK ) );
     }
     else

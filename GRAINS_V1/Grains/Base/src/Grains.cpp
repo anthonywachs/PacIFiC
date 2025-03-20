@@ -656,63 +656,80 @@ void Grains::Construction( DOMElement* rootElement )
       if ( collisionAlg )
       {
         // Method
-        string nCollisionAlg = 
+	if ( ReaderXML::hasNodeAttr( collisionAlg, "Type" ) )
+	{
+          string nCollisionAlg = 
 		ReaderXML::getNodeAttr_String( collisionAlg, "Type" );
-        if ( nCollisionAlg == "GJK" )
-          GrainsExec::m_colDetGJK_SV = false;
-        else if ( nCollisionAlg == "GJK_SV" )
-          GrainsExec::m_colDetGJK_SV = true;
-        else
-        {
-          if ( m_rank == 0 )
+          if ( nCollisionAlg == "GJK" ) GrainsExec::m_colDetGJK_SV = false;
+          else if ( nCollisionAlg == "GJK_SV" ) 
+	    GrainsExec::m_colDetGJK_SV = true;
+          else
           {
-            cout << GrainsExec::m_shift6 
+            if ( m_rank == 0 )
+            {
+              cout << GrainsExec::m_shift6 
                  << "Collision detection algorithm is not defined!" 
                  << endl;
-            grainsAbort();
+              grainsAbort();
+            }
           }
-        }
+	}
+	else GrainsExec::m_colDetGJK_SV = false;
 
         // Tolerance
-        double tol = ReaderXML::getNodeAttr_Double( collisionAlg, "Tolerance" );
-        if ( tol < 1e-15 )
-        {
-          if ( m_rank == 0 )
-	    cout << GrainsExec::m_shift6 
+	if ( ReaderXML::hasNodeAttr( collisionAlg, "Tolerance" ) )
+	{
+          double tol = 
+	  	ReaderXML::getNodeAttr_Double( collisionAlg, "Tolerance" );
+          if ( tol < 1e-15 )
+          {
+            if ( m_rank == 0 )
+	      cout << GrainsExec::m_shift6 
 		<< "Tolerance should be greater than 1E-15!" << endl;
-          grainsAbort();
-        }
-        else
-          GrainsExec::m_colDetTolerance = tol;
+            grainsAbort();
+          }
+          else
+            GrainsExec::m_colDetTolerance = tol;
+	}
+	else GrainsExec::m_colDetTolerance = EPSILON;
         
         // Acceleration
-        string acc = 
+	if ( ReaderXML::hasNodeAttr( collisionAlg, "Acceleration" ) )
+	{
+          string acc = 
 		ReaderXML::getNodeAttr_String( collisionAlg, "Acceleration" );
-        if ( acc == "ON" )
-          GrainsExec::m_colDetAcceleration = true;
-        else if ( acc == "OFF" )
-          GrainsExec::m_colDetAcceleration = false;
-        else
-        {
-          if ( m_rank == 0 )
-            cout << GrainsExec::m_shift6 
+          if ( acc == "ON" )
+            GrainsExec::m_colDetAcceleration = true;
+          else if ( acc == "OFF" )
+            GrainsExec::m_colDetAcceleration = false;
+          else
+          {
+            if ( m_rank == 0 )
+              cout << GrainsExec::m_shift6 
 		<< "Acceleration should be ON or OFF!" << endl;
-          grainsAbort();
-        }
+            grainsAbort();
+          }
+	}
+	else GrainsExec::m_colDetAcceleration = false;
 
         // History
-        string hist = ReaderXML::getNodeAttr_String( collisionAlg, "History" );
-        if ( hist == "ON" )
-          GrainsExec::m_colDetWithHistory = true;
-        else if ( hist == "OFF" )
-          GrainsExec::m_colDetWithHistory = false;
-        else
-        {
-          if ( m_rank == 0 )
-            cout << GrainsExec::m_shift6 
-		<< "History should be ON or OFF!" << endl;
-          grainsAbort();
-        }
+	if ( ReaderXML::hasNodeAttr( collisionAlg, "History" ) )
+	{
+          string hist = 
+	  	ReaderXML::getNodeAttr_String( collisionAlg, "History" );
+          if ( hist == "ON" )
+            GrainsExec::m_colDetWithHistory = true;
+          else if ( hist == "OFF" )
+            GrainsExec::m_colDetWithHistory = false;
+          else
+          {
+            if ( m_rank == 0 )
+              cout << GrainsExec::m_shift6 << "History should be ON or OFF!" 
+	      	<< endl;
+            grainsAbort();
+          }
+	}
+	else GrainsExec::m_colDetWithHistory = false;
 
         // Final output
         if ( m_rank == 0 )
@@ -756,8 +773,8 @@ void Grains::Construction( DOMElement* rootElement )
 		<< "Pre-collision Test with oriented bounding cylinders." 
 		<< endl;
       else if ( m_rank == 0 )
-        cout << GrainsExec::m_shift6 
-		<< "Pre-collision Test with bounding volumes is off." << endl;
+        cout << GrainsExec::m_shift6 << "Pre-collision Test with "
+		<< "non-spherical bounding volumes is off." << endl;
     }
 
 
