@@ -984,14 +984,22 @@ BVolume* Box::computeBVolume( unsigned int type ) const
     bvol = new OBB( m_extent, Matrix() );
   else if ( type == 2 ) // OBC
   {
-    double a[2];
-    int axis = ( a[X] = fabs( m_extent[X] ) ) < ( a[Y] = fabs( m_extent[Y] ) )
-      ? Y : X;
-    int i = a[axis] < fabs( m_extent[Z] ) ? Z : axis;
+    double xy = fabs( m_extent[X] - m_extent[Y] );
+    double xz = fabs( m_extent[X] - m_extent[Z] );
+    double yz = fabs( m_extent[Y] - m_extent[Z] );
+    // pick from xy and xz, store to xy
+    int zAxis = xy < xz ? Z : Y;
+    xy = xy < xz ? xy : xz;
+    // pick from xy and yz
+    zAxis = xy < yz ? zAxis : X;
+
     Vector3 e( 0., 0., 0. );
-    e[i] = 1.;
-    double h = 2. * m_extent[i];
-    double r = sqrt( Norm2(m_extent) - m_extent[i]*m_extent[i]);
+    e[ zAxis ] = 1.;
+    double h = 2. * m_extent[zAxis];
+    double r = sqrt( m_extent[X] * m_extent[X] + 
+                     m_extent[Y] * m_extent[Y] +
+                     m_extent[Z] * m_extent[Z] -
+                     m_extent[zAxis] * m_extent[zAxis] );
 
     bvol = new OBC( r, h, e );
   }

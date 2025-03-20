@@ -242,6 +242,25 @@ void Transform::setBasis( const Matrix &basis_ )
 
 
 
+// -----------------------------------------------------------------------------
+// Sets the matrix part of the transformation with specified rotations around 
+// each principal axis
+void Transform::setBasis( double aX, double aY, double aZ )
+{
+    m_basis = Matrix( cos(aZ)*cos(aY),
+                      cos(aZ)*sin(aY)*sin(aX) - sin(aZ)*cos(aX),
+                      cos(aZ)*sin(aY)*cos(aX) + sin(aZ)*sin(aX),
+                      sin(aZ)*cos(aY),
+                      sin(aZ)*sin(aY)*sin(aX) + cos(aZ)*cos(aX),
+                      sin(aZ)*sin(aY)*cos(aX) - cos(aZ)*sin(aX),
+                      -sin(aY),
+                      cos(aY)*sin(aX),
+                      cos(aY)*cos(aX) );
+}
+
+
+
+
 // --------------------------------------------------------------------------
 // Sets the transformation with an 1D array of 12 values as inputs 
 void Transform::setValue( const double m[12] ) 

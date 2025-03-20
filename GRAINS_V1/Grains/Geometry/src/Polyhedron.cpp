@@ -771,6 +771,57 @@ bool Polyhedron::isIn( Point3 const& pt ) const
 
 
 // ----------------------------------------------------------------------------
+// Returns the bounding volume to polyhedron
+BVolume* Polyhedron::computeBVolume( unsigned int type ) const
+{
+  // It is typically not straightforward to find the bounding volume to a general
+  // polyhedron. The method we use here is not by any means the optimal 
+  // (most fitted) bounding volume to the given polyhedron.
+  // Here, we simply loop over all vertices to find those with maximum abs value
+  // in each direction. Persumably, for regular polyhedron it is going to be
+  // enough.
+  BVolume* bvol = NULL;
+  Point3 pt;
+  Vector3 extent( 0., 0., 0. );
+  for ( int i = 0; i < numVerts(); i++ )
+  {
+    pt = m_base[i];
+    extent[X] = fabs( pt[X] ) > extent[X] ? fabs( pt[X] ) : extent[X];
+    extent[Y] = fabs( pt[Y] ) > extent[Y] ? fabs( pt[Y] ) : extent[Y];
+    extent[Z] = fabs( pt[Z] ) > extent[Z] ? fabs( pt[Z] ) : extent[Z];
+  }
+  if ( type == 1 ) // OBB
+  {
+    bvol = new OBB( extent, Matrix() );
+  }
+  else if ( type == 2 ) // OBC
+  {
+    double xy = fabs( extent[X] - extent[Y] );
+    double xz = fabs( extent[X] - extent[Z] );
+    double yz = fabs( extent[Y] - extent[Z] );
+    // pick from xy and xz, store to xy
+    int zAxis = xy < xz ? Z : Y;
+    xy = xy < xz ? xy : xz;
+    // pick from xy and yz
+    zAxis = xy < yz ? zAxis : X;
+
+    Vector3 e( 0., 0., 0. );
+    e[ zAxis ] = 1.;
+    double h = 2. * extent[zAxis];
+    double r = sqrt( extent[X] * extent[X] + 
+                     extent[Y] * extent[Y] +
+                     extent[Z] * extent[Z] -
+                     extent[zAxis] * extent[zAxis] );
+
+    bvol = new OBC( r, h, e );
+  }
+
+  return( bvol );
+}
+
+
+
+// ----------------------------------------------------------------------------
 // Performs advanced comparison of the two polyhedrons and returns whether 
 // they match
 bool Polyhedron::equalType_level2( Convex const* other ) const

@@ -1,6 +1,6 @@
 #include "OBC.hh"
 
-static double tol = EPSILON; // Tolerance used in this class
+
 // --------------------------------------------------------------------
 // Default constructor
 OBC::OBC()
@@ -134,7 +134,7 @@ void OBC::writeShape ( ostream& fileOut ) const
 // ----------------------------------------------------------------------------
 // Sign function
 template < typename T >
-inline int sgn( T const val )
+static inline int sgn( T const val )
 {
     return ( ( T(0) < val ) - ( val < T(0) ) );
 }
@@ -143,29 +143,9 @@ inline int sgn( T const val )
 
 
 // ----------------------------------------------------------------------------
-// Returns the norm of a Point3 object in the xy-plane
-inline double normXY( Point3 const& x )
-{
-  return ( x[X]*x[X] + x[Y]*x[Y] );
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// Returns the dot product of two Vector3 objects in the xy-plane
-inline double dotXY( Vector3 const& x, Vector3 const& y )
-{
-  return ( x[X]*y[X] + x[Y]*y[Y] );
-}
-
-
-
-
-// ----------------------------------------------------------------------------
 // Returns the solutions to to the quartic equation x^4 + bx^3 + cx^2 + dx + e
-inline void solveQuartic( double const b, double const c, double const d,
-                          double const e, double sol[4], int& nbRoots )
+static inline void solveQuartic( double const b, double const c, double const d,
+                                 double const e, double sol[4], int& nbRoots )
 {
   // reseting the number of roots
   nbRoots = 0;
@@ -242,33 +222,6 @@ inline void solveQuartic( double const b, double const c, double const d,
 
 
 // ----------------------------------------------------------------------------
-// Rotation matrix that transforms v to Vector3(0., 0., 1.)
-inline void rotateVec2VecZ( Vector3 const& v, Matrix& rotMat )
-{
-  double const c = 1. + v[Z];
-  if ( fabs( c ) < EPSILON2 )
-    rotMat.setValue( -1.,  0.,  0.,
-                      0., -1.,  0.,
-                      0.,  0., -1. );
-  else if ( fabs( c - 2. ) < EPSILON2 )
-    rotMat.setValue( 1.,  0.,  0.,
-                     0., 1.,  0.,
-                     0.,  0., 1. );
-  else
-  {
-    double const vx2 = v[X]*v[X]/c;
-    double const vy2 = v[Y]*v[Y]/c;
-    double const vxvy = v[X]*v[Y]/c;
-    rotMat.setValue( 1. - vx2, -vxvy, -v[X],
-                     -vxvy, 1. - vy2, -v[Y],
-                     v[X], v[Y], 1. - vx2 - vy2 );
-  }
-}
-
-
-
-
-// ----------------------------------------------------------------------------
 // Returns whether two OBCs are in contact
 bool isContactBVolume( OBC const& obcA,
                        OBC const& obcB,
@@ -276,335 +229,135 @@ bool isContactBVolume( OBC const& obcA,
                        Transform const& b2w )
 {
   // Variables
-  double const rA = obcA.getRadius();
-  double const rB = obcB.getRadius();
-  double const hA = obcA.getHeight() / 2.; // half-height
-  double const hB = obcB.getHeight() / 2.; // half-height
-  Vector3 const& e_A = a2w.getBasis() * obcA.getInitOrientation();
-  Vector3 const& e_B = b2w.getBasis() * obcB.getInitOrientation();
+  double const r1 = obcA.getRadius();
+  double const r2 = obcB.getRadius();
+  double const h1 = obcA.getHeight() / 2.; // half-height
+  double const h2 = obcB.getHeight() / 2.; // half-height
+  Vector3 const eZ = a2w.getBasis() * obcA.getInitOrientation(); // e1 = eZ
+  Vector3 e2 = b2w.getBasis() * obcB.getInitOrientation();
 
-  // Relative positions - B w.r.t. A
-  Matrix rotMatA;
-  rotateVec2VecZ( e_A, rotMatA );
-  Point3 const& x_B2A = rotMatA * ( *(b2w.getOrigin()) - *(a2w.getOrigin()) );
-  Vector3 const& e_B2A = ( rotMatA * e_B ).normalized();
+  // Variables to represent the 2nd cyl in the 1st cyl local coordinates
+  Point3 xPt( *( b2w.getOrigin() ) - *( a2w.getOrigin() ) );
+  Vector3 eX( ( e2 ^ eZ ).normalized() );
+  Vector3 eY( ( eZ ^ eX ).normalized() );
+  // Vector3 eZ( e1 );
+  const double x = eX * xPt;
+  const double y = eY * xPt;
+  const double z = eZ * xPt;
+  const double ey = eY * e2;
+  const double ez = eZ * e2;
 
-  // General variables to use later
-  Vector3 const& u1 = ( Vector3( e_B2A[Y], -e_B2A[X], 0. ) ).normalized();
-  Vector3 const& v1 = ( u1 ^ e_B2A ).normalized();
 
-  //* Contact Scenarios: A primary, B secondary *//
-
-  // Face A - Edge B
-  if ( fabs( x_B2A[Z] ) > hA )
+  /* Step one: Shortest distance -- Projection onto XZ */
+  if ( fabs( x ) >= r1 + r2 )
+    return ( false );
+  else 
   {
-    // Vector3 r = ( e_B2A ^ ( e_B2A ^ zAxis ) ).normalized();
-    // r = sgn( x_B2A[Z] ) * ( rB * r - hB * sgn( e_B2A[Z] ) * e_B2A );
-    Vector3 r = sgn( -x_B2A[Z] ) * ( rB * v1 + hB * sgn( e_B2A[Z] ) * e_B2A );
-    Point3 const& ptE = x_B2A + r;
-    if ( ( fabs( ptE[Z] ) < hA ) && ( normXY( ptE ) < rA * rA ) )
+    const double s2 = y / ey;
+    const double s1 = z + s2 * ez;
+    if ( fabs( s1 ) < h1 && fabs( s2 ) < h2 )
       return ( true );
   }
-
-  // Edge A - Edge B
-  {
-    // To find the correct edge on the secondary cylinder
-    Point3 c1 = x_B2A + hB * e_B2A;
-    Point3 c2 = x_B2A - hB * e_B2A;
-    double distBand1 = pow( sqrt( normXY( c1 ) ) - rA, 2 );
-    double distBand2 = pow( sqrt( normXY( c2 ) ) - rA, 2 );
-    double distEdge1 = distBand1 + pow( fabs( c1[Z] ) - hA, 2 );
-    double distEdge2 = distBand2 + pow( fabs( c2[Z] ) - hA, 2 );
-    if ( ( distBand1 - distBand2 ) * ( distEdge1 - distEdge2 ) < 0. &&
-         ( distEdge1 < distEdge2 ? distEdge1 : distEdge2 ) >= rB * rB )
-    {
-      distEdge1 = distBand1;
-      distEdge2 = distBand2;
-    }
-    Point3 const& ptCenter = distEdge1 < distEdge2 ? c1 : c2;
-
-    if ( ( distBand1 < distBand2 ? distBand1 : distBand2 ) < rB * rB  &&
-          fabs( ptCenter[Z] ) < hA + rB )
-    {
-      // Misc variables
-      // double const p = rB * rB * ( normXY( v1 ) - normXY( u1 ) ) / 2.;
-      double const p = rB * rB * ( normXY( v1 ) - 1. ) / 2.;
-      double const q = rB * dotXY( u1, ptCenter ) / p;
-      double const r = rB * dotXY( v1, ptCenter ) / p;
-      // double const s = ( rA*rA - normXY( ptCenter ) - rB*rB*normXY(u1) ) / p;
-      double const s = ( rA * rA - normXY( ptCenter ) - rB * rB ) / p;
-
-      double sint[4];
-      int nbRoots;
-      solveQuartic( 2.*r, q*q + r*r - s, -r*s, s*s/4. - q*q, sint, nbRoots );
-
-      for ( int i = 0; i < nbRoots; i++ )
-      {
-        if ( fabs( sint[i] ) <= 1. )
-        {
-          double cost = ( s/2. - r*sint[i] - sint[i]*sint[i] ) / q;
-          double zVal = ptCenter[Z] + rB * cost * u1[Z] + rB * sint[i] * v1[Z];
-          if ( fabs( zVal ) < hA )
-            return ( true );
-        }
-      }
-    }
-  }
-
-  // Special Case: Face A - Face B
-  if ( ( fabs( fabs( e_B2A[Z] ) - 1. ) < tol ) &&
-       ( fabs( x_B2A[Z] ) < hA + hB ) &&
-       ( normXY( x_B2A ) < ( rA + rB ) * ( rA + rB ) ) )
-    return ( true );
-
-  // Special Case: Band A - Band B
-  if ( fabs( x_B2A * ( - u1 ) ) < rA + rB )
-  {
-    double lBStar = ( e_B2A[Z] * x_B2A[Z] - e_B2A * x_B2A )
-    / ( 1. - e_B2A[Z] * e_B2A[Z] );
-    if ( fabs( lBStar ) < hB )
-    {
-      double lAStar = x_B2A[Z] + lBStar * e_B2A[Z];
-      if ( fabs( lAStar ) < hA )
-        return ( true );
-    }
-  }
-
-
-  // Relative positions - A w.r.t. B
-  Matrix rotMatB;
-  rotateVec2VecZ( e_B, rotMatB );
-  Point3 const& x_A2B = rotMatB * ( *(a2w.getOrigin()) - *(b2w.getOrigin()) );
-  Vector3 const& e_A2B = ( rotMatB * e_A ).normalized();
-
-  // Vector3 const& u2 = ( e_A2B ^ Vector3( 0., 0., 1. ) ).normalized();
-  Vector3 const& u2 = ( Vector3( e_A2B[Y], -e_A2B[X], 0. ) ).normalized();
-  Vector3 const& v2 = ( u2 ^ e_A2B ).normalized();
-
-  //* Contact Scenarios: B secondary, A pirmary *//
-
-  // Edge B - Face A
-  if ( fabs( x_A2B[Z] ) > hB )
-  {
-    // Vector3 r = ( e_A2B ^ ( e_A2B ^ zAxis ) ).normalized();
-    // r = sgn( x_A2B[Z] ) * ( rA * r - hA * sgn( e_A2B[Z] ) * e_A2B );
-    Vector3 r = sgn( -x_A2B[Z] ) * ( rA * v2 + hA * sgn( e_A2B[Z] ) * e_A2B );
-    Point3 ptE = x_A2B + r;
-    if ( ( fabs( ptE[Z] ) < hB ) && ( normXY( ptE ) < rB * rB ) )
-      return ( true );
-  }
-
-  // Edge B - Band A
-  {
-    Point3 c1 = x_A2B + hA * e_A2B;
-    Point3 c2 = x_A2B - hA * e_A2B;
-    Point3 const& ptCenter = normXY( c1 ) < normXY( c2 ) ? c1 : c2;
-
-    // additional condition to avoid solving the polynomial
-    if ( ( fabs( ptCenter[Z] ) < hB + rA ) &&
-         ( sqrt( normXY( ptCenter ) ) < rA + rB ) )
-    {
-      // Misc variables
-      // double const p = rA * ( normXY( v2 ) - normXY( u2 ) );
-      double const p = rA * ( normXY( v2 ) - 1. );
-      double const q = dotXY( u2, ptCenter ) / p;
-      double const r = dotXY( v2, ptCenter ) / p;
-
-      double sint[4];
-      int nbRoots = 0;
-      solveQuartic( 2.*r, q*q + r*r - 1., -2.*r, -r*r, sint, nbRoots );
-
-      for ( int i = 0; i < nbRoots; i++ )
-      {
-        if ( sint[i] * r >= 0. ) // the min distance, not the max!
-        {
-          double cs = sgn( q ) * sqrt( 1. - sint[i] * sint[i] );
-          Point3 const& ptA = ptCenter + rA * cs * u2 + rA * sint[i] * v2;
-          if ( ( fabs( ptA[Z] ) < hB ) && ( normXY( ptA ) < rB * rB ) )
-            return ( true );
-        }
-      }
-    }
-  }
-
-  return ( false );
-}
-
-
-
-
-// // ----------------------------------------------------------------------------
-// // Returns whether two OBCs are in contact
-// bool isContactBVolume( OBC const& obcA,
-//                        OBC const& obcB,
-//                        Transform const& a2w,
-//                        Transform const& b2w )
-// {
-//   // Variables
-//   double const rA = obcA.getRadius();
-//   double const rB = obcB.getRadius();
-//   double const hA = obcA.getHeight() / 2.; // half-height
-//   double const hB = obcB.getHeight() / 2.; // half-height
-//   Vector3 const& e_A = a2w.getBasis() * obcA.getInitOrientation();
-//   Vector3 const& e_B = b2w.getBasis() * obcB.getInitOrientation();
-
-//   // Relative positions - B w.r.t. A
-//   Matrix rotMat;
-//   rotateVec2VecZ( e_A, rotMat );
-//   Point3 const& x = rotMat * ( *(b2w.getOrigin()) - *(a2w.getOrigin()) );
-//   Vector3 const& e = ( rotMat * e_B ).normalized();
-
-//   // General variables to use later
-//   Vector3 const& u = ( Vector3( e[Y], -e[X], 0. ) ).normalized();
-//   Vector3 const& v = ( u ^ e ).normalized();
-
-//   //* Contact Scenarios: A primary, B secondary *//
-
-//   // Face A - Face B
-//   if ( ( fabs( fabs( e[Z] ) - 1. ) < tol ) &&
-//        ( fabs( x[Z] ) < hA + hB ) &&
-//        ( normXY( x ) < ( rA + rB ) * ( rA + rB ) ) )
-//     return ( true );
-
-//   // Band A - Band B
-//   if ( fabs( x * ( - u1 ) ) < rA + rB )
-//   {
-//     double lBStar = ( e[Z] * x[Z] - e * x ) / ( 1. - e[Z] * e[Z] );
-//     if ( fabs( lBStar ) < hB )
-//     {
-//       double lAStar = x[Z] + lBStar * e[Z];
-//       if ( fabs( lAStar ) < hA )
-//         return ( true );
-//     }
-//   }
-
-//   // Face A - Edge B
-//   if ( fabs( x[Z] ) > hA )
-//   {
-//     // Vector3 r = ( e ^ ( e ^ zAxis ) ).normalized();
-//     // r = sgn( x[Z] ) * ( rB * r - hB * sgn( e[Z] ) * e );
-//     Vector3 r = sgn( -x[Z] ) * ( rB * v + hB * sgn( e[Z] ) * e );
-//     Point3 const& ptE = x + r;
-//     if ( ( fabs( ptE[Z] ) < hA ) && ( normXY( ptE ) < rA * rA ) )
-//       return ( true );
-//   }
-
-//   // Face B - Edge A
-//   if ( fabs( x[Z] ) > hA )
-//   {
-//     // Vector3 r = ( e ^ ( e ^ zAxis ) ).normalized();
-//     // r = sgn( x[Z] ) * ( rB * r - hB * sgn( e[Z] ) * e );
-//     Vector3 r = sgn( -x[Z] ) * ( rB * v + hB * sgn( e[Z] ) * e );
-//     Point3 const& ptE = x + r;
-//     if ( ( fabs( ptE[Z] ) < hA ) && ( normXY( ptE ) < rA * rA ) )
-//       return ( true );
-//   }
-
-
-
-//   // Edge A - Edge B
-//   {
-//     // To find the correct edge on the secondary cylinder
-//     Point3 c1 = x_B2A + hB * e_B2A;
-//     Point3 c2 = x_B2A - hB * e_B2A;
-//     double distBand1 = pow( sqrt( normXY( c1 ) ) - rA, 2 );
-//     double distBand2 = pow( sqrt( normXY( c2 ) ) - rA, 2 );
-//     double distEdge1 = distBand1 + pow( fabs( c1[Z] ) - hA, 2 );
-//     double distEdge2 = distBand2 + pow( fabs( c2[Z] ) - hA, 2 );
-//     if ( ( distBand1 - distBand2 ) * ( distEdge1 - distEdge2 ) < 0. &&
-//          ( distEdge1 < distEdge2 ? distEdge1 : distEdge2 ) >= rB * rB )
-//     {
-//       distEdge1 = distBand1;
-//       distEdge2 = distBand2;
-//     }
-//     Point3 const& ptCenter = distEdge1 < distEdge2 ? c1 : c2;
-
-//     if ( ( distBand1 < distBand2 ? distBand1 : distBand2 ) < rB * rB  &&
-//           fabs( ptCenter[Z] ) < hA + rB )
-//     {
-//       // Misc variables
-//       // double const p = rB * rB * ( normXY( v1 ) - normXY( u1 ) ) / 2.;
-//       double const p = rB * rB * ( normXY( v1 ) - 1. ) / 2.;
-//       double const q = rB * dotXY( u1, ptCenter ) / p;
-//       double const r = rB * dotXY( v1, ptCenter ) / p;
-//       // double const s = ( rA*rA - normXY( ptCenter ) - rB*rB*normXY(u1) ) / p;
-//       double const s = ( rA * rA - normXY( ptCenter ) - rB * rB ) / p;
-
-//       double sint[4];
-//       int nbRoots;
-//       solveQuartic( 2.*r, q*q + r*r - s, -r*s, s*s/4. - q*q, sint, nbRoots );
-
-//       for ( int i = 0; i < nbRoots; i++ )
-//       {
-//         if ( fabs( sint[i] ) <= 1. )
-//         {
-//           double cost = ( s/2. - r*sint[i] - sint[i]*sint[i] ) / q;
-//           double zVal = ptCenter[Z] + rB * cost * u1[Z] + rB * sint[i] * v1[Z];
-//           if ( fabs( zVal ) < hA )
-//             return ( true );
-//         }
-//       }
-//     }
-//   }
-
   
+  /* Step two: Projection onto YZ and check rectangles intersection */
+  // We project the rectangles onto four axes; local coords of the
+  // first and second rectangles.
+  {
+    const double fey = fabs( ey ) + 1.e-5;
+    const double fez = fabs( ez ) + 1.e-5;
+    // onto y-axis
+    if ( fabs( y ) > r1 + h2 * fey + r2 * fez )
+      return ( false ); 
+    // onto z-axis
+    if ( fabs( z ) > h1 + h2 * fez + r2 * fey )
+      return ( false );
+    // onto e_normal
+    if ( fabs( y * ez - z * ey ) > r2 + h1 * fey + r1 * fez )
+      return ( false );
+    // onto e
+    if ( fabs( y * ey + z * ez ) > h2 + h1 * fez + r1 * fey )
+      return ( false );
+  }
 
+  /* Step three: Projection onto XY */
+  // We check the overlap of an ellipse w/ a circle
+  if ( fabs( ez ) < 0.99 && fabs( ez ) > 0.01 )
+  {
+    // First, secondary is an ellipse
+    {
+      const double topy = y + h2 * ey;
+      const double bottomy = y - h2 * ey;
+      if ( std::signbit( topy ) == std::signbit( bottomy ) )
+      {
+        const double x0 = x;
+        const double y0 = abs( topy ) > abs( bottomy ) ? bottomy : topy;
+        // check if origin is not in the ellipse -- and cyls are not par/per
+        if ( x0 * x0 + y0 * y0 / ez / ez > r2 * r2 )
+        {
+          const double ey_sq = ey * ey;
+          const double A = r2 * r2 * ey_sq * ey_sq;
+          const double B = 2. * y0 * ez / r2 / ey_sq;
+          const double C = x0 * x0 / A;
+          const double D = y0 * y0 * ez * ez / A;
 
-//   // Relative positions - A w.r.t. B
-//   Matrix rotMatB;
-//   rotateVec2VecZ( e_B, rotMatB );
-//   Point3 const& x_A2B = rotMatB * ( *(a2w.getOrigin()) - *(b2w.getOrigin()) );
-//   Vector3 const& e_A2B = ( rotMatB * e_A ).normalized();
+          double sint[4];
+          int nbRoots;
+          solveQuartic( -B, C + D - 1., B, -D, sint, nbRoots );
 
-//   // Vector3 const& u2 = ( e_A2B ^ Vector3( 0., 0., 1. ) ).normalized();
-//   Vector3 const& u2 = ( Vector3( e_A2B[Y], -e_A2B[X], 0. ) ).normalized();
-//   Vector3 const& v2 = ( u2 ^ e_A2B ).normalized();
+          for ( int i = 0; i < nbRoots; i++ )
+          {
+            if ( std::signbit( sint[i] ) != std::signbit( B ) )
+            {
+              const double cost = - sgn( x0 ) * sqrt( 1. - sint[i] * sint[i] );
+              const double ptX = x0 + r2 * cost;
+              const double ptY = y0 + r2 * ez * sint[i];
+              if ( ptX * ptX + ptY * ptY > r1 * r1 )
+                return ( false );
+            }
+          }
+        }
+      }
+    } 
+    // Next, primary is an ellipse
+    {
+      Vector3 eY2( ( eX ^ e2 ).normalized() );
+      // don't update x2, it is the same as x with sign flipped
+      const double y2 = -( eY2 * xPt );
+      const double ey2 = eY2 * eZ;
+      // don't update ez, it is the same as before
+      const double topy = y2 + h1 * ey2;
+      const double bottomy = y2 - h1 * ey2;
+      if ( std::signbit( topy ) == std::signbit( bottomy ) )
+      {
+        const double x0 = -x;
+        const double y0 = abs( topy ) > abs( bottomy ) ? bottomy : topy;
+        if ( x0 * x0 + y0 * y0 / ez / ez > r1 * r1 )
+        {
+          const double ey_sq = ey2 * ey2;
+          const double A = r1 * r1 * ey_sq * ey_sq;
+          const double B = 2. * y0 * ez / r1 / ey_sq;
+          const double C = x0 * x0 / A;
+          const double D = y0 * y0 * ez * ez / A;
 
-//   //* Contact Scenarios: B secondary, A pirmary *//
+          double sint[4];
+          int nbRoots;
+          solveQuartic( -B, C + D - 1., B, -D, sint, nbRoots );
 
-//   // Edge B - Face A
-//   if ( fabs( x_A2B[Z] ) > hB )
-//   {
-//     // Vector3 r = ( e_A2B ^ ( e_A2B ^ zAxis ) ).normalized();
-//     // r = sgn( x_A2B[Z] ) * ( rA * r - hA * sgn( e_A2B[Z] ) * e_A2B );
-//     Vector3 r = sgn( -x_A2B[Z] ) * ( rA * v2 + hA * sgn( e_A2B[Z] ) * e_A2B );
-//     Point3 ptE = x_A2B + r;
-//     if ( ( fabs( ptE[Z] ) < hB ) && ( normXY( ptE ) < rB * rB ) )
-//       return ( true );
-//   }
-
-//   // Edge B - Band A
-//   {
-//     Point3 c1 = x_A2B + hA * e_A2B;
-//     Point3 c2 = x_A2B - hA * e_A2B;
-//     Point3 const& ptCenter = normXY( c1 ) < normXY( c2 ) ? c1 : c2;
-
-//     // additional condition to avoid solving the polynomial
-//     if ( ( fabs( ptCenter[Z] ) < hB + rA ) &&
-//          ( sqrt( normXY( ptCenter ) ) < rA + rB ) )
-//     {
-//       // Misc variables
-//       // double const p = rA * ( normXY( v2 ) - normXY( u2 ) );
-//       double const p = rA * ( normXY( v2 ) - 1. );
-//       double const q = dotXY( u2, ptCenter ) / p;
-//       double const r = dotXY( v2, ptCenter ) / p;
-
-//       double sint[4];
-//       int nbRoots = 0;
-//       solveQuartic( 2.*r, q*q + r*r - 1., -2.*r, -r*r, sint, nbRoots );
-
-//       for ( int i = 0; i < nbRoots; i++ )
-//       {
-//         if ( sint[i] * r >= 0. ) // the min distance, not the max!
-//         {
-//           double cs = sgn( q ) * sqrt( 1. - sint[i] * sint[i] );
-//           Point3 const& ptA = ptCenter + rA * cs * u2 + rA * sint[i] * v2;
-//           if ( ( fabs( ptA[Z] ) < hB ) && ( normXY( ptA ) < rB * rB ) )
-//             return ( true );
-//         }
-//       }
-//     }
-//   }
-
-//   return ( false );
-// }
+          for ( int i = 0; i < nbRoots; i++ )
+          {
+            if ( std::signbit( sint[i] ) != std::signbit( B ) )
+            {
+              const double cost = - sgn( x0 ) * sqrt( 1. - sint[i] * sint[i] );
+              const double ptX = x0 + r1 * cost;
+              const double ptY = y0 + r1 * ez * sint[i];
+              if ( ptX * ptX + ptY * ptY > r2 * r2 )
+                return ( false );
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  return ( true );
+}

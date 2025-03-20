@@ -96,6 +96,9 @@ class Polyhedron : public Polytope
     /** @ brief Returns whether a point lies inside the polyhedron
     @param pt point */
     bool isIn( Point3 const& pt ) const;
+
+    /** @ Returns the bounding volume to polyhedron */
+    BVolume* computeBVolume( unsigned int type ) const;
     
     /** @brief Performs advanced comparison of the two polyhedrons and returns
     whether they match

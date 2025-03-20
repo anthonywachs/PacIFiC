@@ -351,7 +351,8 @@ class GrainsExec
     	at this time */	
     static string m_inputFile; /**< Grains3D major input file */
     static int m_return_syscmd; /**< Returned value of system command */
-    static string m_colDetMethod; /**< Collision detection method */
+    static bool m_colDetGJK_SV; /**< GJK_SV? */
+    static bool m_colDetWithHistory; /**< GJK with history */
     static double m_colDetTolerance; /** Tol for Collision detection **/
     static bool m_colDetAcceleration; /** Tol for Collision detection **/
     static unsigned int m_colDetBoundingVolume; /** bounding volume type **/

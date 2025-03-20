@@ -1,642 +1,367 @@
-
 #include "GJK_SV.hh"
-
-
-double rel_error1 = 1.e-8;   // relative error in the computed distance
-double abs_error1 = 1.e-12;  // absolute error if the distance is almost zero
+#include "Matrix.hh"
+#include "GrainsExec.hh"
 
 
 /* ========================================================================== */
 /*                             Low-Level Methods                              */
 /* ========================================================================== */
-// TODO: COMMENT ???
-static inline double determinant( Vector3 const p,
-                             Vector3 const q,
-                             Vector3 const r )
+static inline unsigned int compareSigns( double a, double b )
 {
-  return ( p[0] * ( (q[1] * r[2] ) - ( r[1] * q[2] ) ) - 
-           p[1] * ( q[0] * r[2] - r[0] * q[2] ) +
-           p[2] * ( q[0] * r[1] - r[0] * q[1] ) );
+	// Maybe there's a faster way to deal with this set of operations?
+	return static_cast<unsigned int>( !( ( a > 0 ) ^ ( b > 0 ) ) );
+}
+    
+
+
+
+// -----------------------------------------------------------------------------
+static inline void s1d( Vector3 const y[4], 
+                        unsigned int& bits, 
+                        double (&lambdas)[4] )
+{
+	// Identify the appropriate indices
+	bool s1_set = false;
+	unsigned int i1 = 0xffffffff, i2 = 0xffffffff;
+	for ( unsigned int i = 0; i < 4; ++i )
+	{
+		if ( bits & ( 1 << i ) )
+		{
+			if ( s1_set )
+			{
+				i2 = i;
+				break;
+			}
+			else
+			{
+				i1 = i;
+				s1_set = true;
+			}
+		}
+	}
+
+	// Calculate the signed volume of the simplex.
+	Vector3 t = y[i2] - y[i1];
+	unsigned int I = 0;
+	double neg_tI = -t[0];
+
+	if ( fabs( t[1] ) > fabs( neg_tI ) )
+	{
+		I = 1;
+		neg_tI = -t[1];
+	}
+
+	if ( fabs( t[2] ) > fabs( neg_tI ) )
+	{
+		I = 2;
+		neg_tI = -t[2];
+	}
+
+	double pI = ( y[i2] * t ) / Norm2( t ) * neg_tI + y[i2][I];
+
+	// Identify the signed volume resulting from replacing each point by the 
+	// origin.
+	double C[2] = { -y[i2][I] + pI, 
+					 y[i1][I] - pI };
+	unsigned int sign_comparisons[2] = { compareSigns( neg_tI, C[0] ), 
+                                         compareSigns( neg_tI, C[1] ) };
+
+	// If all signed volumes are identical, the origin lies inside the simplex.
+	if ( sign_comparisons[0] + sign_comparisons[1] == 2 )
+	{
+		lambdas[i1] = C[0] / neg_tI;
+		lambdas[i2] = C[1] / neg_tI;
+	}
+	else
+	{
+		// The point to retain is the one whose sign matches. In the
+		// first case, the origin lies past the first point.
+		if ( sign_comparisons[0] )
+		{
+			bits &= ~(1 << i2);
+			lambdas[i1] = 1.;
+		}
+		else
+		{
+			bits &= ~(1 << i1);
+			lambdas[i2] = 1.;
+		}
+	}
 }
 
 
 
 
 // -----------------------------------------------------------------------------
-// TODO: COMMENT ???
-static inline void projectOnLine( Vector3 const p,
-                                  Vector3 const q,
+static inline void s2d( Vector3 const y[4], 
+                        unsigned int& bits, 
+                        double (&lambdas)[4] )
+{
+	unsigned int counter = 0, point0_idx = 0, point1_idx = 0, point2_idx = 0;
+	for ( unsigned int i = 0; i < 4; ++i )
+	{
+		if ( bits & (1 << i) )
+		{
+			if ( counter == 0 )
+				point0_idx = i;
+			else if ( counter == 1)
+				point1_idx = i;
+			else
+				point2_idx = i;
+			counter += 1;
+		}
+	}
+
+	Vector3 n = static_cast<Vector3>( y[point1_idx] - y[point0_idx] ) ^ 
+				static_cast<Vector3>( y[point2_idx] - y[point0_idx] );
+	Vector3 p0 = ( y[point0_idx] * n / Norm2( n ) ) * n;
+
+	// Choose maximum area plane to project onto.
+	// Make sure to store the *signed* area of the plane.
+	// This loop is unrolled to save a few extra ops (assigning
+	// an initial area of zero, an extra abs, etc)
+	unsigned int idx_x = 1;
+	unsigned int idx_y = 2;
+	double mu_max = ( y[point1_idx][1] * y[point2_idx][2] + 
+					  y[point0_idx][1] * y[point1_idx][2] +
+					  y[point2_idx][1] * y[point0_idx][2] - 
+					  y[point1_idx][1] * y[point0_idx][2] -
+					  y[point2_idx][1] * y[point1_idx][2] - 
+					  y[point0_idx][1] * y[point2_idx][2] );
+
+	// This term is multiplied by -1.
+	double mu = ( y[point1_idx][2] * y[point0_idx][0] + 
+				  y[point2_idx][2] * y[point1_idx][0] +
+				  y[point0_idx][2] * y[point2_idx][0] - 
+				  y[point1_idx][2] * y[point2_idx][0] -
+				  y[point0_idx][2] * y[point1_idx][0] - 
+				  y[point2_idx][2] * y[point0_idx][0] );
+	if ( fabs( mu ) > fabs( mu_max ) )
+	{
+		mu_max = mu;
+		idx_x = 0;
+	}
+
+	mu = ( y[point1_idx][0] * y[point2_idx][1] + 
+           y[point0_idx][0] * y[point1_idx][1] +
+           y[point2_idx][0] * y[point0_idx][1] - 
+           y[point1_idx][0] * y[point0_idx][1] - 
+           y[point2_idx][0] * y[point1_idx][1] - 
+           y[point0_idx][0] * y[point2_idx][1] );
+	if ( fabs( mu ) > fabs( mu_max ) )
+	{
+		mu_max = mu;
+		idx_x = 0;
+		idx_y = 1;
+	}
+
+	// Compute the signed areas of each of the simplices formed by replacing an
+	// index with a projection of the origin onto the area in this plane
+	double C[3] = { 0. };
+	bool sign_comparisons[3] = { false };
+
+	C[0] = ( p0[idx_x] * y[point1_idx][idx_y] + 
+             p0[idx_y] * y[point2_idx][idx_x] + 
+             y[point1_idx][idx_x] * y[point2_idx][idx_y] - 
+             p0[idx_x] * y[point2_idx][idx_y] - 
+             p0[idx_y] * y[point1_idx][idx_x] - 
+             y[point2_idx][idx_x] * y[point1_idx][idx_y] );
+	sign_comparisons[0] = compareSigns( mu_max, C[0] );
+
+	C[1] = ( p0[idx_x] * y[point2_idx][idx_y] + 
+             p0[idx_y] * y[point0_idx][idx_x] + 
+             y[point2_idx][idx_x] * y[point0_idx][idx_y] - 
+             p0[idx_x] * y[point0_idx][idx_y] -
+             p0[idx_y] * y[point2_idx][idx_x] - 
+             y[point0_idx][idx_x] * y[point2_idx][idx_y] );
+	sign_comparisons[1] = compareSigns( mu_max, C[1] );
+
+	C[2] = ( p0[idx_x] * y[point0_idx][idx_y] + 
+             p0[idx_y] * y[point1_idx][idx_x] +
+             y[point0_idx][idx_x] * y[point1_idx][idx_y] - 
+             p0[idx_x] * y[point1_idx][idx_y] -
+             p0[idx_y] * y[point0_idx][idx_x] - 
+             y[point1_idx][idx_x] * y[point0_idx][idx_y] );
+	sign_comparisons[2] = compareSigns( mu_max, C[2] );
+
+	if ( sign_comparisons[0] + sign_comparisons[1] + sign_comparisons[2] == 3 )
+	{
+		lambdas[point0_idx] = C[0] / mu_max;
+		lambdas[point1_idx] = C[1] / mu_max;
+		lambdas[point2_idx] = C[2] / mu_max;
+	}
+	else
+	{
+		double d = 1.e9;
+		Vector3 new_point;
+		unsigned int new_bits = 0;
+		for ( unsigned int j = 0; j < 3; ++j )
+		{
+			if ( !sign_comparisons[j] )
+			{
+				unsigned int new_used = bits;
+				// Test removal of the current point.
+				if ( j == 0 )
+					new_used &= ~(1 << point0_idx);
+				else if ( j == 1 )
+					new_used &= ~(1 << point1_idx);
+				else
+					new_used &= ~(1 << point2_idx);
+
+				double new_lambdas[4] = { 0. };
+
+				s1d( y, new_used, new_lambdas );
+				// Consider resetting in place if possible.
+				new_point[0] = 0;
+				new_point[1] = 0;
+				new_point[2] = 0;
+				for ( unsigned int i = 0; i < 4; ++i )
+				{
+					if ( new_used & (1 << i) )
+						new_point += new_lambdas[i] * y[i];
+				}
+				double d_star = new_point * new_point;
+				if ( d_star < d )
+				{
+					new_bits = new_used;
+					d = d_star;
+					for ( unsigned int i = 0; i < 4; ++i )
+						lambdas[i] = new_lambdas[i];
+				}
+			}
+		}
+		bits = new_bits;
+	}
+}
+
+
+
+
+// -----------------------------------------------------------------------------
+static inline void s3d( Vector3 const y[4], 
+                        unsigned int& bits, 
+                        double (&lambdas)[4] )
+{
+	double C[4] = { 0. };
+
+	// Compute all minors and the total determinant of the matrix M,
+	// which is the transpose of the y matrix with an extra row of
+	// ones at the bottom. Since the indexing is nontrivial and the
+	// array is small (and we can save on some negation), all the
+	// computations are done directly rather than with a loop.
+	// C[0] and C[2] are negated due to the (-1)^(i+j+1) prefactor,
+	// where i is always 4 because we're expanding about the 4th row.
+	C[0] =  y[3][0] * y[2][1] * y[1][2] + 
+			y[2][0] * y[1][1] * y[3][2] + 
+			y[1][0] * y[3][1] * y[2][2] -
+			y[1][0] * y[2][1] * y[3][2] - 
+			y[2][0] * y[3][1] * y[1][2] -
+			y[3][0] * y[1][1] * y[2][2];
+	C[1] =  y[0][0] * y[2][1] * y[3][2] + 
+			y[2][0] * y[3][1] * y[0][2] + 
+			y[3][0] * y[0][1] * y[2][2] -
+			y[3][0] * y[2][1] * y[0][2] - 
+			y[2][0] * y[0][1] * y[3][2] -
+			y[0][0] * y[3][1] * y[2][2];
+	C[2] =  y[3][0] * y[1][1] * y[0][2] + 
+			y[1][0] * y[0][1] * y[3][2] + 
+			y[0][0] * y[3][1] * y[1][2] -
+			y[0][0] * y[1][1] * y[3][2] - 
+			y[1][0] * y[3][1] * y[0][2] -
+			y[3][0] * y[0][1] * y[1][2];
+	C[3] =  y[0][0] * y[1][1] * y[2][2] + 
+			y[1][0] * y[2][1] * y[0][2] + 
+			y[2][0] * y[0][1] * y[1][2] -
+			y[2][0] * y[1][1] * y[0][2] - 
+			y[1][0] * y[0][1] * y[2][2] -
+			y[0][0] * y[2][1] * y[1][2];
+	double dM = C[0] + C[1] + C[2] + C[3];
+
+	unsigned int sign_comparisons[4] = {0};
+	sign_comparisons[0] = compareSigns( dM, C[0] );
+	sign_comparisons[1] = compareSigns( dM, C[1] );
+	sign_comparisons[2] = compareSigns( dM, C[2] );
+	sign_comparisons[3] = compareSigns( dM, C[3] );
+
+	if ( ( sign_comparisons[0] + sign_comparisons[1] + 
+		   sign_comparisons[2] + sign_comparisons[3] ) == 4)
+	{
+		for ( unsigned int i = 0; i < 4; ++i )
+			lambdas[i] = C[i] / dM;
+	}
+	else
+	{
+		double d = 1.e9, d_star = 0.;
+		Vector3 new_point;
+		unsigned int new_bits = 0;
+		for ( unsigned int j = 0; j < 4; ++j )
+		{
+			if ( !sign_comparisons[j] )
+			{
+				// Test removal of the current point.
+				unsigned int new_used = bits;
+				new_used &= ~(1 << j);
+				double new_lambdas[4] = {0.};
+
+				s2d( y, new_used, new_lambdas );
+	
+				new_point = Vector3();
+				for ( unsigned int i = 0; i < 4; ++i )
+				{
+					if ( new_used & (1 << i) )
+						new_point += new_lambdas[i] * y[i];
+				}
+				d_star = new_point * new_point;
+				if ( d_star < d )
+				{
+					new_bits = new_used;
+					d = d_star;
+					for ( unsigned int i = 0; i < 4; ++i )
+						lambdas[i] = new_lambdas[i];
+				}
+			}
+		}
+		bits = new_bits;
+	}
+}
+
+
+
+
+// -----------------------------------------------------------------------------
+static inline void computeVector( unsigned int const bits,
+                                  Vector3 const y[4],
+								  double const lambdas[4],
                                   Vector3& v )
 {
-    Vector3 pq = p - q;
-    double const tmp = ( p * pq ) / ( pq * pq);
-    v = p - tmp * pq;
+    v.setValue( 0., 0., 0. );
+	for ( unsigned int i = 0; i < 4; ++i )
+	{
+		if ( bits & ( 1 << i ) )
+			v += lambdas[i] * y[i];
+	}
 }
 
 
 
 
 // -----------------------------------------------------------------------------
-// TODO: COMMENT ???
-static inline void projectOnPlane( Vector3 const p,
-                                   Vector3 const q,
-                                   Vector3 const r, 
-                                   Vector3& v )
+static inline void computePoints( unsigned int const bits,
+                                  Point3 const p[4],
+                                  Point3 const q[4],
+                                  double const lambdas[4],
+                                  Point3& p1,
+                                  Point3& p2 )
 {
-    Vector3 n = ( Vector3( p - q ) ) ^ ( Vector3( p - r ) );
-    double const tmp = ( n * p ) / ( n * n );
-    v = tmp * n;
-}
-
-
-
-
-// -----------------------------------------------------------------------------
-// TODO: COMMENT ???
-static inline int hff1( Vector3 const p, 
-                        Vector3 const q )
-{
-    if ( Norm2( p ) - p * q > 0 )
-        return 1; // keep q
-    return 0;
-}
-
-
-
-
-// -----------------------------------------------------------------------------
-// TODO: COMMENT ???
-static inline int hff2( Vector3 const p,
-                        Vector3 const q,
-                        Vector3 const r )
-{
-    Vector3 pq = q - p;
-    Vector3 nTemp = pq ^ ( r - p );
-    Vector3 n = pq ^ nTemp;
-    return ( p * n < 0 ); // Discard r if true
-}
-
-
-
-
-// -----------------------------------------------------------------------------
-// TODO: COMMENT ???
-static inline int hff3( Vector3 const p,
-                        Vector3 const q,
-                        Vector3 const r )
-{
-    Vector3 n = ( Vector3( q - p ) ) ^ ( Vector3( r - p ) );
-    return ( p * n <= 0 ); // discard s if true
-}
-
-
-
-
-// -----------------------------------------------------------------------------
-// Handling the case where the simplex is of kind 1-simplex ( line )
-static inline void S1D( Simplex& s, 
-                        Vector3& v )
-{
-    Vector3 const s1p = s.vrtx[1];
-    Vector3 const s2p = s.vrtx[0];
-
-    if ( hff1( s1p, s2p ) ) 
+    p1.setValue( 0., 0., 0. );
+    p2.setValue( 0., 0., 0. );
+    for ( unsigned int i = 0; i < 4; ++i )
     {
-        // update v, no need to update s, return V{1,2}
-        projectOnLine( s1p, s2p, v );
-        return;
-    } 
-    else 
-    {
-        // Update v and s, return V{1}
-        v = s.vrtx[1];
-        s.nvrtx = 1;
-        s.vrtx[0] = s.vrtx[1];
-        return;
-    }
-}
-
-
-
-
-// -----------------------------------------------------------------------------
-// Handling the case where the simplex is of kind 2-simplex ( triangle )
-static inline void S2D( Simplex& s,
-                        Vector3& v ) 
-{
-    Vector3 const s1p = s.vrtx[2];
-    Vector3 const s2p = s.vrtx[1];
-    Vector3 const s3p = s.vrtx[0];
-    int const hff1f_s12 = hff1( s1p, s2p );
-    int const hff1f_s13 = hff1( s1p, s3p );
-
-    if ( hff1f_s12 ) 
-    {
-        int const hff2f_23 = !hff2( s1p, s2p, s3p );
-        if ( hff2f_23 )
+        if ( bits & ( 1 << i ) )
         {
-            if ( hff1f_s13 )
-            {
-                int const hff2f_32 = !hff2( s1p, s3p, s2p );
-                if ( hff2f_32 )
-                {
-                    projectOnPlane( s1p, s2p, s3p, v ); // update s, 
-                                                        // no need to update c
-                    return;                             // return V{1,2,3}
-                } 
-                else
-                {
-                    // update v, update s, return V{1,3}
-                    projectOnLine( s1p, s3p, v );
-                    s.nvrtx = 2;
-                    s.vrtx[1] = s.vrtx[2];
-                    return;
-                }
-            } 
-            else
-            {
-                projectOnPlane( s1p, s2p, s3p, v ); // update s, 
-                                                    // no need to update c
-                return;                             // return V{1,2,3}
-            }
+            p1 += lambdas[i] * p[i];
+            p2 += lambdas[i] * q[i];
         } 
-        else
-        {
-            // update v, update s, return V{1,2}
-            projectOnLine( s1p, s2p, v );
-            s.nvrtx = 2;
-            s.vrtx[0] = s.vrtx[2];
-            return;
-        }
-    } 
-    else if ( hff1f_s13 ) 
-    {
-        int const hff2f_32 = !hff2( s1p, s3p, s2p );
-        if ( hff2f_32 ) 
-        {
-            projectOnPlane( s1p, s2p, s3p, v ); // update s, no need to update v
-            return;                             // return V{1,2,3}
-        }
-        else
-        {
-            // update v, update s, return V{1,3}
-            projectOnLine( s1p, s3p, v );
-            s.nvrtx = 2;
-            s.vrtx[1] = s.vrtx[2];
-            return;
-        }
-    }
-    else
-    {
-        // update s and v, return V{1}
-        v = s.vrtx[2];
-        s.nvrtx = 1;
-        s.vrtx[0] = s.vrtx[2];
-        return;
-    }
-}
-
-
-
-
-
-// -----------------------------------------------------------------------------
-// Handling the case where the simplex is of kind 3-simplex ( tetrahedron )
-static inline void S3D( Simplex& s, 
-                        Vector3& v )
-{
-    Vector3 s1, s2, s3, s4, s1s2, s1s3, s1s4;
-    Vector3 si, sj, sk;
-    int testLineThree, testLineFour, testPlaneTwo, 
-        testPlaneThree, testPlaneFour, dotTotal;
-    int i, j, k;
-
-    s1 = s.vrtx[3];
-    s2 = s.vrtx[2];
-    s3 = s.vrtx[1];
-    s4 = s.vrtx[0];
-    s1s2 = s2 - s1;
-    s1s3 = s3 - s1;
-    s1s4 = s4 - s1;
-
-    int hff1_tests[3];
-    hff1_tests[2] = hff1( s1, s2 );
-    hff1_tests[1] = hff1( s1, s3 );
-    hff1_tests[0] = hff1( s1, s4 );
-    testLineThree = hff1_tests[1];
-    testLineFour  = hff1_tests[0];
-
-    dotTotal = hff1_tests[2] + testLineThree + testLineFour;
-    if ( dotTotal == 0 )
-    {
-        v = s1;
-        s.nvrtx = 1;
-        s.vrtx[0] = s1;
-        return;
-    }
-
-    double const det134 = determinant( s1s3, s1s4, s1s2 );
-    int const sss = ( det134 <= 0 );
-
-    testPlaneTwo = hff3( s1, s3, s4 ) - sss;
-    testPlaneTwo = testPlaneTwo * testPlaneTwo;
-    testPlaneThree = hff3( s1, s4, s2 ) - sss;
-    testPlaneThree = testPlaneThree * testPlaneThree;
-    testPlaneFour = hff3( s1, s2, s3 ) - sss;
-    testPlaneFour = testPlaneFour * testPlaneFour;
-
-    switch ( testPlaneTwo + testPlaneThree + testPlaneFour )
-    {
-        case 3:
-            v = Vector3( 0., 0., 0. );
-            s.nvrtx = 4;
-            break;
-        case 2:
-            // Only one facing the origin
-            // 1,i,j, are the indices of the points on the triangle and remove k
-            // from simplex
-            s.nvrtx = 3;
-            if ( !testPlaneTwo ) // removes s2
-                s.vrtx[2] = s.vrtx[3];
-            else if ( !testPlaneThree ) // removes s3
-            { 
-                s.vrtx[1] = s2;
-                s.vrtx[2] = s.vrtx[3];
-            }
-            else if ( !testPlaneFour ) // removes s4 - no need to reorder
-            {
-                s.vrtx[0] = s3;
-                s.vrtx[1] = s2;
-                s.vrtx[2] = s.vrtx[3];
-            }
-            // Call S2D
-            S2D( s, v );
-            break;
-        case 1:
-            // Two triangles face the origins:
-            // The only positive hff3 is for triangle 1,i,j, therefore k must be
-            // in the solution as it supports the the point of minimum norm.
-            // 1,i,j, are the indices of the points on the triangle and remove k
-            // from simplex
-            s.nvrtx = 3;
-            if ( testPlaneTwo )
-            {
-                k = 2; // s2
-                i = 1;
-                j = 0;
-            }
-            else if ( testPlaneThree )
-            {
-                k = 1; // s3
-                i = 0;
-                j = 2;
-            }
-            else
-            {
-                k = 0; // s4
-                i = 2;
-                j = 1;
-            }
-
-            si = s.vrtx[i];
-            sj = s.vrtx[j];
-            sk = s.vrtx[k];
-
-            if ( dotTotal == 1 )
-            {
-                if ( hff1_tests[k] )
-                {
-                    if ( !hff2( s1, sk, si ) )
-                    {
-                        s.nvrtx = 3;
-                        s.vrtx[2] = s.vrtx[3];
-                        s.vrtx[1] = si;
-                        s.vrtx[0] = sk;
-                        projectOnPlane( s1, si, sk, v );
-                    }
-                    else if ( !hff2( s1, sk, sj ) )
-                    {
-                        s.nvrtx = 3;
-                        s.vrtx[2] = s.vrtx[3];
-                        s.vrtx[1] = sj;
-                        s.vrtx[0] = sk;
-                        projectOnPlane( s1, sj, sk, v );
-                    } 
-                    else 
-                    {
-                        s.nvrtx = 2;
-                        s.vrtx[1] = s.vrtx[3];
-                        s.vrtx[0] = sk;
-                        projectOnLine(s1, sk, v);
-                    }
-                } 
-                else if ( hff1_tests[i] )
-                {
-                    if ( !hff2( s1, si, sk ) )
-                    {
-                        s.nvrtx = 3;
-                        s.vrtx[2] = s.vrtx[3];
-                        s.vrtx[1] = si;
-                        s.vrtx[0] = sk;
-                        projectOnPlane( s1, si, sk, v );
-                    } 
-                    else
-                    {
-                        s.nvrtx = 2;
-                        s.vrtx[1] = s.vrtx[3];
-                        s.vrtx[0] = si;
-                        projectOnLine( s1, si, v );
-                    }
-                } 
-                else
-                {
-                    if ( !hff2( s1, sj, sk ) )
-                    {
-                        s.nvrtx = 3;
-                        s.vrtx[2] = s.vrtx[3];
-                        s.vrtx[1] = sj;
-                        s.vrtx[0] = sk;
-                        projectOnPlane( s1, sj, sk, v );
-                    }
-                    else
-                    {
-                        s.nvrtx = 2;
-                        s.vrtx[1] = s.vrtx[3];
-                        s.vrtx[0] = sj;
-                        projectOnLine( s1, sj, v );
-                    }
-                }
-            }
-            else if ( dotTotal == 2 )
-            {
-                // Two edges have positive hff1, meaning that for two edges the
-                // origin's project fall on the segement.
-                // Certainly the edge 1,k supports the the point of minimum norm,
-                // and so hff1_1k is positive.
-                if ( hff1_tests[i] )
-                {
-                    if ( !hff2( s1, sk, si ) )
-                    {
-                        if ( !hff2( s1, si, sk ) ) 
-                        {
-                            s.nvrtx = 3;
-                            s.vrtx[2] = s.vrtx[3];
-                            s.vrtx[1] = si;
-                            s.vrtx[0] = sk;
-                            projectOnPlane( s1, si, sk, v );
-                        }
-                        else
-                        {
-                            s.nvrtx = 2;
-                            s.vrtx[1] = s.vrtx[3];
-                            s.vrtx[0] = sk;
-                            projectOnLine( s1, sk, v );
-                        }
-                    }
-                    else
-                    {
-                        if ( !hff2( s1, sk, sj ) )
-                        {
-                            s.nvrtx = 3;
-                            s.vrtx[2] = s.vrtx[3];
-                            s.vrtx[1] = sj;
-                            s.vrtx[0] = sk;
-                            projectOnPlane( s1, sj, sk, v );
-                        } 
-                        else
-                        {
-                            s.nvrtx = 2;
-                            s.vrtx[1] = s.vrtx[3];
-                            s.vrtx[0] = sk;
-                            projectOnLine( s1, sk, v );
-                        }
-                    }
-                }
-                else if ( hff1_tests[j] ) // there is no other choice
-                { 
-                    if ( !hff2( s1, sk, sj ) )
-                    {
-                        if (!hff2(s1, sj, sk))
-                        {
-                            s.nvrtx = 3;
-                            s.vrtx[2] = s.vrtx[3];
-                            s.vrtx[1] = sj;
-                            s.vrtx[0] = sk;
-                            projectOnPlane( s1, sj, sk, v );
-                        }
-                        else
-                        {
-                            s.nvrtx = 2;
-                            s.vrtx[1] = s.vrtx[3];
-                            s.vrtx[0] = sj;
-                            projectOnLine( s1, sj, v );
-                        }
-                    } 
-                    else
-                    {
-                        if (!hff2(s1, sk, si)) 
-                        {
-                            s.nvrtx = 3;
-                            s.vrtx[2] = s.vrtx[3];
-                            s.vrtx[1] = si;
-                            s.vrtx[0] = sk;
-                            projectOnPlane( s1, si, sk, v );
-                        }
-                        else
-                        {
-                            s.nvrtx = 2;
-                            s.vrtx[1] = s.vrtx[3];
-                            s.vrtx[0] = sk;
-                            projectOnLine( s1, sk, v );
-                        }
-                    }
-                } 
-                else
-                {
-                    // ERROR;
-                }
-
-            } 
-            else if ( dotTotal == 3 )
-            {
-                // MM : ALL THIS HYPHOTESIS IS FALSE
-                // sk is s.t. hff3 for sk < 0. So, sk must support the origin 
-                // because there are 2 triangles facing the origin.
-                int hff2_ik = hff2( s1, si, sk );
-                int hff2_jk = hff2( s1, sj, sk );
-                int hff2_ki = hff2( s1, sk, si );
-                int hff2_kj = hff2( s1, sk, sj );
-
-                // if ( hff2_ki == 0 && hff2_kj == 0 )
-                // {
-                //     mexPrintf("\n\n UNEXPECTED VALUES!!! \n\n");
-                // }
-                if ( hff2_ki == 1 && hff2_kj == 1 )
-                {
-                    s.nvrtx = 2;
-                    s.vrtx[1] = s.vrtx[3];
-                    s.vrtx[0] = sk;
-                    projectOnLine( s1, sk, v );
-                } 
-                else if ( hff2_ki ) // discard i
-                {
-                    if ( hff2_jk ) // discard k
-                    {       
-                        s.nvrtx = 2;
-                        s.vrtx[1] = s.vrtx[3];
-                        s.vrtx[0] = sj;
-                        projectOnLine( s1, sj, v );
-                    }
-                    else
-                    {
-                        s.nvrtx = 3;
-                        s.vrtx[2] = s.vrtx[3];
-                        s.vrtx[1] = sj;
-                        s.vrtx[0] = sk;
-                        projectOnPlane( s1, sk, sj, v );
-                    }
-                } 
-                else // discard j
-                {
-                    if ( hff2_ik ) // discard k
-                    {
-                        s.nvrtx = 2;
-                        s.vrtx[1] = s.vrtx[3];
-                        s.vrtx[0] = si;
-                        projectOnLine( s1, si, v );
-                    }
-                    else
-                    {
-                        s.nvrtx = 3;
-                        s.vrtx[2] = s.vrtx[3];
-                        s.vrtx[1] = si;
-                        s.vrtx[0] = sk;
-                        projectOnPlane( s1, sk, si, v );
-                    }
-                }
-            }
-            break;
-        case 0:
-            // The origin is outside all 3 triangles
-            if ( dotTotal == 1 )
-            {
-                if (testLineThree) // Here si is set such that hff(s1,si) > 0
-                {
-                    k = 2;
-                    i = 1; // s3
-                    j = 0;
-                }
-                else if ( testLineFour ) 
-                {
-                    k = 1; // s3
-                    i = 0;
-                    j = 2;
-                }
-                else
-                {
-                    k = 0;
-                    i = 2; // s2
-                    j = 1;
-                }
-                si = s.vrtx[i];
-                sj = s.vrtx[j];
-                sk = s.vrtx[k];
-
-                if ( !hff2( s1, si, sj ) )
-                {
-                    s.nvrtx = 3;
-                    s.vrtx[2] = s.vrtx[3];
-                    s.vrtx[1] = si;
-                    s.vrtx[0] = sj;
-                    projectOnPlane( s1, si, sj, v );
-                }
-                else if ( !hff2( s1, si, sk ) )
-                {
-                    s.nvrtx = 3;
-                    s.vrtx[2] = s.vrtx[3];
-                    s.vrtx[1] = si;
-                    s.vrtx[0] = sk;
-                    projectOnPlane( s1, si, sk, v );
-                }
-                else
-                {
-                    s.nvrtx = 2;
-                    s.vrtx[1] = s.vrtx[3];
-                    s.vrtx[0] = si;
-                    projectOnLine( s1, si, v );
-                }
-            }
-            else if ( dotTotal == 2 )
-            {
-                // Here si is set such that hff(s1,si) < 0
-                s.nvrtx = 3;
-                if ( !testLineThree )
-                {
-                    k = 2;
-                    i = 1; // s3
-                    j = 0;
-                } 
-                else if ( !testLineFour ) 
-                {
-                    k = 1;
-                    i = 0; // s4
-                    j = 2;
-                } 
-                else
-                {
-                    k = 0;
-                    i = 2; // s2
-                    j = 1;
-                }
-                si = s.vrtx[i];
-                sj = s.vrtx[j];
-                sk = s.vrtx[k];
-
-                if ( !hff2( s1, sj, sk ) )
-                {
-                    if ( !hff2( s1, sk, sj ) ) 
-                    {
-                        s.nvrtx = 3;
-                        s.vrtx[2] = s.vrtx[3];
-                        s.vrtx[1] = sj;
-                        s.vrtx[0] = sk;
-                        projectOnPlane( s1, sj, sk, v );
-                    } 
-                    else if ( !hff2( s1, sk, si ) )
-                    {
-                        s.nvrtx = 3;
-                        s.vrtx[2] = s.vrtx[3];
-                        s.vrtx[1] = si;
-                        s.vrtx[0] = sk;
-                        projectOnPlane( s1, sk, si, v );
-                    } 
-                    else 
-                    {
-                        s.nvrtx = 2;
-                        s.vrtx[1] = s.vrtx[3];
-                        s.vrtx[0] = sk;
-                        projectOnLine( s1, sk, v );
-                    }
-                } 
-                else if ( !hff2( s1, sj, si ) )
-                {
-                    s.nvrtx = 3;
-                    s.vrtx[2] = s.vrtx[3];
-                    s.vrtx[1] = si;
-                    s.vrtx[0] = sj;
-                    projectOnPlane( s1, si, sj, v );
-                }
-                else
-                {
-                    s.nvrtx = 2;
-                    s.vrtx[1] = s.vrtx[3];
-                    s.vrtx[0] = sj;
-                    projectOnLine( s1, sj, v );
-                }
-            }
-            break;
-        default:
-            printf("\nERROR:\tunhandled");
     }
 }
 
@@ -644,24 +369,54 @@ static inline void S3D( Simplex& s,
 
 
 // -----------------------------------------------------------------------------
-// Distance subalgorithm using the signed volume method
-static inline void subalgorithm( Simplex& s,
-                                 Vector3& v)
+static inline void sv_subalgorithm( Vector3 const y[4], 
+                                    unsigned int& bits, 
+                                    double (&lambdas)[4],
+									Vector3& v )
 {
-    switch ( s.nvrtx )
-    {
-        case 4:
-            S3D( s, v );
-            break;
-        case 3:
-            S2D( s, v );
-            break;
-        case 2:
-            S1D( s, v );
-            break;
-        default:
-            printf("\nERROR:\t invalid simplex\n");
-    }
+	// The y array is never modified by this function.  The bits may be
+	// modified if necessary, and the lambdas will be updated.  All the other
+	// functions (if they need to make deeper calls e.g. s3d->s2d) will have to
+	// make copies of bits to avoid overwriting that data incorrectly.
+	unsigned int num_used = 0;
+	for ( unsigned int i = 0; i < 4; ++i )
+		num_used += (bits >> i) & 1;
+
+	// Start with the most common cases.
+	if ( num_used == 1 )
+	{
+		for ( unsigned int i = 0; i < 4; ++i )
+		{
+			if ( bits & (1 << i) )
+				lambdas[i] = 1.;
+		}
+	}
+	else if ( num_used == 2 )
+		s1d( y, bits, lambdas );
+	else if ( num_used == 3 )
+		s2d( y, bits, lambdas );
+	else
+		s3d( y, bits, lambdas );
+
+	computeVector( bits, y, lambdas, v );
+}
+    
+    
+
+
+// -----------------------------------------------------------------------------
+// The next function is used for detecting degenerate cases that cause
+// termination problems due to rounding errors.
+static inline bool degenerate( unsigned int const bits,
+                               Vector3 const y[4],
+                               Vector3 const& w )
+{
+	for ( unsigned int i = 0, bit = 1; i < 4; ++i, bit <<= 1 )
+	{
+		if ( ( bits & bit ) && y[i] == w )
+			return ( true );
+	}
+	return ( false );
 }
 
 
@@ -670,80 +425,207 @@ static inline void subalgorithm( Simplex& s,
 /* ========================================================================== */
 /*                            High-Level Methods                              */
 /* ========================================================================== */
-// Returns whether 2 convex shapes intersect using the GJK_SV algorithm
 double closest_points_GJK_SV( Convex const& a, 
                               Convex const& b, 
                               Transform const& a2w,
-                              Transform const& b2w, 
+                              Transform const& b2w,
                               Point3& pa,
                               Point3& pb,
-                              int& nbIter ) 
+                              int& nbIter )
 {
-    unsigned int k = 0;                  // iteration counter
-    int const maxk = 30;                 // maximum number of GJK iterations
-    unsigned int i;
-    
-    /* Initialise search direction */
-    // Vector3 c2c = b2w.getOrigin() - a2w.getOrigin();
-    // Vector3 w = a2w( a.support( ( -c2c ) * a2w.getBasis() ) ) - 
-    //             b2w( b.support( (  c2c ) * b2w.getBasis() ) );
-    Vector3 v = a2w( a.support( Vector3Null ) ) - 
-                b2w( b.support( Vector3Null ) );
-    Vector3 w;
-    Vector3 d;
-    double dist2 = Norm2( v );
-    double momentum = 0., oneMinusMomentum = 1.;
-    bool acceleration = true;
+    // GJK variables
+    unsigned int bits = 0;           // identifies current simplex
+    unsigned int last = 0;           // identifies last found support point
+    Point3 p[4];                     // support points of A in local
+    Point3 q[4];                     // support points of B in local
+    Vector3 y[4];				     // support points of A-B in world
+    double mu = 0.;                  // optimality gap
+    int numIterations = 0;           // No. iterations
+    double lambdas[4] = { 0. };      // Weights
 
-    /* Initialise simplex */
-    Simplex s = { 1, { Vector3( 0., 0., 0. ) } };
-    s.vrtx[0] = w;
+    // Misc variables, e.g. tolerance, ...
+    double relError = GrainsExec::m_colDetTolerance;    // rel error for opt gap
+    double absError = 1.e-4 * relError;          // abs error for optimality gap
+    bool acceleration = GrainsExec::m_colDetAcceleration;     // isAcceleration?
+    double momentum = 0., oneMinusMomentum = 1.;  // in case we use acceleration
 
-    /* Begin GJK iteration */
-    do {
-        k++;
-        if ( acceleration )
+    // Initializing vectors
+    Vector3 v( a2w( a.support( Vector3Null ) ) - 
+               b2w( b.support( Vector3Null ) ) );
+    Vector3 w( v );
+    Vector3 d( v );
+    double dist = Norm( v );
+
+    while ( bits < 15 && dist > EPSILON2 && numIterations < 1000 )
+    {
+        ++numIterations;
+        // Updating the bits, ...
+        for ( unsigned int new_index = 0; new_index < 4; ++new_index )
         {
-            momentum = k / ( k + 2. );
+            // At least one of these must be empty, otherwise we have an overlap.
+            if ( !( bits & ( 1 << new_index ) ) )
+			{
+				last = new_index;
+				break;
+			}
+        }
+
+        // Finding the suitable direction using either Nesterov or original
+        // The number 8 is hard-coded. Emprically, it shows the best convergence
+        // for superquadrics. For the rest of shapes, we really do not need to 
+        // use Nesterov as the improvemenet is marginal.
+        if ( acceleration && numIterations % 8 != 0 )
+        {
+            momentum = numIterations / ( numIterations + 2. );
             oneMinusMomentum = 1. - momentum;
             d = momentum * d + 
-                momentum * oneMinusMomentum * w +
-                oneMinusMomentum * oneMinusMomentum * v;
-            w = a2w( a.support( ( -d ) * a2w.getBasis() ) ) - 
-                b2w( b.support( (  d ) * b2w.getBasis() ) );
-            
-            if ( dist2 - v * w <= sqrt( dist2 ) * rel_error1 / 2. )
-            {
-                if ( sqrt( dist2 ) * Norm( d ) - v * d <= abs_error1 )
-                    break;
-                w = a2w( a.support( ( -v ) * a2w.getBasis() ) ) - 
-                    b2w( b.support( (  v ) * b2w.getBasis() ) );
-                acceleration = false;
-            }
+                momentum * oneMinusMomentum * v +
+                oneMinusMomentum * oneMinusMomentum * w;
         }
         else
-        {
-            w = a2w( a.support( ( -v ) * a2w.getBasis() ) ) - 
-                b2w( b.support( (  v ) * b2w.getBasis() ) );
+            d = v;
 
-            double exeedtol_rel = dist2 - ( v * w );
-            if ( exeedtol_rel <= sqrt( dist2 ) * rel_error1 / 2. || 
-                 exeedtol_rel <= abs_error1 )
+        p[last] = a.support( ( -d ) * a2w.getBasis() );
+        q[last] = b.support( (  d ) * b2w.getBasis() );
+        w = a2w( p[last] ) - b2w( q[last] );
+        
+        // termination criteria -- optimiality gap
+        mu = dist - v * w / dist;
+        if ( mu < dist * relError || mu < absError )
+        {
+            if ( acceleration )
+            {
+                if ( Norm( d - v ) < EPSILON )
+                    break;
+                acceleration = false;
+                p[last] = a.support( ( -v ) * a2w.getBasis() );
+                q[last] = b.support( (  v ) * b2w.getBasis() );
+                w = a2w( p[last] ) - b2w( q[last] );
+            }
+            else
                 break;
         }
+        // termination criteria -- degenerate case
+        if ( degenerate( bits, y, w ) )
+            break;
+        
+        // if not terminated, get ready for the next iteration
+        y[last] = w;
+        bits |= ( 1 << last );
+		sv_subalgorithm( y, bits, lambdas, v );
+        dist = Norm( v );
+    }
+    // compute witness points
+    computePoints( bits, p, q, lambdas, pa, pb );
+    nbIter = numIterations;
+    return ( dist );
+}
 
-        // Add new vertex to simplex
-        i = s.nvrtx;
-        s.vrtx[i] = w;
-        s.nvrtx++;
 
-        /* Invoke distance sub-algorithm */
-        subalgorithm( s, v );
-        dist2 = Norm2( v );
 
-    } while ( ( s.nvrtx != 4 ) && ( k != maxk ) );
-    pa = a.support( ( -v ) * a2w.getBasis() );
-    pb = a.support( (  v ) * b2w.getBasis() );
-    nbIter = k;
-    return ( sqrt( dist2 ) );
+
+
+
+// -----------------------------------------------------------------------------
+double closest_points_GJK_SV( Convex const& a, 
+                              Convex const& b, 
+                              Transform const& a2w,
+                              Transform const& b2w,
+                              Vector3& v,
+                              Point3& pa,
+                              Point3& pb,
+                              int& nbIter )
+{
+  	// GJK variables
+    unsigned int bits = 0;           // identifies current simplex
+    unsigned int last = 0;           // identifies last found support point
+    Point3 p[4];                     // support points of A in local
+    Point3 q[4];                     // support points of B in local
+    Vector3 y[4];				     // support points of A-B in world
+    double mu = 0.;                  // optimality gap
+    int numIterations = 0;           // No. iterations
+    double lambdas[4];               // Weights
+
+    // Misc variables, e.g. tolerance, ...
+    double relError = GrainsExec::m_colDetTolerance;    // rel error for opt gap
+    double absError = 1.e-4 * relError;          // abs error for optimality gap
+    bool acceleration = GrainsExec::m_colDetAcceleration;     // isAcceleration?
+    double momentum = 0., oneMinusMomentum = 1.;  // in case we use acceleration
+
+    // Initializing vectors
+    Vector3 w;
+    if ( v != Vector3Null )
+        w = a2w( a.support( ( -v ) * a2w.getBasis() ) ) - 
+            b2w( b.support( (  v ) * b2w.getBasis() ) );
+    else // if we don't have a better guess
+    {
+        v = a2w( a.support( Vector3Null ) ) - b2w( b.support( Vector3Null ) );
+        w = v;
+    }
+    Vector3 d( v );
+    double dist = 1.;
+
+    while ( bits < 15 && dist > EPSILON2 && numIterations < 1000 )
+    {
+        ++numIterations;
+        // Updating the bits, ...
+        for ( unsigned int new_index = 0; new_index < 4; ++new_index )
+        {
+            // At least one of these must be empty, otherwise we have an overlap.
+            if ( !( bits & ( 1 << new_index ) ) )
+			{
+				last = new_index;
+				break;
+			}
+        }
+
+        // Finding the suitable direction using either Nesterov or original
+        // The number 8 is hard-coded. Emprically, it shows the best convergence
+        // for superquadrics. For the rest of shapes, we really do not need to 
+        // use Nesterov as the improvemenet is marginal.
+        if ( acceleration && numIterations % 8 != 0 )
+        {
+            momentum = numIterations / ( numIterations + 2. );
+            oneMinusMomentum = 1. - momentum;
+            d = momentum * d + 
+                momentum * oneMinusMomentum * v +
+                oneMinusMomentum * oneMinusMomentum * w;
+        }
+        else
+            d = v;
+
+        p[last] = a.support( ( -d ) * a2w.getBasis() );
+        q[last] = b.support( (  d ) * b2w.getBasis() );
+        w = a2w( p[last] ) - b2w( q[last] );
+        
+        // termination criteria -- optimiality gap
+        mu = dist - v * w / dist;
+        if ( mu < dist * relError || mu < absError )
+        {
+            if ( acceleration )
+            {
+                if ( Norm( d - v ) < EPSILON )
+                    break;
+                acceleration = false;
+                p[last] = a.support( ( -v ) * a2w.getBasis() );
+                q[last] = b.support( (  v ) * b2w.getBasis() );
+                w = a2w( p[last] ) - b2w( q[last] );
+            }
+            else
+                break;
+        }
+        // termination criteria -- degenerate case
+        if ( degenerate( bits, y, w ) )
+            break;
+        
+        // if not terminated, get ready for the next iteration
+        y[last] = w;
+        bits |= ( 1 << last );
+		sv_subalgorithm( y, bits, lambdas, v );
+        dist = Norm( v );
+    }
+    // compute witness points
+    computePoints( bits, p, q, lambdas, pa, pb );
+    nbIter = numIterations;
+    return ( dist );
 }

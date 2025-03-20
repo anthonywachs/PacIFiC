@@ -6,6 +6,7 @@
 #include "Point3.hh"
 #include "PointContact.hh"
 #include "Torsor.hh"
+#include "CollisionHistory.hh"
 #include <list>
 #include <string>
 #include <map>
@@ -347,6 +348,11 @@ class Component
     virtual void SearchContact( Component* voisin, double dt,
       double const& time, LinkedCell *LC,
       list<ContactInfos*>& listContact );
+    
+    /** @brief Searches for the previous direction of contact with component
+    with id = _id
+    @param _id id of the component to search for */
+    Vector3 lookupCollision( int _id ) const;
 
     /** @brief Increments the coordination number by nc
     @param nc increment of the coordination number */
@@ -499,6 +505,7 @@ class Component
     	particle id>, tuple<isContactActive, kt * cumulative tangential 
 	dispacement, previous normal vector, kr * cumulative rotational 
 	motion> > */
+    CollisionHistory m_collisionHistory; /**< keep track of collisions */
     static size_t m_nb; /**< Number of created components */
     static double m_massObstacle; /**< Mass of obstacle assumed to be infinite
     */

@@ -364,8 +364,8 @@ BVolume* Rectangle::computeBVolume( unsigned int type ) const
     bvol = new OBB( Vector3( m_LX, m_LY, 0. ), Matrix() );
   else if ( type == 2 ) // OBC
   {
-    bvol = new OBC( sqrt( m_LX * m_LX + m_LY * m_LY ), 
-                    0.,
+    bvol = new OBC( sqrt( m_LX * m_LX + m_LY * m_LY ) / 2., 
+                    EPSILON,
                     Vector3( 0., 0., 1. ) );
   }
   return( bvol );

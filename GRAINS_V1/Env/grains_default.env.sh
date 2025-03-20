@@ -59,7 +59,7 @@ echo -e '\033[31mXERCESCROOT & XERCESC_ROOT\033[0m =' $XERCESCROOT '&' $XERCESC_
 #if [ $GRAINS_CPP = "g++" ]
 if [ $GRAINS_SERCOMPIL_ENV = "GNU" ] 
 then
-  GCCFLAGS="-pedantic -W -Wno-long-long -Wno-ctor-dtor-privacy -Wno-unused-parameter -D_GLIBCXX_USE_CXX11_ABI=0 -std=c++11 "
+  GCCFLAGS="-pedantic -W -Wno-long-long -Wno-ctor-dtor-privacy -Wno-unused-parameter -D_GLIBCXX_USE_CXX11_ABI=0 -std=c++17 "
 fi
 export GRAINS_GENCCFLAGS="-m${GRAINS_BITS_DEFAULT} ${GRAINS_COMPIL_OPT} -fPIC -Wall -Wwrite-strings -Wconversion -Wshadow -Wno-deprecated -Wno-comment ${GCCFLAGS}"
 export GRAINS_MPICCFLAGS="-DMPICH_IGNORE_CXX_SEEK -DMPICH_SKIP_MPICXX -DOMPI_IGNORE_CXX_SEEK -DOMPI_SKIP_MPICXX"

@@ -580,29 +580,45 @@ BVolume* Superquadric::computeBVolume( unsigned int type ) const
     bvol = new OBB( Vector3( m_a, m_b, m_c ), Matrix() );
   else if ( type == 2 ) // OBC
   {
-    double a[2];
-    int axis = ( a[X] = fabs( m_a ) ) < ( a[Y] = fabs( m_b ) ) ? Y : X;
-    axis = a[axis] < fabs( m_c ) ? Z : axis;
-    Vector3 e( 0., 0., 0. );
-    e[axis] = 1.;
-    double h = 0., r = 0.;
-    switch ( axis )
-    {
-      case 0:
-        h = 2. * m_a;
-        r = m_b > m_c ? m_b : m_c;
-      break;
-      case 1:
-        h = 2. * m_b;
-        r = m_a > m_c ? m_a : m_c;
-      break;
-      case 2:
-        h = 2. * m_c;
-        r = m_b > m_a ? m_b : m_a;
-      break;
-    }
+      // cylinder-like SQ -- in this case, bigger from m_a and m_b is radius
+      // and height is 2. * m_c
+      if ( m_n2 == 2. )
+      {
+          Vector3 e( 0., 0., 1. );
+          double r = m_a > m_b ? m_a : m_b;
+          double h = 2. * m_c;
+          bvol = new OBC( r, h, e );
+      }
+      // cube-like SQ -- in this case, the OBC is the same as OBC for a box
+      // if ( m_n1 == m_n2 )
+      else
+      {
+          double xy = fabs( m_a - m_b );
+          double xz = fabs( m_a - m_c );
+          double yz = fabs( m_b - m_c );
+          // pick from xy and xz, store to xy
+          int zAxis = xy < xz ? Z : Y;
+          xy = xy < xz ? xy : xz;
+          // pick from xy and yz
+          zAxis = xy < yz ? zAxis : X;
+          
+          double h;
+          if ( zAxis == X )
+              h = 2. * m_a;
+          else if ( zAxis == Y )
+              h = 2. * m_b;
+          else if ( zAxis == Z )
+              h = 2. * m_c;
 
-    bvol = new OBC( r, h, e );
+          Vector3 e( 0., 0., 0. );
+          e[ zAxis ] = 1.;
+          double r = sqrt( m_a * m_a + 
+                           m_b * m_b +
+                           m_c * m_c -
+                           h * h / 4. );
+
+          bvol = new OBC( r, h, e );
+      }
   }
 
   return( bvol );
