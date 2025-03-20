@@ -546,6 +546,16 @@ void Component::SearchContact( Component* voisin, double dt,
 
 
 // ----------------------------------------------------------------------------
+// earches for the previous direction of contact with component with id = _id
+Vector3 Component::lookupCollision( int _id ) const
+{
+    return( m_collisionHistory.lookupCollision( _id ) );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
 // Increments the coordination number by nc
 void Component::addToCoordinationNumber( int const& nc )
 {}

@@ -174,6 +174,19 @@ bool Polytope::isIn( Point3 const& pt ) const
 
 
 // ----------------------------------------------------------------------------
+// Returns the bounding volume to polytope
+BVolume* Polytope::computeBVolume( unsigned int type ) const
+{
+  cout << "Warning when calling Polytope::computeBVolume( type ) "
+       << "\nShould not go into this method !\n"
+       << "Need for an assistance ! Stop running !\n";
+  exit(10);
+  return( NULL );
+}
+
+
+
+// ----------------------------------------------------------------------------
 // Performs advanced comparison of the two convexes and returns whether they 
 // match
 bool Polytope::equalType_level2( Convex const* other ) const

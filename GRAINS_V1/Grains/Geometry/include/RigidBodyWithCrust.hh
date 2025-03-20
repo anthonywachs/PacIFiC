@@ -74,6 +74,23 @@ class RigidBodyWithCrust : public RigidBody
     rigid bodies already touch or overlap */
     PointContact ClosestPoint( RigidBodyWithCrust &neighbor );
 
+    /** @brief Returns the features of the contact: contact point location,
+    overlap vector (vector joining the points on each rigid body surface that
+    realize the minimal distance between the shrunk rigid bodies, divided by the
+    minimal distance between the shrunk rigid bodies and multiplied by the
+    sum of the crust thicknesses minus the minimal distance between the shrunk
+    rigid bodies, i.e., minus the overlap), overlap distance = minimal distance
+    between the shrunk rigid bodies minus the sum of the crust thicknesses.
+    Note: contact exists if overlap distance is negative, i.e., minimal distance
+    between the shrunk rigid bodies < sum of the crust thicknesses
+    @param neighbor the other rigid body
+    @param initialDirection the initial direction to start GJK with
+    @exception if the minimal distance between the shrunk rigid bodies is 0, in
+    practice less than EPSILON defined in Basic.H, which means that the shrunk
+    rigid bodies already touch or overlap */
+    PointContact ClosestPoint( RigidBodyWithCrust &neighbor,
+                               Vector3& initialDirection );
+
     /** @brief Returns the features of the contact when the overlap computed by
     ClosestPoint is too large, the method artificially increases the size of the
     crust thickness for this particular contact detection by a factor > 1 and

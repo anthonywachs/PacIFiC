@@ -172,7 +172,14 @@ class Transform
   
     /** @brief Sets the matrix part of the transformation
     @param basis_ matrix part of the transformation */
-    void setBasis( Matrix const& basis_ );    
+    void setBasis( Matrix const& basis_ );
+
+    /** @brief Sets the matrix part of the transformation with specified
+    rotations around each principal axis
+    @param aX rotation around the x-axis
+    @param aY rotation around the y-axis
+    @param aZ rotation around the z-axis */
+    void setBasis( double aX, double aY, double aZ );    
 
     /** @brief Sets the transformation with an 1D array of 12 values as inputs  
     !!! IMPORTANT !!! the 1D array must be organized as: 0=Mxx, 1=Mxy, 2=Mxz,

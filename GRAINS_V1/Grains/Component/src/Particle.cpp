@@ -482,7 +482,29 @@ void Particle::InterAction( Component* voisin,
 
   try 
   {
-    closestPoint = m_geoRBWC->ClosestPoint( *(voisin->getRigidBody()) );
+    if ( GrainsExec::m_colDetWithHistory )
+    {
+      int id = voisin->getID();
+      Vector3 initialDirection = this->lookupCollision( id );
+      // we have to check the map for the other component as well in case the
+      // initial direction is null. Note that !(v != Vector3Null) is more 
+      // efficient that v = Vector3Null.
+      // Also, note the negative sign as well.
+      if ( !( initialDirection != Vector3Null ) )
+        initialDirection = -( voisin->lookupCollision( this->getID() ) );
+      // Collision detection
+      closestPoint = m_geoRBWC->ClosestPoint( *( voisin->getRigidBody() ),
+                                               initialDirection );
+      if ( initialDirection != Vector3Null )
+      {
+        m_collisionHistory.updateCollision( id, initialDirection );
+        // cout << initialDirection << endl;
+      }
+      else
+        m_collisionHistory.removeCollision( id );
+    }
+    else
+      closestPoint = m_geoRBWC->ClosestPoint( *(voisin->getRigidBody()) );
   }
   catch ( ContactError& error ) 
   {
