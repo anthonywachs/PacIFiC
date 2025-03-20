@@ -165,10 +165,10 @@ class Grains : public ComputingTime, public SolverComputingTime
 	features */   
     list< pair<Particle*,size_t> > m_newParticles; /**< types of new particles 
     	to be inserted */
-    list<Point3>* m_insertion_position; /**< list of insertion positions */
+    vector<Point3>* m_insertion_position; /**< list of insertion positions */
     list<Matrix>* m_insertion_angular_position; /**< list of insertion angular 
     	positions */    
-    list<Point3>::iterator m_il_sp; /**< iterator on the selected position in
+    size_t m_i_sp; /**< index of the selected position in 
     	m_insertion_position */
     list<Matrix>::iterator m_il_sap; /**< iterator on the selected angular 
     	position in m_insertion_angular_position */	

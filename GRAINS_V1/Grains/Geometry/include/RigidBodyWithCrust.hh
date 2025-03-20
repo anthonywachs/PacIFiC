@@ -89,7 +89,7 @@ class RigidBodyWithCrust : public RigidBody
     practice less than EPSILON defined in Basic.H, which means that the shrunk
     rigid bodies already touch or overlap */
     PointContact ClosestPoint( RigidBodyWithCrust &neighbor,
-                               Vector3& initialDirection );
+	Vector3& initialDirection );
 
     /** @brief Returns the features of the contact when the overlap computed by
     ClosestPoint is too large, the method artificially increases the size of the

@@ -422,7 +422,15 @@ bool GrainsMPI::insertParticle( PullMode const& mode )
         else
           m_allcomponents.DeleteAndDestroyWait();
 
-	if ( npositions ) m_insertion_position->erase( m_il_sp );
+	if ( npositions ) 
+	{
+	  if ( m_insertion_order == PM_RANDOM )
+	    (*m_insertion_position)[m_i_sp] = m_insertion_position->back();
+	  m_insertion_position->pop_back();
+	  if ( m_insertion_position->size() < 
+	  	size_t( 0.5 * double(m_insertion_position->capacity()) ) ) 
+	    m_insertion_position->shrink_to_fit();
+	}
 	if ( nangpositions ) m_insertion_angular_position->erase( m_il_sap );
       }
     }

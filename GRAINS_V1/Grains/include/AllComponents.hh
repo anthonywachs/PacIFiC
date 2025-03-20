@@ -380,7 +380,7 @@ class AllComponents
     @param known_positions the list of remaining insertion positions    
     @param rank process rank    
     @param nprocs number of processes */
-    size_t read( istream& fileSave, list<Point3>* known_positions,
+    size_t read( istream& fileSave, vector<Point3>* known_positions,
     	int const& rank, int const& nprocs );
     
     /** @brief Reloads particles from an input stream 
@@ -405,7 +405,7 @@ class AllComponents
     @param nprocs number of processes     
     @param wrapper MPI wrapper */
     void write( ostream &fileSave, string const& filename, 
-    	list<Point3> const* known_positions, CloneInReload cir, 
+    	vector<Point3> const* known_positions, CloneInReload cir, 
 	LinkedCell const* LC, int const& rank,
   	int const& nprocs, GrainsMPIWrapper const* wrapper ) const;
     
@@ -419,7 +419,7 @@ class AllComponents
     @param wrapper MPI wrapper 
     @param periodic true if the domain is periodic */
     void write_singleMPIFile( ostream &fileSave, string const& filename,
-    	list<Point3> const* known_positions, CloneInReload cir, 
+    	vector<Point3> const* known_positions, CloneInReload cir, 
 	LinkedCell const* LC, GrainsMPIWrapper const* wrapper, 
 	bool periodic ) const;
 

@@ -514,7 +514,7 @@ void GrainsTestDev::Simulation( double time_interval )
 
   GrainsExec::m_colDetBoundingVolume = 2;
   // ------
-  double aX = 0., aY = M_PI / 2., aZ = 0.;
+  //double aX = 0., aY = M_PI / 2., aZ = 0.;
   // double arr1[12] = { cosl(aZ)*cosl(aY),
   //                     cosl(aZ)*sinl(aY)*sinl(aX) - sinl(aZ)*cosl(aX),
   //                     cosl(aZ)*sinl(aY)*cosl(aX) + sinl(aZ)*sinl(aX),
@@ -535,7 +535,7 @@ void GrainsTestDev::Simulation( double time_interval )
         //               {0.68725783191399126, -0.72152872679487934, -0.0841009446001688, 0.52167773850176191, 0.4096726220059298, 
         // 0.74834529458698007, -0.50549877311875591, -0.55817975526576302, 0.65795619245272363, -0.071112092542979913, 0.017270385854537773, 
         // -1.1023320524838516}
-  aY = 1. * M_PI / 180., aX = 0., aZ = 0.;
+  //aY = 1. * M_PI / 180., aX = 0., aZ = 0.;
   // double arr2[12] = { cosl(aZ)*cosl(aY),
   //                     cosl(aZ)*sinl(aY)*sinl(aX) - sinl(aZ)*cosl(aX),
   //                     cosl(aZ)*sinl(aY)*cosl(aX) + sinl(aZ)*sinl(aX),
@@ -558,7 +558,7 @@ void GrainsTestDev::Simulation( double time_interval )
   Transform const& a2w( arr1 );
   Transform const& b2w( arr2 );
   Convex* cvxA = new Cylinder( 0.035225199999999998, 0.070450399999999996 );
-  Convex* cvxB = new Box( 1.56, 1.56, 0.005 );
+  //Convex* cvxB = new Box( 1.56, 1.56, 0.005 );
   RigidBody rbA( cvxA, a2w );
   RigidBody rbB( cvxA, b2w );
   OBC const& obcA = (OBC const&) rbA.getBVolume();

@@ -294,14 +294,9 @@ frame
 @param pb point representing the other tip of the minimal distance segment on
 B
 @param nbIter number of iterations of GJK for convergence */
-double closest_points( Convex const& a, 
-                       Convex const& b, 
-                       Transform const& a2w,
-                       Transform const& b2w, 
-                       Vector3& v,
-                       Point3& pa, 
-                       Point3& pb, 
-                       int& nbIter );
+double closest_points( Convex const& a, Convex const& b, 
+	Transform const& a2w, Transform const& b2w, Vector3& v,
+	Point3& pa, Point3& pb, int& nbIter );
 //@}
 
 #endif

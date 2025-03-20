@@ -1027,7 +1027,7 @@ void AllComponents::read_pre2024( istream& fileSave, string const& filename,
 
 // ---------------------------------------------------------------------------
 // Reloads reference particles and obstacles from an input stream
-size_t AllComponents::read( istream& fileSave, list<Point3>* known_positions, 
+size_t AllComponents::read( istream& fileSave, vector<Point3>* known_positions, 
 	int const& rank, int const& nprocs )
 {
   string buffer, readingMode ;
@@ -1089,6 +1089,7 @@ size_t AllComponents::read( istream& fileSave, list<Point3>* known_positions,
   if ( npos )
   {
     Point3 P;
+    if ( rank == 0 ) known_positions->reserve( npos );
     for (i=0; i<npos; i++) 
     {
       fileSave >> P[X] >> P[Y] >> P[Z];
@@ -1307,7 +1308,7 @@ void AllComponents::read_particles( string const& filename, size_t const& npart,
 // Writes components to an output stream. Only active particles are written 
 // to the stream
 void AllComponents::write( ostream &fileSave, string const& filename, 
-	list<Point3> const* known_positions, CloneInReload cir, 
+	vector<Point3> const* known_positions, CloneInReload cir, 
 	LinkedCell const* LC, int const& rank,
 	int const& nprocs, GrainsMPIWrapper const* wrapper ) const
 {
@@ -1334,7 +1335,7 @@ void AllComponents::write( ostream &fileSave, string const& filename,
     	<< endl;
     if ( known_positions->size() )
     {
-      list<Point3>::const_iterator il;
+      vector<Point3>::const_iterator il;
       for (il=known_positions->cbegin();il!=known_positions->cend();il++)
         fileSave << GrainsExec::doubleToString(ios::scientific,FORMAT16DIGITS,
   		(*il)[X]) << " " << 
@@ -1431,7 +1432,7 @@ void AllComponents::write( ostream &fileSave, string const& filename,
 // ---------------------------------------------------------------------------
 // Writes components to a single file MPI File in parallel
 void AllComponents::write_singleMPIFile( ostream &fileSave, 
-	string const& filename, list<Point3> const* known_positions, 
+	string const& filename, vector<Point3> const* known_positions, 
 	CloneInReload cir, LinkedCell const* LC, 
 	GrainsMPIWrapper const* wrapper, bool periodic ) const
 {  
@@ -1512,7 +1513,7 @@ void AllComponents::write_singleMPIFile( ostream &fileSave,
     	<< endl;
     if ( known_positions->size() )
     {
-      list<Point3>::const_iterator il;
+      vector<Point3>::const_iterator il;
       for (il=known_positions->cbegin();il!=known_positions->cend();il++)
         fileSave << GrainsExec::doubleToString(ios::scientific,FORMAT16DIGITS,
   		(*il)[X]) << " " << 

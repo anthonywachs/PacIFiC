@@ -12,6 +12,7 @@
 #include "TrilobeCylinder.hh"
 #include "QuadrilobeCylinder.hh"
 #include <stdlib.h>
+#include <algorithm>
 
 
 // Initialisation des attributs static
@@ -41,7 +42,8 @@ Grains::Grains()
   , m_randomseed( RGS_DEFAULT )
   , m_InsertionLattice( NULL )
   , m_insertion_position( NULL )
-  , m_insertion_angular_position( NULL )  
+  , m_insertion_angular_position( NULL )
+  , m_i_sp( 0 )  
   , m_insertion_frequency( 1 )
   , m_force_insertion( false )
   , m_RandomMotionCoefTrans( 0. )
@@ -53,7 +55,7 @@ Grains::Grains()
   , m_wrapper( NULL )
 {
   if ( GrainsBuilderFactory::getContext() == DIM_2 ) m_dimension = 2;
-  m_insertion_position = new list<Point3>;
+  m_insertion_position = new vector<Point3>;
   m_insertion_angular_position = new list<Matrix>;
   GrainsExec::initializePartialPeriodicity();
 }
@@ -637,7 +639,7 @@ void Grains::Construction( DOMElement* rootElement )
 
     // Collision detection
     DOMNode* collision = 
-                      ReaderXML::getNode( root, "CollisionDetectionAlgorithm" );
+	ReaderXML::getNode( root, "CollisionDetectionAlgorithm" );
     if ( !collision )
     {
       if ( m_rank == 0 )
@@ -650,17 +652,16 @@ void Grains::Construction( DOMElement* rootElement )
     else 
     {
       DOMNode* collisionAlg = 
-                       ReaderXML::getNode( collision, "CollisionDetection" );
+	ReaderXML::getNode( collision, "CollisionDetection" );
       if ( collisionAlg )
       {
-
         // Method
         string nCollisionAlg = 
-                          ReaderXML::getNodeAttr_String( collisionAlg, "Type" );
+		ReaderXML::getNodeAttr_String( collisionAlg, "Type" );
         if ( nCollisionAlg == "GJK" )
           GrainsExec::m_colDetGJK_SV = false;
         else if ( nCollisionAlg == "GJK_SV" )
-            GrainsExec::m_colDetGJK_SV = true;
+          GrainsExec::m_colDetGJK_SV = true;
         else
         {
           if ( m_rank == 0 )
@@ -677,9 +678,8 @@ void Grains::Construction( DOMElement* rootElement )
         if ( tol < 1e-15 )
         {
           if ( m_rank == 0 )
-	          cout << GrainsExec::m_shift6 
-                 << "Tolerance should be greater than 1E-15!" 
-                 << endl;
+	    cout << GrainsExec::m_shift6 
+		<< "Tolerance should be greater than 1E-15!" << endl;
           grainsAbort();
         }
         else
@@ -687,7 +687,7 @@ void Grains::Construction( DOMElement* rootElement )
         
         // Acceleration
         string acc = 
-                  ReaderXML::getNodeAttr_String( collisionAlg, "Acceleration" );
+		ReaderXML::getNodeAttr_String( collisionAlg, "Acceleration" );
         if ( acc == "ON" )
           GrainsExec::m_colDetAcceleration = true;
         else if ( acc == "OFF" )
@@ -696,8 +696,7 @@ void Grains::Construction( DOMElement* rootElement )
         {
           if ( m_rank == 0 )
             cout << GrainsExec::m_shift6 
-                 << "Acceleration should be ON or OFF!" 
-                 << endl;
+		<< "Acceleration should be ON or OFF!" << endl;
           grainsAbort();
         }
 
@@ -711,31 +710,29 @@ void Grains::Construction( DOMElement* rootElement )
         {
           if ( m_rank == 0 )
             cout << GrainsExec::m_shift6 
-                 << "History should be ON or OFF!" 
-                 << endl;
+		<< "History should be ON or OFF!" << endl;
           grainsAbort();
         }
 
         // Final output
         if ( m_rank == 0 )
           cout << GrainsExec::m_shift6 
-               << "Collision detection algorithm using " 
-               << ( GrainsExec::m_colDetGJK_SV ? "GJK_SV" : "GJK" )
-               << ", " 
-               << GrainsExec::m_colDetTolerance 
-               << " tolerance, acceleration is " 
-               << ( GrainsExec::m_colDetAcceleration ? "on" : "off" )
-               << ", and history is " 
-               << ( GrainsExec::m_colDetWithHistory ? "on." : "off." ) 
-               << endl;
+		<< "Collision detection algorithm using " 
+		<< ( GrainsExec::m_colDetGJK_SV ? "GJK_SV" : "GJK" )
+		<< ", " << GrainsExec::m_colDetTolerance 
+               	<< " tolerance, acceleration is " 
+               	<< ( GrainsExec::m_colDetAcceleration ? "on" : "off" )
+               	<< ", and history is " 
+               	<< ( GrainsExec::m_colDetWithHistory ? "on." : "off." ) 
+               	<< endl;
       }
       else
       {
         if ( m_rank == 0 )
           cout << GrainsExec::m_shift6 
-               << "Default collision detection algorithm using GJK, " 
-               << "1E-15 tolerance, and without acceleration and history!" 
-               << endl;
+		<< "Default collision detection algorithm using GJK, " 
+		<< "1E-15 tolerance, and without acceleration and history!" 
+               	<< endl;
       }
 
 
@@ -753,16 +750,14 @@ void Grains::Construction( DOMElement* rootElement )
       }
       if ( m_rank == 0 && GrainsExec::m_colDetBoundingVolume == 1 )
         cout << GrainsExec::m_shift6 
-             << "Pre-collision Test with oriented bounding boxes." 
-             << endl;
+		<< "Pre-collision Test with oriented bounding boxes." << endl;
       else if ( m_rank == 0 && GrainsExec::m_colDetBoundingVolume == 2 )
         cout << GrainsExec::m_shift6 
-             << "Pre-collision Test with oriented bounding cylinders." 
-             << endl;
+		<< "Pre-collision Test with oriented bounding cylinders." 
+		<< endl;
       else if ( m_rank == 0 )
         cout << GrainsExec::m_shift6 
-             << "Pre-collision Test with bounding volumes is off." 
-             << endl;
+		<< "Pre-collision Test with bounding volumes is off." << endl;
     }
 
 
@@ -1931,6 +1926,11 @@ void Grains::InsertCreateNewParticles()
       error = setPositionParticlesCyl();
     // From a file
     else error = setPositionParticlesFromFile();
+    
+    // If insertion is from first to last position, we reverse the vector 
+    // and go from last to first for performance reasons
+    if ( m_insertion_order == PM_ORDERED )
+      reverse( m_insertion_position->begin(), m_insertion_position->end());
   }
   if ( error ) grainsAbort();
   
@@ -1976,17 +1976,17 @@ Point3 Grains::getInsertionPoint()
   // List of positions
   if ( !m_insertion_position->empty() )
   {
-    // If order, pick the first position
-    m_il_sp = m_insertion_position->begin();    
+    // If ordered, pick the last position (as the position vector has been
+    // reversed)
+    m_i_sp = m_insertion_position->size() - 1;    
     
-    // If random, pick a random position in the list
+    // If random, pick a random position in the vector
     if ( m_insertion_order == PM_RANDOM )  
     {
       double n = double(random()) / double(INT_MAX);
-      size_t shift = size_t( n * double(m_insertion_position->size()) );
-      std::advance( m_il_sp, shift );      
+      m_i_sp = size_t( n * double(m_insertion_position->size()) );    
     }
-    P = *m_il_sp; 
+    P = (*m_insertion_position)[m_i_sp]; 
   }
   // Insertion windows
   else
@@ -2061,7 +2061,15 @@ bool Grains::insertParticle( PullMode const& mode )
       {
         m_allcomponents.WaitToActive();
 	particle->InitializeForce( true );
-	if ( npositions ) m_insertion_position->erase( m_il_sp );
+	if ( npositions ) 
+	{
+	  if ( m_insertion_order == PM_RANDOM )
+	    (*m_insertion_position)[m_i_sp] = m_insertion_position->back();
+	  m_insertion_position->pop_back();
+	  if ( m_insertion_position->size() < 
+	  	size_t( 0.5 * double(m_insertion_position->capacity()) ) ) 
+	    m_insertion_position->shrink_to_fit();
+	}
 	if ( nangpositions ) m_insertion_angular_position->erase( m_il_sap );	
       }
     }
@@ -2166,6 +2174,9 @@ size_t Grains::setPositionParticlesFromFile()
     }
     else
     {
+      // Allocate the position vector
+      m_insertion_position->reserve( nnewpart + m_insertion_position->size() );
+      
       // Read positions from the file and add them to the list
       filePos.open( m_position.c_str() );
       while ( filePos >> position ) m_insertion_position->push_back( position );
@@ -2254,6 +2265,9 @@ size_t Grains::setPositionParticlesStructuredArray()
   }
   else
   {
+    // Allocate the position vector
+    m_insertion_position->reserve( nnewpart + m_insertion_position->size() );
+    
     // Compute positions and add them to the list
     for (k=0;k<m_InsertionLattice->NX;++k)
       for (l=0;l<m_InsertionLattice->NY;++l)
@@ -2310,7 +2324,8 @@ size_t Grains::setPositionParticlesCyl()
     	( 2. * (double)rand() / RAND_MAX - 1. ) * l / factor;
   Lt[0] = sqrt( pow( cylRadius, 2. ) - pow( posF[0] - 0.5 * deltaf, 2. ) );
   nt[0] = 1;
-  deltat[0] = 2. * Lt[0];   
+  deltat[0] = 2. * Lt[0];
+  maxnpos = na;   
   for (j=1;j<nf;++j)
   {
     posF[j] = - Lfill + deltaf * ( double(j) + 0.5 ) + 
@@ -2318,7 +2333,7 @@ size_t Grains::setPositionParticlesCyl()
     Lt[j] = sqrt( pow( cylRadius, 2. ) - pow( posF[j] - 0.5 * deltaf, 2. ) );
     nt[j] = size_t( 2. * Lt[j] / l );
     deltat[j] = 2. * Lt[j] / double(nt[j]);
-    maxnpos += nf * nt[j];    
+    maxnpos += na * nt[j];    
   }
   maxnpos *= 2;
 
@@ -2335,6 +2350,9 @@ size_t Grains::setPositionParticlesCyl()
   }
   else
   {
+    // Allocate the position vector
+    m_insertion_position->reserve( nnewpart + m_insertion_position->size() );
+
     // Compute positions and add them to the list
     // Bottom half of the cylinder in the filling direction
     size_t counter = 0;
@@ -2375,7 +2393,7 @@ size_t Grains::setPositionParticlesCyl()
 	  ++counter;	  
         }
       }
-    }    
+    }  
   }  
   
   return ( error );
