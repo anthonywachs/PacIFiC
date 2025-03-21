@@ -645,8 +645,9 @@ void Grains::Construction( DOMElement* rootElement )
       if ( m_rank == 0 )
         cout << GrainsExec::m_shift6 <<
               "Default collision detection algorithm using GJK, " <<
-              "1E-15 tolerance, " << 
+              GrainsExec::m_colDetTolerance << " tolerance, " << 
               "without acceleration, " <<
+              "without history, " <<
               "and without any bounding volume collision detection!" << endl;
     }
     else 
@@ -681,11 +682,11 @@ void Grains::Construction( DOMElement* rootElement )
 	{
           double tol = 
 	  	ReaderXML::getNodeAttr_Double( collisionAlg, "Tolerance" );
-          if ( tol < 1e-15 )
+          if ( tol < 1e-10 )
           {
             if ( m_rank == 0 )
 	      cout << GrainsExec::m_shift6 
-		<< "Tolerance should be greater than 1E-15!" << endl;
+		<< "Tolerance should be greater than 1E-10!" << endl;
             grainsAbort();
           }
           else
@@ -748,8 +749,8 @@ void Grains::Construction( DOMElement* rootElement )
         if ( m_rank == 0 )
           cout << GrainsExec::m_shift6 
 		<< "Default collision detection algorithm using GJK, " 
-		<< "1E-15 tolerance, and without acceleration and history!" 
-               	<< endl;
+		<< GrainsExec::m_colDetTolerance << " tolerance, and without acceleration "
+    << "and history!" << endl;
       }
 
 
