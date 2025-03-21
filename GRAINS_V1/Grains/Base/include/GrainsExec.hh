@@ -353,8 +353,8 @@ class GrainsExec
     static int m_return_syscmd; /**< Returned value of system command */
     static bool m_colDetGJK_SV; /**< GJK_SV? */
     static bool m_colDetWithHistory; /**< GJK with history */
-    static double m_colDetTolerance; /** Tol for Collision detection **/
-    static bool m_colDetAcceleration; /** Tol for Collision detection **/
+    static double m_colDetTolerance; /** Relative tol for Collision detection **/
+    static bool m_colDetAcceleration; /** Collision detection with acc **/
     static unsigned int m_colDetBoundingVolume; /** bounding volume type **/
     static Point3 m_defaultInactivePos; /**< Default position of inactive 
     	particles */
