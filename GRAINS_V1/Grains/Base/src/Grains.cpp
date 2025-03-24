@@ -675,7 +675,6 @@ void Grains::Construction( DOMElement* rootElement )
             }
           }
 	}
-	else GrainsExec::m_colDetGJK_SV = false;
 
         // Tolerance
 	if ( ReaderXML::hasNodeAttr( collisionAlg, "Tolerance" ) )
@@ -692,7 +691,6 @@ void Grains::Construction( DOMElement* rootElement )
           else
             GrainsExec::m_colDetTolerance = tol;
 	}
-	else GrainsExec::m_colDetTolerance = EPSILON;
         
         // Acceleration
 	if ( ReaderXML::hasNodeAttr( collisionAlg, "Acceleration" ) )
@@ -711,7 +709,6 @@ void Grains::Construction( DOMElement* rootElement )
             grainsAbort();
           }
 	}
-	else GrainsExec::m_colDetAcceleration = false;
 
         // History
 	if ( ReaderXML::hasNodeAttr( collisionAlg, "History" ) )
@@ -730,7 +727,6 @@ void Grains::Construction( DOMElement* rootElement )
             grainsAbort();
           }
 	}
-	else GrainsExec::m_colDetWithHistory = false;
 
         // Final output
         if ( m_rank == 0 )
@@ -1382,6 +1378,20 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
       }
       if ( m_rank == 0 ) cout << GrainsExec::m_shift9 << "Force insertion = " <<
       	( m_force_insertion  ? "True" : "False" ) << endl;
+
+
+      // Geometric overlap test
+      DOMNode* nGeometricOverlap = ReaderXML::getNode( nInsertion,
+      	"GeometricOverlap" );
+      if ( nGeometricOverlap )
+      {
+        string value = ReaderXML::getNodeAttr_String( nGeometricOverlap,
+		"Value" );
+	if ( value == "BV" ) GrainsExec::m_InsertionWithBVonly = true;
+      }
+      if ( m_rank == 0 ) cout << GrainsExec::m_shift9 << "Geometric overlap "
+      	<< "test = " << ( GrainsExec::m_InsertionWithBVonly  ? 
+	"Bounding Volume only" : "GJK" ) << endl;
 
 
       // Particle positions via an external file OR a structured array OR a

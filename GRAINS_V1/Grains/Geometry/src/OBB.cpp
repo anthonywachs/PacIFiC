@@ -40,7 +40,7 @@ OBB::~OBB()
 
 
 // --------------------------------------------------------------------
-// Returns the OBC radius
+// Returns the bounding volume type
 BVolumeType OBB::getBVolumeType() const
 {
   return ( typeOBB );

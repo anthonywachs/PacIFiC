@@ -744,7 +744,7 @@ void CompositeParticle::InterAction( Component* voisin,
 {
   try 
   {
-    list<ContactInfos*>  listContactInfos;
+    list<ContactInfos*> listContactInfos;
 
     // Search all contact points between the composite particle and the 
     // component and store them in the list listContactInfos

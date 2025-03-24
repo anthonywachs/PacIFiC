@@ -1065,7 +1065,7 @@ void LinkedCell::ComputeForces( double time, double dt,
     for( neighborp=neighborparticles.begin();
     	neighborp!=neighborparticles.end(); neighborp++ )
     {
-      if( (*neighborp)->isCompositeParticle() )
+      if ( (*neighborp)->isCompositeParticle() )
         (*neighborp)->InterAction( reference, dt, time, this );
       else
         reference->InterAction( *neighborp, dt, time, this );

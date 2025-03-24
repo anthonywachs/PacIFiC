@@ -353,8 +353,8 @@ class GrainsExec
     static int m_return_syscmd; /**< Returned value of system command */
     static bool m_colDetGJK_SV; /**< GJK_SV? */
     static bool m_colDetWithHistory; /**< GJK with history */
-    static double m_colDetTolerance; /** Tol for Collision detection **/
-    static bool m_colDetAcceleration; /** Tol for Collision detection **/
+    static double m_colDetTolerance; /** Relative tol for Collision detection **/
+    static bool m_colDetAcceleration; /** Collision detection with acc **/
     static unsigned int m_colDetBoundingVolume; /** bounding volume type **/
     static Point3 m_defaultInactivePos; /**< Default position of inactive 
     	particles */
@@ -365,8 +365,12 @@ class GrainsExec
     static size_t m_time_counter; /**< Discrete time counter */
     static bool m_partialPer_is_active; /**< true is partial periodicity is
     	active */ 
-    static unsigned long long int m_nb_GJK_narrow_collision_detections;
-    static unsigned long long int m_nb_GJK_calls;       
+    static unsigned long long int m_nb_GJK_narrow_collision_detections; /**<
+    	number of narrow collision detections involving GJK */ 
+    static unsigned long long int m_nb_GJK_calls; /**< number of calls to the
+    	GJK algorithm */
+    static bool m_InsertionWithBVonly; /**< if true insert particles with a
+    	bounding volume overlap check only (no call to GJK) */	      
     //@}
 
 

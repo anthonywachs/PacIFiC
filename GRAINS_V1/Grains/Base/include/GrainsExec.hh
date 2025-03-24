@@ -365,8 +365,12 @@ class GrainsExec
     static size_t m_time_counter; /**< Discrete time counter */
     static bool m_partialPer_is_active; /**< true is partial periodicity is
     	active */ 
-    static unsigned long long int m_nb_GJK_narrow_collision_detections;
-    static unsigned long long int m_nb_GJK_calls;       
+    static unsigned long long int m_nb_GJK_narrow_collision_detections; /**<
+    	number of narrow collision detections involving GJK */ 
+    static unsigned long long int m_nb_GJK_calls; /**< number of calls to the
+    	GJK algorithm */
+    static bool m_InsertionWithBVonly; /**< if true insert particles with a
+    	bounding volume overlap check only (no call to GJK) */	      
     //@}
 
 

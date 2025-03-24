@@ -901,46 +901,53 @@ bool RigidBodyWithCrust::isContact( RigidBodyWithCrust& neighbor )
   }
 
   // Bounding Volume Check
-  ++GrainsExec::m_nb_GJK_narrow_collision_detections;
   Vector3 gcagcb = *m_transform.getOrigin() -
     	*neighbor.m_transform.getOrigin();
   bool BVCheck = ( Norm(gcagcb) < m_circumscribedRadius + 
 	neighbor.m_circumscribedRadius );
   if ( GrainsExec::m_colDetBoundingVolume && BVCheck )
     BVCheck = isContactBVolume( *this, neighbor );
-
-  // General case
+  
+  // Check bounding volume overlap only
+  if ( GrainsExec::m_InsertionWithBVonly )
+    contact = BVCheck;
+  // General case with GJK
   // Comment: GJK has consistently shown accuracy issues when 2 particles
-  // overlap a lot. Instead returning a distance of zero to machine precision,
-  // it returns a small number that scales with the size of the particle
-  // Consequently, some particles are mistakenly inserted in the simulation
-  // This requires a fix in the future
-  if ( BVCheck )
-  {
-    // In case one rigid body is a rectangle
-    if ( convexA->getConvexType() == RECTANGLE2D ||
-	convexB->getConvexType() == RECTANGLE2D )
+  // overlap a lot. Instead of returning a distance of zero to machine 
+  // precision, it returns a small number that scales with the size of the 
+  // particle. Consequently, some particles are mistakenly inserted in the 
+  // simulation. This requires a fix in the future  
+  else
+  { 
+    ++GrainsExec::m_nb_GJK_narrow_collision_detections;
+
+    if ( BVCheck )
     {
-      --GrainsExec::m_nb_GJK_narrow_collision_detections;
-      pc = ClosestPointRECTANGLE( *this, neighbor, false );
-      if ( pc.getOverlapDistance() < 0. ) contact = true;	
-    }
-    else
-    {            
-      ++GrainsExec::m_nb_GJK_calls;
+      // In case one rigid body is a rectangle
+      if ( convexA->getConvexType() == RECTANGLE2D ||
+	convexB->getConvexType() == RECTANGLE2D )
+      {
+        --GrainsExec::m_nb_GJK_narrow_collision_detections;
+        pc = ClosestPointRECTANGLE( *this, neighbor, false );
+        if ( pc.getOverlapDistance() < 0. ) contact = true;	
+      }
+      else
+      {            
+        ++GrainsExec::m_nb_GJK_calls;
       
-      Point3 pointA, pointB;
-      int nbIterGJK = 0;
-      Transform const* a2w = this->getTransformWithCrust();
-      Transform const* b2w = neighbor.getTransformWithCrust();  
+        Point3 pointA, pointB;
+        int nbIterGJK = 0;
+        Transform const* a2w = this->getTransformWithCrust();
+        Transform const* b2w = neighbor.getTransformWithCrust();  
    
-      double distanceMin = (*this).m_crustThickness 
+        double distanceMin = (*this).m_crustThickness 
 		+ neighbor.m_crustThickness - EPSILON;
 
-      double distance = closest_points( *m_convex, *(neighbor.m_convex), 
+        double distance = closest_points( *m_convex, *(neighbor.m_convex), 
 		*a2w, *b2w, pointA, pointB, nbIterGJK );
 
-      if ( distance < distanceMin ) contact = true;
+        if ( distance < distanceMin ) contact = true;
+      }
     }
   }
 

@@ -42,7 +42,7 @@ OBC::~OBC()
 
 
 // --------------------------------------------------------------------
-// Returns the OBC radius
+// Returns the bounding volume type
 BVolumeType OBC::getBVolumeType() const
 {
   return ( typeOBC );
