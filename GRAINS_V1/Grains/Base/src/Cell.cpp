@@ -247,7 +247,7 @@ bool Cell::isContact( Particle const* particle_ ) const
 // Returns whether a particle is in contact with another component
 // in the vicinity of the cell. The contact detection is performed with the
 // crust width
-bool Cell::isContactWithCrust( Particle const* particle_ ) const
+bool Cell::isContactWithCrust( Particle const* particle_, bool BVonly ) const
 {
   bool contact = false;
   
@@ -257,18 +257,36 @@ bool Cell::isContactWithCrust( Particle const* particle_ ) const
     if ( *neighbor != particle_ ) 
     {
       if ( particle_->isCompositeParticle() )
-        contact = particle_->isContactWithCrust( *neighbor ); 
+      {
+        contact = particle_->doBVolumeOverlap( *neighbor );
+	if ( contact && !BVonly )
+	  contact = particle_->isContactWithCrust( *neighbor );
+      } 
       else 
-        contact = (*neighbor)->isContactWithCrust( particle_ );
+      {
+        if ( (*neighbor)->isCompositeParticle() )
+	{  
+	  contact = particle_->doBVolumeOverlap( *neighbor );
+	  if ( contact && !BVonly )
+            contact = (*neighbor)->isContactWithCrust( particle_ );
+	}
+	else contact = (*neighbor)->isContactWithCrust( particle_ );
+      }
     }
 
   // Contact detection with obstacles
   list<SimpleObstacle*>::const_iterator obs = m_obstacles.begin();
   for ( ; obs!=m_obstacles.end() && !contact; obs++)
+  {
     if ( particle_->isCompositeParticle() )
-      contact = particle_->isContactWithCrust( *obs );
+    {
+      contact = particle_->doBVolumeOverlap( *obs );
+      if ( contact && !BVonly ) 
+	contact = particle_->isContactWithCrust( *obs );
+    }
     else
-      contact = (*obs)->isContactWithCrust( particle_ ); 
+      contact = (*obs)->isContactWithCrust( particle_ );
+  } 
 
   return ( contact );
 }

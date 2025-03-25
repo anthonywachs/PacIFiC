@@ -158,6 +158,9 @@ CompositeParticle::CompositeParticle( DOMNode* root, int const& pc )
 
   // Compute and set the the circumscribed radius
   setCircumscribedRadius();
+  
+  // Compute and set the non-spherical bounding volume
+  if ( GrainsExec::m_colDetBoundingVolume ) createBoundingVolume();
 
   // In case part of the particle acceleration computed explicity
   if ( Particle::m_splitExplicitAcceleration ) createVelocityInfosNm1();
@@ -1210,4 +1213,106 @@ bool CompositeParticle::equalType( Particle const* other ) const
   }
   
   return ( same );  
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Creates the non-spherical bounding volume */
+void CompositeParticle::createBoundingVolume()
+{
+  BVolume* bvol = NULL;
+  size_t ndim = 3;
+  if ( GrainsBuilderFactory::getContext() == DIM_2 ) ndim = 2;
+  Convex const* convexA = NULL;
+  Transform const* a2w = NULL;
+  RigidBodyWithCrust const* rbA = NULL;
+  Vector3 u;
+  Point3 pointA;
+   
+  if ( GrainsExec::m_colDetBoundingVolume == 1 ) // OBB
+  {
+    Vector3 maxcoord( -1.20 );
+    for ( size_t i=0; i<m_nbElemPart; ++i )
+    {
+      rbA = m_elementaryParticles[i]->getRigidBody();
+      convexA = rbA->getConvex();
+      a2w = rbA->getTransform();
+      for ( size_t m=0; m<ndim; ++m )
+      {
+        u.reset();
+	
+	// Positive coordinate
+	u[m] = 1.;
+	pointA = (*a2w)( convexA->support( ( u ) * a2w->getBasis() ) );
+	maxcoord[m] = max( maxcoord[m], pointA[m] );
+	
+	// Negative coordinate
+	u[m] = - 1.;
+	pointA = (*a2w)( convexA->support( ( u ) * a2w->getBasis() ) );
+	maxcoord[m] = max( maxcoord[m], fabs( pointA[m] ) );		
+      }
+    }
+
+    bvol = new OBB( maxcoord, Matrix() );
+  }
+  else if ( GrainsExec::m_colDetBoundingVolume == 2 ) // OBC
+  {
+    size_t const nn = 720;
+    double const deltatheta = 2. * PI / double(nn);
+    double theta = 0., minVol = 1.e20;
+    Vector3 radius, height( -1.20 );
+    Vector3 initOri[3];
+    size_t coord0, coord1, axisDir = 0;
+    for ( size_t m=0; m<3; ++m ) initOri[m][m] = 1.;
+    
+    for ( size_t i=0; i<m_nbElemPart; ++i )
+    {    
+      rbA = m_elementaryParticles[i]->getRigidBody();
+      convexA = rbA->getConvex();
+      a2w = rbA->getTransform();
+      for ( size_t m=0; m<3; ++m )
+      {      
+        u.reset();
+      
+        // Height
+	// Positive coordinate
+	u[m] = initOri[m][m];
+	pointA = (*a2w)( convexA->support( ( u ) * a2w->getBasis() ) );
+	height[m] = max( height[m], 2. * pointA[m] );
+	
+	// Negative coordinate
+	u[m] = - initOri[m][m];
+	pointA = (*a2w)( convexA->support( ( u ) * a2w->getBasis() ) );
+	height[m] = max( height[m], fabs( 2. * pointA[m] ) );
+	
+	
+	// Radius
+	u[m] = 0.;
+	coord0 = m == 0 ? 1 : 0;
+	coord1 = m == 2 ? 1 : 2;	
+	for ( size_t k=0; k<nn; ++k )
+	{
+	  theta = double(k) * deltatheta;
+	  u[coord0] = cos( theta );
+	  u[coord1] = sin( theta );
+	  pointA = (*a2w)( convexA->support( ( u ) * a2w->getBasis() ) );
+	  radius[m] = max( radius[m], Norm( pointA ) );  
+	}
+      }      
+    }
+    
+    // Select the direction that heads to the smallest volume cylinder
+    for ( size_t m=0; m<3; ++m )  
+      if ( PI * height[m] * pow( radius[m], 2. ) < minVol ) 
+      {  
+        minVol = PI * height[m] * pow( radius[m], 2. );
+	axisDir = m;
+      }
+      
+    bvol = new OBC( radius[axisDir], height[axisDir], initOri[axisDir] );      
+  }
+  
+  m_geoRBWC->setBoundingVolume( bvol ); 
 }

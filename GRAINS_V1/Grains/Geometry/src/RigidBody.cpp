@@ -574,3 +574,14 @@ bool RigidBody::isIn( Point3 const& pt ) const
   invT.setToInverseTransform( m_transform );
   return ( m_convex->isIn( invT( pt ) ) );
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets the pointer to the rigid body's bounding volume
+void RigidBody::setBoundingVolume( BVolume* bvol )
+{
+  if ( m_boundingVolume ) delete m_boundingVolume;
+  m_boundingVolume = bvol;
+}

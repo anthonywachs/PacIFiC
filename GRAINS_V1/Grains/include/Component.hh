@@ -169,8 +169,12 @@ class Component
     virtual bool isIn( Point3 const& pt ) const;
     
     /** @brief Returns whether to store the contact force for post-processing 
-    @param othercomp the other component invovled in the contact */
+    @param othercomp the other component involved in the contact */
     virtual bool storePPForce( Component const* othercomp ) const = 0;
+    
+    /** @brief Returns whether the bounding volumes of two components overlap
+    @param othercomp the other component involved in the overlap test */
+    virtual bool doBVolumeOverlap( Component const* othercomp ) const;    
     //@}
 
 

@@ -4,6 +4,8 @@
 #include "Torsor.hh"
 #include "Error.hh"
 #include "Memento.hh"
+#include "GrainsExec.hh"
+#include "RigidBodyWithCrust.hh"
 #include <algorithm>
 using namespace std;
 
@@ -1030,4 +1032,20 @@ void Component::setContactMap( map< std::tuple<int,int,int>,
 int Component::getTag() const
 {
   return ( 0 );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns whether the bounding volumes of two components overlap
+bool Component::doBVolumeOverlap( Component const* othercomp ) const
+{
+  Vector3 gcagcb = *m_geoRBWC->getCentre() - *othercomp->m_geoRBWC->getCentre();
+  bool BVCheck = ( Norm(gcagcb) < m_geoRBWC->getCircumscribedRadius() + 
+	othercomp->m_geoRBWC->getCircumscribedRadius() );
+  if ( GrainsExec::m_colDetBoundingVolume && BVCheck )
+    BVCheck = isContactBVolume( *m_geoRBWC, *othercomp->m_geoRBWC );
+  
+  return ( BVCheck );  
 }

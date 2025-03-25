@@ -1066,9 +1066,19 @@ void LinkedCell::ComputeForces( double time, double dt,
     	neighborp!=neighborparticles.end(); neighborp++ )
     {
       if ( (*neighborp)->isCompositeParticle() )
-        (*neighborp)->InterAction( reference, dt, time, this );
+      {
+        if ( (*neighborp)->doBVolumeOverlap( reference ) )
+          (*neighborp)->InterAction( reference, dt, time, this );
+      }
       else
-        reference->InterAction( *neighborp, dt, time, this );
+      {
+        if ( reference->isCompositeParticle() )
+	{  
+          if ( (*neighborp)->doBVolumeOverlap( reference ) )
+	    reference->InterAction( *neighborp, dt, time, this );
+	}
+	else reference->InterAction( *neighborp, dt, time, this );
+      }
     }
 
     neighborparticles.clear();
@@ -1081,7 +1091,10 @@ void LinkedCell::ComputeForces( double time, double dt,
          myObs!=cell_->m_obstacles.end(); myObs++ )
     {
       if ( reference->isCompositeParticle() )
-        reference->InterAction( *myObs, dt, time, this );
+      {
+        if ( reference->doBVolumeOverlap( *myObs ) )
+          reference->InterAction( *myObs, dt, time, this );
+      }
       else
         (*myObs)->InterAction( reference, dt, time, this );
     }
@@ -1194,7 +1207,8 @@ bool LinkedCell::isContact( Particle const* particle ) const
 // ----------------------------------------------------------------------------
 // Returns whether a particle is in contact with another component
 // using the method Component::isContactWithCrust
-bool LinkedCell::isContactWithCrust( Particle const* particle ) const
+bool LinkedCell::isContactWithCrust( Particle const* particle,
+	bool BVonly ) const
 {
   bool contact = false;
 
@@ -1207,7 +1221,7 @@ bool LinkedCell::isContactWithCrust( Particle const* particle ) const
   if ( cell_ )
   {
     // In the local cell
-    contact = cell_->isContactWithCrust( particle );
+    contact = cell_->isContactWithCrust( particle, BVonly );
 
     // In the neighboring cells
     for (int k=-1;k<2 && !contact;++k)
@@ -1217,7 +1231,7 @@ bool LinkedCell::isContactWithCrust( Particle const* particle ) const
 	  {
 	    neighborc = getCell( id[X]+k, id[Y]+l, id[Z]+m );
             if ( neighborc ) contact = neighborc->isContactWithCrust(
-	    	particle );
+	    	particle, BVonly );
 	  }
   }
 
@@ -1780,7 +1794,8 @@ bool LinkedCell::insertParticleSerial( Particle* particle,
   // obstacles
 
   // Check with master particle
-  if ( !force_insertion ) contact = isContactWithCrust( particle );
+  if ( !force_insertion ) contact = isContactWithCrust( particle, 
+  	GrainsExec::m_InsertionWithBVonly );
 
   // In case of a periodic domain, we need the geoloc of the cell the particle
   // belongs to
@@ -1806,7 +1821,8 @@ bool LinkedCell::insertParticleSerial( Particle* particle,
 	m_periodic_vector_indices[geoloc][i]] );
 
       // Check contact of the periodic clone
-      contact = isContactWithCrust( particle );
+      contact = isContactWithCrust( particle, 
+      	GrainsExec::m_InsertionWithBVonly );
 
       // If no contact, translate back to original position
       if ( !contact )
@@ -1888,7 +1904,8 @@ pair<bool,bool> LinkedCell::insertParticleParallel( double time,
   // Check contacts
   if ( !force_insertion )
   {
-    if ( insert.first ) insert.second = isContactWithCrust( particle );  
+    if ( insert.first ) insert.second = isContactWithCrust( particle, 
+    	GrainsExec::m_InsertionWithBVonly );  
     insert.second = wrapper->max_INT( insert.second );     
   }
   
@@ -1930,7 +1947,8 @@ pair<bool,bool> LinkedCell::insertParticleParallel( double time,
 
         // Check contact of the periodic clone
         if ( isInLinkedCell( *(particle->getPosition()) ) )
-          contact = isContactWithCrust( particle );
+          contact = isContactWithCrust( particle, 
+	  	GrainsExec::m_InsertionWithBVonly );
 
         // If no contact, translate back to original position
         if ( !contact )

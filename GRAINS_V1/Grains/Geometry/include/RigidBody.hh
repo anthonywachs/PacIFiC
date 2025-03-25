@@ -144,10 +144,14 @@ class RigidBody
     /** @brief Sets the rigid body's transformation with a transformation
     @param transform_ transformation */
     void setTransform( Transform const& transform_ );
+    
+    /** @brief Sets the pointer to the rigid body's bounding volume
+    @param bvol pointer to the rigid body's bounding volume */
+    void setBoundingVolume( BVolume* bvol );    
     //@}
 
 
-    /**@name Get methods */
+    /**@name Accessors */
     //@{
     /** @brief Returns a pointer to the rigid body' center of mass position */
     Point3 const* getCentre() const;

@@ -390,6 +390,9 @@ class CompositeParticle : public Particle
     @param CompParticleRef reference composite particle */
     void createSetElementaryParticles(
     	CompositeParticle const* CompParticleRef );
+	
+    /** @brief Creates the non-spherical bounding volume */
+    void createBoundingVolume();	
     //@}
 
 

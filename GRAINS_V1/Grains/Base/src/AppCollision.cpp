@@ -61,7 +61,8 @@ bool AppCollision::isContact( Particle const* particle ) const
 // ----------------------------------------------------------------------------
 // Returns whether a particle is in contact with another component
 // using the method Component::isContactWithCrust
-bool AppCollision::isContactWithCrust( Particle const* particle ) const
+bool AppCollision::isContactWithCrust( Particle const* particle,
+    	bool BVonly ) const
 {
   return ( false );
 }

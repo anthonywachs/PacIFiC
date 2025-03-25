@@ -162,8 +162,10 @@ class Cell
     /** @brief Returns whether a particle is in contact with another component
     in the vicinity of the cell. The contact detection is performed with the
     crust width
-    @param particle_ particle */
-    bool isContactWithCrust( Particle const* particle_ ) const;   
+    @param particle_ particle 
+    @param BVonly test contact with bounding volume only if true */
+    bool isContactWithCrust( Particle const* particle_,
+    	bool BVonly = false ) const;   
   
     /** @brief Returns whether a particle is close to another component
     in the vicinity of the cell 

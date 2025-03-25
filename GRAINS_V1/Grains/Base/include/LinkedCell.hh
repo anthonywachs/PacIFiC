@@ -51,8 +51,10 @@ class LinkedCell : public AppCollision
 
     /** @brief Returns whether a particle is in contact with another component
     using the method Component::isContactWithCrust
-    @param particle particle */
-    bool isContactWithCrust( Particle const* particle ) const;
+    @param particle particle 
+    @param BVonly test contact with bounding volume only if true */
+    bool isContactWithCrust( Particle const* particle,
+    	bool BVonly = false ) const;
 
     /** @brief Returns whether a particle is close to another component
     using the method Component::isClose
