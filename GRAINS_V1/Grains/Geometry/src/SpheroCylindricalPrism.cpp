@@ -580,3 +580,199 @@ void SpheroCylindricalPrism::SetvisuNodeNbOverHalfPer( int nbpts )
 { 
   m_visuNodeNbPerHalf = nbpts; 
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Writes the spherocylindrical prism in an OBJ format
+void SpheroCylindricalPrism::write_convex_OBJ( ostream& f, 
+	Transform  const& transform, size_t& firstpoint_number ) const
+{
+  Point3 p, pp;
+  double dtheta = PI / m_visuNodeNbPerHalf, tstartleft = 1.5 * PI,
+  	tstartright = - 0.5 * PI; 
+  int rightstart = int(firstpoint_number) +  2 * ( m_visuNodeNbPerHalf + 1 ) 
+  	+ 2;	 
+
+  // Vertices  
+  // Left half cylinder
+  // Lower disk rim
+  p[Y] = - 0.5 * m_height;
+  for (int i=0;i<m_visuNodeNbPerHalf+1;++i)
+  {
+    p[X] = m_radius * cos ( tstartleft - i * dtheta ) - 0.5 * m_length;
+    p[Z] = m_radius * sin ( tstartleft - i * dtheta );
+    pp = transform( p );
+    f << "v " << GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+		pp[X] ) << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+		pp[Y] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+		pp[Z] ) << " " << endl;	
+  }
+
+  // Upper disk rim
+  p[Y] = 0.5 * m_height;
+  for (int i=0;i<m_visuNodeNbPerHalf+1;++i)
+  {
+    p[X] = m_radius * cos ( tstartleft - i * dtheta ) - 0.5 * m_length;
+    p[Z] = m_radius * sin ( tstartleft - i * dtheta );
+    pp = transform( p );
+    f << "v " << GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+		pp[X] ) << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+		pp[Y] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+		pp[Z] ) << " " << endl;	
+  }
+
+  // Lower disk center
+  p[X] = - 0.5 * m_length;
+  p[Y] = - 0.5 * m_height;
+  p[Z] = 0.;
+  pp = transform( p );
+  f << "v " << GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[X] ) << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Y] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Z] ) << " " << endl; 
+
+  // Upper disk center
+  p[Y] = 0.5 * m_height;
+  pp = transform( p );
+  f << "v " << GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[X] ) << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Y] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Z] ) << " " << endl; 
+  
+  
+  // Right half cylinder
+  // Lower disk rim
+  p[Y] = - 0.5 * m_height;
+  for (int i=0;i<m_visuNodeNbPerHalf+1;++i)
+  {
+    p[X] = m_radius * cos ( tstartright + i * dtheta ) + 0.5 * m_length;
+    p[Z] = m_radius * sin ( tstartright + i * dtheta );
+    pp = transform( p );
+    f << "v " << GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+		pp[X] ) << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+		pp[Y] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+		pp[Z] ) << " " << endl;	
+  }
+
+  // Upper disk rim
+  p[Y] = 0.5 * m_height;
+  for (int i=0;i<m_visuNodeNbPerHalf+1;++i)
+  {
+    p[X] = m_radius * cos ( tstartright + i * dtheta ) + 0.5 * m_length;
+    p[Z] = m_radius * sin ( tstartright + i * dtheta );
+    pp = transform( p );
+    f << "v " << GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+		pp[X] ) << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+		pp[Y] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+		pp[Z] ) << " " << endl;	
+  }
+
+  // Lower disk center
+  p[X] = 0.5 * m_length;
+  p[Y] = - 0.5 * m_height;
+  p[Z] = 0.;
+  pp = transform( p );
+  f << "v " << GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[X] ) << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Y] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Z] ) << " " << endl; 
+
+  // Upper disk center
+  p[Y] = 0.5 * m_height;
+  pp = transform( p );
+  f << "v " << GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[X] ) << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Y] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Z] ) << " " << endl; 
+    
+  // Box: no additional point needed
+  
+  // Faces
+  // Left half cylinder
+  for (int i=0;i<m_visuNodeNbPerHalf;++i)
+  {
+    f << "f " << firstpoint_number + i << " "
+    	<< firstpoint_number + i + 1 << " "
+    	<< firstpoint_number + i + m_visuNodeNbPerHalf + 2 << " "
+    	<< firstpoint_number + i + m_visuNodeNbPerHalf + 1 << endl;
+  }
+  
+  // Left half lower disk
+  for (int i=0;i<m_visuNodeNbPerHalf;++i)
+  {
+    f << "f " << firstpoint_number + i << " "
+    	<< firstpoint_number + i + 1 << " "
+    	<< firstpoint_number + 2 * ( m_visuNodeNbPerHalf + 1 ) << endl;
+  }
+  
+  // Left half upper disk
+  for (int i=0;i<m_visuNodeNbPerHalf;++i)
+  {
+    f << "f " << firstpoint_number + i + m_visuNodeNbPerHalf + 1 << " "
+    	<< firstpoint_number + i + m_visuNodeNbPerHalf + 2 << " "
+    	<< firstpoint_number + 2 * ( m_visuNodeNbPerHalf + 1 ) + 1 << endl;
+  } 
+  
+  // Right half cylinder
+  for (int i=0;i<m_visuNodeNbPerHalf;++i)
+  {
+    f << "f " << rightstart + i << " "
+    	<< rightstart + i + 1 << " "
+    	<< rightstart + i + m_visuNodeNbPerHalf + 2 << " "
+    	<< rightstart + i + m_visuNodeNbPerHalf + 1 << endl;
+  }
+  
+  // Right half lower disk
+  for (int i=0;i<m_visuNodeNbPerHalf;++i)
+  {
+    f << "f " << rightstart + i << " "
+    	<< rightstart + i + 1 << " "
+    	<< rightstart + 2 * ( m_visuNodeNbPerHalf + 1 ) << endl;
+  } 
+  
+  // Right half upper disk
+  for (int i=0;i<m_visuNodeNbPerHalf;++i)
+  {
+    f << "f " << rightstart + i + m_visuNodeNbPerHalf + 1 << " "
+    	<< rightstart + i + m_visuNodeNbPerHalf + 2 << " "
+    	<< rightstart + 2 * ( m_visuNodeNbPerHalf + 1 ) + 1 << endl;
+  }
+  
+  // Box
+  f << "f " << firstpoint_number << " "
+  	<< firstpoint_number + m_visuNodeNbPerHalf << " "
+	<< firstpoint_number + 3 * m_visuNodeNbPerHalf + 4 << " "
+  	<< firstpoint_number + 2 * m_visuNodeNbPerHalf + 4 << endl;
+  f << "f " << firstpoint_number + 2 * m_visuNodeNbPerHalf + 1 << " "
+  	<< firstpoint_number + m_visuNodeNbPerHalf + 1 << " "
+	<< firstpoint_number + 3 * m_visuNodeNbPerHalf + 5 << " "
+  	<< firstpoint_number + 4 * m_visuNodeNbPerHalf + 5 << endl;
+  f << "f " << firstpoint_number << " "
+  	<< firstpoint_number + m_visuNodeNbPerHalf + 1 << " "
+	<< firstpoint_number + 3 * m_visuNodeNbPerHalf + 5 << " "
+  	<< firstpoint_number + 2 * m_visuNodeNbPerHalf + 4 << endl;
+  f << "f " << firstpoint_number + 2 * m_visuNodeNbPerHalf + 1 << " "
+  	<< firstpoint_number + m_visuNodeNbPerHalf << " "
+	<< firstpoint_number + 3 * m_visuNodeNbPerHalf + 4 << " "
+  	<< firstpoint_number + 4 * m_visuNodeNbPerHalf + 5 << endl;	
+		
+  firstpoint_number += 4 * ( m_visuNodeNbPerHalf + 2 );
+}

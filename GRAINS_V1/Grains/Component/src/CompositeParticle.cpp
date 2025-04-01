@@ -969,6 +969,9 @@ void CompositeParticle::readAdditionalFeatures( istream& fileIn )
 
   // Compute and set the the circumscribed radius
   setCircumscribedRadius();
+    
+  // Compute and set the non-spherical bounding volume
+  if ( GrainsExec::m_colDetBoundingVolume ) createBoundingVolume();  
 
   // Set elementary particle kinematics
   // Note: again not sure we do anything with the elementary particle kinematics
@@ -1315,4 +1318,19 @@ void CompositeParticle::createBoundingVolume()
   }
   
   m_geoRBWC->setBoundingVolume( bvol ); 
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Writes the particle in an OBJ format
+void CompositeParticle::write_OBJ( ostream& f, size_t const& group_number,
+    	size_t& firstpoint_number ) const
+{
+  for ( size_t i=0; i<m_nbElemPart; ++i )
+  {
+    m_elementaryParticles[i]->write_OBJ( f, i, firstpoint_number );
+    f << endl;
+  } 
 }

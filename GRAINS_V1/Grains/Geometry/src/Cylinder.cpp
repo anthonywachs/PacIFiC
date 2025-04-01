@@ -1,9 +1,11 @@
 #include "Cylinder.hh"
 #include "PointContact.hh"
 #include "Matrix.hh"
+#include "GrainsExec.hh"
 
 int Cylinder::m_visuNodeNbOnPer = 32;
-static double tol = EPSILON; // Tolerance used in this class
+static double tol = EPSILON; // Tolerance used in this class  	  
+
 
 // ----------------------------------------------------------------------------
 // Constructor with radius and height as input parameters
@@ -419,13 +421,116 @@ void Cylinder::SetvisuNodeNbOverPer( int nbpts )
 
 
 // ----------------------------------------------------------------------------
+// Writes the cylinder in an OBJ format
+void Cylinder::write_convex_OBJ( ostream& f, Transform  const& transform,
+    	size_t& firstpoint_number ) const
+{
+  Point3 pp, p;
+  double dtheta = 2.* PI / m_visuNodeNbOnPer;
+
+  // Vertices  
+  // Lower disk rim
+  p[Y] = - m_halfHeight;
+  for (int i=0;i<m_visuNodeNbOnPer;++i)
+  {
+    p[X] = m_radius * cos ( i * dtheta );
+    p[Z] = m_radius * sin ( i * dtheta );
+    pp = transform( p );
+    f << "v " << GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+		pp[X] ) << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+		pp[Y] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+		pp[Z] ) << " " << endl;	
+  }
+
+  // Upper disk rim
+  p[Y] = m_halfHeight;
+  for (int i=0;i<m_visuNodeNbOnPer;++i)
+  {
+    p[X] = m_radius * cos ( i * dtheta );
+    p[Z] = m_radius * sin ( i * dtheta );
+    pp = transform( p );
+    f << "v " << GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+		pp[X] ) << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+		pp[Y] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+		pp[Z] ) << " " << endl;
+  }
+
+  // Lower disk center
+  p[X] = 0.;
+  p[Y] = - m_halfHeight;
+  p[Z] = 0.;
+  pp = transform( p );
+  f << "v " << GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[X] ) << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Y] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Z] ) << " " << endl;
+
+  // Upper disk center
+  p[Y] = m_halfHeight;
+  pp = transform( p );
+  f << "v " << GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[X] ) << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Y] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Z] ) << " " << endl;
+			
+  // Faces 
+  // Rectangular lateral faces
+  for (int i=0;i<m_visuNodeNbOnPer-1;++i)
+  {
+    f << "f " << firstpoint_number + i << " "
+    	<< firstpoint_number + i + 1 << " "
+    	<< firstpoint_number + i + m_visuNodeNbOnPer + 1 << " "
+    	<< firstpoint_number + i + m_visuNodeNbOnPer << endl;
+  }
+  f << "f " << firstpoint_number + m_visuNodeNbOnPer - 1 << " "
+  	<< firstpoint_number << " "
+	<< firstpoint_number + m_visuNodeNbOnPer << " "
+  	<< firstpoint_number + 2 * m_visuNodeNbOnPer - 1 << endl;
+	
+  // Triangular lower faces
+  for (int i=0;i<m_visuNodeNbOnPer-1;++i)
+  {
+    f << "f " << firstpoint_number + i << " "
+    	<< firstpoint_number + i + 1 << " "
+    	<< firstpoint_number + 2 * m_visuNodeNbOnPer << endl;
+  }
+  f << "f " << firstpoint_number + m_visuNodeNbOnPer - 1 << " "
+  	<< firstpoint_number << " "
+	<< firstpoint_number + 2 * m_visuNodeNbOnPer << endl;
+	
+  // Triangular upper faces
+  for (int i=0;i<m_visuNodeNbOnPer-1;++i)
+  {
+    f << "f " << firstpoint_number + i + m_visuNodeNbOnPer << " "
+    	<< firstpoint_number + i + 1 + m_visuNodeNbOnPer << " "
+    	<< firstpoint_number + 2 * m_visuNodeNbOnPer + 1 << endl;
+  }
+  f << "f " << firstpoint_number + 2* m_visuNodeNbOnPer - 1 << " "
+  	<< firstpoint_number + m_visuNodeNbOnPer << " "
+	<< firstpoint_number + 2 * m_visuNodeNbOnPer + 1 << endl;	  	
+
+  firstpoint_number += 2 * m_visuNodeNbOnPer + 2;   			  
+}
+
+
+
+
+// ----------------------------------------------------------------------------
 // LOW-LEVEL ROUTINES FOR CYLINDERS CONTACTS
 // ----------------------------------------------------------------------------
 // Sign function
 template < typename T >
 inline int sgn( T const val )
 {
-    return ( ( T(0) < val ) - ( val < T(0) ) );
+  return ( ( T(0) < val ) - ( val < T(0) ) );
 }
 
 

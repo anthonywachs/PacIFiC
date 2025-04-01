@@ -297,8 +297,6 @@ class GrainsExec
     //@{
     static bool m_MPI; /**< whether the computation is serial or MPI */
     static string m_TIScheme; /**< Time integration scheme type */
-    static bool m_SphereAsPolyParaview; /**< in Paraview, true if spheres are
-    	faceted as polyhedrons, false if post-processed as a vectorial field */
     static int m_MPI_verbose; /**< MPI verbosity level, 3 levels: 0=none,
     	1=particles, 2=particles and MPI Cartesian grid */
     static bool m_isReloaded; /**< whether the simulation starts from a reload 

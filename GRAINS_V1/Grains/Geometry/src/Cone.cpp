@@ -1,4 +1,5 @@
 #include "Cone.hh"
+#include "GrainsExec.hh"
 
 int Cone::m_visuNodeNbOnPer = 32;
 
@@ -392,4 +393,81 @@ bool Cone::equalType_level2( Convex const* other ) const
 void Cone::SetvisuNodeNbOverPer( int nbpts )
 {
   m_visuNodeNbOnPer = nbpts;
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Writes the cone in an OBJ format
+void Cone::write_convex_OBJ( ostream& f, Transform  const& transform,
+    	size_t& firstpoint_number ) const
+{
+  Point3 pp, p;
+  double dtheta = 2.* PI / m_visuNodeNbOnPer;
+
+  // Vertices  
+  // Disk rim
+  p[Y] = - m_quarterHeight;
+  for (int i=0;i<m_visuNodeNbOnPer;++i)
+  {
+    p[X] = m_bottomRadius * cos ( i * dtheta );
+    p[Z] = m_bottomRadius * sin ( i * dtheta );
+    pp = transform( p );
+    f << "v " << GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+		pp[X] ) << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+		pp[Y] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+		pp[Z] ) << " " << endl;	
+  }
+
+  // Disk center
+  p[X] = 0.;
+  p[Y] = - m_quarterHeight;
+  p[Z] = 0.;
+  pp = transform( p );
+  f << "v " << GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[X] ) << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Y] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Z] ) << " " << endl;
+
+  // Upper tip
+  p[X] = 0.;
+  p[Y] = 3. * m_quarterHeight;
+  p[Z] = 0.;
+  pp = transform( p );
+  f << "v " << GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[X] ) << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Y] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Z] ) << " " << endl;
+  
+  // Faces 
+  // Triangular lateral faces 
+  for (int i=0;i<m_visuNodeNbOnPer-1;++i)
+  {
+    f << "f "<< firstpoint_number + i << " "
+    	<< firstpoint_number + i + 1 << " "
+    	<< firstpoint_number + m_visuNodeNbOnPer + 1 << endl;
+  }
+  f << "f " << firstpoint_number + m_visuNodeNbOnPer - 1 << " "
+  	<< firstpoint_number << " "
+  	<< firstpoint_number + m_visuNodeNbOnPer + 1 << endl;
+
+  // Triangular bottom faces 
+  for (int i=0;i<m_visuNodeNbOnPer-1;++i)
+  {
+    f << "f "<< firstpoint_number + i << " "
+    	<< firstpoint_number + i + 1 << " "
+    	<< firstpoint_number + m_visuNodeNbOnPer << endl;
+  }
+  f << "f " << firstpoint_number + m_visuNodeNbOnPer - 1 << " "
+  	<< firstpoint_number << " "
+  	<< firstpoint_number + m_visuNodeNbOnPer << endl;
+
+  firstpoint_number += m_visuNodeNbOnPer + 2;    			  
 }

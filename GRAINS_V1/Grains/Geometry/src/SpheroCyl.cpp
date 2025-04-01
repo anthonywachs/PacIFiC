@@ -610,3 +610,164 @@ void SpheroCyl::SetvisuNodeNbPerQar( int nbpts )
 {
   m_visuNodeNbPerQar = nbpts;
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Writes the spherocylinder in an OBJ format
+void SpheroCyl::write_convex_OBJ( ostream& f, Transform  const& transform,
+    	size_t& firstpoint_number ) const
+{
+  double angle = PI / ( 2. * m_visuNodeNbPerQar ) ;
+  double angleY = 0., local_radius = 0.;
+  int k, i, ptsPerlevel = 4 * m_visuNodeNbPerQar,
+  	Top_number = int(firstpoint_number) + ptsPerlevel * m_visuNodeNbPerQar;
+  Point3 p, pp;
+  
+  // Top sphere 
+  // Regular points on the surface
+  for ( k = m_visuNodeNbPerQar - 1; k < 2*m_visuNodeNbPerQar-1 ; ++k ) 
+  {  
+    angleY = - PI / 2. + ( k + 1 ) * angle;
+    local_radius = m_radius * cos( angleY );
+    p[Y] = m_radius * sin( angleY ) + 0.5 * m_height;
+    for ( i = 0; i < ptsPerlevel ; ++i )
+    {
+      p[X] = local_radius * cos( i * angle );
+      p[Z] = local_radius * sin( i * angle );
+      pp = transform( p );
+      f << "v " << GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[X] ) << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Y] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Z] ) << " " << endl;	
+    }
+  }
+   
+  p[X] = 0.;
+  p[Z] = 0.;	
+  // Top point
+  p[Y] = m_radius + 0.5 * m_height;
+  pp = transform( p );
+  f << "v " << GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[X] ) << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Y] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Z] ) << " " << endl;  
+  
+  // Bottom sphere	 	  
+  // Regular points on the surface
+  for ( k = m_visuNodeNbPerQar - 1; k >=0 ; --k ) 
+  {  
+    angleY = - PI / 2. + ( k + 1 ) * angle;
+    local_radius = m_radius * cos( angleY );
+    p[Y] = m_radius * sin( angleY ) - 0.5 * m_height;
+    for ( i = 0; i < ptsPerlevel ; ++i )
+    {
+      p[X] = local_radius * cos( i * angle );
+      p[Z] = local_radius * sin( i * angle );
+      pp = transform( p );
+      f << "v " << GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[X] ) << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Y] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Z] ) << " " << endl;	
+    }
+  }
+   
+  p[X] = 0.;
+  p[Z] = 0.;
+  // Bottom point
+  p[Y] = - m_radius - 0.5 * m_height;
+  pp = transform( p );
+  f << "v " << GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[X] ) << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Y] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Z] ) << " " << endl;    
+  
+  // Cylinder: no additional point needed 
+  
+  // Faces  
+  // Top sphere
+  // Square faces
+  for ( k = 0; k < m_visuNodeNbPerQar-1 ; ++k ) 
+  {  
+    for ( i = 0; i < ptsPerlevel-1 ; ++i )
+    {
+      f << "f " << firstpoint_number + k * ptsPerlevel + i << " "
+      	<< firstpoint_number + k * ptsPerlevel + i + 1 << " " 
+      	<< firstpoint_number + ( k + 1) * ptsPerlevel + i + 1 << " " 
+      	<< firstpoint_number + ( k + 1 ) * ptsPerlevel + i << endl;		
+    }
+    f << "f " << firstpoint_number + k * ptsPerlevel + ptsPerlevel - 1 << " "
+    	<< firstpoint_number + k * ptsPerlevel << " "
+    	<< firstpoint_number + ( k + 1 ) * ptsPerlevel << " "
+    	<< firstpoint_number + ( k + 1 ) * ptsPerlevel 
+		+ ptsPerlevel - 1 << endl; 
+  }   
+  
+  // Triangular faces  
+  for ( i = 0; i < ptsPerlevel-1 ; ++i )
+  {
+    f << "f " << firstpoint_number
+    		+ ( m_visuNodeNbPerQar - 1 ) * ptsPerlevel + i << " " 
+    	<< firstpoint_number
+    		+ ( m_visuNodeNbPerQar - 1 ) * ptsPerlevel + i + 1 << " " 
+    	<< Top_number << endl;
+  }
+  f << "f " << firstpoint_number +  m_visuNodeNbPerQar * ptsPerlevel - 1 
+  	<< " " << firstpoint_number 
+		+ ( m_visuNodeNbPerQar - 1 ) * ptsPerlevel << " " 
+  	<< Top_number  << endl; 
+	
+  // Bottom sphere
+  int shift = int(firstpoint_number) + ptsPerlevel * m_visuNodeNbPerQar + 1 ;  
+  int Bottom_number = shift + ptsPerlevel * m_visuNodeNbPerQar; 
+  // Square faces
+  for ( k = 0; k < m_visuNodeNbPerQar-1 ; ++k ) 
+  {  
+    for ( i = 0; i < ptsPerlevel-1 ; ++i )
+    {
+      f << "f " << shift + k * ptsPerlevel + i << " " 
+      	<< shift + k * ptsPerlevel + i + 1 << " " 
+      	<< shift + ( k + 1) * ptsPerlevel + i + 1 << " " 	
+      	<< shift + ( k + 1 ) * ptsPerlevel + i << endl;
+    }
+    f << "f " << shift + k * ptsPerlevel + ptsPerlevel - 1 << " "
+    	<< shift + k * ptsPerlevel << " "
+    	<< shift + ( k + 1 ) * ptsPerlevel << " "
+    	<< shift + ( k + 1 ) * ptsPerlevel + ptsPerlevel - 1 << endl;    
+  }
+
+  // Triangular faces 
+  for ( i = 0; i < ptsPerlevel-1 ; ++i )
+  {
+    f << "f " << shift + ( m_visuNodeNbPerQar - 1 ) * ptsPerlevel + i << " "
+    	<< shift + ( m_visuNodeNbPerQar - 1 ) * ptsPerlevel + i + 1 << " "
+    	<< Bottom_number << endl; 
+  }
+  f << "f " << shift +  m_visuNodeNbPerQar * ptsPerlevel - 1 << " "
+  	<< shift + ( m_visuNodeNbPerQar - 1 ) * ptsPerlevel << " "
+  	<< Bottom_number << endl;	
+	
+  // Cylinder	
+  for ( i = 0; i < ptsPerlevel-1 ; ++i )
+  {
+    f << "f " << firstpoint_number + i << " "
+    	<< firstpoint_number + i + 1 << " "
+    	<< shift + i + 1 << " "
+    	<< shift + i << endl;
+  }
+  f << "f " << firstpoint_number + ptsPerlevel - 1 << " "
+  	<< firstpoint_number << " "
+  	<< shift << " "
+  	<< shift + ptsPerlevel - 1 << endl;
+	
+  firstpoint_number += size_t(2 * ( ptsPerlevel * m_visuNodeNbPerQar + 1 )) ;
+}

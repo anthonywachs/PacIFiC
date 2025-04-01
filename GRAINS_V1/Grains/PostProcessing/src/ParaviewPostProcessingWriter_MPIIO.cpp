@@ -191,7 +191,7 @@ void ParaviewPostProcessingWriter::
     *oss_out << *ii + shift[m_rank] << " ";
   if ( m_rank == m_nprocs - 1 ) *oss_out << "\n";  
   out_length = int(oss_out->str().size());
-  delete out_length_per_proc;  
+  delete [] out_length_per_proc;  
   out_length_per_proc = wrapper->AllGather_INT( out_length );
   
   mpifile_offsets[0] = mpifile_offset + header * sizeof(char);
@@ -356,7 +356,6 @@ void ParaviewPostProcessingWriter::
   	out_length, MPI_CHAR, &status );   
 
   delete oss_out;
-  delete out_length_per_proc;
    
    
   // Closing text
@@ -621,7 +620,7 @@ void ParaviewPostProcessingWriter::
 // center of mass coordinates of each particle in a single MPI file in text 
 // mode with MPI I/O routines
 void ParaviewPostProcessingWriter::
-	writeSpheres_Paraview_MPIIO_text(
+	writeParticlesAsGlyph_Paraview_MPIIO_text(
   	list<Particle*> const* particles, string const& partFilename,
 	bool const& forceForAllTag,
 	bool const& processwrites )
@@ -640,7 +639,8 @@ void ParaviewPostProcessingWriter::
   Vector3 const* PPTranslation = 
   	GrainsExec::m_translationParaviewPostProcessing ;
   Point3 gc; 
-  Vector3 vec; 
+  Vector3 vec;
+  Quaternion qrot;   
   double nu, nom;       
   
   // Create a MPI datatype to write doublea as stringa with a given format
@@ -668,7 +668,7 @@ void ParaviewPostProcessingWriter::
     	<< "byte_order=\"LittleEndian\">\n";
   oss << "<UnstructuredGrid>\n";
   oss << "<Piece NumberOfPoints=\"" << total_nbpts << "\""
-    	<< " NumberOfCells=\"0\">\n";
+    	<< " NumberOfCells=\"" << ( total_nbpts ? "1" : "0" ) << "\">\n";
   oss << "<Points>\n";
   oss << "<DataArray type=\"Float32\" NumberOfComponents=\"3\" ";
   oss << "format=\"ascii\">";
@@ -700,7 +700,7 @@ void ParaviewPostProcessingWriter::
 
   MPI_File_write_at_all( file, mpifile_offsets[m_rank], coord, 3 * nbpts, 
     	num_as_string, &status ); 
-  
+ 
 
   // Connectivity, offsets and types and header for orientation
   ostringstream oss2;
@@ -708,16 +708,16 @@ void ParaviewPostProcessingWriter::
   oss2 << "</Points>\n";
   oss2 << "<Cells>\n";
   oss2 << "<DataArray type=\"Int32\" Name=\"connectivity\" format=\"ascii\">";
-  oss2 << "0 0 0</DataArray>\n";
+  oss2 << "0</DataArray>\n";
   oss2 << "<DataArray type=\"Int32\" Name=\"offsets\" format=\"ascii\">";
-  oss2 << "3</DataArray>\n";
+  oss2 << "1</DataArray>\n";
   oss2 << "<DataArray type=\"Int32\" Name=\"types\" format=\"ascii\">";
-  oss2 << "5</DataArray>\n";
+  oss2 << "1</DataArray>\n";
   oss2 << "</Cells>\n"; 
-  oss2 << "<PointData Vectors=\"Orientation\" ";
+  oss2 << "<PointData ";
   oss2 << "Scalars=\"NormU,NormOm,CoordNumb\">\n";
-  oss2 << "<DataArray Name=\"Orientation\" "
-    << "NumberOfComponents=\"3\" type=\"Float32\" format=\"ascii\">\n";         
+  oss2 << "<DataArray Name=\"Quaternion\" "
+    << "NumberOfComponents=\"4\" type=\"Float32\" format=\"ascii\">\n";         
   header = int(oss2.str().size());
   int mpifile_offset = mpifile_offsets[m_nprocs-1] 
   	+ nbpts_per_proc[m_nprocs-1] * 3 * charspernum * sizeof(char);
@@ -725,30 +725,33 @@ void ParaviewPostProcessingWriter::
     MPI_File_write_at( file, mpifile_offset, oss2.str().c_str(), header, 
     	MPI_CHAR, &status );
     
-  
-  // Orientation vector
+ 
+  // Quaternion
+  delete [] coord;
+  coord = new char[ 4 * nbpts * charspernum + 1 ];  
   counter = 0;
   for (particle=particles->begin();particle!=particles->end();particle++)
     if ( (*particle)->getActivity() == COMPUTE && 
 	( (*particle)->getTag() != 2 || forceForAllTag ) )
     {
-      vec = (*particle)->computeOrientationVector();
-      sprintf( &coord[3*counter*charspernum], fmt, vec[X] );
-      sprintf( &coord[(3*counter+1)*charspernum], fmt, vec[Y] );
-      sprintf( &coord[(3*counter+2)*charspernum], endfmt, vec[Z] );
+      qrot = *(*particle)->getQuaternionRotation();
+      sprintf( &coord[4*counter*charspernum], fmt, qrot[W] );      
+      sprintf( &coord[(4*counter+1)*charspernum], fmt, qrot[X] );
+      sprintf( &coord[(4*counter+2)*charspernum], fmt, qrot[Y] );
+      sprintf( &coord[(4*counter+3)*charspernum], endfmt, qrot[Z] );
       ++counter;
     }    
 
   mpifile_offsets[0] = mpifile_offset + header * sizeof(char);
   for (i=1;i<m_nprocs;i++)
     mpifile_offsets[i] = mpifile_offsets[i-1] 
-    	+ nbpts_per_proc[i-1] * 3 * charspernum * sizeof(char);
+    	+ nbpts_per_proc[i-1] * 4 * charspernum * sizeof(char);
 
-  MPI_File_write_at_all( file, mpifile_offsets[m_rank], coord, 3 * nbpts, 
+  MPI_File_write_at_all( file, mpifile_offsets[m_rank], coord, 4 * nbpts, 
     	num_as_string, &status );
 	
   delete [] coord;
-	
+
 
   // Norm of translational velocity
   ostringstream oss5;
@@ -756,7 +759,7 @@ void ParaviewPostProcessingWriter::
   oss5 << "<DataArray type=\"Float32\" Name=\"NormU\" format=\"ascii\">\n";    
   header = int(oss5.str().size());
   mpifile_offset = mpifile_offsets[m_nprocs-1] 
-  	+ nbpts_per_proc[m_nprocs-1] * 3 * charspernum * sizeof(char);
+  	+ nbpts_per_proc[m_nprocs-1] * 4 * charspernum * sizeof(char);
   if ( m_rank == 0 )
     MPI_File_write_at( file, mpifile_offset, oss5.str().c_str(), header, 
     	MPI_CHAR, &status ); 
@@ -877,7 +880,7 @@ void ParaviewPostProcessingWriter::
 // center of mass coordinates of each particle in a single MPI file in binary 
 // mode with MPI I/O routines
 void ParaviewPostProcessingWriter::
-	writeSpheres_Paraview_MPIIO_binary(
+	writeParticlesAsGlyph_Paraview_MPIIO_binary(
   	list<Particle*> const* particles, string const& partFilename,
 	bool const& forceForAllTag,
 	bool const& processwrites )
@@ -895,7 +898,8 @@ void ParaviewPostProcessingWriter::
   	normU_binary_offset, normOm_binary_offset, coord_binary_offset, 
 	total_offset; 
   Point3 gc;
-  Vector3 vec;    	    
+  Vector3 vec;
+  Quaternion qrot;      	    
 
   // Open the file 
   MPI_File_open( MPI_COMM_activeProc, ( m_ParaviewFilename_dir 
@@ -920,21 +924,22 @@ void ParaviewPostProcessingWriter::
       for (int comp=0;comp<3;++comp) write_double_binary( gc[comp] ) ;
     }   
   compress_segment_binary( CURRENT_LENGTH,	
-  	"writeSpheres_Paraview_MPIIO_binary/Points" );  
+  	"writeParticlesAsGlyph_Paraview_MPIIO_binary/Points" );  
 
 
-  // Orientation vector
+  // Write quaternion to the the binary buffer
   orientation_binary_offset = OFFSET;
-  start_output_binary( sizeof_Float32, 3 * nbpts );  
+  start_output_binary( sizeof_Float32, 4 * nbpts );  
   for (particle=particles->begin();particle!=particles->end();particle++)
     if ( (*particle)->getActivity() == COMPUTE && 
 	( (*particle)->getTag() != 2 || forceForAllTag ) )
     {
-      vec = (*particle)->computeOrientationVector();
-      for (int comp=0;comp<3;++comp) write_double_binary( vec[comp] ) ;
+      qrot = *(*particle)->getQuaternionRotation();
+      write_double_binary( qrot[W] ) ;
+      for (int comp=0;comp<3;++comp) write_double_binary( qrot[comp] ) ;
     }    
   compress_segment_binary( CURRENT_LENGTH, 
-  	"writeSpheres_Paraview_MPIIO_binary/Orientation" ); 
+  	"writeParticlesAsGlyph_Paraview_MPIIO_binary/Orientation" ); 
 
 
   // Write field values to the binary buffer
@@ -948,7 +953,7 @@ void ParaviewPostProcessingWriter::
       write_double_binary( normU );
     }
   compress_segment_binary( CURRENT_LENGTH, 
-  	"writeSpheres_Paraview_MPIIO_binary/NormU" ); 
+  	"writeParticlesAsGlyph_Paraview_MPIIO_binary/NormU" ); 
   
   normOm_binary_offset = OFFSET;
   start_output_binary( sizeof_Float32, nbpts );
@@ -960,7 +965,7 @@ void ParaviewPostProcessingWriter::
       write_double_binary( normOm );
     }
   compress_segment_binary( CURRENT_LENGTH, 
-  	"writeSpheres_Paraview_MPIIO_binary/NormOm" ); 
+  	"writeParticlesAsGlyph_Paraview_MPIIO_binary/NormOm" ); 
 
   coord_binary_offset = OFFSET;
   start_output_binary( sizeof_Float32, nbpts );
@@ -972,7 +977,7 @@ void ParaviewPostProcessingWriter::
       write_double_binary( coordNum );
     }
   compress_segment_binary( CURRENT_LENGTH, 
-  	"writeSpheres_Paraview_MPIIO_binary/CoordNumb" ); 
+  	"writeParticlesAsGlyph_Paraview_MPIIO_binary/CoordNumb" ); 
   total_offset = OFFSET;  
   
   int* total_binary_offset_per_proc = wrapper->AllGather_INT( total_offset );
@@ -993,7 +998,7 @@ void ParaviewPostProcessingWriter::
     oss << "<UnstructuredGrid>\n";  
   }
   oss << "<Piece NumberOfPoints=\"" << nbpts << "\""
-    	<< " NumberOfCells=\"0\">\n";
+    	<< " NumberOfCells=\"" << ( nbpts ? "1" : "0" ) << "\">\n";
   oss << "<Points>\n";
   oss << "<DataArray type=\"Float32\" NumberOfComponents=\"3\" ";
   oss << "offset=\"" << cumul_binary_offset_per_proc[m_rank] 
@@ -1001,15 +1006,15 @@ void ParaviewPostProcessingWriter::
   oss << "</Points>\n";
   oss << "<Cells>\n";
   oss << "<DataArray type=\"Int32\" Name=\"connectivity\" format=\"ascii\">";
-  oss << "0 0 0</DataArray>\n";
+  oss << "0</DataArray>\n";
   oss << "<DataArray type=\"Int32\" Name=\"offsets\" format=\"ascii\">";
-  oss << "3</DataArray>\n";
+  oss << "1</DataArray>\n";
   oss << "<DataArray type=\"Int32\" Name=\"types\" format=\"ascii\">";
-  oss << "5</DataArray>\n";
+  oss << "1</DataArray>\n";
   oss << "</Cells>\n"; 
-  oss << "<PointData Vectors=\"Orientation\" ";
+  oss << "<PointData ";
   oss << "Scalars=\"NormU,NormOm,CoordNumb\">\n";
-  oss << "<DataArray Name=\"Orientation\" NumberOfComponents=\"3\" " <<
+  oss << "<DataArray Name=\"Quaternion\" NumberOfComponents=\"4\" " <<
   	"type=\"Float32\" offset=\"" << cumul_binary_offset_per_proc[m_rank] 
 	+ orientation_binary_offset << "\" format=\"appended\"></DataArray>\n";
   oss << "<DataArray type=\"Float32\" Name=\"NormU\" offset=\"" << 

@@ -1,6 +1,7 @@
 #define __STDCPP_WANT_MATH_SPEC_FUNCS__ 1
 #include <bits/stdc++.h>
 #include "Superquadric.hh"
+#include "GrainsExec.hh"
 #include "sstream"
 using namespace std;
 
@@ -653,4 +654,138 @@ bool Superquadric::equalType_level2( Convex const* other ) const
 void Superquadric::SetvisuNodeNbPerQar( int nbpts )
 {
   m_visuNodeNbPerQar = nbpts;
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Writes the sphere in an OBJ format
+void Superquadric::write_convex_OBJ( ostream& f, Transform  const& transform,
+    	size_t& firstpoint_number ) const
+{
+  double eps1 = 2. / m_n1;
+  double eps2 = 2. / m_n2;
+  double dtheta = PI / ( 2. * m_visuNodeNbPerQar ), dphi = dtheta;
+  Point3 p, pp;
+  int i, k, ptsPerlevel = 4 * m_visuNodeNbPerQar,
+	Bottom_number = ptsPerlevel * ( 2 * m_visuNodeNbPerQar - 1 ),
+	Top_number = ptsPerlevel * ( 2 * m_visuNodeNbPerQar - 1 ) + 1;
+  double cost, sint, costeps1, sinteps1, cosp, sinp;
+
+  // Vertices
+  for (i = 1; i < 2*m_visuNodeNbPerQar; i++)
+  {
+    cost = cos( i * dtheta );
+    sint = sin( i * dtheta );
+
+    if ( cost == 0. )
+      costeps1 = 0.;
+    else if ( cost < 0. )
+      costeps1 = -pow( -cost, eps1 );
+    else
+      costeps1 = pow( cost, eps1 );
+
+    // Theta is always strictly between 0 and pi so sint is strictly positive
+    sinteps1 = pow( sint, eps1 );
+
+    for ( int j = 0; j < 4*m_visuNodeNbPerQar; j++ )
+    {
+      cosp = cos( j * dphi );
+      sinp = sin( j * dphi );
+
+      if ( cosp == 0. )
+        p[X] = 0.;
+      else if ( cosp < 0. )
+        p[X] = -m_a * sinteps1 * pow( -cosp, eps2 );
+      else
+        p[X] = m_a * sinteps1 * pow( cosp, eps2 );
+
+      if ( sinp == 0. )
+        p[Y] = 0.;
+      else if ( sinp < 0. )
+        p[Y] = -m_b * sinteps1 * pow( -sinp, eps2 );
+      else
+        p[Y] = m_b * sinteps1 * pow( sinp, eps2 );
+
+      p[Z] = m_c * costeps1;
+
+      pp = transform( p );
+      f << "v " << GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[X] ) << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Y] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Z] ) << " " << endl;	
+    }
+  }
+  
+  p[X] = 0.;
+  p[Y] = 0.;
+  // Bottom point
+  p[Z] = - m_c;
+  pp = transform( p );
+  f << "v " << GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[X] ) << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Y] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Z] ) << " " << endl;
+	
+  // Top point
+  p[Z] = m_c;
+  pp = transform( p );
+  f << "v " << GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[X] ) << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Y] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Z] ) << " " << endl;
+
+  // Faces  
+  // Square faces
+  for ( k = 0; k < 2*m_visuNodeNbPerQar-2 ; ++k ) 
+  {  
+    for ( i = 0; i < ptsPerlevel-1 ; ++i )
+    {
+      f << "f " << firstpoint_number + k * ptsPerlevel + i << " " 
+      	<< firstpoint_number + k * ptsPerlevel + i + 1 << " "
+      	<< firstpoint_number + ( k + 1) * ptsPerlevel + i + 1 << " "	
+      	<< firstpoint_number + ( k + 1 ) * ptsPerlevel + i << endl;		
+    }
+    f << "f " << firstpoint_number + k * ptsPerlevel + ptsPerlevel - 1 
+    	<< " " << firstpoint_number + k * ptsPerlevel << " " 
+	<< firstpoint_number + ( k + 1 ) * ptsPerlevel << " "
+	<< firstpoint_number + ( k + 1 ) * ptsPerlevel + ptsPerlevel - 1 
+	<< endl;   
+  }  
+
+  // Top triangular faces
+  for ( i = 0; i < ptsPerlevel-1 ; ++i )
+  {
+    f << "f " << firstpoint_number + i << " " 
+    	<< firstpoint_number + i + 1 << " "
+    	<< firstpoint_number + Top_number << endl;
+  }
+  f << "f " << firstpoint_number + ptsPerlevel - 1 << " "
+  	<< firstpoint_number << " "
+	<< firstpoint_number + Top_number << endl;
+  
+  // Bottom triangular faces
+  for ( i = 0; i < ptsPerlevel-1 ; ++i )
+  {
+    f << "f " << firstpoint_number
+    		+ ( 2 * m_visuNodeNbPerQar - 2 ) * ptsPerlevel + i << " " 
+    	<<  firstpoint_number
+    		+ ( 2 * m_visuNodeNbPerQar - 2 ) * ptsPerlevel + i + 1 << " " 
+    	<< firstpoint_number + Bottom_number << endl;
+  }
+  f << "f " << firstpoint_number
+  		+ ( 2 * m_visuNodeNbPerQar - 1 ) * ptsPerlevel - 1 << " " 
+  	<< firstpoint_number
+  		+ ( 2 * m_visuNodeNbPerQar - 2 ) * ptsPerlevel  << " "
+	<< firstpoint_number + Bottom_number << endl;
+
+  firstpoint_number += 4 * m_visuNodeNbPerQar * 
+  	( 2 * m_visuNodeNbPerQar - 1 ) + 2 ;  
 }

@@ -1,6 +1,7 @@
 #include "GrainsExec.hh"
 #include "Polyhedron.hh"
 #include "AllComponents.hh"
+#include "GrainsExec.hh"
 #include <fstream>
 #include <new> 
 #include <sstream>
@@ -774,8 +775,8 @@ bool Polyhedron::isIn( Point3 const& pt ) const
 // Returns the bounding volume to polyhedron
 BVolume* Polyhedron::computeBVolume( unsigned int type ) const
 {
-  // It is typically not straightforward to find the bounding volume to a general
-  // polyhedron. The method we use here is not by any means the optimal 
+  // It is typically not straightforward to find the bounding volume to a 
+  // general polyhedron. The method we use here is not by any means the optimal 
   // (most fitted) bounding volume to the given polyhedron.
   // Here, we simply loop over all vertices to find those with maximum abs value
   // in each direction. Persumably, for regular polyhedron it is going to be
@@ -851,3 +852,39 @@ bool Polyhedron::equalType_level2( Convex const* other ) const
   
   return ( same );
 } 
+
+
+
+
+// ----------------------------------------------------------------------------
+// Writes the polyhedron in an OBJ format
+void Polyhedron::write_convex_OBJ( ostream& f, Transform  const& transform,
+    	size_t& firstpoint_number ) const
+{
+  Point3 pp;
+  int ncorners = numVerts();
+  
+  // Vertices
+  for (int i=0; i<ncorners; i++) 
+  {
+    pp = transform( (*this)[i] );
+    f << "v " << GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+		pp[X] ) << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+		pp[Y] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+		pp[Z] ) << " " << endl;	  
+  }  
+  
+  // Faces 
+  size_t nbface = m_allFaces->size();
+  for (size_t i=0; i<nbface; i++) 
+  {
+    f << "f";
+    for (size_t j=0;j<(*m_allFaces)[i].size();++j) 
+      f << " " << firstpoint_number + (*m_allFaces)[i][j];
+    f << endl;
+  }
+  
+  firstpoint_number += size_t(ncorners);  			  
+}

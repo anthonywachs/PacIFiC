@@ -230,6 +230,15 @@ class RigidBody
     @param translation additional center of mass translation */
     list<Point3> get_polygonsPts_PARAVIEW( Vector3 const* translation = NULL )
     	const;
+	
+    /** @brief Writes the rigid body's convex shape in an OBJ format
+    @param f output stream 
+    @param firstpoint_number number of the 1st point */
+    void write_OBJ( ostream& f, size_t& firstpoint_number ) const;
+    
+    /** @brief Returns an orientation vector describing the rigid body angular
+    position */
+    Vector3 computeOrientationVector() const;    	
     //@}
 
 

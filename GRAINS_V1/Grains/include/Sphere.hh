@@ -108,6 +108,13 @@ class Sphere : public Convex
     @param transform geometric transformation */
     void write_convex_STL( ostream& f, Transform const& transform ) const;
 
+    /** @brief Writes the sphere in an OBJ format
+    @param f output stream
+    @param transform geometric transformation 
+    @param firstpoint_number number of the 1st point */
+    void write_convex_OBJ( ostream& f, Transform const& transform,
+    	size_t& firstpoint_number ) const;	
+
     /** @brief Writes the sphere in a Paraview format
     @param connectivity connectivity of Paraview polytopes
     @param offsets connectivity offsets
@@ -123,14 +130,6 @@ class Sphere : public Convex
     reconstruction in Paraview
     @param nbpts number of point per quarter of the equator line */
     static void SetvisuNodeNbPerQar( int nbpts );
-
-    /** @brief Returns whether the convex shape is a sphere */
-    bool isSphere() const;
-
-    /** @brief Returns an orientation vector describing the convex shape angular
-    position
-    @param transform geometric transformation */
-    Vector3 computeOrientationVector( Transform const* transform ) const;
 
     /** @ brief Returns whether a point lies inside the sphere
     @param pt point */

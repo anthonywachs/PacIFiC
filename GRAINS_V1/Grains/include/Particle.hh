@@ -662,7 +662,15 @@ class Particle : public Component
 	
     /** @brief Returns the number of bytes of the particle when written in a 
     binary format to an output stream */
-    size_t get_numberOfBytes() const ;	
+    size_t get_numberOfBytes() const ;
+    
+    /** @brief Writes the particle in an OBJ format
+    @param f output stream 
+    @param group_number elementary particle number in case of composite 
+    particle 
+    @param firstpoint_number number of the 1st point */
+    virtual void write_OBJ( ostream& f, size_t const& group_number,
+    	size_t& firstpoint_number ) const;
     //@}
 
 

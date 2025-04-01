@@ -113,6 +113,13 @@ class Cone : public Convex {
     /** @brief Returns whether a point lies inside the cone
     @param pt point */
     bool isIn( Point3 const& pt ) const; 
+    
+    /** @brief Writes the cone in an OBJ format
+    @param f output stream
+    @param transform geometric transformation 
+    @param firstpoint_number number of the 1st point */
+    void write_convex_OBJ( ostream& f, Transform const& transform,
+    	size_t& firstpoint_number ) const;     
 
     /** @ Returns the bounding volume to cone */
     BVolume* computeBVolume( unsigned int type ) const;

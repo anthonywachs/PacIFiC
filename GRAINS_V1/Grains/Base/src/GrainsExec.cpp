@@ -6,7 +6,6 @@
 
 bool GrainsExec::m_MPI = false;
 string GrainsExec::m_TIScheme = "SecondOrderLeapFrog";
-bool GrainsExec::m_SphereAsPolyParaview = false;
 int GrainsExec::m_MPI_verbose = 0;
 bool GrainsExec::m_isReloaded = false;
 string GrainsExec::m_ReloadType = "new" ;

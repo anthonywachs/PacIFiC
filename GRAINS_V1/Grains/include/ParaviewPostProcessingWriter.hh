@@ -158,6 +158,8 @@ class ParaviewPostProcessingWriter : public PostProcessingWriter
     bool m_mpiio_singlefile; /**< whether to use MPI I/O writing routines to
     	output data in a single file */
     bool m_pertype; /**< whether to write particle files per type */
+    bool m_useGlyphWheneverPossible; /**< whether to write particles as Glyph
+    	whenever a particle shape allows it */
     char * BUFFER ;
     int ALLOCATED ;
     int OFFSET ;
@@ -185,6 +187,11 @@ class ParaviewPostProcessingWriter : public PostProcessingWriter
 	LinkedCell const* LC,
 	AllInsertionWindows const& insert_windows ); 
 
+    /** @brief Writes reference particle data
+    @param referenceParticles reference particles */
+    void writeReferenceParticles_Paraview(
+  	vector<Particle*> const* referenceParticles );
+
     /** @brief Writes obstacles data
     @param allObstacles list of simple obstcales 
     @param obsFilename output file name */
@@ -198,7 +205,7 @@ class ParaviewPostProcessingWriter : public PostProcessingWriter
     @param partFilename output file name
     @param forceForAllTag writes particle data regardless of the particle tag 
     @param processwrites whether this process writes data */
-    void writeSpheres_Paraview(
+    void writeParticlesAsGlyph_Paraview(
   	list<Particle*> const* particles, string const& partFilename,
 	bool const& forceForAllTag = false,
 	bool const& processwrites = true );	
@@ -325,7 +332,7 @@ class ParaviewPostProcessingWriter : public PostProcessingWriter
     @param partFilename output file name
     @param forceForAllTag writes particle data regardless of the particle tag 
     @param processwrites whether this process writes data */
-    void writeSpheres_Paraview_MPIIO_text(
+    void writeParticlesAsGlyph_Paraview_MPIIO_text(
   	list<Particle*> const* particles, string const& partFilename,
 	bool const& forceForAllTag = false,
 	bool const& processwrites = true ); 
@@ -337,7 +344,7 @@ class ParaviewPostProcessingWriter : public PostProcessingWriter
     @param partFilename output file name
     @param forceForAllTag writes particle data regardless of the particle tag 
     @param processwrites whether this process writes data */
-    void writeSpheres_Paraview_MPIIO_binary(
+    void writeParticlesAsGlyph_Paraview_MPIIO_binary(
   	list<Particle*> const* particles, string const& partFilename,
 	bool const& forceForAllTag = false,
 	bool const& processwrites = true );

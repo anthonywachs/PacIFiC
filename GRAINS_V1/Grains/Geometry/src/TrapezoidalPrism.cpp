@@ -479,3 +479,54 @@ bool TrapezoidalPrism::equalType_level2( Convex const* other ) const
   
   return ( same );
 } 
+
+
+
+
+// ----------------------------------------------------------------------------
+// Writes the trapezoidal prism in an OBJ format
+void TrapezoidalPrism::write_convex_OBJ( ostream& f, 
+	Transform  const& transform, size_t& firstpoint_number ) const
+{
+  Point3 pp;
+
+  // Vertices  
+  for (int i=0;i<8;++i)
+  {
+    pp = transform( m_corners[i] );
+    f << "v " << GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+		pp[X] ) << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+		pp[Y] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+		pp[Z] ) << " " << endl;	
+  }
+  
+  // Faces
+  f << "f " << firstpoint_number + 4 << " "
+  	<< firstpoint_number + 5 << " "
+	<< firstpoint_number + 6 << " "
+  	<< firstpoint_number + 7 << endl;
+  f << "f " << firstpoint_number + 5 << " "
+  	<< firstpoint_number + 1 << " "
+	<< firstpoint_number + 2 << " "
+  	<< firstpoint_number + 6 << endl;	
+  f << "f " << firstpoint_number + 1 << " "
+  	<< firstpoint_number << " "
+	<< firstpoint_number + 3 << " "
+  	<< firstpoint_number + 2 << endl;	
+  f << "f " << firstpoint_number << " "
+  	<< firstpoint_number + 4 << " "
+	<< firstpoint_number + 7 << " "
+  	<< firstpoint_number + 3 << endl;
+  f << "f " << firstpoint_number + 4 << " "
+  	<< firstpoint_number << " "
+	<< firstpoint_number + 1 << " "
+  	<< firstpoint_number + 5 << endl;	
+  f << "f " << firstpoint_number + 3 << " "
+  	<< firstpoint_number + 7 << " "
+	<< firstpoint_number + 6 << " "
+  	<< firstpoint_number + 2 << endl;
+	
+  firstpoint_number += 8;
+}

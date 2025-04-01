@@ -214,16 +214,15 @@ void ParaviewPostProcessingWriter::writeParticles_Paraview(
 
 
 // ----------------------------------------------------------------------------
-// Writes spherical particles data in a vector form containing the
-// center of mass coordinates of each particle
-void ParaviewPostProcessingWriter:: writeSpheres_Paraview(
+// Writes particles data in Paraview Glyph format
+void ParaviewPostProcessingWriter:: writeParticlesAsGlyph_Paraview(
     list<Particle*> const* particles,
     string const& partFilename,
     bool const& forceForAllTag, bool const& processwrites )
 {
   list<Particle*>::const_iterator particle;
   Point3 gc; 
-  Vector3 vectrans;
+  Quaternion qrot;
   Vector3 const* PPTranslation = 
   	GrainsExec::m_translationParaviewPostProcessing ;
 
@@ -235,13 +234,13 @@ void ParaviewPostProcessingWriter:: writeSpheres_Paraview(
   if ( m_binary ) f << "compressor=\"vtkZLibDataCompressor\"";
   f << ">" << endl;
   f << "<UnstructuredGrid>" << endl;
-  int nbpts=0,nbcells=0;
+  int nbpts = 0;
   for (particle=particles->begin();particle!=particles->end();particle++)
     if ( (*particle)->getActivity() == COMPUTE && 
        ( (*particle)->getTag() != 2 || forceForAllTag ) )
       nbpts++;
   f << "<Piece NumberOfPoints=\"" << nbpts << "\""
-    << " NumberOfCells=\"" << nbcells << "\">" << endl;
+    << " NumberOfCells=\"" << ( nbpts ? "1" : "0" ) << "\">" << endl;
   f << "<Points>" << endl;
   f << "<DataArray type=\"Float32\" NumberOfComponents=\"3\" ";
   if ( m_binary ) f << "offset=\"" << OFFSET << "\" format=\"appended\">";
@@ -259,7 +258,7 @@ void ParaviewPostProcessingWriter:: writeSpheres_Paraview(
         for (int comp=0;comp<3;++comp)
           write_double_binary( gc[comp] ) ;
       }
-    flush_binary( f, "writeSpheres_Paraview/Points" );
+    flush_binary( f, "writeParticlesAsGlyph_Paraview/Points" );
   }
   else
   {
@@ -285,12 +284,12 @@ void ParaviewPostProcessingWriter:: writeSpheres_Paraview(
   {
     if ( m_binary )
     {
-      start_output_binary( sizeof_Int32, 3 ) ;
-      for (int ii=0;ii<3;ii++) write_int_binary( 0 );
-      flush_binary( f, "writeSpheres_Paraview/connectivity" );
+      start_output_binary( sizeof_Int32, 1 ) ;
+      write_int_binary( 0 );
+      flush_binary( f, "writeParticlesAsGlyph_Paraview/connectivity" );
     }
     else  
-      f << "0 0 0";
+      f << "0";
   }
   f << "</DataArray>" << endl;
   f << "<DataArray type=\"Int32\" Name=\"offsets\" ";
@@ -301,11 +300,11 @@ void ParaviewPostProcessingWriter:: writeSpheres_Paraview(
     if ( m_binary )
     {
       start_output_binary( sizeof_Int32, 1 ) ;
-      write_int_binary( 3 );
-      flush_binary( f, "writeSpheres_Paraview/offsets" );
+      write_int_binary( 1 );
+      flush_binary( f, "writeParticlesAsGlyph_Paraview/offsets" );
     }
     else  
-      f << "3";	
+      f << "1";	
   }
   f << "</DataArray>" << endl;
   f << "<DataArray type=\"Int32\" Name=\"types\" ";
@@ -316,33 +315,34 @@ void ParaviewPostProcessingWriter:: writeSpheres_Paraview(
     if ( m_binary )
     {
       start_output_binary( sizeof_Int32, 1 ) ;
-      write_int_binary( 5 );
-      flush_binary( f, "writeSpheres_Paraview/types" );
+      write_int_binary( 1 );
+      flush_binary( f, "writeParticlesAsGlyph_Paraview/types" );
     }
     else  
-      f << "5";
+      f << "1";
   }
   f << "</DataArray>" << endl;
   f << "</Cells>" << endl;
-  f << "<PointData Vectors=\"Orientation\" ";
+  f << "<PointData ";
   f << "Scalars=\"NormU,NormOm,CoordNumb\">" << endl;
-  f << "<DataArray Name=\"Orientation\" "
-    << "NumberOfComponents=\"3\" type=\"Float32\" ";
+  f << "<DataArray Name=\"Quaternion\" "
+    << "NumberOfComponents=\"4\" type=\"Float32\" ";
   if ( m_binary ) f << "offset=\"" << OFFSET << "\" format=\"appended\">";
   else f << "format=\"ascii\">" << endl;
   if ( m_binary )
   {
-    start_output_binary( sizeof_Float32, 3*nbpts ) ;
+    start_output_binary( sizeof_Float32, 4*nbpts ) ;
     for (particle=particles->begin();particle!=particles->end();
       	particle++)
       if ( (*particle)->getActivity() == COMPUTE && 
          ( (*particle)->getTag() != 2 || forceForAllTag ) )
       {
-        vectrans = (*particle)->computeOrientationVector();
+        qrot = *(*particle)->getQuaternionRotation();
+	write_double_binary( qrot[W] ) ;
         for (int comp=0;comp<3;++comp)
-          write_double_binary( vectrans[comp] ) ;
+          write_double_binary( qrot[comp] ) ;
       }
-    flush_binary( f, "writeSpheres_Paraview/Orientation" );      
+    flush_binary( f, "writeParticlesAsGlyph_Paraview/Quaternion" );      
   }
   else
   {
@@ -351,13 +351,14 @@ void ParaviewPostProcessingWriter:: writeSpheres_Paraview(
       if ( (*particle)->getActivity() == COMPUTE && 
          ( (*particle)->getTag() != 2 || forceForAllTag ) )
       {
-        vectrans = (*particle)->computeOrientationVector();
+        qrot = *(*particle)->getQuaternionRotation();
+	f << qrot[3] << " ";
         for (int comp=0;comp<3;++comp)
-          f << vectrans[comp] << " " ;
+          f << qrot[comp] << " " ;
         f << endl;	
       }
   }  
-  f << "</DataArray>" << endl;
+  f << "</DataArray>" << endl;  
 
   f << "<DataArray Name=\"NormU\" type=\"Float32\" ";
   if ( m_binary ) f << "offset=\"" << OFFSET << "\" format=\"appended\">";
@@ -370,7 +371,7 @@ void ParaviewPostProcessingWriter:: writeSpheres_Paraview(
       if ( (*particle)->getActivity() == COMPUTE && 
          ( (*particle)->getTag() != 2 || forceForAllTag ) )
         write_double_binary( Norm( *(*particle)->getTranslationalVelocity() ) );
-    flush_binary( f, "writeSpheres_Paraview/NormU" );      
+    flush_binary( f, "writeParticlesAsGlyph_Paraview/NormU" );      
   }
   else
   {
@@ -394,7 +395,7 @@ void ParaviewPostProcessingWriter:: writeSpheres_Paraview(
       if ( (*particle)->getActivity() == COMPUTE && 
          ( (*particle)->getTag() != 2 || forceForAllTag ) )
         write_double_binary( Norm( *(*particle)->getAngularVelocity() ) );
-    flush_binary( f, "writeSpheres_Paraview/NormOm" );
+    flush_binary( f, "writeParticlesAsGlyph_Paraview/NormOm" );
   }
   else
   {
@@ -418,7 +419,7 @@ void ParaviewPostProcessingWriter:: writeSpheres_Paraview(
       if ( (*particle)->getActivity() == COMPUTE && 
          ( (*particle)->getTag() != 2 || forceForAllTag ) )
         write_double_binary( double((*particle)->getCoordinationNumber()) );
-    flush_binary( f, "writeSpheres_Paraview/CoordNumb" );
+    flush_binary( f, "writeParticlesAsGlyph_Paraview/CoordNumb" );
   }
   else
   {

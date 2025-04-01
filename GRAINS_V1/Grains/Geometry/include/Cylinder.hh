@@ -120,10 +120,16 @@ class Cylinder : public Convex
     /** @brief Returns whether a point lies inside the cylinder
     @param pt point */
     bool isIn( Point3 const& pt ) const;
+    
+    /** @brief Writes the cylinder in an OBJ format
+    @param f output stream
+    @param transform geometric transformation 
+    @param firstpoint_number number of the 1st point */
+    void write_convex_OBJ( ostream& f, Transform const& transform,
+    	size_t& firstpoint_number ) const;      
 
     /** @brief Returns the bounding volume to cylinder */
     BVolume* computeBVolume( unsigned int type ) const;
-
 
     /** @brief Performs advanced comparison of the two cylinders and returns
     whether they match
@@ -136,6 +142,7 @@ class Cylinder : public Convex
     @param nbpts number of point over the cylinder perimeter */
     static void SetvisuNodeNbOverPer( int nbpts );       
     //@}
+
 
     /** @name Friend methods */
     //@{
@@ -155,7 +162,7 @@ class Cylinder : public Convex
     double m_radius; /**< cylinder radius */
     double m_halfHeight; /**< cylinder half height */
     static int m_visuNodeNbOnPer; /**< number of points over the circular edges
-    	for Paraview post-processing */
+    	for Paraview post-processing */	
     //@}
 
 

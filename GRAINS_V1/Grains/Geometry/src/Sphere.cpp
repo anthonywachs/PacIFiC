@@ -2,11 +2,12 @@
 #include "BVolume.hh"
 #include "OBB.hh"
 #include "OBC.hh"
+#include "GrainsExec.hh"
 #include "sstream"
 #include <math.h>
 
 
-int Sphere::m_visuNodeNbPerQar = 8;
+int Sphere::m_visuNodeNbPerQar = 4;
 
 // ----------------------------------------------------------------------------
 // Constructor with radius as input parameter
@@ -50,16 +51,6 @@ Sphere::~Sphere()
 ConvexType Sphere::getConvexType() const 
 {
   return ( SPHERE );
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// Returns whether the convex shape is a sphere
-bool Sphere::isSphere() const 
-{
-  return ( true );
 }
 
 
@@ -510,20 +501,6 @@ void Sphere::write_polygonsStr_PARAVIEW( list<int>& connectivity,
 
 
 // ----------------------------------------------------------------------------
-// Returns an orientation vector describing the convex shape angular
-// position
-Vector3 Sphere::computeOrientationVector( Transform const* transform ) const
-{
-  Point3 pp( 0., m_radius, 0. );
-  Point3 pptrans = (*transform)( pp ); 
-
-  return ( pptrans - *transform->getOrigin() );
-} 
-
-
-
-
-// ----------------------------------------------------------------------------
 // Sets the number of point per quarter of the equator line for 
 // Paraview post-processing, i.e., controls the number of facets in the sphere
 // reconstruction in Paraview
@@ -577,3 +554,109 @@ bool Sphere::equalType_level2( Convex const* other ) const
   
   return ( same );
 } 
+
+
+
+
+// ----------------------------------------------------------------------------
+// Writes the sphere in an OBJ format
+void Sphere::write_convex_OBJ( ostream& f, Transform  const& transform,
+    	size_t& firstpoint_number ) const
+{
+  double angle = PI / ( 2. * m_visuNodeNbPerQar ) ;
+  double angleZ = 0., local_radius = 0.;
+  int k, i, ptsPerlevel = 4 * m_visuNodeNbPerQar,
+  	Bottom_number = ptsPerlevel * ( 2 * m_visuNodeNbPerQar - 1 ),
+	Top_number = ptsPerlevel * ( 2 * m_visuNodeNbPerQar - 1 ) + 1;
+  Point3 p, pp;
+  
+  // Vertices
+  // Regular points on the surface
+  for ( k = 0; k < 2*m_visuNodeNbPerQar-1 ; ++k ) 
+  {  
+    angleZ = - PI / 2. + ( k + 1 ) * angle;
+    local_radius = m_radius * cos( angleZ );
+    p[Z] = m_radius * sin( angleZ );
+    for ( i = 0; i < ptsPerlevel ; ++i )
+    {
+      p[X] = local_radius * cos( i * angle );
+      p[Y] = local_radius * sin( i * angle );
+      pp = transform( p );
+      f << "v " << GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[X] ) << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Y] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Z] ) << " " << endl;			 
+    }
+  }
+   
+  p[X] = 0.;
+  p[Y] = 0.;
+  // Bottom point
+  p[Z] = - m_radius;
+  pp = transform( p );
+  f << "v " << GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[X] ) << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Y] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Z] ) << " " << endl;
+	
+  // Top point
+  p[Z] = m_radius;
+  pp = transform( p );
+  f << "v " << GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[X] ) << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Y] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Z] ) << " " << endl;
+
+  // Faces  
+  // Square faces
+  for ( k = 0; k < 2*m_visuNodeNbPerQar-2 ; ++k ) 
+  {  
+    for ( i = 0; i < ptsPerlevel-1 ; ++i )
+    {
+      f << "f " << firstpoint_number + k * ptsPerlevel + i << " " 
+      	<< firstpoint_number + k * ptsPerlevel + i + 1 << " "
+      	<< firstpoint_number + ( k + 1) * ptsPerlevel + i + 1 << " "	
+      	<< firstpoint_number + ( k + 1 ) * ptsPerlevel + i << endl;		
+    }
+    f << "f " << firstpoint_number + k * ptsPerlevel + ptsPerlevel - 1 
+    	<< " " << firstpoint_number + k * ptsPerlevel << " " 
+	<< firstpoint_number + ( k + 1 ) * ptsPerlevel << " "
+	<< firstpoint_number + ( k + 1 ) * ptsPerlevel + ptsPerlevel - 1 
+	<< endl;   
+  }  
+
+  // Bottom triangular faces
+  for ( i = 0; i < ptsPerlevel-1 ; ++i )
+  {
+    f << "f " << firstpoint_number + i << " " 
+    	<< firstpoint_number + i + 1 << " "
+    	<< firstpoint_number + Bottom_number << endl;
+  }
+  f << "f " << firstpoint_number + ptsPerlevel - 1 << " "
+  	<< firstpoint_number << " "
+	<< firstpoint_number + Bottom_number << endl;
+  
+  // Top triangular faces
+  for ( i = 0; i < ptsPerlevel-1 ; ++i )
+  {
+    f << "f " << firstpoint_number
+    		+ ( 2 * m_visuNodeNbPerQar - 2 ) * ptsPerlevel + i << " " 
+    	<<  firstpoint_number
+    		+ ( 2 * m_visuNodeNbPerQar - 2 ) * ptsPerlevel + i + 1 << " " 
+    	<< firstpoint_number + Top_number << endl;
+  }
+  f << "f " << firstpoint_number
+  		+ ( 2 * m_visuNodeNbPerQar - 1 ) * ptsPerlevel - 1 << " " 
+  	<< firstpoint_number
+  		+ ( 2 * m_visuNodeNbPerQar - 2 ) * ptsPerlevel  << " "
+	<< firstpoint_number + Top_number << endl;
+
+  firstpoint_number += 4 * m_visuNodeNbPerQar * 
+  	( 2 * m_visuNodeNbPerQar - 1 ) + 2 ;  
+}

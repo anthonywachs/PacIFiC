@@ -171,6 +171,20 @@ void Convex::write_convex_STL( ostream& f, Transform  const& transform ) const
 
 
 // ----------------------------------------------------------------------------
+// Writes the convex shape in an OBJ format
+void Convex::write_convex_OBJ( ostream& f, Transform  const& transform,
+    	size_t& firstpoint_number ) const
+{
+  cout << "Warning for this Convex the method "
+       << "Convex::write_convex_OBJ() is not yet implemented !\n"
+       << "Need for an assistance ! Stop running !\n";
+  exit(10);
+}
+
+
+
+
+// ----------------------------------------------------------------------------
 // Writes a list of points describing the convex shape in a Paraview format
 list<Point3> Convex::get_polygonsPts_PARAVIEW( Transform const& transform,
   	Vector3 const* translation )
@@ -194,16 +208,6 @@ void Convex::write_polygonsStr_PARAVIEW( list<int>& connectivity,
        << "Convex::write_polygonsStr_PARAVIEW() is not yet implemented !\n"
        << "Need for an assistance ! Stop running !\n";
   exit(10);
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// Returns an orientation vector describing the convex shape angular position
-Vector3 Convex::computeOrientationVector( Transform const* transform ) const
-{
-  return ( Vector3Null );
 }
 
 
@@ -760,16 +764,6 @@ istream& operator >> ( istream& fileIn, Convex& convex )
 ShapeType Convex::getType() const
 {
   return ( CONVEX );
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// Returns whether the convex shape is a sphere
-bool Convex::isSphere() const
-{
-  return ( false );
 }
 
 

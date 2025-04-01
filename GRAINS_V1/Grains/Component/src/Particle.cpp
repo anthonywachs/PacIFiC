@@ -1388,8 +1388,7 @@ void Particle::createVelocityInfosNm1()
 // particle
 Vector3 Particle::computeOrientationVector() const
 {
-  return( m_geoRBWC->getConvex()->computeOrientationVector(
-  	m_geoRBWC->getTransform() ) );
+  return( m_geoRBWC->computeOrientationVector() );
 }
 
 
@@ -1938,4 +1937,16 @@ void Particle::setPositionDir_nm1( Direction dir )
 double Particle::getPositionDir_nm1() const
 {
   return ( m_pos_dir_nm1 );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Writes the particle in an OBJ format
+void Particle::write_OBJ( ostream& f, size_t const& group_number,
+    	size_t& firstpoint_number ) const
+{
+  f << "g Object" << GrainsExec::intToString( int( group_number ) ) << endl;
+  m_geoRBWC->write_OBJ( f, firstpoint_number ); 
 }

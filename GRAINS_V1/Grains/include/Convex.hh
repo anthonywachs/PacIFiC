@@ -143,6 +143,13 @@ class Convex : public Shape
     @param transform geometric transformation */
     virtual void write_convex_STL( ostream& f, Transform const& transform )
   	const;
+	
+    /** @brief Writes the convex shape in an OBJ format
+    @param f output stream
+    @param transform geometric transformation 
+    @param firstpoint_number number of the 1st point */
+    virtual void write_convex_OBJ( ostream& f, Transform const& transform,
+    	size_t& firstpoint_number ) const;	
 
     /** @brief Returns a list of points describing the convex shape in a
     Paraview format
@@ -161,15 +168,6 @@ class Convex : public Shape
     virtual void write_polygonsStr_PARAVIEW( list<int>& connectivity,
     	list<int>& offsets, list<int>& cellstype, int& firstpoint_globalnumber,
 	int& last_offset ) const;
-
-    /** @brief Returns whether the convex shape is a sphere */
-    virtual bool isSphere() const;
-
-    /** @brief Returns an orientation vector describing the convex shape angular
-    position
-    @param transform geometric transformation */
-    virtual Vector3 computeOrientationVector( Transform const* transform )
-    	const;
 
     /** @ brief Returns whether a point lies inside the convex shape
     @param pt point */

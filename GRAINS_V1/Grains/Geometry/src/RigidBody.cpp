@@ -585,3 +585,24 @@ void RigidBody::setBoundingVolume( BVolume* bvol )
   if ( m_boundingVolume ) delete m_boundingVolume;
   m_boundingVolume = bvol;
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Writes the rigid body's convex shape in an OBJ format
+void RigidBody::write_OBJ( ostream& f, size_t& firstpoint_number ) const
+{
+  m_convex->write_convex_OBJ( f, m_transform, firstpoint_number );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns an orientation vector describing the rigid body angular position
+Vector3 RigidBody::computeOrientationVector() const
+{
+  Point3 p( 0., 1., 0. );
+  return ( m_transform( p ) - *(m_transform.getOrigin()) );
+}

@@ -142,6 +142,9 @@ TrilobeCylinder::TrilobeCylinder( DOMNode* root, int const& pc )
 
   // Set the the circumscribed radius
   setCircumscribedRadius();
+  
+  // Compute and set the non-spherical bounding volume
+  if ( GrainsExec::m_colDetBoundingVolume ) createBoundingVolume();  
 
   // In case part of the particle acceleration computed explicity
   if ( Particle::m_splitExplicitAcceleration ) createVelocityInfosNm1();

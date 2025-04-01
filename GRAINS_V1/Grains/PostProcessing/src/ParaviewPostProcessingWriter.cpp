@@ -44,6 +44,7 @@ ParaviewPostProcessingWriter::ParaviewPostProcessingWriter( DOMNode* dn,
   , m_network( false )
   , m_mpiio_singlefile( false )
   , m_pertype( true )
+  , m_useGlyphWheneverPossible( true )
   , BUFFER( NULL )
   , ALLOCATED( 0 )
   , OFFSET( 0 )
@@ -112,7 +113,15 @@ ParaviewPostProcessingWriter::ParaviewPostProcessingWriter( DOMNode* dn,
   { 
     int nnn = ReaderXML::getNodeAttr_Int( dn, "NbPtsPerSCPHalf" );
     SpheroCylindricalPrism::SetvisuNodeNbOverHalfPer( nnn );
-  }          
+  }
+  if ( ReaderXML::hasNodeAttr( dn, "UseGlyphWheneverPossible" ) )
+  { 
+    string sglyph = ReaderXML::getNodeAttr_String( dn, 
+    	"UseGlyphWheneverPossible" );
+    if ( sglyph == "False" ) m_useGlyphWheneverPossible = false;
+  }            
+
+  if ( m_useGlyphWheneverPossible ) m_pertype = true;
     
   // Output to screen
   if ( m_rank == 0 && verbose )
@@ -131,7 +140,9 @@ ParaviewPostProcessingWriter::ParaviewPostProcessingWriter( DOMNode* dn,
     cout << GrainsExec::m_shift12 << "MPIIO = " 
     	<< ( m_mpiio_singlefile ? "True" : "False" ) << endl;
     cout << GrainsExec::m_shift12 << "Per particle type = " 
-    	<< ( m_pertype ? "True" : "False" ) << endl;			
+    	<< ( m_pertype ? "True" : "False" ) << endl;
+    cout << GrainsExec::m_shift12 << "Use Glyph whenever possible = " 
+    	<< ( m_useGlyphWheneverPossible ? "True" : "False" ) << endl;
   } 
 }
 
@@ -152,7 +163,8 @@ ParaviewPostProcessingWriter::ParaviewPostProcessingWriter(
   , m_initialCycleNumber_forced( false )
   , m_network( false )
   , m_mpiio_singlefile( false ) 
-  , m_pertype( true )      
+  , m_pertype( true )
+  , m_useGlyphWheneverPossible( true )        
   , BUFFER( NULL )
   , ALLOCATED( 0 )
   , OFFSET( 0 )
@@ -173,7 +185,9 @@ ParaviewPostProcessingWriter::ParaviewPostProcessingWriter(
     cout << GrainsExec::m_shift12 << "MPIIO = " 
     	<< ( m_mpiio_singlefile ? "True" : "False" ) << endl;
     cout << GrainsExec::m_shift12 << "Per particle type = " 
-    	<< ( m_pertype ? "True" : "False" ) << endl;				
+    	<< ( m_pertype ? "True" : "False" ) << endl;
+    cout << GrainsExec::m_shift12 << "Use Glyph whenever possible = " 
+    	<< ( m_useGlyphWheneverPossible ? "True" : "False" ) << endl;					
   }
 }	
 
@@ -204,7 +218,7 @@ void ParaviewPostProcessingWriter::PostProcessing_start(
 	Obstacle *obstacle, LinkedCell const* LC,
 	AllInsertionWindows const& insert_windows )
 {
-  size_t nbParticleTypes = referenceParticles->size() ;
+  size_t nbParticleTypes = referenceParticles->size();
   size_t nbPPTypes = m_pertype ? nbParticleTypes : 1;  
 
   if ( GrainsExec::m_ReloadType == "new" ) 
@@ -280,7 +294,7 @@ void ParaviewPostProcessingWriter::PostProcessing_start(
 		<< " compressor=\"vtkZLibDataCompressor\"";
 		
       m_Paraview_saveInsertionWindow_pvd<< ">" << endl; 
-      m_Paraview_saveInsertionWindow_pvd << "<Collection>" << endl;                   
+      m_Paraview_saveInsertionWindow_pvd << "<Collection>" << endl;
 
       if ( LC )
       {
@@ -422,11 +436,17 @@ void ParaviewPostProcessingWriter::PostProcessing_start(
     ++m_ParaviewCycleNumber;                
   }
   
-  // Periodic boundaries
-  if ( m_rank == 0 ) 	
+  if ( m_rank == 0 )
+  { 	
+    // Periodic boundaries
     if ( GrainsExec::m_periodic == true && LC )
       writePeriodicBoundary_Paraview(
-  	LC, m_ParaviewFilename + "_PeriodicBoundaries" );	
+  	LC, m_ParaviewFilename + "_PeriodicBoundaries" );
+	
+    // Reference particles	
+    if ( m_useGlyphWheneverPossible )
+      writeReferenceParticles_Paraview( referenceParticles );
+  }	
 }
 
 
@@ -600,9 +620,7 @@ void ParaviewPostProcessingWriter::one_output(
 
       if ( m_nprocs > 1 && !m_mpiio_singlefile )
       {       
-        if ( nbParticleTypes == 1 &&
-	(*referenceParticles)[0]->getRigidBody()->getConvex()
-       	->isSphere() && !GrainsExec::m_SphereAsPolyParaview )
+        if ( nbParticleTypes == 1 && m_useGlyphWheneverPossible )
         {
           list<string> ptVec;
           ptVec.push_back("Orientation");
@@ -615,23 +633,21 @@ void ParaviewPostProcessingWriter::one_output(
     }
     
     // VTU files
-    if ( nbParticleTypes == 1 &&
-    	(*referenceParticles)[0]->getRigidBody()->getConvex()
-	->isSphere() && !GrainsExec::m_SphereAsPolyParaview )
+    if ( nbParticleTypes == 1 && m_useGlyphWheneverPossible )
     {
       if ( m_mpiio_singlefile && m_nprocs > 1 )
       {
 	if ( m_binary )
-	  writeSpheres_Paraview_MPIIO_binary( particles,
+	  writeParticlesAsGlyph_Paraview_MPIIO_binary( particles,
      	  	partFilename + ".vtu", false, 
 		PostProcessingWriter::m_bPPWindow[m_rank] );
 	else
-	  writeSpheres_Paraview_MPIIO_text( particles,
+	  writeParticlesAsGlyph_Paraview_MPIIO_text( particles,
      	  	partFilename + ".vtu", false,
 		PostProcessingWriter::m_bPPWindow[m_rank] );	    	     
       }
       else		
-	writeSpheres_Paraview( particles, partFilename 
+	writeParticlesAsGlyph_Paraview( particles, partFilename 
 	  	+ ( m_nprocs > 1 ? "_" + ossRK.str() : "" ) + ".vtu", false,
 		PostProcessingWriter::m_bPPWindow[m_rank] );
     }
@@ -689,8 +705,7 @@ void ParaviewPostProcessingWriter::one_output(
 
         if ( m_nprocs > 1 && !m_mpiio_singlefile )
 	{
-	  if ( (*referenceParticles)[i]->getRigidBody()->getConvex()
-	 	->isSphere() && !GrainsExec::m_SphereAsPolyParaview )
+	  if ( m_useGlyphWheneverPossible )
           {
             list<string> ptVec;
             ptVec.push_back("Orientation");
@@ -703,22 +718,21 @@ void ParaviewPostProcessingWriter::one_output(
       }
 
       // VTU files
-      if ( (*referenceParticles)[i]->getRigidBody()->getConvex()
-          ->isSphere() && !GrainsExec::m_SphereAsPolyParaview )
+      if ( m_useGlyphWheneverPossible )
       {
         if ( m_mpiio_singlefile && m_nprocs > 1 )
         {
 	  if ( m_binary )
-	    writeSpheres_Paraview_MPIIO_binary( &partPerType[i],
+	    writeParticlesAsGlyph_Paraview_MPIIO_binary( &partPerType[i],
      	  	partFilename + ".vtu", false, 
 		PostProcessingWriter::m_bPPWindow[m_rank] );
 	  else
-	    writeSpheres_Paraview_MPIIO_text( &partPerType[i],
+	    writeParticlesAsGlyph_Paraview_MPIIO_text( &partPerType[i],
      	  	partFilename + ".vtu", false,
 		PostProcessingWriter::m_bPPWindow[m_rank] );	    	     
         }
         else		
-	  writeSpheres_Paraview( &partPerType[i], partFilename 
+	  writeParticlesAsGlyph_Paraview( &partPerType[i], partFilename 
 	  	+ ( m_nprocs > 1 ? "_" + ossRK.str() : "" ) + ".vtu", false,
 		PostProcessingWriter::m_bPPWindow[m_rank] );
       }
@@ -766,9 +780,7 @@ void ParaviewPostProcessingWriter::one_output(
 
       if ( m_nprocs > 1 && !m_mpiio_singlefile )
       {
-	if ( nbParticleTypes == 1 
-		&& (*referenceParticles)[0]->getRigidBody()->getConvex()
-	 	->isSphere() && !GrainsExec::m_SphereAsPolyParaview )
+	if ( nbParticleTypes == 1 && m_useGlyphWheneverPossible )
         {
           list<string> ptVec;
           ptVec.push_back("Orientation");
@@ -781,23 +793,21 @@ void ParaviewPostProcessingWriter::one_output(
     }
 
     // VTU files
-    if ( nbParticleTypes == 1 
-	&& (*referenceParticles)[0]->getRigidBody()->getConvex()
-          ->isSphere() && !GrainsExec::m_SphereAsPolyParaview )
+    if ( nbParticleTypes == 1 && m_useGlyphWheneverPossible )
     {
       if ( m_mpiio_singlefile && m_nprocs > 1 )
       {
 	if ( m_binary )
-	  writeSpheres_Paraview_MPIIO_binary( periodic_clones,
+	  writeParticlesAsGlyph_Paraview_MPIIO_binary( periodic_clones,
      	  	partFilename + ".vtu", true, 
 		PostProcessingWriter::m_bPPWindow[m_rank] );
 	else
-	  writeSpheres_Paraview_MPIIO_text( periodic_clones,
+	  writeParticlesAsGlyph_Paraview_MPIIO_text( periodic_clones,
      	  	partFilename + ".vtu", true,
 		PostProcessingWriter::m_bPPWindow[m_rank] );	    	     
       }
       else		
-	writeSpheres_Paraview( periodic_clones, partFilename 
+	writeParticlesAsGlyph_Paraview( periodic_clones, partFilename 
 	  	+ ( m_nprocs > 1 ? "_" + ossRK.str() : "" ) + ".vtu", true,
 		PostProcessingWriter::m_bPPWindow[m_rank] );
     }
@@ -992,6 +1002,29 @@ void ParaviewPostProcessingWriter::updateObstaclesIndicator(
   for (list<SimpleObstacle*>::iterator iv=allObstacles.begin();
   	iv!=allObstacles.end();iv++) (*iv)->setIndicator( 0. );
   obstacle->updateIndicator( time, dt );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Writes reference particle data
+void ParaviewPostProcessingWriter::writeReferenceParticles_Paraview(
+	vector<Particle*> const* referenceParticles )
+{
+  vector<Particle*>::const_iterator iv;   
+  size_t m = 0, fp = 1;
+  Vector3 vzero;
+  for (iv=referenceParticles->cbegin();iv!=referenceParticles->cend();iv++,++m)
+  {
+    fp = 1;
+    ofstream f( ( m_ParaviewFilename_dir + "/" + m_ParaviewFilename + 
+    	"_RefPart_" + GrainsExec::intToString( int(m) ) + ".obj" ).c_str(), 
+	ios::out );
+    f << "# OBJ file of Particle class " << m << endl;     	
+    (*iv)->write_OBJ( f, m, fp );	
+    f.close();	    
+  }
 }
 
 
