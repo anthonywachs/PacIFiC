@@ -713,7 +713,7 @@ class Particle : public Component
     int m_coordination_number; /**< coordination number */
     Vector3 m_weight; /**< particle weight */
     string m_specific_composite_shape; /**< specific composite particle 
-    	shape, e.g., SpheroCylinder */
+    	shape, e.g., TrilobeCylinder */
     static int m_maxID; /**< Maximum ID number, particle ID numbers range
     	from 1 to m_maxID and are therefore always positive */
     double m_pos_dir_nm1; /**< center of mass position in a given direction 

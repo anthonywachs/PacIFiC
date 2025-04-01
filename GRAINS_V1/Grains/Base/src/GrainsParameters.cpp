@@ -7,7 +7,6 @@
 #include "PostProcessingWriter.hh"
 #include "ParaviewPostProcessingWriter.hh"
 #include "ContactForceModel.hh"
-#include "SpheroCylinder.hh"
 #include "TrilobeCylinder.hh"
 #include "QuadrilobeCylinder.hh"
 
@@ -154,9 +153,7 @@ void GrainsParameters::Construction( DOMElement* rootElement )
 	if ( ReaderXML::hasNodeAttr( nCompParticle, "SpecificShape" )  )
 	  sshape = ReaderXML::getNodeAttr_String( nCompParticle, 
 	  	"SpecificShape" );
-	if ( sshape == "SpheroCylinder" )
-	  particleRef = new SpheroCylinder( nCompParticle, nbPC+int(i) );
-	else if ( sshape == "TrilobeCylinder" )
+	if ( sshape == "TrilobeCylinder" )
 	  particleRef = new TrilobeCylinder( nCompParticle, nbPC+int(i) );
 	else if ( sshape == "QuadrilobeCylinder" )
 	  particleRef = new QuadrilobeCylinder( nCompParticle, nbPC+int(i) );

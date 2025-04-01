@@ -10,7 +10,6 @@
 #include "PostProcessingWriter.hh"
 #include "ParaviewPostProcessingWriter.hh"
 #include "GrainsBuilderFactory.hh"
-#include "SpheroCylinder.hh"
 #include "TrilobeCylinder.hh"
 #include "QuadrilobeCylinder.hh"
 #include <math.h>
@@ -899,9 +898,7 @@ void AllComponents::read_pre2024( istream& fileSave, string const& filename,
     else
     {
       fileSave >> buffer >> buffer;
-      if ( buffer == "SpheroCylinder" )
-        particle = new SpheroCylinder( false );
-      else if ( buffer == "TrilobeCylinder" )
+      if ( buffer == "TrilobeCylinder" )
         particle = new TrilobeCylinder( false );  
       else if ( buffer == "QuadrilobeCylinder" )
         particle = new QuadrilobeCylinder( false );        	
@@ -943,9 +940,6 @@ void AllComponents::read_pre2024( istream& fileSave, string const& filename,
     if ( m_ReferenceParticles[ParticleGeomType]->isCompositeParticle() )
     {    
       if ( m_ReferenceParticles[ParticleGeomType]
-      		->getSpecificCompositeShapeName() == "SpheroCylinder" )
-        particle = new SpheroCylinder( false );
-      else if ( m_ReferenceParticles[ParticleGeomType]
       		->getSpecificCompositeShapeName() == "TrilobeCylinder" )
         particle = new TrilobeCylinder( false );
       else if ( m_ReferenceParticles[ParticleGeomType]
@@ -1050,9 +1044,7 @@ size_t AllComponents::read( istream& fileSave, vector<Point3>* known_positions,
     else
     {
       fileSave >> buffer >> buffer;
-      if ( buffer == "SpheroCylinder" )
-        particle = new SpheroCylinder( false );
-      else if ( buffer == "TrilobeCylinder" )
+      if ( buffer == "TrilobeCylinder" )
         particle = new TrilobeCylinder( false ); 
       else if ( buffer == "QuadrilobeCylinder" )
         particle = new QuadrilobeCylinder( false ); 
@@ -1244,9 +1236,6 @@ void AllComponents::read_particles( string const& filename, size_t const& npart,
       if ( m_ReferenceParticles[ParticleGeomType]->isCompositeParticle() )
       {    
         if ( m_ReferenceParticles[ParticleGeomType]
-      		->getSpecificCompositeShapeName() == "SpheroCylinder" )
-          particle = new SpheroCylinder( false );
-        else if ( m_ReferenceParticles[ParticleGeomType]
       		->getSpecificCompositeShapeName() == "TrilobeCylinder" )
           particle = new TrilobeCylinder( false );
         else if ( m_ReferenceParticles[ParticleGeomType]
