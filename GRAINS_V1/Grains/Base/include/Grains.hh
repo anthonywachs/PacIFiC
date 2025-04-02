@@ -302,7 +302,11 @@ class Grains : public ComputingTime, public SolverComputingTime
     virtual size_t getNbInsertionPositions() const;
     
     /** @brief Checks the periodic clones when a simulation is reloaded */
-    virtual void checkClonesReload();         	
+    virtual void checkClonesReload(); 
+    
+    /** @brief Reads time output frequency in MPI 
+    @param root XML node */
+    virtual void read_timeouputfrequency( DOMNode* root );            	
     //@}
   
 };

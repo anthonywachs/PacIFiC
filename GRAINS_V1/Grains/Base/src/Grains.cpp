@@ -1156,6 +1156,9 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 		"Time step magnitude is mandatory !!" << endl;
       grainsAbort();
     }
+    
+    // Time output frequency in MPI
+    read_timeouputfrequency( root );
 
     // Time integrator
     DOMNode* nTimeIntegration = ReaderXML::getNode( root, "TimeIntegration" );
@@ -2604,3 +2607,11 @@ void Grains::checkClonesReload()
 	m_allcomponents.getReferenceParticles(),
 	m_time );
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Reads time output frequency in MPI */
+void Grains::read_timeouputfrequency( DOMNode* root )
+{}

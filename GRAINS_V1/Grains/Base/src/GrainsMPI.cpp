@@ -14,6 +14,7 @@
 // Default constructor
 GrainsMPI::GrainsMPI()
   : Grains()
+  , m_timeoutputfreq( 1000 )
 {}
 
 
@@ -50,7 +51,8 @@ void GrainsMPI::Simulation( double time_interval )
   {
     double vmax = 0., vmean = 0. ;
     list<Particle*>* newBufPart = new list<Particle*>;  
-    bool forcestats = false;    
+    bool forcestats = false;
+    size_t timeoutputcounter = 0;    
 
     // Timers
     SCT_insert_app( "ParticlesInsertion" );
@@ -97,7 +99,15 @@ void GrainsMPI::Simulation( double time_interval )
 	{
           GrainsExec::m_postprocess_forces_at_this_time = true;
 	  m_collision->resetPPForceIndex();
-        }
+        }	
+	++timeoutputcounter;
+	if ( timeoutputcounter == m_timeoutputfreq ) 
+	{
+	  timeoutputcounter = 0;
+	  if ( !GrainsExec::m_output_data_at_this_time )
+	    if ( m_rank == 0 ) cout << "Time = " << m_time << endl
+	    	<< std::flush;
+	}
 	
 
         // Insertion of particles     
@@ -779,4 +789,21 @@ void GrainsMPI::checkClonesReload()
 	m_allcomponents.getCloneParticles(),
 	m_allcomponents.getReferenceParticles(),
 	m_collision, false, false );		
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Reads time output frequency in MPI */
+void GrainsMPI::read_timeouputfrequency( DOMNode* root )
+{
+  DOMNode* nTOF = ReaderXML::getNode( root, "TimeOutput" );
+  if ( nTOF )
+  {
+    m_timeoutputfreq = ReaderXML::getNodeAttr_Int( nTOF, "Every" );
+    if ( m_rank == 0 ) cout << GrainsExec::m_shift6 <<
+      	"Write time on standard output every = " << m_timeoutputfreq << 
+	" time steps" << endl;
+  }
 }

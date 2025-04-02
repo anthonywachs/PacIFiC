@@ -110,8 +110,20 @@ class GrainsMPI : virtual public Grains
     virtual size_t getNbInsertionPositions() const;
     
     /** @brief Checks the clones when a simulation is reloaded */
-    virtual void checkClonesReload();      	                      
+    virtual void checkClonesReload();
+    
+    /** @brief Reads time output frequency in MPI 
+    @param root XML node */
+    virtual void read_timeouputfrequency( DOMNode* root );
     //@}
+    
+    
+  private:
+    /** @name Parameters */
+    //@{
+    size_t m_timeoutputfreq; /**< writes time every m_timeoutputfred time 
+    	steps */
+    //@}    
   
 };
 
