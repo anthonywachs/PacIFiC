@@ -511,11 +511,10 @@ void GrainsMPI::InsertCreateNewParticles()
   double volIN = m_allcomponents.getVolumeIn(), 
   	volOUT = m_allcomponents.getVolumeOut();
   volIN = m_wrapper->sum_DOUBLE( volIN );
-  volOUT = m_wrapper->sum_DOUBLE( volOUT ); 
   
   if ( m_rank == 0 ) 
-    cout << endl << "Volume des Particles IN  : " << volIN  << '\n'
-      	<< "                     OUT : " << volOUT << '\n'
+    cout << endl << "Particle volume IN  : " << volIN  << '\n'
+      	<< "                OUT : " << volOUT << '\n'
       	<< endl; 
 }
 

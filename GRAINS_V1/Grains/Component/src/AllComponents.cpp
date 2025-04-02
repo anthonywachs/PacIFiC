@@ -719,7 +719,8 @@ double AllComponents::getVolumeIn() const
 
   for (particle=m_ActiveParticles.cbegin();
   	particle!=m_ActiveParticles.cend(); particle++)
-    volume += (*particle)->getVolume();
+    if ( (*particle)->getTag() != 2 )	
+      volume += (*particle)->getVolume();
 
   return ( volume );
 }
