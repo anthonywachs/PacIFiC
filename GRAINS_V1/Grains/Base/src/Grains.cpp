@@ -1533,6 +1533,34 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 	      m_InsertionLattice->box.setAsCylinder( ptBC, radius, height, 
 	      	axisdir_str );
 		
+              DOMNode* fillStrat = ReaderXML::getNode( nCyl, "Filling" );
+	      m_InsertionLattice->FillingRelStart = 0.;
+	      m_InsertionLattice->FillingFrom = "Bottom";
+	      if ( fillStrat )
+	      {
+                if ( ReaderXML::hasNodeAttr( fillStrat, "RelStartCoord" ) )
+		  m_InsertionLattice->FillingRelStart = 
+		  	ReaderXML::getNodeAttr_Double( 
+		  		fillStrat, "RelStartCoord" );
+			
+		if ( m_InsertionLattice->FillingRelStart < 0. || 
+			m_InsertionLattice->FillingRelStart > 1. )
+	        {
+                  if ( m_rank == 0 ) cout << GrainsExec::m_shift6 <<
+		  	"RelStartCoord must be between 0 and 1"
+			" in <CylinderArray> !!" << endl;
+                  grainsAbort();	      
+	        }			
+                
+		if ( ReaderXML::hasNodeAttr( fillStrat, "From" ) )
+		  m_InsertionLattice->FillingFrom = 
+		  	ReaderXML::getNodeAttr_String( 
+		  		fillStrat, "From" );
+		if ( m_InsertionLattice->FillingFrom != "Bottom" &&
+			m_InsertionLattice->FillingFrom != "Top" ) 
+		  m_InsertionLattice->FillingFrom = "Bottom";	
+	      }	      
+		
               m_position = "CYLINDER";
 	      if ( m_rank == 0 )
 	      {
@@ -1542,7 +1570,11 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
                 cout << GrainsExec::m_shift12 << "Radius = " <<
 	    		radius << " Height = " << height << " Direction = " << 
 			axisdir_str << " Filling direction = " <<
-	    		fill_dir << endl;			
+	    		fill_dir << endl;
+		cout << GrainsExec::m_shift12 << "Filling relative start "
+			"coordinate = " << m_InsertionLattice->FillingRelStart 
+			<< " Filling from = " << m_InsertionLattice->FillingFrom
+			<< endl;
 	      }	      		
 	    }
 	    else
@@ -2319,7 +2351,7 @@ size_t Grains::setPositionParticlesStructuredArray()
 // array
 size_t Grains::setPositionParticlesCyl()
 {
-  // Note: we simply perturn positions to avoid positions matching exactly
+  // Note: we simply perturb positions to avoid positions matching exactly
   // the limits of the linked cell grid that would be problematic in parallel
 
   size_t i, j, k, error = 0, nnewpart = 0, maxnpos = 0;
@@ -2353,7 +2385,9 @@ size_t Grains::setPositionParticlesCyl()
   Lt[0] = sqrt( pow( cylRadius, 2. ) - pow( posF[0] - 0.5 * deltaf, 2. ) );
   nt[0] = 1;
   deltat[0] = 2. * Lt[0];
-  maxnpos = na;   
+  if ( posF[0] > 
+    	cylRadius * ( 2. * m_InsertionLattice->FillingRelStart - 1. ) )
+    maxnpos += na;   
   for (j=1;j<nf;++j)
   {
     posF[j] = - Lfill + deltaf * ( double(j) + 0.5 ) + 
@@ -2361,9 +2395,14 @@ size_t Grains::setPositionParticlesCyl()
     Lt[j] = sqrt( pow( cylRadius, 2. ) - pow( posF[j] - 0.5 * deltaf, 2. ) );
     nt[j] = size_t( 2. * Lt[j] / l );
     deltat[j] = 2. * Lt[j] / double(nt[j]);
-    maxnpos += na * nt[j];    
+    if ( posF[j] > 
+    	cylRadius * ( 2. * m_InsertionLattice->FillingRelStart - 1. ) )
+      maxnpos += na * nt[j];    
   }
-  maxnpos *= 2;
+  for (j=0;j<nf;++j)
+    if ( - posF[nf-1-j] > 
+    	cylRadius * ( 2. * m_InsertionLattice->FillingRelStart - 1. ) )
+      maxnpos += na * nt[j]; 
 
   // Checks that number of positions is larger or equal to the number of new 
   // particles to insert
@@ -2386,19 +2425,23 @@ size_t Grains::setPositionParticlesCyl()
     size_t counter = 0;
     for (j=0;j<nf && counter<nnewpart;++j)
     {
-      position[F] = posF[j] + bottomCentre[F];  
-      for (i=0;i<nt[j] && counter<nnewpart;++i)
+      if ( posF[j] > 
+    	cylRadius * ( 2. * m_InsertionLattice->FillingRelStart - 1. ) )
       {
-        position[T] = - Lt[j] + deltat[j] * ( double(i) + 0.5 ) + 
+        position[F] = posF[j] + bottomCentre[F];  
+        for (i=0;i<nt[j] && counter<nnewpart;++i)
+        {
+          position[T] = - Lt[j] + deltat[j] * ( double(i) + 0.5 ) + 
     		( 2. * (double)rand() / RAND_MAX - 1. ) * l / factor
 		+ bottomCentre[T];
-	for (k=0;k<na && counter<nnewpart;++k)
-	{
-	  position[A] = - 0.5 * cylHeight + deltaa * ( double(k) + 0.5 ) + 
+	  for (k=0;k<na && counter<nnewpart;++k)
+	  {
+	    position[A] = - 0.5 * cylHeight + deltaa * ( double(k) + 0.5 ) + 
     		( 2. * (double)rand() / RAND_MAX - 1. ) * l / factor
 		+ bottomCentre[A] + 0.5 * cylHeight;
-          m_insertion_position->push_back( position );
-	  ++counter;
+            m_insertion_position->push_back( position );
+	    ++counter;
+          }
         }
       }
     }
@@ -2406,22 +2449,33 @@ size_t Grains::setPositionParticlesCyl()
     // Top half of the cylinder in the filling direction
     for (j=0;j<nf && counter<nnewpart;++j)
     {
-      position[F] = - posF[nf-1-j] + bottomCentre[F]; 
-      for (i=0;i<nt[nf-1-j] && counter<nnewpart;++i)
+      if ( - posF[nf-1-j] > 
+    	cylRadius * ( 2. * m_InsertionLattice->FillingRelStart - 1. ) )
       {
-        position[T] = - Lt[nf-1-j] + deltat[nf-1-j] * ( double(i) + 0.5 ) + 
+        position[F] = - posF[nf-1-j] + bottomCentre[F]; 
+        for (i=0;i<nt[nf-1-j] && counter<nnewpart;++i)
+        {
+          position[T] = - Lt[nf-1-j] + deltat[nf-1-j] * ( double(i) + 0.5 ) + 
     		( 2. * (double)rand() / RAND_MAX - 1. ) * l / factor
 		+ bottomCentre[T];
-	for (k=0;k<na && counter<nnewpart;++k)
-	{
-	  position[A] = - 0.5 * cylHeight + deltaa * ( double(k) + 0.5 ) + 
+	  for (k=0;k<na && counter<nnewpart;++k)
+	  {
+	    position[A] = - 0.5 * cylHeight + deltaa * ( double(k) + 0.5 ) + 
     		( 2. * (double)rand() / RAND_MAX - 1. ) * l / factor
 		+ bottomCentre[A] + 0.5 * cylHeight;
-          m_insertion_position->push_back( position );
-	  ++counter;	  
+            m_insertion_position->push_back( position );
+	    ++counter;	  
+          }
         }
       }
-    }  
+    }
+    
+    // If filling from top, revert F coordinates with respect to the cylinder
+    // center
+    if ( m_InsertionLattice->FillingFrom == "Top" )
+      for (vector<Point3>::iterator iv=m_insertion_position->begin();
+      	iv!=m_insertion_position->end();iv++)
+	(*iv)[F] = 2. * bottomCentre[F] - (*iv)[F];        
   }  
   
   return ( error );

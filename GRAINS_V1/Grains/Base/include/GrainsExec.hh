@@ -32,7 +32,10 @@ struct InsertionLattice
   size_t NY; /**< Number of positions in y */
   size_t NZ; /**< Number of positions in z */
   size_t NN; /**< Total number of positions */
-  Direction FillingDir; /**< cylinder disk filling direction */  
+  Direction FillingDir; /**< cylinder disk filling direction */
+  double FillingRelStart; /**< filling start position relative to the diameter 
+  	of the cylinder */
+  string FillingFrom; /**< either "top" or "bottom" of the cylinder */	   
 };
 
 
