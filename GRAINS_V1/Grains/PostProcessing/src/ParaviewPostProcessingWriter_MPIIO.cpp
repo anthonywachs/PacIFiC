@@ -42,7 +42,7 @@ void ParaviewPostProcessingWriter::
   	GrainsExec::m_translationParaviewPostProcessing ;
   double nu, nom;     
   
-  // Create a MPI datatype to write doublea as stringa with a given format
+  // Create a MPI datatype to write doublea as strings with a given format
   MPI_Type_contiguous( charspernum, MPI_CHAR, &num_as_string ); 
   MPI_Type_commit( &num_as_string );
 
@@ -643,7 +643,7 @@ void ParaviewPostProcessingWriter::
   Quaternion qrot;   
   double nu, nom;       
   
-  // Create a MPI datatype to write doublea as stringa with a given format
+  // Create a MPI datatype to write doublea as strings with a given format
   MPI_Type_contiguous( charspernum, MPI_CHAR, &num_as_string ); 
   MPI_Type_commit( &num_as_string );
 
@@ -1103,7 +1103,7 @@ void ParaviewPostProcessingWriter::
   Point3 gc; 
   Vector3 const* vec;      
   
-  // Create a MPI datatype to write doublea as stringa with a given format
+  // Create a MPI datatype to write doublea as strings with a given format
   MPI_Type_contiguous( charspernum, MPI_CHAR, &num_as_string ); 
   MPI_Type_commit( &num_as_string );
 
@@ -1461,7 +1461,7 @@ void ParaviewPostProcessingWriter::
   Point3 pt;
         
   
-  // Create a MPI datatype to write doublea as stringa with a given format
+  // Create a MPI datatype to write doublea as strings with a given format
   MPI_Type_contiguous( charspernum, MPI_CHAR, &num_as_string ); 
   MPI_Type_commit( &num_as_string );
 
@@ -1753,7 +1753,7 @@ void ParaviewPostProcessingWriter::
   double norm = 0.;
   
   
-  // Create a MPI datatype to write doublea as stringa with a given format
+  // Create a MPI datatype to write doublea as strings with a given format
   MPI_Type_contiguous( charspernum, MPI_CHAR, &num_as_string ); 
   MPI_Type_commit( &num_as_string );
   

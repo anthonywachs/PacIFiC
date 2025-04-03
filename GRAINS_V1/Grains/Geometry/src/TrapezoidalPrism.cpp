@@ -435,7 +435,7 @@ BVolume* TrapezoidalPrism::computeBVolume( unsigned int type ) const
   BVolume* bvol = NULL;
   if ( type == 1 ) // OBB
   {
-    Vector3 ext( m_extent[0], m_extent[2], m_extent[4] );
+    Vector3 ext( m_extent[0], m_extent[2], m_extent[3] );
     bvol = new OBB( ext, Matrix() );
   }
   else if ( type == 2 ) // OBC
