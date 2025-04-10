@@ -270,7 +270,7 @@ void output_vtu_dlmfd_intpts( RigidBody const* allrb, const int np,
 
 //----------------------------------------------------------------------------
 void save_data( scalar* list, vector* vlist, RigidBody const* allrb, 
-	const int np,double const time )
+	const int np, double const time )
 //----------------------------------------------------------------------------
 {
   static int cycle_number = 0; 
@@ -428,7 +428,10 @@ void save_data( scalar* list, vector* vlist, RigidBody const* allrb,
     }         
 # endif  
   
-  ++cycle_number;        
+  ++cycle_number; 
+  
+  output_vtu_bin_foreach_MPIIO( list, vlist );
+  output_vtu_ascii_foreach_MPIIO( list, vlist );           
 }
 
 
