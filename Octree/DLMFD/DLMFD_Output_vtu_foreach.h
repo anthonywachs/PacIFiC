@@ -81,11 +81,11 @@ coord* init_percelldir()
 
 
 char* BUFFER ;
-int ALLOCATED ;
-int OFFSET ;
-int CURRENT_LENGTH ;
-int sizeof_Float32 = 4 ;
-int sizeof_Int32 = 4 ;
+uint32_t ALLOCATED ;
+uint32_t OFFSET ;
+uint32_t CURRENT_LENGTH ;
+
+
 
 
 
@@ -134,15 +134,14 @@ void output_pvtu_ascii( scalar* list, vector* vlist, FILE* fp,
 
 
 /**
-# output_vtu_asci_foreach
+# output_vtu_ascii_foreach
 This function writes one XML VTK file per PID process of type unstructured grid
 (*.vtu) which can be read using Paraview. File stores scalar and vector fields
-defined at the center points. Results are recorded on ASCII format. If one 
+defined at the center points. Results are written in ASCII format. If one 
 writes one *.vtu file per PID process this function may be combined with
 output_pvtu_ascii() above to read in parallel.  
 */
-void output_vtu_ascii_foreach( scalar* list, vector* vlist, 
-	FILE* fp, bool linear )
+void output_vtu_ascii_foreach( scalar* list, vector* vlist, FILE* fp )
 {
 # if defined(_OPENMP)
     int num_omp = omp_get_max_threads();
@@ -389,12 +388,11 @@ void output_pvtu_bin( scalar* list, vector* vlist,  FILE* fp, char* subname )
 # output_vtu_bin_foreach
 This function writes one XML VTK file per PID process of type unstructured grid
 (*.vtu) which can be read using Paraview. File stores scalar and vector fields
-defined at the center points. Results are recorded on binary format. If one 
+defined at the center points. Results are written in binary format. If one 
 writes one *.vtu file per PID process this function may be combined with
 output_pvtu_bin() above to read in parallel. 
 */
-void output_vtu_bin_foreach( scalar* list, vector* vlist, FILE* fp, 
-	bool linear )
+void output_vtu_bin_foreach( scalar* list, vector* vlist, FILE* fp )
 {
 # if defined(_OPENMP)
     int num_omp = omp_get_max_threads();
@@ -403,7 +401,7 @@ void output_vtu_bin_foreach( scalar* list, vector* vlist, FILE* fp,
 
   vertex scalar marker[];
   // We use uint32_t for the 3 following variables because the number
-  // of cells/vertices on a single proc never exceeds the limit of 4,294,967,295 
+  // of cells/vertices on a single proc never exceeds the limit of 4,294,967,295
   uint32_t no_points = 0, no_cells = 0, vertexnum = 0 ;
 
   // In case of periodicity
@@ -634,6 +632,7 @@ void output_vtu_bin_foreach( scalar* list, vector* vlist, FILE* fp,
 
 
 # if _MPI
+// Returns the number of digits in an integer number up to 99999999999
 uint8_t count_revifs( uint64_t n ) 
 {
   if (n > 9999999999) return 11;
@@ -652,7 +651,15 @@ uint8_t count_revifs( uint64_t n )
 
 
 
-void output_vtu_ascii_foreach_MPIIO( scalar* list, vector* vlist )
+/**
+# output_vtu_ascii_foreach_MPIIO
+This function writes a single XML VTK file regardless of the number of processes
+of type unstructured grid (*.vtu) which can be read using Paraview, using MPI IO
+functions. File stores scalar and vector fields defined at the center points. 
+Results are written in ASCII format.
+*/
+void output_vtu_ascii_foreach_MPIIO( scalar* list, vector* vlist, 
+	char* filename )
 {
   MPI_File file;
   MPI_Status status;
@@ -660,16 +667,16 @@ void output_vtu_ascii_foreach_MPIIO( scalar* list, vector* vlist )
   char fmt[8] = "%12.5e ";
   char endfmt[8] = "%12.5e\n";
   const int charspernum = 13;
-  size_t counter = 0; 
+  uint64_t counter = 0; 
   char header[1000],line[200];
-  unsigned int nprocs = npe(), i, j, m, rank = pid();  
+  uint32_t nprocs = npe(), i, j, m, rank = pid();  
   
   // Create a MPI datatype to write doublea as strings with a given format
   MPI_Type_contiguous( charspernum, MPI_CHAR, &num_as_string ); 
   MPI_Type_commit( &num_as_string );
 
   // Open the file 
-  MPI_File_open( MPI_COMM_WORLD, "Res/titi.vtu", 
+  MPI_File_open( MPI_COMM_WORLD, filename, 
   	MPI_MODE_CREATE | MPI_MODE_WRONLY,
 	MPI_INFO_NULL, &file );
 
@@ -815,8 +822,9 @@ void output_vtu_ascii_foreach_MPIIO( scalar* list, vector* vlist )
     
   // Header for connectivity
   sprintf( header, "</DataArray>\n</Points>\n<Cells>\n"
-  	"<DataArray type=\"UInt64\" Name=\"connectivity\" format=\"ascii\">\n" );
-  int mpifile_offset = mpifile_offsets[nprocs-1] 
+  	"<DataArray type=\"UInt64\" Name=\"connectivity\" "
+	"format=\"ascii\">\n" );
+  uint64_t mpifile_offset = mpifile_offsets[nprocs-1] 
   	+ nbpts_per_proc[nprocs-1] * dimension * charspernum * sizeof(char);
   if ( rank == 0 )
     MPI_File_write_at( file, mpifile_offset, header, strlen(header),
@@ -990,12 +998,12 @@ void output_vtu_ascii_foreach_MPIIO( scalar* list, vector* vlist )
   MPI_File_write_at_all( file, mpifile_offsets[rank], connectivity, 
   	out_length, MPI_CHAR, &status );   
 
-  free(connectivity); connectivity = NULL;
+  free(connectivity); connectivity = NULL;  
 
 
   // Header for offset
-  sprintf( header, "\n</DataArray>\n<DataArray type=\"UInt64\" Name=\"offsets\" "
-  	"format=\"ascii\">\n" );
+  sprintf( header, "\n</DataArray>\n<DataArray type=\"UInt64\" Name=\"offsets\""
+  	" format=\"ascii\">\n" );
   mpifile_offset = mpifile_offsets[nprocs-1] 
   	+ out_length_per_proc[nprocs-1] * sizeof(char);
   if ( rank == 0 )
@@ -1025,8 +1033,8 @@ void output_vtu_ascii_foreach_MPIIO( scalar* list, vector* vlist )
   }
   
   out_length = counter;
-  MPI_Allgather( &out_length, 1, MPI_INT, out_length_per_proc, 1, MPI_INT, 
-  	MPI_COMM_WORLD );
+  MPI_Allgather( &out_length, 1, MPI_UINT64_T, out_length_per_proc, 1, 
+  	MPI_UINT64_T, MPI_COMM_WORLD );
   
   mpifile_offsets[0] = mpifile_offset + strlen(header) * sizeof(char);
   for (i=1;i<nprocs;i++)
@@ -1041,7 +1049,7 @@ void output_vtu_ascii_foreach_MPIIO( scalar* list, vector* vlist )
 
   // Header for types
   sprintf( header, "\n</DataArray>\n<DataArray type=\"UInt8\" Name=\"types\" "
-  	"format=\"ascii\">\n" );
+  	"format=\"ascii\">\n" );	
   mpifile_offset = mpifile_offsets[nprocs-1] 
   	+ out_length_per_proc[nprocs-1] * sizeof(char);
   if ( rank == 0 )
@@ -1061,8 +1069,8 @@ void output_vtu_ascii_foreach_MPIIO( scalar* list, vector* vlist )
   }
   
   out_length = counter;
-  MPI_Allgather( &out_length, 1, MPI_INT, out_length_per_proc, 1, MPI_INT, 
-  	MPI_COMM_WORLD );
+  MPI_Allgather( &out_length, 1, MPI_UINT64_T, out_length_per_proc, 1, 
+  	MPI_UINT64_T, MPI_COMM_WORLD );
   
   mpifile_offsets[0] = mpifile_offset + strlen(header) * sizeof(char);
   for (i=1;i<nprocs;i++)
@@ -1190,16 +1198,16 @@ void output_vtu_ascii_foreach_MPIIO( scalar* list, vector* vlist )
 
 // ----------------------------------------------------------------------------
 // Methods to write binary data
-void check_allocated_binary( int size )  
+void check_allocated_binary( uint32_t size )  
 {
   if ( OFFSET + size >= ALLOCATED ) 
   {
-    int new_size = max( 2*ALLOCATED, (int)1024 ) ;
-    new_size = max( new_size, 2*(OFFSET+size) ) ;
-    new_size = 4 * ( new_size/4 +1 ) ; // alignment on 4 bytes
+    uint32_t new_size = max( 2 * ALLOCATED, (uint32_t)1024 ) ;
+    new_size = max( new_size, 2 * (OFFSET+size) ) ;
+    new_size = 4 * ( new_size / 4 + 1 ) ; // alignment on 4 bytes
       
     char* new_buffer = (char*) calloc( new_size, sizeof(char) ); 
-    for( int i=0 ;i<OFFSET ;i++ ) new_buffer[i] = BUFFER[i] ;
+    for( uint32_t i=0 ;i<OFFSET ;i++ ) new_buffer[i] = BUFFER[i] ;
     if ( BUFFER != 0 ) free(BUFFER) ;
     BUFFER = new_buffer ;
     ALLOCATED = new_size ;      
@@ -1209,24 +1217,24 @@ void check_allocated_binary( int size )
 
 
 
-int store_int_binary( int val )  
+uint32_t store_uint_binary( uint32_t val )  
 {
-  int result = OFFSET ;
-  *((int*)&(BUFFER[OFFSET])) = val ;
-  OFFSET += sizeof_Int32  ;
+  uint32_t result = OFFSET ;
+  *((uint32_t*)&(BUFFER[OFFSET])) = val ;
+  OFFSET += sizeof(uint32_t)  ;
   return result ;
 }
 
 
 
 
-void start_output_binary( int size, int number )
+void start_output_binary( uint32_t size, uint32_t number )
 {
-  int current_output_size = size*number ;
-  int ncomp = current_output_size + (current_output_size+999)/1000 
-  	+ 12 + sizeof_Int32 ;	
+  uint32_t current_output_size = size * number ;
+  uint32_t ncomp = current_output_size + ( current_output_size + 999 ) / 1000 
+  	+ 12 + sizeof(uint32_t) ;	
   check_allocated_binary( ncomp ) ;
-  CURRENT_LENGTH = store_int_binary( current_output_size ) ;
+  CURRENT_LENGTH = store_uint_binary( current_output_size ) ;
 }
 
 
@@ -1234,70 +1242,79 @@ void start_output_binary( int size, int number )
 
 void write_double_binary( double val )  
 {
-  *((float*)&(BUFFER[OFFSET])) = (float)val ;
-  OFFSET += sizeof_Float32  ;
+  *((PARAVIEW_DATATYPE*)&(BUFFER[OFFSET])) = (PARAVIEW_DATATYPE)val ;
+  OFFSET += sizeof(PARAVIEW_DATATYPE)  ;
 }
 
 
 
 
-void write_int_binary( int val )  
+void write_uint_binary( uint32_t val )  
 {
-//  store_int_binary(val) ;
-  *((int*)&(BUFFER[OFFSET])) = val ;
-  OFFSET += sizeof_Int32  ;
+  *((uint32_t*)&(BUFFER[OFFSET])) = val ;
+  OFFSET += sizeof(uint32_t) ;
 }
 
 
 
 
-void compress_segment_binary( int seg )  
+void write_uint8_binary( uint8_t val )  
 {
-   static int BlockSize = 32768 ;
-   int size = (int)(*((int*)&BUFFER[seg])), i ;
+  *((uint8_t*)&(BUFFER[OFFSET])) = val ;
+  OFFSET += sizeof(uint8_t) ;
+}
+
+
+
+
+void compress_segment_binary( uint32_t seg )  
+{
+   static uint32_t BlockSize = 32768 ;
+   uint32_t size = (uint32_t)(*((uint32_t*)&BUFFER[seg])), i ;
    
-   int numFullBlocks = size / BlockSize;
-   int lastBlockSize = size % BlockSize;
-   int numBlocks = numFullBlocks + (lastBlockSize?1:0);
+   uint32_t numFullBlocks = size / BlockSize;
+   uint32_t lastBlockSize = size % BlockSize;
+   uint32_t numBlocks = numFullBlocks + (lastBlockSize?1:0);
 
-   int headerLength = numBlocks+3;
+   uint32_t headerLength = numBlocks + 3;
 
-   int* CompressionHeader = (int*) calloc( headerLength, sizeof(int) ); 
+   uint32_t* CompressionHeader = (uint32_t*) calloc( headerLength, 
+   	sizeof(uint32_t) ); 
    CompressionHeader[0] = numBlocks;
    CompressionHeader[1] = BlockSize;
    CompressionHeader[2] = lastBlockSize;
 
-   unsigned long encoded_buff_size = max(BlockSize,size)  ;
+   uint64_t encoded_buff_size = max( BlockSize, size )  ;
    unsigned char* encoded_buff = (unsigned char*) calloc( encoded_buff_size, 
    	sizeof(unsigned char) ); 
-   int encoded_offset = 0, block ;
+   uint32_t encoded_offset = 0, block ;
    for( block=0 ; block<numBlocks ; block++ )
    {
-      int buffer_start = seg + sizeof_Int32 + block*BlockSize ;
-      int length = ( block+1<numBlocks || !lastBlockSize ? 
+      uint32_t buffer_start = seg + sizeof(uint32_t) + block*BlockSize ;
+      uint32_t length = ( block+1<numBlocks || !lastBlockSize ? 
       	BlockSize : lastBlockSize ) ;
       unsigned char* to_encode = (unsigned char *)(&BUFFER[buffer_start]) ;
       unsigned char* encoded = &encoded_buff[encoded_offset] ;
-      unsigned long ncomp = encoded_buff_size - encoded_offset ;
+      uint64_t ncomp = encoded_buff_size - encoded_offset ;
 
       compress2( (Bytef*)encoded, &ncomp, (const Bytef*)to_encode,
 	length, Z_DEFAULT_COMPRESSION );
 	 
-      CompressionHeader[3+block] = (int)(ncomp) ;
-      encoded_offset += (int)(ncomp) ;      
+      CompressionHeader[3+block] = (uint32_t)(ncomp) ;
+      encoded_offset += (uint32_t)(ncomp) ;      
    }
    
    OFFSET = seg ;
-   check_allocated_binary( headerLength * sizeof_Int32 + encoded_offset ) ;
+   check_allocated_binary( headerLength * sizeof(uint32_t) + encoded_offset ) ;
    
    for( i=0 ; i<headerLength ; i++ )
-      store_int_binary( CompressionHeader[i] ) ;     
+      store_uint_binary( CompressionHeader[i] ) ;     
 
    for( i=0 ; i<encoded_offset ; i++ )
       BUFFER[OFFSET++] = encoded_buff[i] ;
 
-   if( OFFSET%4 != 0 )
-      OFFSET = 4*( OFFSET/4 +1 ) ; // Re-alignment
+   if( OFFSET % 4 != 0 )
+      OFFSET = 4 * ( OFFSET / 4 +1 ) ; // Re-alignment
    
    free(CompressionHeader); CompressionHeader = NULL;
    free(encoded_buff); encoded_buff = NULL;
@@ -1315,18 +1332,25 @@ void flush_binary()
 
 
 
-
-void output_vtu_bin_foreach_MPIIO( scalar* list, vector* vlist )
+/**
+# output_vtu_bin_foreach_MPIIO
+This function writes a single XML VTK file regardless of the number of processes
+of type unstructured grid (*.vtu) which can be read using Paraview, using MPI IO
+functions. File stores scalar and vector fields defined at the center points. 
+Results are written in binary format.
+*/
+void output_vtu_bin_foreach_MPIIO( scalar* list, vector* vlist, 
+	char* filename )
 {
   MPI_File file;
   MPI_Status status;
-  int point_binary_offset = 0, connectivity_binary_offset, 
+  uint64_t point_binary_offset = 0, connectivity_binary_offset, 
   	offsets_binary_offset, cellstype_binary_offset, total_offset;
   char header[5000], line[500];
-  int nprocs = npe(), i, m, rank = pid(); 
+  uint32_t nprocs = npe(), i, m, rank = pid(); 
   	  
   // Open the file 
-  MPI_File_open( MPI_COMM_WORLD, "Res/titi_bin.vtu", 
+  MPI_File_open( MPI_COMM_WORLD, filename, 
   	MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &file );  
 
 
@@ -1334,8 +1358,7 @@ void output_vtu_bin_foreach_MPIIO( scalar* list, vector* vlist )
   // We use unsigned int for the 2 following variables because the number
   // of cells/vertices on a single proc never exceeds the limit of 4,294,967,295
   // on 64-bit systems. Hence there is not need to use long unsigned int
-  unsigned int no_points = 0, no_cells = 0;
-  int vertexnum = 0;
+  uint32_t no_points = 0, no_cells = 0, vertexnum = 0;
 
   // In case of periodicity
   scalar per_mask[];
@@ -1379,7 +1402,7 @@ void output_vtu_bin_foreach_MPIIO( scalar* list, vector* vlist )
 
 
   // Write point coordinates to the binary buffer
-  start_output_binary( sizeof_Float32, dimension * no_points ) ;
+  start_output_binary( sizeof(PARAVIEW_DATATYPE), dimension * no_points ) ;
   foreach_vertex(serial, noauto)
   {
 #    if dimension == 2
@@ -1427,100 +1450,101 @@ void output_vtu_bin_foreach_MPIIO( scalar* list, vector* vlist )
 
   // Write connectivity to the binary buffer
   connectivity_binary_offset = OFFSET;
-  start_output_binary( sizeof_Int32, NVERTCELL * no_cells ) ;  
+  start_output_binary( sizeof(uint32_t), NVERTCELL * no_cells ) ;  
   foreach(serial, noauto)
     if ( per_mask[] )
     {
 #     if dimension == 2
-        int ape1 = (int)marker[];
-        int ape2 = (int)marker[1,0];
-        int ape3 = (int)marker[1,1];
-        int ape4 = (int)marker[0,1];
-	write_int_binary( ape1 );
-        write_int_binary( ape2 );
-	write_int_binary( ape3 );
-        write_int_binary( ape4 );				
+        uint32_t ape1 = (uint32_t)marker[];
+        uint32_t ape2 = (uint32_t)marker[1,0];
+        uint32_t ape3 = (uint32_t)marker[1,1];
+        uint32_t ape4 = (uint32_t)marker[0,1];
+	write_uint_binary( ape1 );
+        write_uint_binary( ape2 );
+	write_uint_binary( ape3 );
+        write_uint_binary( ape4 );				
 #     endif
 #     if dimension == 3
-        int ape1 = (int)marker[];
-        int ape2 = (int)marker[1,0,0];
-        int ape3 = (int)marker[1,1,0];
-        int ape4 = (int)marker[0,1,0];
-        int ape5 = (int)marker[0,0,1];
-        int ape6 = (int)marker[1,0,1];
-        int ape7 = (int)marker[1,1,1];
-        int ape8 = (int)marker[0,1,1];
-	write_int_binary( ape1 );
-        write_int_binary( ape2 );
-	write_int_binary( ape3 );
-        write_int_binary( ape4 );
-	write_int_binary( ape5 );
-        write_int_binary( ape6 );
-	write_int_binary( ape7 );
-        write_int_binary( ape8 );			
+        uint32_t ape1 = (uint32_t)marker[];
+        uint32_t ape2 = (uint32_t)marker[1,0,0];
+        uint32_t ape3 = (uint32_t)marker[1,1,0];
+        uint32_t ape4 = (uint32_t)marker[0,1,0];
+        uint32_t ape5 = (uint32_t)marker[0,0,1];
+        uint32_t ape6 = (uint32_t)marker[1,0,1];
+        uint32_t ape7 = (uint32_t)marker[1,1,1];
+        uint32_t ape8 = (uint32_t)marker[0,1,1];
+	write_uint_binary( ape1 );
+        write_uint_binary( ape2 );
+	write_uint_binary( ape3 );
+        write_uint_binary( ape4 );
+	write_uint_binary( ape5 );
+        write_uint_binary( ape6 );
+	write_uint_binary( ape7 );
+        write_uint_binary( ape8 );			
 #     endif
     }
     // Additional duplicated vertices
     else
     {
 #     if dimension == 2
-        int ape1 = vertexnum; vertexnum++;
-        int ape2 = vertexnum; vertexnum++;
-        int ape3 = vertexnum; vertexnum++;
-        int ape4 = vertexnum; vertexnum++;
-	write_int_binary( ape1 );
-        write_int_binary( ape2 );
-	write_int_binary( ape3 );
-        write_int_binary( ape4 );   
+        uint32_t ape1 = vertexnum; vertexnum++;
+        uint32_t ape2 = vertexnum; vertexnum++;
+        uint32_t ape3 = vertexnum; vertexnum++;
+        uint32_t ape4 = vertexnum; vertexnum++;
+	write_uint_binary( ape1 );
+        write_uint_binary( ape2 );
+	write_uint_binary( ape3 );
+        write_uint_binary( ape4 );   
 #     endif
 #     if dimension == 3
-        int ape1 = vertexnum; vertexnum++;
-        int ape2 = vertexnum; vertexnum++;
-        int ape3 = vertexnum; vertexnum++;
-        int ape4 = vertexnum; vertexnum++;
-        int ape5 = vertexnum; vertexnum++;
-        int ape6 = vertexnum; vertexnum++;
-        int ape7 = vertexnum; vertexnum++;
-        int ape8 = vertexnum; vertexnum++;
-	write_int_binary( ape1 );
-        write_int_binary( ape2 );
-	write_int_binary( ape3 );
-        write_int_binary( ape4 );
-	write_int_binary( ape5 );
-        write_int_binary( ape6 );
-	write_int_binary( ape7 );
-        write_int_binary( ape8 );
+        uint32_t ape1 = vertexnum; vertexnum++;
+        uint32_t ape2 = vertexnum; vertexnum++;
+        uint32_t ape3 = vertexnum; vertexnum++;
+        uint32_t ape4 = vertexnum; vertexnum++;
+        uint32_t ape5 = vertexnum; vertexnum++;
+        uint32_t ape6 = vertexnum; vertexnum++;
+        uint32_t ape7 = vertexnum; vertexnum++;
+        uint32_t ape8 = vertexnum; vertexnum++;
+	write_uint_binary( ape1 );
+        write_uint_binary( ape2 );
+	write_uint_binary( ape3 );
+        write_uint_binary( ape4 );
+	write_uint_binary( ape5 );
+        write_uint_binary( ape6 );
+	write_uint_binary( ape7 );
+        write_uint_binary( ape8 );
 #     endif
     }  
-  compress_segment_binary( CURRENT_LENGTH );  
+  compress_segment_binary( CURRENT_LENGTH ); 
 
 
   // Write offsets to the binary buffer  
   offsets_binary_offset = OFFSET;
-  start_output_binary( sizeof_Int32, no_cells ) ;  
+  start_output_binary( sizeof(uint32_t), no_cells ) ;  
   for (i = 1; i < no_cells+1; i++) 
-    write_int_binary( i * NVERTCELL );
+    write_uint_binary( i * NVERTCELL );
   compress_segment_binary( CURRENT_LENGTH ); 
   
   
   // Write cell types to the binary buffer  
   cellstype_binary_offset = OFFSET;
-  start_output_binary( sizeof_Int32, no_cells ) ;  
+  start_output_binary( sizeof(uint32_t), no_cells ) ;  
   for (i = 0; i < no_cells; i++)
-    write_int_binary( CELLTYPE );  
+    write_uint8_binary( CELLTYPE );  
   compress_segment_binary( CURRENT_LENGTH );   
-
-
+  
+  
   // Scalar field values
   int nscalar = 0, iscal = 0;
   for (scalar s in list) ++nscalar;
-  int* scalar_binary_offset = (int*) calloc( nscalar, sizeof(int) );
+  uint32_t* scalar_binary_offset = (uint32_t*) calloc( nscalar, 
+  	sizeof(uint32_t) );
 
   // Write each scalar field to the binary buffer 
   for (scalar s in list) 
   {
     scalar_binary_offset[iscal] = OFFSET;
-    start_output_binary( sizeof_Float32, no_cells );    
+    start_output_binary( sizeof(PARAVIEW_DATATYPE), no_cells );    
     foreach(serial, noauto) write_double_binary( val(s) );
     compress_segment_binary( CURRENT_LENGTH );
     ++iscal;      
@@ -1530,13 +1554,14 @@ void output_vtu_bin_foreach_MPIIO( scalar* list, vector* vlist )
   // Vector field values
   int nvector = 0, ivec = 0;
   for (vector v in vlist)  ++nvector;
-  int* vector_binary_offset = (int*) calloc( nvector, sizeof(int) );
+  uint32_t* vector_binary_offset = (uint32_t*) calloc( nvector, 
+  	sizeof(uint32_t) );
 
   // Write each scalar field to the binary buffer 
   for (vector v in vlist)
   {
     vector_binary_offset[ivec] = OFFSET;
-    start_output_binary( sizeof_Float32, dimension * no_cells );     
+    start_output_binary( sizeof(PARAVIEW_DATATYPE), dimension * no_cells );     
     foreach(serial, noauto)
     {
 #     if dimension == 2
@@ -1555,14 +1580,16 @@ void output_vtu_bin_foreach_MPIIO( scalar* list, vector* vlist )
 
 
   total_offset = OFFSET; 
-  int* total_binary_offset_per_proc = (int*) calloc( nprocs, sizeof(int) );
-  MPI_Allgather( &total_offset, 1, MPI_INT, total_binary_offset_per_proc, 1, 
-  	MPI_INT, MPI_COMM_WORLD );    
-  int* cumul_binary_offset_per_proc = (int*) calloc( nprocs, sizeof(int) );
+  uint32_t* total_binary_offset_per_proc = (uint32_t*) calloc( nprocs, 
+  	sizeof(uint32_t) );
+  MPI_Allgather( &total_offset, 1, MPI_UINT32_T, total_binary_offset_per_proc, 
+  	1, MPI_UINT32_T, MPI_COMM_WORLD );    
+  uint64_t* cumul_binary_offset_per_proc = (uint64_t*) calloc( nprocs, 
+  	sizeof(uint64_t) );
   cumul_binary_offset_per_proc[0] = 0;
   for (m=1;m<nprocs;m++) 
     cumul_binary_offset_per_proc[m] = cumul_binary_offset_per_proc[m-1]
-    	+ total_binary_offset_per_proc[m-1];
+    	+ (uint64_t)total_binary_offset_per_proc[m-1];
 
 
   // Header per piece + general for 1st and last process
@@ -1581,42 +1608,45 @@ void output_vtu_bin_foreach_MPIIO( scalar* list, vector* vlist )
   }	
   sprintf( line, "<Points>\n" );
   strcat( header, line );  
-  sprintf( line, "<DataArray type=\"Float32\" NumberOfComponents=\"3\" "
-  	"offset=\"%d\" format=\"appended\"></DataArray>\n</Points>\n", 
-	cumul_binary_offset_per_proc[rank] + point_binary_offset );
+  sprintf( line, "<DataArray type=\"%s\" NumberOfComponents=\"3\" "
+  	"offset=\"%lu\" format=\"appended\"></DataArray>\n</Points>\n", 
+	PARAVIEW_DATANAME,
+	cumul_binary_offset_per_proc[rank] + (uint64_t)point_binary_offset );
   strcat( header, line );     
-  sprintf( line, "<Cells>\n<DataArray type=\"Int32\" Name=\"connectivity\"" 
-  	" offset=\"%d\" format=\"appended\"></DataArray>\n",	
-	cumul_binary_offset_per_proc[rank] + connectivity_binary_offset );
+  sprintf( line, "<Cells>\n<DataArray type=\"UInt32\" Name=\"connectivity\"" 
+  	" offset=\"%lu\" format=\"appended\"></DataArray>\n",	
+	cumul_binary_offset_per_proc[rank] 
+		+ (uint64_t)connectivity_binary_offset );
   strcat( header, line );  	
-  sprintf( line, "<DataArray type=\"Int32\" Name=\"offsets\" offset=\"%d"
+  sprintf( line, "<DataArray type=\"UInt32\" Name=\"offsets\" offset=\"%lu"
   	"\" format=\"appended\"></DataArray>\n",	
-	cumul_binary_offset_per_proc[rank] + offsets_binary_offset );
+	cumul_binary_offset_per_proc[rank] + (uint64_t)offsets_binary_offset );
   strcat( header, line ); 		
-  sprintf( line, "<DataArray type=\"Int32\" Name=\"types\" offset=\"%d"
+  sprintf( line, "<DataArray type=\"UInt8\" Name=\"types\" offset=\"%lu"
   	"\" format=\"appended\"></DataArray>\n</Cells>\n",
-	cumul_binary_offset_per_proc[rank] + cellstype_binary_offset );   
+	cumul_binary_offset_per_proc[rank] 
+		+ (uint64_t)cellstype_binary_offset );   
   strcat( header, line );
   sprintf( line, "<CellData Scalars=\"scalars\">\n" );
   strcat( header, line );  
   iscal = 0;
   for (scalar s in list) 
   {
-    sprintf( line, "<DataArray type=\"Float32\" Name=\"%s\" offset=\""
-    	"%d\" format=\"appended\"></DataArray>\n", 
-	s.name, cumul_binary_offset_per_proc[rank] 
-	+ scalar_binary_offset[iscal] );
+    sprintf( line, "<DataArray type=\"%s\" Name=\"%s\" offset=\""
+    	"%lu\" format=\"appended\"></DataArray>\n", 
+	PARAVIEW_DATANAME, s.name, cumul_binary_offset_per_proc[rank] 
+	+ (uint64_t)scalar_binary_offset[iscal] );
     strcat( header, line );  	
     ++iscal;  
   }
   ivec = 0;
   for (vector v in vlist)
   {  
-    sprintf( line, "<DataArray type=\"Float32\" Name=\"%s\" "
+    sprintf( line, "<DataArray type=\"%s\" Name=\"%s\" "
     	"NumberOfComponents=\"3\" offset=\""
-    	"%d\" format=\"appended\"></DataArray>\n", 
-	v.x.name, cumul_binary_offset_per_proc[rank] 
-	+ vector_binary_offset[ivec] );
+    	"%lu\" format=\"appended\"></DataArray>\n", 
+	PARAVIEW_DATANAME, v.x.name, cumul_binary_offset_per_proc[rank] 
+	+ (uint64_t)vector_binary_offset[ivec] );
     strcat( header, line );  	  
     ++ivec;
   }
@@ -1630,12 +1660,13 @@ void output_vtu_bin_foreach_MPIIO( scalar* list, vector* vlist )
   }            
 
 
-  int header_length = strlen( header );
-  int* header_length_per_proc = (int*) calloc( nprocs, sizeof(int) );  
-  MPI_Allgather( &header_length, 1, MPI_INT, header_length_per_proc, 1, 
-  	MPI_INT, MPI_COMM_WORLD ); 
+  uint32_t header_length = strlen( header );
+  uint32_t* header_length_per_proc = (uint32_t*) calloc( nprocs, 
+  	sizeof(uint32_t) );  
+  MPI_Allgather( &header_length, 1, MPI_UINT32_T, header_length_per_proc, 1, 
+  	MPI_UINT32_T, MPI_COMM_WORLD ); 
 
-  int* mpifile_offsets = (int*) calloc( nprocs, sizeof(int) );
+  uint64_t* mpifile_offsets = (uint64_t*) calloc( nprocs, sizeof(uint64_t) );
   mpifile_offsets[0] = 0;
   for (m=1;m<nprocs;m++) 
     mpifile_offsets[m] = mpifile_offsets[m-1]
@@ -1645,7 +1676,7 @@ void output_vtu_bin_foreach_MPIIO( scalar* list, vector* vlist )
 
 
   // Write the binary buffers
-  int starting_point = mpifile_offsets[nprocs-1] 
+  uint64_t starting_point = mpifile_offsets[nprocs-1] 
   	+ header_length_per_proc[nprocs-1] * sizeof(char); 
   for (m=0;m<nprocs;m++) 
     mpifile_offsets[m] = starting_point
@@ -1673,6 +1704,8 @@ void output_vtu_bin_foreach_MPIIO( scalar* list, vector* vlist )
   free(cumul_binary_offset_per_proc); cumul_binary_offset_per_proc = NULL;
   free(header_length_per_proc); header_length_per_proc = NULL;
   free(mpifile_offsets); mpifile_offsets = NULL; 
-  free(scalar_binary_offset); scalar_binary_offset = NULL;      
+  free(scalar_binary_offset); scalar_binary_offset = NULL;
+  free(vector_binary_offset); vector_binary_offset = NULL;        
 }
 # endif
+

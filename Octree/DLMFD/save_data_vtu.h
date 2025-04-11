@@ -15,6 +15,9 @@
 # ifndef PARAVIEW_BINFILE
 #   define PARAVIEW_BINFILE 1
 # endif
+# ifndef PARAVIEW_MPIIO_WRITER 
+#   define PARAVIEW_MPIIO_WRITER 0
+# endif
 
 # include "DLMFD_Output_vtu_foreach.h"
 
@@ -111,7 +114,7 @@ void output_vtu_dlmfd_bndpts( RigidBody const* allrb, const int np,
 
 
 
- //----------------------------------------------------------------------------
+//----------------------------------------------------------------------------
 void output_vtu_dlmfd_intpts( RigidBody const* allrb, const int np,
 	char const* fname )
 //----------------------------------------------------------------------------
@@ -284,34 +287,43 @@ void save_data( scalar* list, vector* vlist, RigidBody const* allrb,
   // Write the VTU file
   sprintf( filename_vtu, "%s", RESULT_DIR );
   strcat( filename_vtu, "/" );  
-  strcat( filename_vtu, RESULT_FLUID_ROOTFILENAME );  
-  sprintf( suffix, "_T%d_%d.vtu", cycle_number, pid() );
-  strcat( filename_vtu, suffix );
- 
-  fpvtk = fopen( filename_vtu, "w" );
-  if ( PARAVIEW_BINFILE ) output_vtu_bin_foreach( list, vlist, fpvtk, false );
-  else output_vtu_ascii_foreach( list, vlist, fpvtk, false );  
-  fclose( fpvtk );
-   
-  // Write the PVTU file  
-  if ( pid() == 0 ) 
-  {
-    sprintf( filename_pvtu, "%s", RESULT_DIR );
-    strcat( filename_pvtu, "/" );  
-    strcat( filename_pvtu, RESULT_FLUID_ROOTFILENAME );    
-    sprintf( suffix, "_T%d.pvtu", cycle_number );
-    strcat( filename_pvtu, suffix );
-
-    fpvtk = fopen( filename_pvtu, "w" );
-    
-    sprintf( filename_vtu, "%s", RESULT_FLUID_ROOTFILENAME );
-    sprintf( suffix, "_T%d", cycle_number );
+  strcat( filename_vtu, RESULT_FLUID_ROOTFILENAME );
+# if PARAVIEW_MPIIO_WRITER
+    sprintf( suffix, "_T%d.vtu", cycle_number );
+    strcat( filename_vtu, suffix );    
+    if ( PARAVIEW_BINFILE ) 
+      output_vtu_bin_foreach_MPIIO( list, vlist, filename_vtu );
+    else output_vtu_ascii_foreach_MPIIO( list, vlist, filename_vtu );    
+# else   
+    sprintf( suffix, "_T%d_%d.vtu", cycle_number, pid() );
     strcat( filename_vtu, suffix );
-    if ( PARAVIEW_BINFILE ) output_pvtu_bin( list, vlist, fpvtk, filename_vtu );
-    else output_pvtu_ascii( list, vlist, fpvtk, filename_vtu );    
-
+ 
+    fpvtk = fopen( filename_vtu, "w" );
+    if ( PARAVIEW_BINFILE ) output_vtu_bin_foreach( list, vlist, fpvtk );
+    else output_vtu_ascii_foreach( list, vlist, fpvtk );  
     fclose( fpvtk );
+   
+    // Write the PVTU file  
+    if ( pid() == 0 ) 
+    {
+      sprintf( filename_pvtu, "%s", RESULT_DIR );
+      strcat( filename_pvtu, "/" );  
+      strcat( filename_pvtu, RESULT_FLUID_ROOTFILENAME );    
+      sprintf( suffix, "_T%d.pvtu", cycle_number );
+      strcat( filename_pvtu, suffix );
+
+      fpvtk = fopen( filename_pvtu, "w" );
+    
+      sprintf( filename_vtu, "%s", RESULT_FLUID_ROOTFILENAME );
+      sprintf( suffix, "_T%d", cycle_number );
+      strcat( filename_vtu, suffix );
+      if ( PARAVIEW_BINFILE ) output_pvtu_bin( list, vlist, fpvtk, 
+      		filename_vtu );
+      else output_pvtu_ascii( list, vlist, fpvtk, filename_vtu );    
+
+      fclose( fpvtk );
   }
+# endif   
   
   // Write the PVD file  
   if ( pid() == 0 ) 
@@ -330,7 +342,11 @@ void save_data( scalar* list, vector* vlist, RigidBody const* allrb,
     strcat( time_line, suffix );
     strcat( time_line, " group=\"\" part=\"0\" file=\"" );
     strcpy( filename_pvtu, RESULT_FLUID_ROOTFILENAME );    
-    sprintf( suffix, "_T%d.pvtu", cycle_number );
+#   if PARAVIEW_MPIIO_WRITER
+      sprintf( suffix, "_T%d.vtu", cycle_number );
+#   else
+      sprintf( suffix, "_T%d.pvtu", cycle_number );
+#   endif      
     strcat( filename_pvtu, suffix );
     strcat( time_line, filename_pvtu );        
     strcat( time_line, "\"/>\n" );  
@@ -430,8 +446,10 @@ void save_data( scalar* list, vector* vlist, RigidBody const* allrb,
   
   ++cycle_number; 
   
-  output_vtu_bin_foreach_MPIIO( list, vlist );
-  output_vtu_ascii_foreach_MPIIO( list, vlist );           
+//   char zzz[80] = "Res/titi.vtu";
+//   output_vtu_ascii_foreach_MPIIO( list, vlist, zzz );
+//   strcpy( zzz, "Res/titi_bin.vtu" );  
+//   output_vtu_bin_foreach_MPIIO( list, vlist, zzz );           
 }
 
 
