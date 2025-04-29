@@ -160,7 +160,7 @@ class ParaviewPostProcessingWriter : public PostProcessingWriter
     bool m_pertype; /**< whether to write particle files per type */
     bool m_useGlyphWheneverPossible; /**< whether to write particles as Glyph
     	whenever a particle shape allows it */
-    char * BUFFER ;
+    char* BUFFER ;
     int ALLOCATED ;
     int OFFSET ;
     int CURRENT_LENGTH ;

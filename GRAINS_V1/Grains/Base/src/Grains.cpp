@@ -1349,6 +1349,7 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 	  m_randomseed = RGS_RANDOM;
 	  srand( (unsigned int)( time(NULL) ) );
 	}
+	else srand( 0 );
       }
       if ( m_rank == 0 ) cout << GrainsExec::m_shift9 << "Random generator"
       	" seed = " << ( m_randomseed == RGS_DEFAULT ? "Default to 1 "

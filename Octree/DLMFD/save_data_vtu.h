@@ -20,6 +20,7 @@
 # endif
 
 # include "DLMFD_Output_vtu_foreach.h"
+//# include "htg-functions.h"
 
 
 //----------------------------------------------------------------------------
@@ -449,7 +450,10 @@ void save_data( scalar* list, vector* vlist, RigidBody const* allrb,
 //   char zzz[80] = "Res/titi.vtu";
 //   output_vtu_ascii_foreach_MPIIO( list, vlist, zzz );
 //   strcpy( zzz, "Res/titi_bin.vtu" );  
-//   output_vtu_bin_foreach_MPIIO( list, vlist, zzz );           
+//   output_vtu_bin_foreach_MPIIO( list, vlist, zzz ); 
+//   char zzz[80];
+//   sprintf( zzz, "Res/titi_%u.htg", pid() );  
+//   output_htg( list, vlist, zzz );       
 }
 
 
