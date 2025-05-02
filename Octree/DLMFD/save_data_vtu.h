@@ -289,7 +289,7 @@ void save_data( scalar* list, vector* vlist, RigidBody const* allrb,
   sprintf( filename_vtu, "%s", RESULT_DIR );
   strcat( filename_vtu, "/" );  
   strcat( filename_vtu, RESULT_FLUID_ROOTFILENAME );
-# if PARAVIEW_MPIIO_WRITER
+# if PARAVIEW_MPIIO_WRITER && _MPI
     sprintf( suffix, "_T%d.vtu", cycle_number );
     strcat( filename_vtu, suffix );    
     if ( PARAVIEW_BINFILE ) 
@@ -343,7 +343,7 @@ void save_data( scalar* list, vector* vlist, RigidBody const* allrb,
     strcat( time_line, suffix );
     strcat( time_line, " group=\"\" part=\"0\" file=\"" );
     strcpy( filename_pvtu, RESULT_FLUID_ROOTFILENAME );    
-#   if PARAVIEW_MPIIO_WRITER
+#   if PARAVIEW_MPIIO_WRITER && _MPI
       sprintf( suffix, "_T%d.vtu", cycle_number );
 #   else
       sprintf( suffix, "_T%d.pvtu", cycle_number );

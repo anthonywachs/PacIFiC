@@ -460,9 +460,15 @@ void DLMFD_Uzawa_velocity( const int i )
       }
     }
     // Boundary points
-    foreach_level(depth()) 
+    foreach_level(MAXLEVEL,serial) 
       if ( DLM_Flag[] > 0.5 )
-        cache_append( &Traversal_uqutu, point, 0);  
+      {
+        ppp.i = point.i;
+        ppp.j = point.j;
+        ppp.k = point.k;		
+        ppp.level = point.level;
+	cache_append( &Traversal_uqutu, ppp, 0); 
+      } 
   
     // Only DLM_lambda has not been nullified at the end of the previous
     // call to DLMFD_subproblem as it is needed for the computation of the 

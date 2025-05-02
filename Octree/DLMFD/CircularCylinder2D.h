@@ -52,20 +52,9 @@ bool in_which_CircularCylinder2D( double x1, double y1,
   // Check if it is in the master rigid body
   bool status = is_in_CircularCylinder2D_clone( x1, y1, gp );
   if ( status && setPeriodicRefCenter )
-  {
-    Cache poscache = {0};
-    Point lpoint;
-    lpoint = locate( x1, y1 );
-
-    if ( lpoint.level > -1 )
-    {
-      cache_append( &poscache, lpoint, 0 );
-      foreach_cache(poscache)
-        foreach_dimension()
-          PeriodicRefCenter.x[] = gp.center.x;
-      free( poscache.p );
-    }
-  }
+    foreach_point( x1, y1 )
+      foreach_dimension()
+        PeriodicRefCenter.x[] = gp.center.x;
 
   //  Check if it is in any clone rigid body
   if ( gp.nperclones && !status )
@@ -75,20 +64,9 @@ bool in_which_CircularCylinder2D( double x1, double y1,
       clones.center = gp.perclonecenters[i];
       status = is_in_CircularCylinder2D_clone( x1, y1, clones );
       if ( status && setPeriodicRefCenter )
-      {
-        Cache poscache = {0};
-	Point lpoint;
-	lpoint = locate( x1, y1 );
-	
-	if ( lpoint.level > -1 )
-	{
-	  cache_append( &poscache, lpoint, 0 );
-	  foreach_cache(poscache)
-	    foreach_dimension()
-	      PeriodicRefCenter.x[] = clones.center.x;
-          free( poscache.p );
-        }
-      }
+        foreach_point( x1, y1 )
+          foreach_dimension()
+	    PeriodicRefCenter.x[] = clones.center.x;
     }
 
   return status;
@@ -123,9 +101,7 @@ void create_FD_Boundary_CircularCylinder2D( GeomParameter gcp,
 //----------------------------------------------------------------------------
 {
   int m = nsphere;
-  coord pos; pos.z = 0.;
-  Point lpoint;
-  
+  coord pos; pos.z = 0.;  
   coord shift = {0., 0., 0.};
   coord ori = {X0, Y0, 0.};
  
@@ -166,17 +142,9 @@ void create_FD_Boundary_CircularCylinder2D( GeomParameter gcp,
     if ( setPeriodicRefCenter )
     {
       // Setting the periodic clone center vector field
-      Cache poscache = {0};
-      lpoint = locate( pos.x, pos.y );
-
-      if ( lpoint.level > -1 )
-      {
-        cache_append( &poscache, lpoint, 0 );
-        foreach_cache(poscache)
-          foreach_dimension()
-            pPeriodicRefCenter->x[] = gcp.center.x + shift.x;
-        free( poscache.p );
-      }
+      foreach_point( pos.x, pos.y )
+        foreach_dimension()
+	  pPeriodicRefCenter->x[] = gcp.center.x + shift.x;
     }
 
     dlm_bd->x[i] = pos.x;
@@ -184,7 +152,7 @@ void create_FD_Boundary_CircularCylinder2D( GeomParameter gcp,
   }
 
   if ( setPeriodicRefCenter ) synchronize((scalar*){pPeriodicRefCenter->x,
-  	pPeriodicRefCenter->y, pPeriodicRefCenter->z});
+  	pPeriodicRefCenter->y});
 }
 
 
@@ -198,13 +166,17 @@ void create_FD_Interior_CircularCylinder2D( RigidBody* p, vector Index,
 {
   GeomParameter gci = p->g;
   Cache* fd = &(p->Interior);
+  Point ppp;
 
   /** Create the cache for the interior points */
-  foreach()
+  foreach(serial)
     if ( in_which_CircularCylinder2D( x, y, gci, PeriodicRefCenter, true ) )
       if ( (int)Index.y[] == -1 )
       {
-        cache_append( fd, point, 0 );
+	ppp.i = point.i;
+        ppp.j = point.j;		
+        ppp.level = point.level;
+	cache_append( fd, ppp, 0 );
         Index.y[] = p->pnum;
       }
 

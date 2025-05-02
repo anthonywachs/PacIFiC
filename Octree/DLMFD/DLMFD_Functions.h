@@ -328,7 +328,7 @@ void initialize_and_allocate_Cache( Cache* p )
 
 
 
-
+ 
 # include "CircularCylinder2D.h"
 # include "Sphere.h"
 # include "Cube.h"
@@ -412,7 +412,7 @@ void free_rigidbodies( RigidBody* allrbs, const size_t nrb, bool full_free )
 
 
 
-
+ 
 /** Prints data of a rigid body */
 //----------------------------------------------------------------------------
 void print_rigidbody( RigidBody const* p, char const* poshift )
@@ -542,7 +542,7 @@ void print_rigidbody( RigidBody const* p, char const* poshift )
 
 
 
-
+ 
 /** Prints all RigidBody* data */
 //----------------------------------------------------------------------------
 void print_all_rigidbodies( RigidBody const* allrbs, const size_t nrb,
@@ -635,7 +635,7 @@ void fill_DLM_Index( const RigidBodyBoundary dlm_bd, vector Index,
 
 
 
-
+ 
 /** Returns whether a point lies inside a rigid body */
 //----------------------------------------------------------------------------
 bool is_in_rigidbody( RigidBody const* p, double x, double y, double z )
@@ -688,21 +688,21 @@ bool is_in_rigidbody( RigidBody const* p, double x, double y, double z )
 void fill_FlagMesh( scalar Flag, vector const Index, RigidBody const* allrbs )
 //----------------------------------------------------------------------------
 {
-  foreach() Flag[] = 0;  
-  
-  bool goflag = false;
-  double xc, yc, zc = 0.;
-  
-  foreach_level(depth()) 
+  foreach() Flag[] = 0; 
+
+  bool goflag = false;  
+  foreach_level(MAXLEVEL,serial) 
   {      
     goflag = false;
     if ( (int)Index.x[] > -1 ) goflag = true;
     else
     {
-      xc = x;
-      yc = y;
+      double xc = x;
+      double yc = y;
 #     if dimension == 3
-        zc = z;
+        double  zc = z;
+#     else
+        double zc = 0.;
 #     endif      
       foreach_neighbor()
         if ( !goflag ) 
@@ -721,7 +721,7 @@ void fill_FlagMesh( scalar Flag, vector const Index, RigidBody const* allrbs )
 
 
 
-#include "DLMFD_Weight_functions.h"
+# include "DLMFD_Weight_functions.h"
 
 /** Returns the weight associated to a cell if it belongs to the 3^dim stencil
 associated to a Lagrange multiplier, otherwise return 0. The cell that contains 
@@ -809,7 +809,7 @@ void deactivate_critical_boundary_points( RigidBody* allrbs, const size_t nrb,
 
   // Distance to rigid walls
   if ( domain_has_rigid_walls )
-    foreach_level(depth()) 
+    foreach_level(MAXLEVEL,serial)
     {      
       if ( (int)Index.x[] > -1 )
       {
@@ -851,7 +851,7 @@ void deactivate_critical_boundary_points( RigidBody* allrbs, const size_t nrb,
   // Proximity of rigid bodies
   if ( nrb > 1 )
   {
-    foreach_level(depth()) 
+    foreach_level(MAXLEVEL,serial)
       if ( (int)Index.x[] > -1 )
       {
 	RBid0 = (size_t)Index.y[];
@@ -968,7 +968,7 @@ void deactivate_critical_boundary_points( RigidBody* allrbs, const size_t nrb,
 
 
 
-
+ 
 /** Tag cells that belong to a 3^dim stencil associated to a Lagrange multiplier
 point of the rigid body boundary. */
 //----------------------------------------------------------------------------
@@ -990,7 +990,7 @@ void reverse_fill_DLM_Flag( RigidBody* allrbs, const size_t nrb, scalar Flag,
     GeomParameter gcb = allrbs[k].g;
     Cache* Boundary = &(allrbs[k].Boundary);
         
-    foreach_level(depth()) 
+    foreach_level(MAXLEVEL,serial) 
     {      
       localcellpos.x = x;
       localcellpos.y = y;
@@ -1074,7 +1074,15 @@ void reverse_fill_DLM_Flag( RigidBody* allrbs, const size_t nrb, scalar Flag,
       if ( goflag == 1 ) 
       {
 	Flag[] = 1;
-	if ( cacheflag == 1 ) cache_append( Boundary, point, 0 );
+	if ( cacheflag == 1 ) 
+	{		
+	  Point ppp;
+	  ppp.i = point.i;
+          ppp.j = point.j;
+          ppp.k = point.k;			
+          ppp.level = point.level;	  
+	  cache_append( Boundary, ppp, 0 );
+	}
       }
     }  
   } // end loop on rigid body id 
@@ -1154,7 +1162,7 @@ void create_boundary_points( RigidBody* p, vector* pPeriodicRefCenter,
 
 
 
-
+ 
 /** Initializes the rigid bodies and the scalar/vector fields needed to the 
 method */
 //----------------------------------------------------------------------------
@@ -1197,7 +1205,7 @@ void allocate_and_init_rigidbodies( RigidBody* allrbs, const size_t nrb,
 
 
 
-
+ 
 /** Creates boundary points of all rigid bodies but does not set the 
 PeriodicRefCenter field */
 //----------------------------------------------------------------------------
@@ -1743,48 +1751,24 @@ double compute_flowrate_right( const vector u, const int level )
 //----------------------------------------------------------------------------
 {
   double flowrate = 0.;
-
-# if !ADAPTIVE 
-    Cache intDomain = {0};
-    Point lpoint;
-    foreach() 
-      if ( x > L0 - Delta ) 
-      { 
-	lpoint = locate( x, y, z );
-	cache_append( &intDomain, lpoint, 0 );
-      }
-		
-    cache_shrink( &intDomain );
-    
-    foreach_cache(intDomain)
-      flowrate += sq(Delta) * u.x[];
-  
-    free( intDomain.p );
-# endif
-
 # if ADAPTIVE
     double hh = L0 / pow(2,level);
-    double zi = 0., yj = 0., xval = 0., uinter = 0.;
-    int ii = 0, jj = 0;
-  
-    foreach_level(level) xval = L0 - 0.5 * Delta + X0;
-  
-    for (ii = 0; ii < pow(2,level); ii++) 
+# else
+    double hh = Delta;
+# endif 
+  double zi = 0., yj = 0., xval = X0 + 0.9999 * L0, uinter = 0.;
+  int ii = 0, jj = 0;
+    
+  for (ii = 0; ii < pow(2,level); ii++) 
+  {
+    zi = 0.5 * hh + ii * hh + Z0;
+    for (jj = 0; jj < pow(2,level); jj++) 
     {
-      zi = 0.5 * hh + ii * hh + Z0;
-      for (jj = 0; jj < pow(2,level); jj++) 
-      {
-        yj = 0.5 * hh + jj * hh + Y0;
-        uinter = interpolate( u.x, xval, yj, zi );
-	if ( uinter < nodata )
-	  flowrate += sq(hh) * uinter;
-      }
-    }  
-# endif
-
-# if _MPI
-    mpi_all_reduce( flowrate, MPI_DOUBLE, MPI_SUM );
-# endif
+      yj = 0.5 * hh + jj * hh + Y0;
+      uinter = interpolate( u.x, xval, yj, zi );
+      flowrate += sq(hh) * uinter;
+    }
+  }      
  
   return flowrate;
 }
@@ -1798,48 +1782,24 @@ double compute_flowrate_top( const vector u, const int level )
 //----------------------------------------------------------------------------
 {
   double flowrate = 0.;
-
-# if !ADAPTIVE 
-    Cache intDomain = {0};
-    Point lpoint;
-    foreach() 
-      if ( y > L0 - Delta ) 
-      { 
-	lpoint = locate( x, y, z );
-	cache_append( &intDomain, lpoint, 0 );
-      }
-		
-    cache_shrink( &intDomain );
-    
-    foreach_cache(intDomain)
-      flowrate += sq(Delta) * u.y[];
-  
-    free( intDomain.p );
-# endif
-
 # if ADAPTIVE
     double hh = L0 / pow(2,level);
-    double zi = 0., yval = 0., xj = 0., uinter = 0.;
-    int ii = 0, jj = 0;
+# else
+    double hh = Delta;
+# endif 
+  double zi = 0., yval = Y0 + 0.9999 * L0, xj = 0., uinter = 0.;
+  int ii = 0, jj = 0;
   
-    foreach_level(level) yval = L0 - 0.5 * Delta + Y0;
-  
-    for (ii = 0; ii < pow(2,level); ii++) 
+  for (ii = 0; ii < pow(2,level); ii++) 
+  {
+    zi = 0.5 * hh + ii * hh + Z0;
+    for (jj = 0; jj < pow(2,level); jj++) 
     {
-      zi = 0.5 * hh + ii * hh + Z0;
-      for (jj = 0; jj < pow(2,level); jj++) 
-      {
-        xj = 0.5 * hh + jj * hh + X0;
-        uinter = interpolate( u.y, xj, yval, zi );
-	if ( uinter < nodata )
-	  flowrate += sq(hh) * uinter;
-      }
-    }  
-# endif
-
-# if _MPI
-    mpi_all_reduce( flowrate, MPI_DOUBLE, MPI_SUM );
-# endif
+      xj = 0.5 * hh + jj * hh + X0;
+      uinter = interpolate( u.y, xj, yval, zi );
+      flowrate += sq(hh) * uinter;
+    }
+  }  
  
   return flowrate;
 }
@@ -1852,49 +1812,25 @@ double compute_flowrate_top( const vector u, const int level )
 double compute_flowrate_front( const vector u, const int level ) 
 //----------------------------------------------------------------------------
 {
-  double flowrate = 0.;
-
-# if !ADAPTIVE 
-    Cache intDomain = {0};
-    Point lpoint;
-    foreach() 
-      if ( z > L0 - Delta ) 
-      { 
-	lpoint = locate( x, y, z );
-	cache_append( &intDomain, lpoint, 0 );
-      }
-		
-    cache_shrink( &intDomain );
-    
-    foreach_cache(intDomain)
-      flowrate += sq(Delta) * u.z[];
-  
-    free( intDomain.p );
-# endif
-
+  double flowrate = 0.;  
 # if ADAPTIVE
     double hh = L0 / pow(2,level);
-    double xi = 0., yj = 0., zval = 0., uinter = 0.;
-    int ii = 0, jj = 0;
-  
-    foreach_level(level) zval = L0 - 0.5 * Delta + Z0;
-  
-    for (ii = 0; ii < pow(2,level); ii++) 
-    {
-      xi = 0.5 * hh + ii * hh + X0;
-      for (jj = 0; jj < pow(2,level); jj++) 
-      {
-        yj = 0.5 * hh + jj * hh + Y0;
-        uinter = interpolate ( u.z, xi, yj, zval );
-	if ( uinter < nodata )
-	  flowrate += sq(hh) * uinter;
-      }
-    }  
-# endif
+# else
+    double hh = Delta;
+# endif    
+  double xi = 0., yj = 0., zval = Z0 + 0.9999 * L0, uinter = 0.;
+  int ii = 0, jj = 0;
 
-# if _MPI
-    mpi_all_reduce( flowrate, MPI_DOUBLE, MPI_SUM );
-# endif
+  for (ii = 0; ii < pow(2,level); ii++) 
+  {
+    xi = 0.5 * hh + ii * hh + X0;
+    for (jj = 0; jj < pow(2,level); jj++) 
+    {
+      yj = 0.5 * hh + jj * hh + Y0;
+      uinter = interpolate ( u.z, xi, yj, zval );
+      flowrate += sq(hh) * uinter;
+    }
+  }
  
   return flowrate;
 }

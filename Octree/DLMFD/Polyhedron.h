@@ -10,7 +10,6 @@ void periodic_correction( GeomParameter* gcp, coord* pos,
 {
   coord ori = {X0, Y0, Z0};
   coord shift = {0., 0., 0.};
-  Point lpoint;
 
   foreach_dimension()
   {
@@ -31,19 +30,9 @@ void periodic_correction( GeomParameter* gcp, coord* pos,
   }
 
   if ( setPeriodicRefCenter )
-  {
-    Cache poscache = {0};
-    lpoint = locate( pos->x, pos->y, pos->z );
-
-    if ( lpoint.level > -1 )
-    {
-      cache_append( &poscache, lpoint, 0 );
-      foreach_cache(poscache)
-        foreach_dimension()
-          pPeriodicRefCenter->x[] = gcp->center.x + shift.x;
-      free( poscache.p );
-    }
-  }
+    foreach_point( pos->x, pos->y, pos->z )
+      foreach_dimension()
+        pPeriodicRefCenter->x[] = gcp->center.x + shift.x;
 }
 
 
@@ -238,20 +227,9 @@ bool in_which_Polyhedron( double x1, double y1, double z1,
   // Check if it is in the master rigid body
   bool status = is_in_Polyhedron_clone( x1, y1, z1, gp );    
   if ( status && setPeriodicRefCenter )
-  {
-    Cache poscache = {0};
-    Point lpoint;
-    lpoint = locate( x1, y1, z1 );
-
-    if ( lpoint.level > -1 )
-    {
-      cache_append( &poscache, lpoint, 0 );
-      foreach_cache(poscache)
-        foreach_dimension()
-	  pPeriodicRefCenter->x[] = gp.center.x;
-      free( poscache.p );
-    }
-  }
+    foreach_point( x1, y1, z1 )
+      foreach_dimension()
+        pPeriodicRefCenter->x[] = gp.center.x;
 
   double x2, y2, z2;
 
@@ -266,20 +244,9 @@ bool in_which_Polyhedron( double x1, double y1, double z1,
       z2 = z1 + gp.center.z - clones.center.z;
       status = is_in_Polyhedron_clone( x2, y2, z2, gp );
       if ( status && setPeriodicRefCenter )
-      {
-        Cache poscache = {0};
-	Point lpoint;
-	lpoint = locate( x1, y1, z1 );
-        
-	if ( lpoint.level > -1 )
-	{
-	  cache_append( &poscache, lpoint, 0 );
-	  foreach_cache(poscache)
-	    foreach_dimension()
-	      pPeriodicRefCenter->x[] = clones.center.x;
-          free( poscache.p );
-	}
-      }
+        foreach_point( x1, y1, z1 )
+          foreach_dimension()
+            pPeriodicRefCenter->x[] = clones.center.x;
     }
 
   return status;
@@ -294,19 +261,22 @@ void create_FD_Interior_Polyhedron( RigidBody* p, vector Index,
 	vector PeriodicRefCenter )
 //----------------------------------------------------------------------------
 {
-  Cache* c;
+  GeomParameter gp = p->g;  
+  Cache* fd = &(p->Interior);
+  Point ppp;
 
   /** Create the cache of the interior points of the polyhedron */
-  c = &(p->Interior);
-
-  GeomParameter gp = p->g;
-  foreach()
+  foreach(serial)
     if ( in_which_Polyhedron( x, y, z, gp, &PeriodicRefCenter, true ) )
       if ( (int)Index.y[] == -1 )
       {
-        cache_append( c, point, 0 );
+	ppp.i = point.i;
+        ppp.j = point.j;
+        ppp.k = point.k;			
+        ppp.level = point.level;
+	cache_append( fd, ppp, 0 );
 	Index.y[] = p->pnum;
       }
 
-  cache_shrink( c );
+  cache_shrink( fd );
 }

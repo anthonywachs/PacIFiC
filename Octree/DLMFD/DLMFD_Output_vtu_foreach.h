@@ -843,9 +843,9 @@ void output_vtu_ascii_foreach_MPIIO( scalar* list, vector* vlist,
     {
 #     if dimension == 2
         uint64_t ape1 = (uint64_t)marker[] + shift[rank];
-        uint64_t ape2 = (uint64_t)marker[1,0]) + shift[rank];
-        uint64_t ape3 = (uint64_t)marker[1,1]) + shift[rank];
-        uint64_t int ape4 = (uint64_t)marker[0,1]) + shift[rank];
+        uint64_t ape2 = (uint64_t)marker[1,0] + shift[rank];
+        uint64_t ape3 = (uint64_t)marker[1,1] + shift[rank];
+        uint64_t ape4 = (uint64_t)marker[0,1] + shift[rank];
 	length += count_revifs( ape1 ) + count_revifs( ape2 )
 		+ count_revifs( ape3 ) + count_revifs( ape4 ) + 4;		
 #     endif
@@ -1552,7 +1552,7 @@ void output_vtu_bin_foreach_MPIIO( scalar* list, vector* vlist,
   
   
   // Vector field values
-  int nvector = 0, ivec = 0;
+  int nvector = 0, ivc = 0;
   for (vector v in vlist)  ++nvector;
   uint32_t* vector_binary_offset = (uint32_t*) calloc( nvector, 
   	sizeof(uint32_t) );
@@ -1560,7 +1560,7 @@ void output_vtu_bin_foreach_MPIIO( scalar* list, vector* vlist,
   // Write each scalar field to the binary buffer 
   for (vector v in vlist)
   {
-    vector_binary_offset[ivec] = OFFSET;
+    vector_binary_offset[ivc] = OFFSET;
     start_output_binary( sizeof(PARAVIEW_DATATYPE), dimension * no_cells );     
     foreach(serial, noauto)
     {
@@ -1575,7 +1575,7 @@ void output_vtu_bin_foreach_MPIIO( scalar* list, vector* vlist,
 #     endif
     }    
     compress_segment_binary( CURRENT_LENGTH );
-    ++ivec;      
+    ++ivc;      
   }    
 
 
@@ -1639,16 +1639,16 @@ void output_vtu_bin_foreach_MPIIO( scalar* list, vector* vlist,
     strcat( header, line );  	
     ++iscal;  
   }
-  ivec = 0;
+  ivc = 0;
   for (vector v in vlist)
   {  
     sprintf( line, "<DataArray type=\"%s\" Name=\"%s\" "
     	"NumberOfComponents=\"3\" offset=\""
     	"%lu\" format=\"appended\"></DataArray>\n", 
 	PARAVIEW_DATANAME, v.x.name, cumul_binary_offset_per_proc[rank] 
-	+ (uint64_t)vector_binary_offset[ivec] );
+	+ (uint64_t)vector_binary_offset[ivc] );
     strcat( header, line );  	  
-    ++ivec;
+    ++ivc;
   }
   sprintf( line, "</CellData>\n</Piece>\n" );
   strcat( header, line );   

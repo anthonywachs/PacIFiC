@@ -269,7 +269,7 @@ event init (i = 0)
   allDLMFDptscells.total_number_of_DLMFDcells = 0;
 
   // If new simulation: set fluid initial condition from user defined case file
-  if ( ! restore ( file = FLUID_DUMP_FILENAME ) ) 
+  if ( ! restore ( FLUID_DUMP_FILENAME ) ) 
   {
     // Set the restarted simulation boolean to 0
     restarted_simu = 0;
@@ -517,7 +517,7 @@ event init (i = 0)
 
 
 
-
+ 
 /** Logfile event to stop the simulation at maxtime */
 //----------------------------------------------------------------------------
 event logfile ( i=0; i++ ) 
@@ -599,7 +599,7 @@ void do_output( char const* mess )
       , omega
 #   endif        
     };
-    dump( file = dump_name, dump_list );  
+    dump( dump_name, dump_list );  
 # endif
 
   // Basilisk output for restart
@@ -608,7 +608,7 @@ void do_output( char const* mess )
 # else
     dump_list = (scalar *){u, g};    
 # endif     
-  dump( file = FLUID_DUMP_FILENAME, dump_list );    
+  dump( FLUID_DUMP_FILENAME, dump_list );    
 
   // Granular solver output for both post-processing & restart
   event( "GranularSolver_saveResults" );
