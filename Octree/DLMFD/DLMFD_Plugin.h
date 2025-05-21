@@ -529,12 +529,13 @@ event logfile ( i=0; i++ )
   if ( t - maxtime > - ROUNDDOUBLECOEF * dt ) 
   {
     // Close all DLMFD files
-    close_file_pointers( nbRigidBodies, pdata, fdata, converge, cellvstime ); 
+    close_file_pointers( nbRigidBodies, pdata, !RIGIDBODIES_AS_FIXED_OBSTACLES,
+    	fdata, converge, cellvstime ); 
 
     // Write the dump time and time step for restart
     if ( pid() == 0 ) printf( "Write t and dt in time restart file\n" );
     save_t_dt_restart( DUMP_DIR, t, dt, imposed_periodicpressuredrop );  
-    
+ 
     // Stop simulation
     return 1; 
   }

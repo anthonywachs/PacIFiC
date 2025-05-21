@@ -1631,7 +1631,7 @@ void computeHydroForceTorque( RigidBody* allrbs, const size_t nrb, FILE** sl,
 
 /** Initialize/open all DLMFD file pointers */
 //----------------------------------------------------------------------------
-void init_file_pointers( const size_t nrb, FILE** p, const bool pdata_is_open,
+void init_file_pointers( const size_t nrb, FILE** p, const bool open_pdata,
 	FILE** d, FILE** UzawaCV, FILE** CVT, const size_t rflag ) 
 //----------------------------------------------------------------------------
 {
@@ -1647,7 +1647,7 @@ void init_file_pointers( const size_t nrb, FILE** p, const bool pdata_is_open,
       {
         sprintf( suffix, "_%lu.dat", k );
 
-        if ( pdata_is_open )
+        if ( open_pdata )
 	{
           strcpy( name, RESULT_DIR );
           strcat( name, "/" );
@@ -1666,7 +1666,7 @@ void init_file_pointers( const size_t nrb, FILE** p, const bool pdata_is_open,
 	
 	// Write headers in these files
 	if ( !rflag ) 
-	  writer_headers( pdata_is_open ? p[k] : NULL, pdata_is_open, d[k] );
+	  writer_headers( open_pdata ? p[k] : NULL, open_pdata, d[k] );
       }
     
       // Uzawa convergence
@@ -1705,8 +1705,8 @@ void init_file_pointers( const size_t nrb, FILE** p, const bool pdata_is_open,
 
 /** Close all DLMFD files */
 //----------------------------------------------------------------------------
-void close_file_pointers( const size_t nrb, FILE** p, FILE** d, FILE* UzawaCV, 
-	FILE* CVT ) 
+void close_file_pointers( const size_t nrb, FILE** p, const bool pdata_is_open,
+	FILE** d, FILE* UzawaCV, FILE* CVT ) 
 //----------------------------------------------------------------------------
 { 
 # if _MPI
@@ -1714,11 +1714,8 @@ void close_file_pointers( const size_t nrb, FILE** p, FILE** d, FILE* UzawaCV,
 # endif
     {
       // Rigid body data
-      for (size_t k = 0; k < nrb; k++) 
-      {
-        fclose( p[k] ); 
-        fclose( d[k] );
-      }
+      if ( pdata_is_open ) for (size_t k = 0; k < nrb; k++) fclose( p[k] );      
+      for (size_t k = 0; k < nrb; k++) fclose( d[k] );
     
       // Uzawa convergence
       fclose( UzawaCV );  
