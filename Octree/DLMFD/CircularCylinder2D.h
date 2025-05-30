@@ -6,10 +6,11 @@
 /** Tests whether a point lies inside the 2D circular cylinder */
 //----------------------------------------------------------------------------
 bool is_in_CircularCylinder2D_clone( const double x, const double y, 
-	const GeomParameter gp )
+	GeomParameter const* gcp )
 //----------------------------------------------------------------------------
 {
-  return ( sqrt( sq( x - gp.center.x ) + sq( y - gp.center.y ) ) < gp.radius );
+  return ( sqrt( sq( x - gcp->center.x ) + sq( y - gcp->center.y ) ) 
+  	< gcp->radius );
 }
 
 
@@ -19,22 +20,22 @@ bool is_in_CircularCylinder2D_clone( const double x, const double y,
 periodic clones */
 //----------------------------------------------------------------------------
 bool is_in_CircularCylinder2D( const double x, const double y, 
-	const GeomParameter gp )
+	GeomParameter const* gcp )
 //----------------------------------------------------------------------------
 {
   // Check if it is in the master rigid body
-  bool status = is_in_CircularCylinder2D_clone( x, y, gp );
+  bool status = is_in_CircularCylinder2D_clone( x, y, gcp );
 
   // Check if it is in any clone rigid body
-  if ( gp.nperclones && !status )
-    for (int i = 0; i < gp.nperclones && !status; i++)
+  if ( gcp->nperclones && !status )
+    for (int i = 0; i < gcp->nperclones && !status; i++)
     {
-      GeomParameter clones = gp;
-      clones.center = gp.perclonecenters[i];
-      status = is_in_CircularCylinder2D_clone( x, y, clones );
+      GeomParameter clone = *gcp;
+      clone.center = gcp->perclonecenters[i];
+      status = is_in_CircularCylinder2D_clone( x, y, &clone );
     }
 
-  return status;
+  return ( status );
 }
 
 
@@ -45,31 +46,31 @@ periodic clones and assign the proper center of mass coordinates associated to
 this point */
 //----------------------------------------------------------------------------
 bool in_which_CircularCylinder2D( double x1, double y1, 
-	const GeomParameter gp, vector PeriodicRefCenter, 
+	GeomParameter const* gcp, vector* pPeriodicRefCenter, 
 	const bool setPeriodicRefCenter )
 //----------------------------------------------------------------------------
 {
   // Check if it is in the master rigid body
-  bool status = is_in_CircularCylinder2D_clone( x1, y1, gp );
+  bool status = is_in_CircularCylinder2D_clone( x1, y1, gcp );
   if ( status && setPeriodicRefCenter )
     foreach_point( x1, y1 )
       foreach_dimension()
-        PeriodicRefCenter.x[] = gp.center.x;
+        pPeriodicRefCenter->x[] = gcp->center.x;
 
   //  Check if it is in any clone rigid body
-  if ( gp.nperclones && !status )
-    for (int i = 0; i < gp.nperclones && !status; i++) 
+  if ( gcp->nperclones && !status )
+    for (int i = 0; i < gcp->nperclones && !status; i++) 
     {
-      GeomParameter clones = gp;
-      clones.center = gp.perclonecenters[i];
-      status = is_in_CircularCylinder2D_clone( x1, y1, clones );
+      GeomParameter clone = *gcp;
+      clone.center = gcp->perclonecenters[i];
+      status = is_in_CircularCylinder2D_clone( x1, y1, &clone );
       if ( status && setPeriodicRefCenter )
         foreach_point( x1, y1 )
           foreach_dimension()
-	    PeriodicRefCenter.x[] = clones.center.x;
+	    pPeriodicRefCenter->x[] = clone.center.x;
     }
 
-  return status;
+  return ( status );
 }
 
 
@@ -78,12 +79,12 @@ bool in_which_CircularCylinder2D( double x1, double y1,
 /** Computes the number of boundary points on the perimeter of the 2D circular 
 cylinder */
 //----------------------------------------------------------------------------
-void compute_nboundary_CircularCylinder2D( const GeomParameter gcp, int* nb ) 
+void compute_nboundary_CircularCylinder2D( GeomParameter const* gcp, int* nb ) 
 //----------------------------------------------------------------------------
 {
   double delta = L0 / (double)(1 << MAXLEVEL) ; 
 
-  *nb = (int)( floor( 2. * pi * gcp.radius
+  *nb = (int)( floor( 2. * pi * gcp->radius
 	/ ( INTERBPCOEF * delta ) ) );
       
   if( *nb == 0 )
@@ -95,7 +96,7 @@ void compute_nboundary_CircularCylinder2D( const GeomParameter gcp, int* nb )
 
 /** Creates boundary points on the surface of the 2D circular cylinder */
 //----------------------------------------------------------------------------
-void create_FD_Boundary_CircularCylinder2D( GeomParameter gcp,
+void create_FD_Boundary_CircularCylinder2D( GeomParameter const* gcp,
 	RigidBodyBoundary* dlm_bd, const int nsphere, 
 	vector* pPeriodicRefCenter, const bool setPeriodicRefCenter  ) 
 //----------------------------------------------------------------------------
@@ -107,7 +108,7 @@ void create_FD_Boundary_CircularCylinder2D( GeomParameter gcp,
  
   int i;
   double theta[m];
-  double radius = gcp.radius;
+  double radius = gcp->radius;
   coord fact_theta[m];
   
   for (i = 0; i < m; i++) 
@@ -117,8 +118,8 @@ void create_FD_Boundary_CircularCylinder2D( GeomParameter gcp,
     fact_theta[i].y = sin( theta[i] );
     
     /* Assign positions x, y on the circular cylinder boundary */ 
-    pos.x = radius * fact_theta[i].x + gcp.center.x + X0;
-    pos.y = radius * fact_theta[i].y + gcp.center.y + Y0;
+    pos.x = radius * fact_theta[i].x + gcp->center.x + X0;
+    pos.y = radius * fact_theta[i].y + gcp->center.y + Y0;
 
     /* Check if the point falls outside of the domain */    
     foreach_dimension()
@@ -144,7 +145,7 @@ void create_FD_Boundary_CircularCylinder2D( GeomParameter gcp,
       // Setting the periodic clone center vector field
       foreach_point( pos.x, pos.y )
         foreach_dimension()
-	  pPeriodicRefCenter->x[] = gcp.center.x + shift.x;
+	  pPeriodicRefCenter->x[] = gcp->center.x + shift.x;
     }
 
     dlm_bd->x[i] = pos.x;
@@ -164,13 +165,13 @@ void create_FD_Interior_CircularCylinder2D( RigidBody* p, vector Index,
 	vector PeriodicRefCenter )
 //----------------------------------------------------------------------------
 {
-  GeomParameter gci = p->g;
+  GeomParameter const* gcp = &(p->g);
   Cache* fd = &(p->Interior);
   Point ppp;
 
   /** Create the cache for the interior points */
   foreach(serial)
-    if ( in_which_CircularCylinder2D( x, y, gci, PeriodicRefCenter, true ) )
+    if ( in_which_CircularCylinder2D( x, y, gcp, &PeriodicRefCenter, true ) )
       if ( (int)Index.y[] == -1 )
       {
 	ppp.i = point.i;

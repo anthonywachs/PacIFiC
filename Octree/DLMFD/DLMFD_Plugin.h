@@ -604,7 +604,7 @@ void do_output( char const* mess )
 # endif
 
   // Basilisk output for restart
-# if DLM_alpha_coupling
+# if DLM_ALPHA_COUPLING
     dump_list = (scalar *){u, g, DLM_explicit};
 # else
     dump_list = (scalar *){u, g};    
@@ -699,10 +699,10 @@ event once_timestep_is_determined (i++)
 # if IMPOSED_PERIODICFLOW
 #   if IMPOSED_PERIODICFLOW_DIRECTION == 0 
       const face vector dp[] = { 
-		imposed_periodicpressuredrop / ( L0 * FLUID_DENSITY ), 0., 0. };
+	- imposed_periodicpressuredrop / ( L0 * FLUID_DENSITY ), 0., 0. };
 #   elif IMPOSED_PERIODICFLOW_DIRECTION == 1
       const face vector dp[] = { 0.,
-		imposed_periodicpressuredrop / ( L0 * FLUID_DENSITY ), 0. };  	
+	- imposed_periodicpressuredrop / ( L0 * FLUID_DENSITY ), 0. };  	
 #   else 
       const face vector dp[] = { 0., 0., 
 		- imposed_periodicpressuredrop / ( L0 * FLUID_DENSITY ) };  
@@ -716,7 +716,7 @@ event once_timestep_is_determined (i++)
 
   /* Construction of rigid bodies and their DLMFD features */
   if ( pid() == 0 ) printf( "   DLMFD RB construction\n" ); 
-  DLMFD_construction();   
+  DLMFD_construction();  
 }
 
 
@@ -814,11 +814,11 @@ event end_timestep (i++)
     double flowrate = 0.;
 #   if IMPOSED_PERIODICFLOW_TYPE == 0
 #     if IMPOSED_PERIODICFLOW_DIRECTION == 0 
-        flowrate = compute_flowrate_right( u, periodicflowrate_level );
+        flowrate = compute_flowrate_right( u, PERIODICFLOWRATE_LEVEL );
 #     elif IMPOSED_PERIODICFLOW_DIRECTION == 1
-        flowrate = compute_flowrate_top( u, periodicflowrate_level );
+        flowrate = compute_flowrate_top( u, PERIODICFLOWRATE_LEVEL );
 #     else 
-        flowrate = compute_flowrate_front( u, periodicflowrate_level );
+        flowrate = compute_flowrate_front( u, PERIODICFLOWRATE_LEVEL );
 #     endif 
       if ( pid() == 0 )
         printf( "   Periodic flow rate = %8.5e\n", flowrate );           

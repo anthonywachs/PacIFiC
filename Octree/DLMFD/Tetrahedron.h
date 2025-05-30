@@ -6,7 +6,7 @@
 
 /** Computes the number of boundary points on the surface of the tetrahedron */
 //----------------------------------------------------------------------------
-void compute_nboundary_Tetrahedron( GeomParameter* gcp, int* nb, int* lN )
+void compute_nboundary_Tetrahedron( GeomParameter const* gcp, int* nb, int* lN )
 //----------------------------------------------------------------------------
 {
   double delta = L0 / (double)(1 << MAXLEVEL) ;  
@@ -41,7 +41,7 @@ void compute_nboundary_Tetrahedron( GeomParameter* gcp, int* nb, int* lN )
 
 /** Creates boundary points on the surface of the tetrahedron */
 //----------------------------------------------------------------------------
-void create_FD_Boundary_Tetrahedron( GeomParameter* gcp,
+void create_FD_Boundary_Tetrahedron( GeomParameter const* gcp,
 	RigidBodyBoundary* dlm_bd, const int m, const int lN, 
 	vector* pPeriodicRefCenter, const bool setPeriodicRefCenter )
 //----------------------------------------------------------------------------
@@ -83,19 +83,15 @@ void create_FD_Boundary_Tetrahedron( GeomParameter* gcp,
     {
       for (int jj = 1; jj <= lN-2 - ii; jj++)
       {
-        pos.x = refcorner.x + (double) ii * dir1.x
+        foreach_dimension()
+	  pos.x = refcorner.x + (double) ii * dir1.x
 		      + (double) jj * dir2.x;
-        pos.y = refcorner.y + (double) ii * dir1.y
-      		+ (double) jj * dir2.y;
-        pos.z = refcorner.z + (double) ii * dir1.z
-      		+ (double) jj * dir2.z;
 		
         periodic_correction( gcp, &pos, pPeriodicRefCenter, 
 		setPeriodicRefCenter );
 
-        dlm_bd->x[isb] = pos.x;
-	dlm_bd->y[isb] = pos.y;
-	dlm_bd->z[isb] = pos.z;
+        foreach_dimension()
+	  dlm_bd->x[isb] = pos.x;
 	
 	isb++;
       }
@@ -163,9 +159,8 @@ void create_FD_Boundary_Tetrahedron( GeomParameter* gcp,
     periodic_correction( gcp, &pos, pPeriodicRefCenter, 
     	setPeriodicRefCenter );
 
-    dlm_bd->x[isb] = pos.x;
-    dlm_bd->y[isb] = pos.y;
-    dlm_bd->z[isb] = pos.z;
+    foreach_dimension()
+      dlm_bd->x[isb] = pos.x;
 
     isb++;
   }

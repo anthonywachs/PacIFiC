@@ -89,6 +89,7 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
     nperclonesp = 0;
     GeomParameter* gg = &(allrb[k].g);
     gg->pgp = NULL;
+    gg->cgp = NULL;    
     allrb[k].toygsp = NULL;
     
     // Read the rigid body number but assign k
@@ -382,6 +383,8 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
       gg->center.z = 0.;      
 #   endif
     gg->ncorners = ncornersp;
+    if ( gg->ncorners == 666 ) gg->ncorners = 8;
+    else if ( gg->ncorners == 777 ) gg->ncorners = 0;
     gg->radius = radiusp; 
     gg->nperclones = nperclonesp;    
     if ( nperclonesp )
@@ -483,7 +486,17 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
        case 20: 
          allrb[k].shape = DODECAHEDRON;
 	 update_Dodecahedron( gg );
-         break;      	  
+         break;
+	 
+       case 666: 
+         allrb[k].shape = BOX;
+	 update_Box( gg );
+         break;	
+	 
+       case 777: 
+         allrb[k].shape = CIRCULARCYLINDER3D;
+	 update_CircularCylinder3D( gg );
+         break;	        	  
 #     else
         case 1: 
           allrb[k].shape = CIRCULARCYLINDER2D;

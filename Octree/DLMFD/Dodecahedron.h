@@ -6,7 +6,8 @@
 
 /** Computes the number of boundary points on the surface of the dodecahedron */
 //----------------------------------------------------------------------------
-void compute_nboundary_Dodecahedron( GeomParameter* gcp, int* nb, int* lN )
+void compute_nboundary_Dodecahedron( GeomParameter const* gcp, int* nb, 
+	int* lN )
 //----------------------------------------------------------------------------
 {
   double delta = L0 / (double)(1 << MAXLEVEL) ; 
@@ -42,7 +43,7 @@ void compute_nboundary_Dodecahedron( GeomParameter* gcp, int* nb, int* lN )
 
 /** Creates boundary points on the surface of the dodecahedron */
 //----------------------------------------------------------------------------
-void create_FD_Boundary_Dodecahedron( GeomParameter* gcp,
+void create_FD_Boundary_Dodecahedron( GeomParameter const* gcp,
 	RigidBodyBoundary* dlm_bd, const int m, const int lN, 
 	vector* pPeriodicRefCenter, const bool setPeriodicRefCenter )
 //----------------------------------------------------------------------------
@@ -71,16 +72,15 @@ void create_FD_Boundary_Dodecahedron( GeomParameter* gcp,
     coord refcorner = { orig_x, orig_y, orig_z } ;
 
     // Add central points on each surface of the Dodecahedron (12 points)
-    pos.x = refcorner.x;
-    pos.y = refcorner.y;
-    pos.z = refcorner.z;
+    foreach_dimension()
+      pos.x = refcorner.x;
     
     periodic_correction( gcp, &pos, pPeriodicRefCenter, 
     	setPeriodicRefCenter );
 
-    dlm_bd->x[isb] = pos.x;
-    dlm_bd->y[isb] = pos.y;
-    dlm_bd->z[isb] = pos.z;
+    foreach_dimension()
+      dlm_bd->x[isb] = pos.x;
+
     isb++;
 
     for (int k = 0; k < npoints; k++)
@@ -117,19 +117,15 @@ void create_FD_Boundary_Dodecahedron( GeomParameter* gcp,
       {
         for (int jj = 1; jj <= lN-2 - ii; jj++)
         {
-          pos.x = refcorner.x + (double) ii * dir1.x
+          foreach_dimension()
+	    pos.x = refcorner.x + (double) ii * dir1.x
 		+ (double) jj * dir2.x;
-          pos.y = refcorner.y + (double) ii * dir1.y
-		+ (double) jj * dir2.y;
-          pos.z = refcorner.z + (double) ii * dir1.z
-		+ (double) jj * dir2.z;
 
           periodic_correction( gcp, &pos, pPeriodicRefCenter, 
     		setPeriodicRefCenter );
 
-          dlm_bd->x[isb] = pos.x;
-          dlm_bd->y[isb] = pos.y;
-          dlm_bd->z[isb] = pos.z;
+          foreach_dimension()
+	    dlm_bd->x[isb] = pos.x;
 
           isb++;
         }
@@ -197,9 +193,8 @@ void create_FD_Boundary_Dodecahedron( GeomParameter* gcp,
     periodic_correction( gcp, &pos, pPeriodicRefCenter, 
     	setPeriodicRefCenter );
 
-    dlm_bd->x[isb] = pos.x;
-    dlm_bd->y[isb] = pos.y;
-    dlm_bd->z[isb] = pos.z;
+    foreach_dimension()
+      dlm_bd->x[isb] = pos.x;
 
     isb++;
   }

@@ -6,11 +6,11 @@
 /** Tests whether a point lies inside the sphere */
 //----------------------------------------------------------------------------
 bool is_in_Sphere_clone( const double x, const double y, const double z,
-	const GeomParameter gp )
+	GeomParameter const* gcp )
 //----------------------------------------------------------------------------
 {
-  return ( sqrt( sq( x - gp.center.x ) + sq( y - gp.center.y )
-    	+ sq( z - gp.center.z ) ) < gp.radius );
+  return ( sqrt( sq( x - gcp->center.x ) + sq( y - gcp->center.y )
+    	+ sq( z - gcp->center.z ) ) < gcp->radius );
 }
 
 
@@ -20,22 +20,22 @@ bool is_in_Sphere_clone( const double x, const double y, const double z,
 periodic clones */
 //----------------------------------------------------------------------------
 bool is_in_Sphere( const double x, const double y, const double z,
-	const GeomParameter gp )
+	GeomParameter const* gcp )
 //----------------------------------------------------------------------------
 {
   // Check if it is in the master rigid body
-  bool status = is_in_Sphere_clone( x, y, z, gp );
+  bool status = is_in_Sphere_clone( x, y, z, gcp );
 
   // Check if it is in any clone rigid body
-  if ( gp.nperclones && !status )
-    for (int i = 0; i < gp.nperclones && !status; i++)
+  if ( gcp->nperclones && !status )
+    for (int i = 0; i < gcp->nperclones && !status; i++)
     {
-      GeomParameter clones = gp;
-      clones.center = gp.perclonecenters[i];
-      status = is_in_Sphere_clone( x, y, z, clones );
+      GeomParameter clone = *gcp;
+      clone.center = gcp->perclonecenters[i];
+      status = is_in_Sphere_clone( x, y, z, &clone );
     }
 
-  return status;
+  return ( status );
 }
 
 
@@ -46,43 +46,43 @@ periodic clones and assign the proper center of mass coordinates associated to
 this point */
 //----------------------------------------------------------------------------
 bool in_which_Sphere( double x1, double y1, double z1,
-	const GeomParameter gp, vector PeriodicRefCenter, 
+	GeomParameter const* gcp, vector* pPeriodicRefCenter, 
 	const bool setPeriodicRefCenter )
 //----------------------------------------------------------------------------
 {
   // Check if it is in the master rigid body
-  bool status = is_in_Sphere_clone( x1, y1, z1, gp );
+  bool status = is_in_Sphere_clone( x1, y1, z1, gcp );
   if ( status && setPeriodicRefCenter )
     foreach_point( x1, y1, z1 )
       foreach_dimension()
-        PeriodicRefCenter.x[] = gp.center.x;
+        pPeriodicRefCenter->x[] = gcp->center.x;
 
   //  Check if it is in any clone rigid body
-  if ( gp.nperclones && !status )
-    for (int i = 0; i < gp.nperclones && !status; i++) 
+  if ( gcp->nperclones && !status )
+    for (int i = 0; i < gcp->nperclones && !status; i++) 
     {
-      GeomParameter clones = gp;
-      clones.center = gp.perclonecenters[i];
-      status = is_in_Sphere_clone( x1, y1, z1, clones );
+      GeomParameter clone = *gcp;
+      clone.center = gcp->perclonecenters[i];
+      status = is_in_Sphere_clone( x1, y1, z1, &clone );
       if ( status && setPeriodicRefCenter )
         foreach_point( x1, y1, z1 )
           foreach_dimension()
-            PeriodicRefCenter.x[] = clones.center.x;
+            pPeriodicRefCenter->x[] = clone.center.x;
     }
 
-  return status;
+  return ( status );
 }
 
 
 
 /** Computes the number of boundary points on the surface of the sphere */
 //----------------------------------------------------------------------------
-void compute_nboundary_Sphere( const GeomParameter gcp, int* nb )
+void compute_nboundary_Sphere( GeomParameter const* gcp, int* nb )
 //----------------------------------------------------------------------------
 {
   double delta = L0 / (double)(1 << MAXLEVEL) ;  
 
-  *nb = (int)( floor( pow( 3.809 * gcp.radius
+  *nb = (int)( floor( pow( 3.809 * gcp->radius
 	/ ( INTERBPCOEF * delta ), 2.) ) );
 
   if ( *nb == 0 )
@@ -94,7 +94,7 @@ void compute_nboundary_Sphere( const GeomParameter gcp, int* nb )
 
 /** Creates boundary points on the surface of the sphere */
 //----------------------------------------------------------------------------
-void create_FD_Boundary_Sphere( GeomParameter gcp,
+void create_FD_Boundary_Sphere( GeomParameter const* gcp,
 	RigidBodyBoundary* dlm_bd, const int nsphere, 
 	vector* pPeriodicRefCenter, const bool setPeriodicRefCenter )
 //----------------------------------------------------------------------------
@@ -111,7 +111,7 @@ void create_FD_Boundary_Sphere( GeomParameter gcp,
 
   double delta = L0 / (double)(1 << MAXLEVEL) ;  
   double spiral_spacing_correction = INTERBPCOEF * delta / sqrt(3.) ;
-  double hydro_radius = gcp.radius;
+  double hydro_radius = gcp->radius;
   size_t k;
 
   /* Number of points */
@@ -153,9 +153,9 @@ void create_FD_Boundary_Sphere( GeomParameter gcp,
       thetak += 0.25 * spiral_spacing_correction / hydro_radius ;
     }
 
-    pos.x = hydro_radius * cos( phik ) * sin( thetak ) + gcp.center.x;
-    pos.y = hydro_radius * sin( phik ) * sin( thetak ) + gcp.center.y;
-    pos.z = hydro_radius * cos( thetak ) + gcp.center.z;
+    pos.x = hydro_radius * cos( phik ) * sin( thetak ) + gcp->center.x;
+    pos.y = hydro_radius * sin( phik ) * sin( thetak ) + gcp->center.y;
+    pos.z = hydro_radius * cos( thetak ) + gcp->center.z;
 
     /* Check if the point falls outside of the domain */    
     foreach_dimension()
@@ -181,12 +181,11 @@ void create_FD_Boundary_Sphere( GeomParameter gcp,
       // Setting the periodic clone center vector field
       foreach_point( pos.x, pos.y, pos.z )
         foreach_dimension()
-	  pPeriodicRefCenter->x[] = gcp.center.x + shift.x;
+	  pPeriodicRefCenter->x[] = gcp->center.x + shift.x;
     }
 
-    dlm_bd->x[k] = pos.x;
-    dlm_bd->y[k] = pos.y;
-    dlm_bd->z[k] = pos.z;
+    foreach_dimension() 
+      dlm_bd->x[k] = pos.x;
   }
 
   if ( setPeriodicRefCenter ) synchronize((scalar*){pPeriodicRefCenter->x,
@@ -202,13 +201,13 @@ void create_FD_Interior_Sphere( RigidBody* p, vector Index,
 	vector PeriodicRefCenter )
 //----------------------------------------------------------------------------
 {
-  GeomParameter gci = p->g;
+  GeomParameter* gcp = &(p->g);
   Cache* fd = &(p->Interior);
   Point ppp;
   
   /** Create the cache for the interior points */
   foreach(serial)
-    if ( in_which_Sphere( x, y, z, gci, PeriodicRefCenter, true ) )
+    if ( in_which_Sphere( x, y, z, gcp, &PeriodicRefCenter, true ) )
       if ( (int)Index.y[] == -1 )
       {
 	ppp.i = point.i;

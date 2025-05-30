@@ -55,6 +55,10 @@ solve them successively. We chose here a two-steps time-spliting.
 #   define DLM_ALPHA_COUPLING 0
 # endif
 
+# ifndef DLM_UZAWA_TOL
+#   define DLM_UZAWA_TOL 1.e-5
+# endif
+
 # ifndef DLMFD_BOUNDARYPOINTS
 #   define DLMFD_BOUNDARYPOINTS 1
 # endif
@@ -247,7 +251,7 @@ void DLMFD_construction()
     	DLM_Index, 1 );	
 # endif	
 
-  // Create fictitious-domain's cache for the interior domain
+  // Create fictitious-domain cache for the interior domain
 # if DLMFD_INTERIORPOINTS 
     for (size_t k = 0; k < nbRigidBodies; k++) 
     {
@@ -286,7 +290,17 @@ void DLMFD_construction()
         case DODECAHEDRON:
 	  create_FD_Interior_Polyhedron( &allRigidBodies[k], DLM_Index, 
 	  	DLM_PeriodicRefCenter );
-	  break;	  		  
+	  break;
+	  
+        case BOX:
+	  create_FD_Interior_Polyhedron( &allRigidBodies[k], DLM_Index, 
+	  	DLM_PeriodicRefCenter );
+	  break;
+	  
+        case CIRCULARCYLINDER3D:
+	  create_FD_Interior_CircularCylinder3D( &allRigidBodies[k], DLM_Index, 
+	  	DLM_PeriodicRefCenter );
+	  break;	  	  	  		  
 	  
 	default:
           fprintf( stderr,"Unknown Rigid Body shape !!\n" );
@@ -337,7 +351,7 @@ void DLMFD_Uzawa_velocity( const int i )
   double mpitimings[npe()];
   
   double DLM_alpha = 0., DLM_beta = 0.;
-  double DLM_tol = 1.e-5, DLM_nr2 = 0., DLM_nr2_km1 = 0., DLM_wv = 0.;
+  double DLM_tol = DLM_UZAWA_TOL, DLM_nr2 = 0., DLM_nr2_km1 = 0., DLM_wv = 0.;
   int ki = 0, DLM_maxiter = 200, allDLMFDcells = 0, allDLMFDpts = 0, 
   	total_number_of_cells = 0;
   double rho_f = FLUID_DENSITY;
@@ -404,72 +418,78 @@ void DLMFD_Uzawa_velocity( const int i )
     int bbb = 0;
     Point ppp;
     initialize_and_allocate_Cache( &Traversal_rvwlambda );
-    // Interior points
-    for (size_t m = 0; m < nbRigidBodies; m++)
-    {     
-      bbb = 0; 
-      foreach_cache((*Interior[m])) 
-      {      
-        if ( DLM_Flag[] < 1 )
-        {
-          ppp.i = (Interior[m]->p)[bbb].i;
-          ppp.j = (Interior[m]->p)[bbb].j;
-          ppp.k = (Interior[m]->p)[bbb].k;		
-          ppp.level = (Interior[m]->p)[bbb].level;	
-	  cache_append( &Traversal_rvwlambda, ppp, 0);
+#   if DLMFD_INTERIORPOINTS
+      // Interior points
+      for (size_t m = 0; m < nbRigidBodies; m++)
+      {     
+        bbb = 0; 
+        foreach_cache((*Interior[m])) 
+        {      
+          if ( DLM_Flag[] < 1 )
+          {
+            ppp.i = (Interior[m]->p)[bbb].i;
+            ppp.j = (Interior[m]->p)[bbb].j;
+            ppp.k = (Interior[m]->p)[bbb].k;		
+            ppp.level = (Interior[m]->p)[bbb].level;	
+	    cache_append( &Traversal_rvwlambda, ppp, 0);
+          }
+          bbb++;
         }
-        bbb++;
       }
-    }
-    // Boundary points
-    for (size_t m = 0; m < nbRigidBodies; m++) 
-    { 
-      bbb = 0;
-      foreach_cache((*Boundary[m])) 
-      {   
-        if ( DLM_Index.x[] > -1 ) 
-        {
-          ppp.i = (Boundary[m]->p)[bbb].i;
-          ppp.j = (Boundary[m]->p)[bbb].j;
-          ppp.k = (Boundary[m]->p)[bbb].k;		
-          ppp.level = (Boundary[m]->p)[bbb].level;	
-	  cache_append( &Traversal_rvwlambda, ppp, 0);
+#   endif
+#   if DLMFD_BOUNDARYPOINTS      
+      // Boundary points
+      for (size_t m = 0; m < nbRigidBodies; m++) 
+      { 
+        bbb = 0;
+        foreach_cache((*Boundary[m])) 
+        {   
+          if ( DLM_Index.x[] > -1 ) 
+          {
+            ppp.i = (Boundary[m]->p)[bbb].i;
+            ppp.j = (Boundary[m]->p)[bbb].j;
+            ppp.k = (Boundary[m]->p)[bbb].k;		
+            ppp.level = (Boundary[m]->p)[bbb].level;	
+	    cache_append( &Traversal_rvwlambda, ppp, 0);
+          }
+          bbb++;
         }
-        bbb++;
-      }
-    } 
-  
+      } 
+#   endif  
     // Cache for u, qu and tu
     Cache Traversal_uqutu;
     initialize_and_allocate_Cache( &Traversal_uqutu );
-    // Interior points
-    for (size_t m = 0; m < nbRigidBodies; m++)
-    {     
-      bbb = 0; 
-      foreach_cache((*Interior[m])) 
-      {      
-        if ( DLM_Flag[] < 1 )
-        {
-          ppp.i = (Interior[m]->p)[bbb].i;
-          ppp.j = (Interior[m]->p)[bbb].j;
-          ppp.k = (Interior[m]->p)[bbb].k;		
-          ppp.level = (Interior[m]->p)[bbb].level;	
-	  cache_append( &Traversal_uqutu, ppp, 0);
+#   if DLMFD_INTERIORPOINTS
+      // Interior points
+      for (size_t m = 0; m < nbRigidBodies; m++)
+      {     
+        bbb = 0; 
+        foreach_cache((*Interior[m])) 
+        {      
+          if ( DLM_Flag[] < 1 )
+          {
+            ppp.i = (Interior[m]->p)[bbb].i;
+            ppp.j = (Interior[m]->p)[bbb].j;
+            ppp.k = (Interior[m]->p)[bbb].k;		
+            ppp.level = (Interior[m]->p)[bbb].level;	
+	    cache_append( &Traversal_uqutu, ppp, 0);
+          }
+          bbb++;
         }
-        bbb++;
       }
-    }
-    // Boundary points
-    foreach_level(MAXLEVEL,serial) 
-      if ( DLM_Flag[] > 0.5 )
-      {
-        ppp.i = point.i;
-        ppp.j = point.j;
-        ppp.k = point.k;		
-        ppp.level = point.level;
-	cache_append( &Traversal_uqutu, ppp, 0); 
-      } 
-  
+#   endif 
+#   if DLMFD_BOUNDARYPOINTS       
+      // Boundary points
+      foreach_level(MAXLEVEL,serial) 
+        if ( DLM_Flag[] > 0.5 )
+        {
+          ppp.i = point.i;
+          ppp.j = point.j;
+          ppp.k = point.k;		
+          ppp.level = point.level;
+	  cache_append( &Traversal_uqutu, ppp, 0); 
+        } 
+#   endif   
     // Only DLM_lambda has not been nullified at the end of the previous
     // call to DLMFD_subproblem as it is needed for the computation of the 
     // hydrodynamic force & torque for post-processing, so we nullify it here
@@ -851,18 +871,18 @@ void DLMFD_Uzawa_velocity( const int i )
 #             if dimension == 3
                 (*qw[k]).x += allRigidBodies[k].DLMFD_couplingfactor * 
 	      		( (allRigidBodies[k].Ip[0]) * (*w[k]).x
-    			- (allRigidBodies[k].Ip[3]) * (*w[k]).y 
-			- (allRigidBodies[k].Ip[4]) * (*w[k]).z ) 
+    			+ (allRigidBodies[k].Ip[3]) * (*w[k]).y 
+			+ (allRigidBodies[k].Ip[4]) * (*w[k]).z ) 
 			/ dt;
                 (*qw[k]).y += allRigidBodies[k].DLMFD_couplingfactor * 
-	      		( - (allRigidBodies[k].Ip[3]) * (*w[k]).x
+	      		( (allRigidBodies[k].Ip[3]) * (*w[k]).x
     			+ (allRigidBodies[k].Ip[1]) * (*w[k]).y 
-			- (allRigidBodies[k].Ip[5]) * (*w[k]).z ) 
+			+ (allRigidBodies[k].Ip[5]) * (*w[k]).z ) 
 			/ dt;
 #             endif
               (*qw[k]).z += allRigidBodies[k].DLMFD_couplingfactor * 
-	    	( - (allRigidBodies[k].Ip[4]) * (*w[k]).x 
-    		- (allRigidBodies[k].Ip[5]) * (*w[k]).y 
+	    	( (allRigidBodies[k].Ip[4]) * (*w[k]).x 
+    		+ (allRigidBodies[k].Ip[5]) * (*w[k]).y 
 		+ (allRigidBodies[k].Ip[2]) * (*w[k]).z ) / dt;   
 
               /* Solution of Ip * DLMFD_couplingfactor * w / dt = qw */
@@ -1392,7 +1412,7 @@ void DLMFD_Uzawa_velocity( const int i )
 	}
       }
 #   endif
-    
+
 
     if ( nbParticles )
     {
@@ -1735,7 +1755,7 @@ void DLMFD_Uzawa_velocity( const int i )
 	}
       }
 #   endif
-     
+
     /* (4) Compute alpha = r^(k-1)*r^(k-1) / DLM_w.y */
     DLM_nr2_km1 = DLM_nr2;
     DLM_wv = 0.;
@@ -1756,7 +1776,7 @@ void DLMFD_Uzawa_velocity( const int i )
       mpi_all_reduce( DLM_wv, MPI_DOUBLE, MPI_SUM );
 #   endif
 
-    DLM_alpha = DLM_nr2_km1 / DLM_wv;
+    DLM_alpha = DLM_nr2_km1 != 0. ? DLM_nr2_km1 / DLM_wv : 0.;
         
     /* (5) Update lambda = lambda - alpha*DLM_w and r = r - alpha*y */
 #   if DLMFD_OPT
@@ -1818,7 +1838,7 @@ void DLMFD_Uzawa_velocity( const int i )
       mpi_all_reduce( DLM_nr2, MPI_DOUBLE, MPI_SUM );
 #   endif
     
-    DLM_beta = DLM_nr2 / DLM_nr2_km1;
+    DLM_beta = DLM_nr2_km1 != 0. ? DLM_nr2 / DLM_nr2_km1 : 0.;
 
     /* (9) Update DLM_w = r + beta*DLM_w */
     /* Sign error in eq (A.15) of J.Eng. Math, 2011 */

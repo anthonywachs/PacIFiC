@@ -44,7 +44,9 @@ enum RigidBodyShape {
   TETRAHEDRON,
   OCTAHEDRON,
   DODECAHEDRON,
-  ICOSAHEDRON
+  ICOSAHEDRON,
+  BOX,
+  CIRCULARCYLINDER3D
 };
 
 
@@ -83,6 +85,18 @@ typedef struct {
 
 
 
+/** Additional geometric parameters for 3D cylinders */
+typedef struct {
+  coord BottomCenter;
+  coord TopCenter;
+  coord BottomToTopVec;
+  coord RadialRefVec;
+  double radius;
+  double height;
+} CylGeomParameter;
+
+
+
 
 /** Rigid body geometric parameters */
 typedef struct {
@@ -91,7 +105,8 @@ typedef struct {
   double radius;
   int ncorners;
   int nperclones;
-  PolyGeomParameter* pgp;  
+  PolyGeomParameter* pgp;
+  CylGeomParameter* cgp;  
 } GeomParameter;
 
 
@@ -336,6 +351,8 @@ void initialize_and_allocate_Cache( Cache* p )
 # include "Octahedron.h"
 # include "Dodecahedron.h"
 # include "Icosahedron.h"
+# include "Box.h"
+# include "CircularCylinder3D.h"
 
 /** Frees the rigid body data that were dynamically allocated */
 //----------------------------------------------------------------------------
@@ -401,7 +418,15 @@ void free_rigidbodies( RigidBody* allrbs, const size_t nrb, bool full_free )
 
         case DODECAHEDRON:
 	  free_Dodecahedron( &(allrbs[k].g) );
-	  break;	
+	  break;
+	  
+        case BOX:
+	  free_Box( &(allrbs[k].g) );
+	  break;
+	  
+        case CIRCULARCYLINDER3D:
+	  free_CircularCylinder3D( &(allrbs[k].g) );
+	  break;	  	  	
 	  
         default:
           fprintf( stderr,"Unknown Rigid Body shape !!\n" );
@@ -451,7 +476,15 @@ void print_rigidbody( RigidBody const* p, char const* poshift )
 
       case DODECAHEDRON:
         printf( "DODECAHEDRON" );
-	break;	
+	break;
+	
+      case BOX:
+        printf( "BOX" );
+	break;
+	
+      case CIRCULARCYLINDER3D:
+        printf( "CIRCULARCYLINDER3D" );
+	break;			
 	  
       default:
         fprintf( stderr,"Unknown Rigid Body shape !!\n" );
@@ -642,36 +675,44 @@ bool is_in_rigidbody( RigidBody const* p, double x, double y, double z )
 //----------------------------------------------------------------------------
 {
   bool is_in = false;
-  GeomParameter gci = p->g;
+  GeomParameter const* gcp = &(p->g);
   switch ( p->shape )
   {
     case SPHERE:
-      is_in = is_in_Sphere( x, y, z, gci );
+      is_in = is_in_Sphere( x, y, z, gcp );
       break;
 	  
     case CIRCULARCYLINDER2D:
-      is_in = is_in_CircularCylinder2D( x, y, gci );        
+      is_in = is_in_CircularCylinder2D( x, y, gcp );        
       break;
 	  
     case CUBE:
-      is_in = is_in_Polyhedron( x, y, z, gci );        
+      is_in = is_in_Polyhedron( x, y, z, gcp );        
       break;
 	
     case TETRAHEDRON:
-      is_in = is_in_Polyhedron( x, y, z, gci );             
+      is_in = is_in_Polyhedron( x, y, z, gcp );             
       break;
 	
     case OCTAHEDRON:
-      is_in = is_in_Polyhedron( x, y, z, gci );             
+      is_in = is_in_Polyhedron( x, y, z, gcp );             
       break;
 	
     case ICOSAHEDRON:
-      is_in = is_in_Polyhedron( x, y, z, gci );             
+      is_in = is_in_Polyhedron( x, y, z, gcp );             
       break;
 
     case DODECAHEDRON:
-      is_in = is_in_Polyhedron( x, y, z, gci );             
+      is_in = is_in_Polyhedron( x, y, z, gcp );             
       break;
+      
+    case BOX:
+      is_in = is_in_Polyhedron( x, y, z, gcp );             
+      break;
+      
+    case CIRCULARCYLINDER3D:
+      is_in = is_in_CircularCylinder3D( x, y, z, gcp );             
+      break;            
 	  
     default:
       fprintf( stderr,"Unknown Rigid Body shape !!\n" );
@@ -741,7 +782,7 @@ double reversed_weight( RigidBody* pp, const coord weightcellpos,
   int NCX = 0, CX = 0, weight_id = 0;
   size_t goflag = 0;
   double weight = 0.;
-  GeomParameter gcb = pp->g; 
+  GeomParameter const* gcp = &(pp->g); 
   
   /* Compute relative vector from the cell (containning the boundary) position 
   to the boundary's (analytical) position */
@@ -764,13 +805,10 @@ double reversed_weight( RigidBody* pp, const coord weightcellpos,
   /* Assign quadrant number CX defining relative position of the Lagrange point 
   with respect to the center of the cell it belongs to */ 
   assign_dial( rel, &CX );
-  
-  GeomParameter gcbdum;
-  gcbdum = gcb;
 
   /* Assign quadrant number NCX given by the direction of the normal over 
   the geometric boundary of the rigid body */ 
-  assign_dial_fd_boundary( pp, lambdapos, gcbdum, delta, &NCX );
+  assign_dial_fd_boundary( pp, lambdapos, gcp, delta, &NCX );
   
   /* Compute relative vector from the cell to the cell that contains the 
   Lagrange multiplier */
@@ -987,7 +1025,7 @@ void reverse_fill_DLM_Flag( RigidBody* allrbs, const size_t nrb, scalar Flag,
     coord localcellpos = {0., 0., 0.};
  
     RigidBodyBoundary dlm_lambda = allrbs[k].s;
-    GeomParameter gcb = allrbs[k].g;
+    GeomParameter const* gcp = &(allrbs[k].g);
     Cache* Boundary = &(allrbs[k].Boundary);
         
     foreach_level(MAXLEVEL,serial) 
@@ -1050,12 +1088,9 @@ void reverse_fill_DLM_Flag( RigidBody* allrbs, const size_t nrb, scalar Flag,
 	  Lagrange point with respect to the center of the cell it belongs to */
           assign_dial( rel, &CX );
 
-	  GeomParameter gcbdum;
-	  gcbdum = gcb;
-
           /* Assign quadrant number NCX given by the direction of the normal 
 	  over the geometric boundary of the rigid body */ 
-          assign_dial_fd_boundary( &allrbs[k], lambdapos, gcbdum, Delta, 
+          assign_dial_fd_boundary( &allrbs[k], lambdapos, gcp, Delta, 
 	  	&NCX );
 
           /* Compute relative vector from the cell to the cell that contains 
@@ -1107,16 +1142,16 @@ void create_boundary_points( RigidBody* p, vector* pPeriodicRefCenter,
   switch( p->shape )
   {
     case SPHERE:
-      compute_nboundary_Sphere( gci, &m );
+      compute_nboundary_Sphere( &gci, &m );
       allocate_RigidBodyBoundary( &(p->s), m );
-      create_FD_Boundary_Sphere( gci, &(p->s), m, pPeriodicRefCenter, 
+      create_FD_Boundary_Sphere( &gci, &(p->s), m, pPeriodicRefCenter, 
       		setPeriodicRefCenter );
       break;
 	  
     case CIRCULARCYLINDER2D:
-      compute_nboundary_CircularCylinder2D( gci, &m );
+      compute_nboundary_CircularCylinder2D( &gci, &m );
       allocate_RigidBodyBoundary( &(p->s), m );
-      create_FD_Boundary_CircularCylinder2D( gci, &(p->s), m, 
+      create_FD_Boundary_CircularCylinder2D( &gci, &(p->s), m, 
       		pPeriodicRefCenter, setPeriodicRefCenter );
       break;
 	  
@@ -1151,9 +1186,23 @@ void create_boundary_points( RigidBody* p, vector* pPeriodicRefCenter,
     case DODECAHEDRON:     
       compute_nboundary_Dodecahedron( &gci, &m, &lN );	
       allocate_RigidBodyBoundary( &(p->s), m );
-      create_FD_Boundary_Dodecahedron( &gci, &(p->s), m, lN, pPeriodicRefCenter, 
+      create_FD_Boundary_Dodecahedron( &gci, &(p->s), m, lN, pPeriodicRefCenter,
 		setPeriodicRefCenter );
-      break;	
+      break;
+      
+    case BOX:     
+      compute_nboundary_Box( &gci, &m );	
+      allocate_RigidBodyBoundary( &(p->s), m );
+      create_FD_Boundary_Box( &gci, &(p->s), m, pPeriodicRefCenter, 
+		setPeriodicRefCenter );
+      break;
+      
+    case CIRCULARCYLINDER3D:     
+      compute_nboundary_CircularCylinder3D( &gci, &m );	
+      allocate_RigidBodyBoundary( &(p->s), m );
+      create_FD_Boundary_CircularCylinder3D( &gci, &(p->s), m, 
+      		pPeriodicRefCenter, setPeriodicRefCenter );
+      break;            	
 	  
     default:
       fprintf( stderr, "Unknown Rigid Body shape !!\n" );
@@ -1714,7 +1763,7 @@ void close_file_pointers( const size_t nrb, FILE** p, const bool pdata_is_open,
 # endif
     {
       // Rigid body data
-      if ( pdata_is_open ) for (size_t k = 0; k < nrb; k++) fclose( p[k] );      
+      if ( pdata_is_open ) for (size_t k = 0; k < nrb; k++) fclose( p[k] );
       for (size_t k = 0; k < nrb; k++) fclose( d[k] );
     
       // Uzawa convergence
@@ -1753,7 +1802,7 @@ double compute_flowrate_right( const vector u, const int level )
 # else
     double hh = Delta;
 # endif 
-  double zi = 0., yj = 0., xval = X0 + 0.9999 * L0, uinter = 0.;
+  double zi = 0., yj = 0., xval = X0 + 0.999999 * L0, uinter = 0.;
   int ii = 0, jj = 0;
     
   for (ii = 0; ii < pow(2,level); ii++) 
@@ -1784,7 +1833,7 @@ double compute_flowrate_top( const vector u, const int level )
 # else
     double hh = Delta;
 # endif 
-  double zi = 0., yval = Y0 + 0.9999 * L0, xj = 0., uinter = 0.;
+  double zi = 0., yval = Y0 + 0.999999 * L0, xj = 0., uinter = 0.;
   int ii = 0, jj = 0;
   
   for (ii = 0; ii < pow(2,level); ii++) 
@@ -1815,7 +1864,7 @@ double compute_flowrate_front( const vector u, const int level )
 # else
     double hh = Delta;
 # endif    
-  double xi = 0., yj = 0., zval = Z0 + 0.9999 * L0, uinter = 0.;
+  double xi = 0., yj = 0., zval = Z0 + 0.999999 * L0, uinter = 0.;
   int ii = 0, jj = 0;
 
   for (ii = 0; ii < pow(2,level); ii++) 

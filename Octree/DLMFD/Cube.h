@@ -6,7 +6,7 @@
 
 /** Computes the number of boundary points on the surface of the cube */
 //----------------------------------------------------------------------------
-void compute_nboundary_Cube( GeomParameter* gcp, int* nb, int* lN )
+void compute_nboundary_Cube( GeomParameter const* gcp, int* nb, int* lN )
 //----------------------------------------------------------------------------
 {
   double delta = L0 / (double)(1 << MAXLEVEL) ;  
@@ -40,7 +40,7 @@ void compute_nboundary_Cube( GeomParameter* gcp, int* nb, int* lN )
 
 /** Creates boundary points on the surface of the cube */
 //----------------------------------------------------------------------------
-void create_FD_Boundary_Cube( GeomParameter* gcp,
+void create_FD_Boundary_Cube( GeomParameter const* gcp,
 	RigidBodyBoundary* dlm_bd, const int m, const int lN, 
 	vector* pPeriodicRefCenter, const bool setPeriodicRefCenter )
 //----------------------------------------------------------------------------
@@ -82,19 +82,15 @@ void create_FD_Boundary_Cube( GeomParameter* gcp,
     {
       for (int jj = 1; jj <= lN-2; jj++)
       {
-        pos.x = refcorner.x + (double) ii * dir1.x
+        foreach_dimension()
+	  pos.x = refcorner.x + (double) ii * dir1.x
       		+ (double) jj * dir2.x;
-        pos.y = refcorner.y + (double) ii * dir1.y
-      		+ (double) jj * dir2.y;
-        pos.z = refcorner.z + (double) ii * dir1.z
-      		+ (double) jj * dir2.z;
 		
         periodic_correction( gcp, &pos, pPeriodicRefCenter, 
 		setPeriodicRefCenter );
 
-        dlm_bd->x[isb] = pos.x;
-        dlm_bd->y[isb] = pos.y;
-        dlm_bd->z[isb] = pos.z;
+        foreach_dimension()
+	  dlm_bd->x[isb] = pos.x;
 
       	isb++;
       }
@@ -103,7 +99,7 @@ void create_FD_Boundary_Cube( GeomParameter* gcp,
 
   // We have 8 corner points for the cube
   int allindextable[8][8] = {{0}};
-  int j1,jm1;
+  int j1, jm1;
 
   /* Add points on the edges without the corners */
   for (int i = 0; i < nfaces; i++)
@@ -160,9 +156,8 @@ void create_FD_Boundary_Cube( GeomParameter* gcp,
     
     periodic_correction( gcp, &pos, pPeriodicRefCenter, setPeriodicRefCenter );
 
-    dlm_bd->x[isb] = pos.x;
-    dlm_bd->y[isb] = pos.y;
-    dlm_bd->z[isb] = pos.z;
+    foreach_dimension()
+      dlm_bd->x[isb] = pos.x;
 
     isb++;
   }

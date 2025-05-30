@@ -3983,29 +3983,28 @@ double compute_weight_Quad( const int weight_id, const coord posb ,
 
 //----------------------------------------------------------------------------
 size_t is_in_cubic_boundingbox( const double x, const double y, 
-	const double z, const GeomParameter gp ) 
+	const double z, GeomParameter const* gcp ) 
 //----------------------------------------------------------------------------
 {
   size_t isin = 0;
 
-  double xmax = gp.center.x + 0.5*gp.radius;
-  double xmin = gp.center.x - 0.5*gp.radius;
-  double ymax = gp.center.y + 0.5*gp.radius;
-  double ymin = gp.center.y - 0.5*gp.radius;
+  double xmax = gcp->center.x + 0.5 * gcp->radius;
+  double xmin = gcp->center.x - 0.5 * gcp->radius;
+  double ymax = gcp->center.y + 0.5 * gcp->radius;
+  double ymin = gcp->center.y - 0.5 * gcp->radius;
 
 #if dimension > 2  
-  double zmax = gp.center.z + 0.5*gp.radius;
-  double zmin = gp.center.z - 0.5*gp.radius;
+  double zmax = gcp->center.z + 0.5 * gcp->radius;
+  double zmin = gcp->center.z - 0.5 * gcp->radius;
 #endif
 
-  if ((x < xmax) && (x > xmin) && (y < ymax) && (y > ymin)
+  if ( x < xmax  && x > xmin && y < ymax && y > ymin
 #if dimension > 2
-      && (z< zmax) && (z > zmin)
+      && z < zmax && z > zmin
 #endif
-      )
-    isin = 1;
+  ) isin = 1;
       
-  return isin;
+  return ( isin );
 }
 
 
@@ -4015,7 +4014,7 @@ size_t is_in_cubic_boundingbox( const double x, const double y,
 assign the dial accordingly */
 //----------------------------------------------------------------------------
 void assign_dial_fd_boundary( RigidBody* p, const coord posb, 
-	const GeomParameter gp, const double Delta, int* NCX ) 
+	GeomParameter const* gcp, const double Delta, int* NCX ) 
 //----------------------------------------------------------------------------
 {
   bool isin_xp = false, isin_yp = false, isin_zp = false;  
@@ -4024,45 +4023,60 @@ void assign_dial_fd_boundary( RigidBody* p, const coord posb,
   switch ( p->shape )
   {
     case SPHERE:
-      isin_xp = is_in_Sphere( posb.x + RDelta, posb.y, posb.z, gp );
-      isin_yp = is_in_Sphere( posb.x, posb.y + RDelta, posb.z, gp );
-      isin_zp = is_in_Sphere( posb.x, posb.y, posb.z + RDelta, gp );
+      isin_xp = is_in_Sphere( posb.x + RDelta, posb.y, posb.z, gcp );
+      isin_yp = is_in_Sphere( posb.x, posb.y + RDelta, posb.z, gcp );
+      isin_zp = is_in_Sphere( posb.x, posb.y, posb.z + RDelta, gcp );
       break;
 	  
     case CIRCULARCYLINDER2D:
-      isin_xp = is_in_CircularCylinder2D( posb.x + RDelta, posb.y, gp );
-      isin_yp = is_in_CircularCylinder2D( posb.x, posb.y + RDelta, gp );
+      isin_xp = is_in_CircularCylinder2D( posb.x + RDelta, posb.y, gcp );
+      isin_yp = is_in_CircularCylinder2D( posb.x, posb.y + RDelta, gcp );
       break;
 	  
     case CUBE:
-      isin_xp = is_in_Polyhedron( posb.x + RDelta, posb.y, posb.z, gp );
-      isin_yp = is_in_Polyhedron( posb.x, posb.y + RDelta, posb.z, gp );
-      isin_zp = is_in_Polyhedron( posb.x, posb.y, posb.z + RDelta, gp );
+      isin_xp = is_in_Polyhedron( posb.x + RDelta, posb.y, posb.z, gcp );
+      isin_yp = is_in_Polyhedron( posb.x, posb.y + RDelta, posb.z, gcp );
+      isin_zp = is_in_Polyhedron( posb.x, posb.y, posb.z + RDelta, gcp );
       break;
 
     case TETRAHEDRON:
-      isin_xp = is_in_Polyhedron( posb.x + RDelta, posb.y, posb.z, gp );
-      isin_yp = is_in_Polyhedron( posb.x, posb.y + RDelta, posb.z, gp );
-      isin_zp = is_in_Polyhedron( posb.x, posb.y, posb.z + RDelta, gp );
+      isin_xp = is_in_Polyhedron( posb.x + RDelta, posb.y, posb.z, gcp );
+      isin_yp = is_in_Polyhedron( posb.x, posb.y + RDelta, posb.z, gcp );
+      isin_zp = is_in_Polyhedron( posb.x, posb.y, posb.z + RDelta, gcp );
       break;
       
     case OCTAHEDRON:
-      isin_xp = is_in_Polyhedron( posb.x + RDelta, posb.y, posb.z, gp );
-      isin_yp = is_in_Polyhedron( posb.x, posb.y + RDelta, posb.z, gp );
-      isin_zp = is_in_Polyhedron( posb.x, posb.y, posb.z + RDelta, gp );
+      isin_xp = is_in_Polyhedron( posb.x + RDelta, posb.y, posb.z, gcp );
+      isin_yp = is_in_Polyhedron( posb.x, posb.y + RDelta, posb.z, gcp );
+      isin_zp = is_in_Polyhedron( posb.x, posb.y, posb.z + RDelta, gcp );
       break;
 
     case DODECAHEDRON:
-      isin_xp = is_in_Polyhedron( posb.x + RDelta, posb.y, posb.z, gp );
-      isin_yp = is_in_Polyhedron( posb.x, posb.y + RDelta, posb.z, gp );
-      isin_zp = is_in_Polyhedron( posb.x, posb.y, posb.z + RDelta, gp );
+      isin_xp = is_in_Polyhedron( posb.x + RDelta, posb.y, posb.z, gcp );
+      isin_yp = is_in_Polyhedron( posb.x, posb.y + RDelta, posb.z, gcp );
+      isin_zp = is_in_Polyhedron( posb.x, posb.y, posb.z + RDelta, gcp );
       break;  
             
     case ICOSAHEDRON:
-      isin_xp = is_in_Polyhedron( posb.x + RDelta, posb.y, posb.z, gp );
-      isin_yp = is_in_Polyhedron( posb.x, posb.y + RDelta, posb.z, gp );
-      isin_zp = is_in_Polyhedron( posb.x, posb.y, posb.z + RDelta, gp );
-      break;         
+      isin_xp = is_in_Polyhedron( posb.x + RDelta, posb.y, posb.z, gcp );
+      isin_yp = is_in_Polyhedron( posb.x, posb.y + RDelta, posb.z, gcp );
+      isin_zp = is_in_Polyhedron( posb.x, posb.y, posb.z + RDelta, gcp );
+      break;
+      
+    case BOX:
+      isin_xp = is_in_Polyhedron( posb.x + RDelta, posb.y, posb.z, gcp );
+      isin_yp = is_in_Polyhedron( posb.x, posb.y + RDelta, posb.z, gcp );
+      isin_zp = is_in_Polyhedron( posb.x, posb.y, posb.z + RDelta, gcp );
+      break;
+      
+    case CIRCULARCYLINDER3D:
+      isin_xp = is_in_CircularCylinder3D( posb.x + RDelta, posb.y, posb.z, 
+      		gcp );
+      isin_yp = is_in_CircularCylinder3D( posb.x, posb.y + RDelta, posb.z, 
+      		gcp );
+      isin_zp = is_in_CircularCylinder3D( posb.x, posb.y, posb.z + RDelta, 
+      		gcp );
+      break;                     
 	  
     default:
       fprintf( stderr,"Unknown Rigid Body shape !!\n" );
