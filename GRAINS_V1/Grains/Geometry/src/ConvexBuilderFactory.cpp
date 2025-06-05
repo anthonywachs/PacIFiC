@@ -12,6 +12,7 @@
 #include "TrapezoidalPrism.hh"
 #include "SpheroCyl.hh"
 #include "SpheroCylindricalPrism.hh"
+#include "TruncatedCone.hh"
 
 
 // ----------------------------------------------------------------------------
@@ -39,7 +40,9 @@ Convex* ConvexBuilderFactory::create( DOMNode* root )
   else if ( type == "SpheroCylinder" || type == "SpheroCyl" ) 
     convex = new SpheroCyl( element ); 
   else if ( type == "SpheroCylindricalPrism" ) 
-    convex = new SpheroCylindricalPrism( element );     
+    convex = new SpheroCylindricalPrism( element );
+  else if ( type == "TruncatedCone" ) 
+    convex = new TruncatedCone( element );         
     
   assert( convex != NULL );
 
@@ -70,7 +73,9 @@ Convex* ConvexBuilderFactory::create( string& type, istream& fileIn )
   else if ( type == "*SpheroCylinder" || type == "*SpheroCyl" ) 
     convex = new SpheroCyl( fileIn );
   else if ( type == "*SpheroCylindricalPrism" ) 
-    convex = new SpheroCylindricalPrism( fileIn );            
+    convex = new SpheroCylindricalPrism( fileIn ); 
+  else if ( type == "*TruncatedCone" ) 
+    convex = new TruncatedCone( fileIn );                
   else
   {
     cout << "Invalid convex type : " << type.c_str() << endl;

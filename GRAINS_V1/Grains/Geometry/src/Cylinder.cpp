@@ -399,7 +399,7 @@ BVolume* Cylinder::computeBVolume( unsigned int type ) const
   else if ( type == 2 ) // OBC
   {
     Vector3 const& e = Vector3( 0., 1., 0. );
-    bvol = new OBC( m_radius, 2*m_halfHeight, e );
+    bvol = new OBC( m_radius, 2. * m_halfHeight, e );
   }
   
   return( bvol );

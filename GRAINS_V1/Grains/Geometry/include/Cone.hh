@@ -19,7 +19,7 @@ class Cone : public Convex {
     /** @brief Constructor with flat base radius and height as input parameters
     @param r flat base radius
     @param h height */
-    Cone( double r = 0, double h = 0 ); 
+    Cone( double r = 0., double h = 0. ); 
   
     /** @brief Constructor with an input stream
     @param fileIn input stream */
@@ -138,14 +138,6 @@ class Cone : public Convex {
   
 
   protected:
-    /**@name Methods */
-    //@{
-    /** @brief Returns the circumscribed radius of the reference box,
-    i.e., without applying any transformation */
-    double computeCircumscribedRadius() const;
-    //@} 
-
-
     /** @name Parameters */
     //@{
     double m_bottomRadius; /**< radius of the flat base */
@@ -154,6 +146,13 @@ class Cone : public Convex {
     static int m_visuNodeNbOnPer; /**< number of points over the circular edges
     	for Paraview post-processing */    
     //@}  
+    
+    
+    /** @name Methods */
+    //@{
+    /** @brief Returns the circumscribed radius of the reference box,
+    i.e., without applying any transformation */
+    double computeCircumscribedRadius() const;    
 };
 
 #endif

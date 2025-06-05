@@ -352,11 +352,9 @@ BVolume* Cone::computeBVolume( unsigned int type ) const
   BVolume* bvol = NULL;
   if ( type == 1 ) // OBB
     bvol = new OBB( Vector3( m_bottomRadius, 
-                             4. * m_quarterHeight, 
-                             m_bottomRadius ), 
-                    Matrix() );
+	3. * m_quarterHeight, m_bottomRadius ), Matrix() );
   else if ( type == 2 ) // OBC
-    bvol = new OBC( m_bottomRadius, 4. * m_quarterHeight, Vector3(0., 1., 0.) );
+    bvol = new OBC( m_bottomRadius, 6. * m_quarterHeight, Vector3(0., 1., 0.) );
 
   return( bvol );
 }
@@ -387,8 +385,8 @@ bool Cone::equalType_level2( Convex const* other ) const
 
  
 // ----------------------------------------------------------------------------
-// Sets the number of point over the cylinder perimeter for Paraview 
-// post-processing, i.e., controls the number of facets in the cylinder 
+// Sets the number of point over the cone perimeter for Paraview 
+// post-processing, i.e., controls the number of facets in the cone 
 // reconstruction in Paraview
 void Cone::SetvisuNodeNbOverPer( int nbpts )
 {
