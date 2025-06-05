@@ -15,12 +15,16 @@
 # ifndef PARAVIEW_BINFILE
 #   define PARAVIEW_BINFILE 1
 # endif
-# ifndef PARAVIEW_MPIIO_WRITER 
-#   define PARAVIEW_MPIIO_WRITER 0
+# ifndef PARAVIEW_VTU_MPIIO_WRITER 
+#   define PARAVIEW_VTU_MPIIO_WRITER 0
+# endif
+# if PARAVIEW_VTU_MPIIO_WRITER && !_MPI
+#   undef PARAVIEW_VTU_MPIIO_WRITER
+#   define PARAVIEW_VTU_MPIIO_WRITER 0
 # endif
 
 # include "DLMFD_Output_vtu_foreach.h"
-//# include "htg-functions.h"
+# include "vtkXMLHyperTreeGrid.h"
 
 
 //----------------------------------------------------------------------------
@@ -273,89 +277,159 @@ void output_vtu_dlmfd_intpts( RigidBody const* allrb, const int np,
 
 
 //----------------------------------------------------------------------------
-void save_data( scalar* list, vector* vlist, RigidBody const* allrb, 
+void save_data_vtk( scalar* list, vector* vlist, RigidBody const* allrb, 
 	const int np, double const time )
 //----------------------------------------------------------------------------
 {
   static int cycle_number = 0; 
   if ( !cycle_number ) cycle_number = init_cycle_number;
   
-  FILE * fpvtk;
-  char filename_vtu[80] = "";
-  char filename_pvtu[80] = "";     
+  FILE * fpvtk; 
+  char filename_pvd[80] = "";
   char suffix[80] = "";
 
-  // Write the VTU file
-  sprintf( filename_vtu, "%s", RESULT_DIR );
-  strcat( filename_vtu, "/" );  
-  strcat( filename_vtu, RESULT_FLUID_ROOTFILENAME );
-# if PARAVIEW_MPIIO_WRITER && _MPI
-    sprintf( suffix, "_T%d.vtu", cycle_number );
-    strcat( filename_vtu, suffix );    
-    if ( PARAVIEW_BINFILE ) 
-      output_vtu_bin_foreach_MPIIO( list, vlist, filename_vtu );
-    else output_vtu_ascii_foreach_MPIIO( list, vlist, filename_vtu );    
-# else   
-    sprintf( suffix, "_T%d_%d.vtu", cycle_number, pid() );
-    strcat( filename_vtu, suffix );
- 
-    fpvtk = fopen( filename_vtu, "w" );
-    if ( PARAVIEW_BINFILE ) output_vtu_bin_foreach( list, vlist, fpvtk );
-    else output_vtu_ascii_foreach( list, vlist, fpvtk );  
-    fclose( fpvtk );
-   
-    // Write the PVTU file  
-    if ( pid() == 0 ) 
-    {
-      sprintf( filename_pvtu, "%s", RESULT_DIR );
-      strcat( filename_pvtu, "/" );  
-      strcat( filename_pvtu, RESULT_FLUID_ROOTFILENAME );    
-      sprintf( suffix, "_T%d.pvtu", cycle_number );
-      strcat( filename_pvtu, suffix );
-
-      fpvtk = fopen( filename_pvtu, "w" );
-    
-      sprintf( filename_vtu, "%s", RESULT_FLUID_ROOTFILENAME );
-      sprintf( suffix, "_T%d", cycle_number );
-      strcat( filename_vtu, suffix );
-      if ( PARAVIEW_BINFILE ) output_pvtu_bin( list, vlist, fpvtk, 
-      		filename_vtu );
-      else output_pvtu_ascii( list, vlist, fpvtk, filename_vtu );    
-
-      fclose( fpvtk );
-  }
-# endif   
-  
-  // Write the PVD file  
-  if ( pid() == 0 ) 
-  {  
-    char filename_pvd[80] = "";
-    sprintf( filename_pvd, "%s", RESULT_DIR );
-    strcat( filename_pvd, "/" );  
-    strcat( filename_pvd, RESULT_FLUID_ROOTFILENAME );
-    strcat( filename_pvd, ".pvd" ); 
-
-    fpvtk = fopen( filename_pvd, "w" );
-
-    char time_line[200] = "";
-    strcpy( time_line, "<DataSet timestep=" );
-    sprintf( suffix, "\"%.4e\"", time );
-    strcat( time_line, suffix );
-    strcat( time_line, " group=\"\" part=\"0\" file=\"" );
-    strcpy( filename_pvtu, RESULT_FLUID_ROOTFILENAME );    
-#   if PARAVIEW_MPIIO_WRITER && _MPI
+# if PARAVIEW_VTU
+    char filename_vtu[80] = "";            
+    // Write the VTU file
+    sprintf( filename_vtu, "%s", RESULT_DIR );
+    strcat( filename_vtu, "/" );  
+    strcat( filename_vtu, RESULT_FLUID_ROOTFILENAME );
+#   if PARAVIEW_VTU_MPIIO_WRITER
       sprintf( suffix, "_T%d.vtu", cycle_number );
-#   else
-      sprintf( suffix, "_T%d.pvtu", cycle_number );
-#   endif      
-    strcat( filename_pvtu, suffix );
-    strcat( time_line, filename_pvtu );        
-    strcat( time_line, "\"/>\n" );  
-    strcat( vtk_field_times_series, time_line );    
-    output_pvd( fpvtk, vtk_field_times_series );
+      strcat( filename_vtu, suffix );    
+      if ( PARAVIEW_BINFILE ) 
+        output_vtu_bin_foreach_MPIIO( list, vlist, filename_vtu );
+      else output_vtu_ascii_foreach_MPIIO( list, vlist, filename_vtu );    
+#   else   
+#     if _MPI      
+        sprintf( suffix, "_T%d_%d.vtu", cycle_number, pid() );
+#     else
+        sprintf( suffix, "_T%d.vtu", cycle_number );
+#     endif	
+      strcat( filename_vtu, suffix );
+ 
+      fpvtk = fopen( filename_vtu, "w" );
+      if ( PARAVIEW_BINFILE ) output_vtu_bin_foreach( list, vlist, fpvtk );
+      else output_vtu_ascii_foreach( list, vlist, fpvtk );  
+      fclose( fpvtk );
+   
+      // Write the PVTU file
+#     if _MPI         
+        if ( pid() == 0 ) 
+        {
+          char filename_pvtu[80] = ""; 
+	  sprintf( filename_pvtu, "%s", RESULT_DIR );
+          strcat( filename_pvtu, "/" );  
+          strcat( filename_pvtu, RESULT_FLUID_ROOTFILENAME );    
+          sprintf( suffix, "_T%d.pvtu", cycle_number );
+          strcat( filename_pvtu, suffix );
+
+          fpvtk = fopen( filename_pvtu, "w" );
+    
+          sprintf( filename_vtu, "%s", RESULT_FLUID_ROOTFILENAME );
+          sprintf( suffix, "_T%d", cycle_number );
+          strcat( filename_vtu, suffix );
+          if ( PARAVIEW_BINFILE ) output_pvtu_bin( list, vlist, fpvtk, 
+      		filename_vtu );
+          else output_pvtu_ascii( list, vlist, fpvtk, filename_vtu );    
+
+          fclose( fpvtk );
+        }
+#     endif	
+#   endif
+     
+    // Write the PVD file  
+    if ( pid() == 0 ) 
+    {  
+      sprintf( filename_pvd, "%s", RESULT_DIR );
+      strcat( filename_pvd, "/" );  
+      strcat( filename_pvd, RESULT_FLUID_ROOTFILENAME );
+      strcat( filename_pvd, "_vtu.pvd" ); 
+
+      fpvtk = fopen( filename_pvd, "w" );
+
+      char time_line[200] = "";
+      strcpy( time_line, "<DataSet timestep=" );
+      sprintf( suffix, "\"%.4e\"", time );
+      strcat( time_line, suffix );
+      strcat( time_line, " group=\"\" part=\"0\" file=\"" );
+      strcpy( filename_vtu, RESULT_FLUID_ROOTFILENAME );    
+#     if PARAVIEW_VTU_MPIIO_WRITER || !_MPI
+        sprintf( suffix, "_T%d.vtu", cycle_number );
+#     else
+        sprintf( suffix, "_T%d.pvtu", cycle_number );
+#     endif      
+      strcat( filename_vtu, suffix );
+      strcat( time_line, filename_vtu );        
+      strcat( time_line, "\"/>\n" );  
+      strcat( vtu_field_times_series, time_line );    
+      output_pvd( fpvtk, vtu_field_times_series );
   
-    fclose( fpvtk );
-  }
+      fclose( fpvtk );
+    }
+# endif
+
+
+# if PARAVIEW_HTG 
+    char filename_htg[80] = "";             
+    // Write the HTG file
+    sprintf( filename_htg, "%s", RESULT_DIR );
+    strcat( filename_htg, "/" );  
+    strcat( filename_htg, RESULT_FLUID_ROOTFILENAME );
+    sprintf( suffix, "_T%d.htg", cycle_number );
+    strcat( filename_htg, suffix );
+    vtkXMLHyperTreeGrid *vtk_xml_hypertreegrid = NULL; 
+
+#   if _MPI
+      MPI_File fp;
+      MPI_File_open( MPI_COMM_WORLD, filename_htg,
+                MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &fp );
+      vtk_xml_hypertreegrid =
+      	vtk_xml_hypertreegrid_init( 2, PARAVIEW_DATATYPE_DOUBLE ? 9: 8, 1, 
+		true, list, vlist, time );
+      vtk_xml_hypertreegrid_to_file( vtk_xml_hypertreegrid, fp );
+      vtk_xml_hypertreegrid_free( vtk_xml_hypertreegrid );
+      MPI_File_close( &fp );
+#   else
+      FILE *fp = fopen( filename_htg, "w");
+      if ( PARAVIEW_BINFILE )
+        vtk_xml_hypertreegrid = vtk_xml_hypertreegrid_init( 2, 
+		PARAVIEW_DATATYPE_DOUBLE ? 9: 8, 1, true, list, vlist, time );
+      else 
+        vtk_xml_hypertreegrid = vtk_xml_hypertreegrid_init( 2, 
+		PARAVIEW_DATATYPE_DOUBLE ? 9: 8, 0, false, list, vlist, time );
+      vtk_xml_hypertreegrid_to_file( vtk_xml_hypertreegrid, fp );
+      fclose(fp);
+      vtk_xml_hypertreegrid_free( vtk_xml_hypertreegrid );
+#   endif
+         
+    // Write the PVD file  
+    if ( pid() == 0 ) 
+    {  
+      sprintf( filename_pvd, "%s", RESULT_DIR );
+      strcat( filename_pvd, "/" );  
+      strcat( filename_pvd, RESULT_FLUID_ROOTFILENAME );
+      strcat( filename_pvd, "_htg.pvd" ); 
+
+      fpvtk = fopen( filename_pvd, "w" );
+
+      char time_line[200] = "";
+      strcpy( time_line, "<DataSet timestep=" );
+      sprintf( suffix, "\"%.4e\"", time );
+      strcat( time_line, suffix );
+      strcat( time_line, " group=\"\" part=\"0\" file=\"" );
+      strcpy( filename_htg, RESULT_FLUID_ROOTFILENAME );
+      sprintf( suffix, "_T%d.htg", cycle_number );     
+      strcat( filename_htg, suffix );        
+      strcat( time_line, filename_htg );        
+      strcat( time_line, "\"/>\n" );  
+      strcat( htg_field_times_series, time_line );    
+      output_pvd( fpvtk, htg_field_times_series );
+  
+      fclose( fpvtk );
+    }
+# endif
+    
   
   // Write the last cycle number in a file for restart  
   if ( pid() == 0 ) 
@@ -374,17 +448,17 @@ void save_data( scalar* list, vector* vlist, RigidBody const* allrb,
   }
   
 # if PARAVIEW_DLMFD_BNDPTS
-    sprintf( filename_vtu, "%s", RESULT_DIR );
-    strcat( filename_vtu, "/" );  
-    strcat( filename_vtu, PARAVIEW_DLMFD_BNDPTS_FILENAME );  
+    char filename_bnd_vtu[80] = "";
+    sprintf( filename_bnd_vtu, "%s", RESULT_DIR );
+    strcat( filename_bnd_vtu, "/" );  
+    strcat( filename_bnd_vtu, PARAVIEW_DLMFD_BNDPTS_FILENAME );  
     sprintf( suffix, "_T%d.vtu", cycle_number );
-    strcat( filename_vtu, suffix );
+    strcat( filename_bnd_vtu, suffix );
         
-    output_vtu_dlmfd_bndpts( allrb, np, filename_vtu );
+    output_vtu_dlmfd_bndpts( allrb, np, filename_bnd_vtu );
   
     if ( pid() == 0 ) 
     {  
-      char filename_pvd[80] = "";
       sprintf( filename_pvd, "%s", RESULT_DIR );
       strcat( filename_pvd, "/" );  
       strcat( filename_pvd, PARAVIEW_DLMFD_BNDPTS_FILENAME );
@@ -397,10 +471,7 @@ void save_data( scalar* list, vector* vlist, RigidBody const* allrb,
       sprintf( suffix, "\"%.4e\"", time );
       strcat( time_line, suffix );
       strcat( time_line, " group=\"\" part=\"0\" file=\"" );
-      sprintf( filename_vtu, "%s", PARAVIEW_DLMFD_BNDPTS_FILENAME );  
-      sprintf( suffix, "_T%d.vtu", cycle_number );
-      strcat( filename_vtu, suffix ); 
-      strcat( time_line, filename_vtu );         
+      strcat( time_line, filename_bnd_vtu );         
       strcat( time_line, "\"/>\n" );  
       strcat( vtk_bndpts_times_series, time_line );    
       output_pvd( fpvtk, vtk_bndpts_times_series );
@@ -410,17 +481,17 @@ void save_data( scalar* list, vector* vlist, RigidBody const* allrb,
 # endif
 
 # if PARAVIEW_DLMFD_INTPTS
-    sprintf( filename_vtu, "%s", RESULT_DIR );
-    strcat( filename_vtu, "/" );  
-    strcat( filename_vtu, PARAVIEW_DLMFD_INTPTS_FILENAME );  
+    char filename_int_vtu[80] = "";
+    sprintf( filename_int_vtu, "%s", RESULT_DIR );
+    strcat( filename_int_vtu, "/" );  
+    strcat( filename_int_vtu, PARAVIEW_DLMFD_INTPTS_FILENAME );  
     sprintf( suffix, "_T%d.vtu", cycle_number );
-    strcat( filename_vtu, suffix );
+    strcat( filename_int_vtu, suffix );
         
-    output_vtu_dlmfd_intpts( allrb, np, filename_vtu );
+    output_vtu_dlmfd_intpts( allrb, np, filename_int_vtu );
   
     if ( pid() == 0 ) 
     {  
-      char filename_pvd[80] = "";
       sprintf( filename_pvd, "%s", RESULT_DIR );
       strcat( filename_pvd, "/" );  
       strcat( filename_pvd, PARAVIEW_DLMFD_INTPTS_FILENAME );
@@ -433,10 +504,7 @@ void save_data( scalar* list, vector* vlist, RigidBody const* allrb,
       sprintf( suffix, "\"%.4e\"", time );
       strcat( time_line, suffix );
       strcat( time_line, " group=\"\" part=\"0\" file=\"" );
-      sprintf( filename_vtu, "%s", PARAVIEW_DLMFD_INTPTS_FILENAME );  
-      sprintf( suffix, "_T%d.vtu", cycle_number );
-      strcat( filename_vtu, suffix ); 
-      strcat( time_line, filename_vtu );        
+      strcat( time_line, filename_int_vtu );        
       strcat( time_line, "\"/>\n" );  
       strcat( vtk_intpts_times_series, time_line );    
       output_pvd( fpvtk, vtk_intpts_times_series );
@@ -445,15 +513,7 @@ void save_data( scalar* list, vector* vlist, RigidBody const* allrb,
     }         
 # endif  
   
-  ++cycle_number; 
-  
-//   char zzz[80] = "Res/titi.vtu";
-//   output_vtu_ascii_foreach_MPIIO( list, vlist, zzz );
-//   strcpy( zzz, "Res/titi_bin.vtu" );  
-//   output_vtu_bin_foreach_MPIIO( list, vlist, zzz ); 
-//   char zzz[80];
-//   sprintf( zzz, "Res/titi_%u.htg", pid() );  
-//   output_htg( list, vlist, zzz );       
+  ++cycle_number;       
 }
 
 
@@ -481,36 +541,66 @@ void reinitialize_vtk_restart( void )
   if ( pid() == 0 ) 
   {    
     // Field files 
-    char filename_pvd[80] = "";
+    char filename_pvd_root[80] = "";
     char time_line[256] = "";
     char start[9] = ""; 
     char start_ref[20] = "<DataSet";    
-    sprintf( filename_pvd, "%s", RESULT_DIR );
-    strcat( filename_pvd, "/" );  
-    strcat( filename_pvd, RESULT_FLUID_ROOTFILENAME );
-    strcat( filename_pvd, ".pvd" ); 
-
-    fpvtk = fopen( filename_pvd, "r" ); 
+    sprintf( filename_pvd_root, "%s", RESULT_DIR );
+    strcat( filename_pvd_root, "/" );  
+    strcat( filename_pvd_root, RESULT_FLUID_ROOTFILENAME );
     
-    while ( fgets( time_line, sizeof(time_line), fpvtk ) ) 
-    {      
-      // Extract 8 first characters
-      strncpy( start, time_line, 8 );
-      start[8] = '\0';
+#   if PARAVIEW_VTU
+      char filename_vtu_pvd[80] = "";
+      strcpy( filename_vtu_pvd, filename_pvd_root );      
+      strcat( filename_vtu_pvd, "_vtu.pvd" ); 
 
-      // If 8 first characters equal "<DataSet", it is an output time line
-      // We add to the vtk time series string
-      if ( ! strcmp( start, start_ref ) )
-        strcat( vtk_field_times_series, time_line );      
-    }
+      fpvtk = fopen( filename_vtu_pvd, "r" ); 
+    
+      while ( fgets( time_line, sizeof(time_line), fpvtk ) ) 
+      {      
+        // Extract 8 first characters
+        strncpy( start, time_line, 8 );
+        start[8] = '\0';
+
+        // If 8 first characters equal "<DataSet", it is an output time line
+        // We add to the vtk time series string
+        if ( ! strcmp( start, start_ref ) )
+          strcat( vtu_field_times_series, time_line );      
+      }
+    
+      fclose( fpvtk );
+#   endif
+
+#   if PARAVIEW_HTG
+      char filename_htg_pvd[80] = "";
+      strcpy( filename_htg_pvd, filename_pvd_root );      
+      strcat( filename_htg_pvd, "_htg.pvd" ); 
+
+      fpvtk = fopen( filename_htg_pvd, "r" ); 
+    
+      while ( fgets( time_line, sizeof(time_line), fpvtk ) ) 
+      {      
+        // Extract 8 first characters
+        strncpy( start, time_line, 8 );
+        start[8] = '\0';
+
+        // If 8 first characters equal "<DataSet", it is an output time line
+        // We add to the vtk time series string
+        if ( ! strcmp( start, start_ref ) )
+          strcat( htg_field_times_series, time_line );      
+      }
+    
+      fclose( fpvtk );
+#   endif          
     
 #   if PARAVIEW_DLMFD_BNDPTS
-      sprintf( filename_pvd, "%s", RESULT_DIR );
-      strcat( filename_pvd, "/" );  
-      strcat( filename_pvd, PARAVIEW_DLMFD_BNDPTS_FILENAME );
-      strcat( filename_pvd, ".pvd" ); 
+      char filename_bnd_pvd[80] = "";
+      sprintf( filename_bnd_pvd, "%s", RESULT_DIR );
+      strcat( filename_bnd_pvd, "/" );  
+      strcat( filename_bnd_pvd, PARAVIEW_DLMFD_BNDPTS_FILENAME );
+      strcat( filename_bnd_pvd, ".pvd" ); 
 
-      fpvtk = fopen( filename_pvd, "r" ); 
+      fpvtk = fopen( filename_bnd_pvd, "r" ); 
     
       while ( fgets( time_line, sizeof(time_line), fpvtk ) ) 
       {      
@@ -522,16 +612,19 @@ void reinitialize_vtk_restart( void )
         // We add to the vtk time series string
         if ( ! strcmp( start, start_ref ) )
           strcat( vtk_bndpts_times_series, time_line );      
-      }      
+      }
+      
+      fclose( fpvtk );             
 #   endif 
 
 #   if PARAVIEW_DLMFD_INTPTS
-      sprintf( filename_pvd, "%s", RESULT_DIR );
-      strcat( filename_pvd, "/" );  
-      strcat( filename_pvd, PARAVIEW_DLMFD_INTPTS_FILENAME );
-      strcat( filename_pvd, ".pvd" ); 
+      char filename_int_pvd[80] = "";
+      sprintf( filename_int_pvd, "%s", RESULT_DIR );
+      strcat( filename_int_pvd, "/" );  
+      strcat( filename_int_pvd, PARAVIEW_DLMFD_INTPTS_FILENAME );
+      strcat( filename_int_pvd, ".pvd" ); 
 
-      fpvtk = fopen( filename_pvd, "r" ); 
+      fpvtk = fopen( filename_int_pvd, "r" ); 
     
       while ( fgets( time_line, sizeof(time_line), fpvtk ) ) 
       {      
@@ -543,10 +636,9 @@ void reinitialize_vtk_restart( void )
         // We add to the vtk time series string
         if ( ! strcmp( start, start_ref ) )
           strcat( vtk_intpts_times_series, time_line );      
-      }      
-#   endif 
-    
-    
-    fclose( fpvtk ); 
+      }
+      
+      fclose( fpvtk );             
+#   endif  
   }         
 }

@@ -111,10 +111,16 @@ void output_pvtu_ascii( scalar* list, vector* vlist, FILE* fp,
   }
   for (vector v in vlist) 
   {
+    char* paraview_name;
+    size_t trunc_len = (size_t)(strlen(v.x.name) - 2);
+    paraview_name = malloc((trunc_len + 1) * sizeof(char));
+    strncpy( paraview_name, v.x.name, trunc_len );
+    paraview_name[trunc_len] = '\0';
     fprintf( fp, "<PDataArray type=\"%s\" "
     	"NumberOfComponents=\"3\" Name=\"%s\" format=\"ascii\">\n", 
-	PARAVIEW_DATANAME, v.x.name );
+	PARAVIEW_DATANAME, paraview_name );
     fputs( "</PDataArray>\n", fp );
+    free( paraview_name );
   }
   fputs( "</PCellData>\n", fp );
   fputs( "<PPoints>\n", fp );
@@ -206,21 +212,27 @@ void output_vtu_ascii_foreach( scalar* list, vector* vlist, FILE* fp )
     fprintf( fp, "<DataArray type=\"%s\" Name=\"%s\" "
     	"format=\"ascii\">\n", PARAVIEW_DATANAME, s.name );
     foreach(serial, noauto)
-      fprintf( fp, "%g\n", val(s) );
+      fprintf( fp, "%12.5e\n", val(s) );
     fputs( "</DataArray>\n", fp );
   }
   for (vector v in vlist) 
   {
+    char* paraview_name;
+    size_t trunc_len = (size_t)(strlen(v.x.name) - 2);
+    paraview_name = malloc((trunc_len + 1) * sizeof(char));
+    strncpy( paraview_name, v.x.name, trunc_len );
+    paraview_name[trunc_len] = '\0';
     fprintf( fp, "<DataArray type=\"%s\" "
     	"NumberOfComponents=\"3\" Name=\"%s\" format=\"ascii\">\n", 
-	PARAVIEW_DATANAME, v.x.name );
+	PARAVIEW_DATANAME, paraview_name );
+    free( paraview_name );
     foreach(serial, noauto)
     {
 #     if dimension == 2
-        fprintf( fp, "%g %g 0.\n", val(v.x), val(v.y) );
+        fprintf( fp, "%12.5e %12.5e 0.\n", val(v.x), val(v.y) );
 #     endif
 #     if dimension == 3
-        fprintf( fp, "%g %g %g\n", val(v.x), val(v.y), val(v.z) );
+        fprintf( fp, "%12.5e %12.5e %12.5e\n", val(v.x), val(v.y), val(v.z) );
 #     endif
     }
     fputs( "</DataArray>\n", fp );
@@ -232,10 +244,10 @@ void output_vtu_ascii_foreach( scalar* list, vector* vlist, FILE* fp )
   foreach_vertex(serial, noauto)
   {
 #   if dimension == 2
-      fprintf( fp, "%g %g 0\n", x, y );
+      fprintf( fp, "%12.5e %12.5e 0\n", x, y );
 #   endif
 #   if dimension == 3
-      fprintf( fp, "%g %g %g\n", x, y, z );
+      fprintf( fp, "%12.5e %12.5e %12.5e\n", x, y, z );
 #   endif
   }
   // Additional duplicated vertices in case of periodicity
@@ -250,7 +262,7 @@ void output_vtu_ascii_foreach( scalar* list, vector* vlist, FILE* fp )
 	  {
 	    supvertex.x = x + percelldir[j].x * Delta;
 	    supvertex.y = y + percelldir[j].y * Delta;	    
-            fprintf( fp, "%g %g 0.\n", supvertex.x, supvertex.y );	  
+            fprintf( fp, "%12.5e %12.5e 0.\n", supvertex.x, supvertex.y );
 	  }		
 #       endif
 #       if dimension == 3
@@ -259,7 +271,8 @@ void output_vtu_ascii_foreach( scalar* list, vector* vlist, FILE* fp )
 	    supvertex.x = x + percelldir[j].x * Delta;
 	    supvertex.y = y + percelldir[j].y * Delta;	
 	    supvertex.z = z + percelldir[j].z * Delta;	    	    
-            fprintf( fp, "%g %g %g\n", supvertex.x, supvertex.y, supvertex.z );
+            fprintf( fp, "%12.5e %12.5e %12.5e\n", supvertex.x, supvertex.y, 
+	    	supvertex.z );
 	  }	
 #       endif    
       }
@@ -363,9 +376,16 @@ void output_pvtu_bin( scalar* list, vector* vlist,  FILE* fp, char* subname )
   }
   for (vector v in vlist) 
   {
+    char* paraview_name;
+    size_t trunc_len = (size_t)(strlen(v.x.name) - 2);
+    paraview_name = malloc((trunc_len + 1) * sizeof(char));
+    strncpy( paraview_name, v.x.name, trunc_len );
+    paraview_name[trunc_len] = '\0';
     fprintf( fp,"<PDataArray type=\"%s\" NumberOfComponents=\"3\""
-    	" Name=\"%s\" format=\"appended\">\n", PARAVIEW_DATANAME, v.x.name );
+    	" Name=\"%s\" format=\"appended\">\n", PARAVIEW_DATANAME, 
+	paraview_name );
     fputs( "</PDataArray>\n", fp );
+    free( paraview_name );    
   }
   fputs( "</PCellData>\n", fp );
   fputs( "<PPoints>\n", fp );
@@ -464,12 +484,18 @@ void output_vtu_bin_foreach( scalar* list, vector* vlist, FILE* fp )
   }
   for (vector v in vlist) 
   {
+    char* paraview_name;
+    size_t trunc_len = (size_t)(strlen(v.x.name) - 2);
+    paraview_name = malloc((trunc_len + 1) * sizeof(char));
+    strncpy( paraview_name, v.x.name, trunc_len );
+    paraview_name[trunc_len] = '\0';
     fprintf( fp,"<DataArray type=\"%s\" Name=\"%s\" "
     	"NumberOfComponents=\"3\" format=\"appended\" offset=\"%lu\">\n", 
-	PARAVIEW_DATANAME, v.x.name, count );
+	PARAVIEW_DATANAME, paraview_name, count );
     count += 3 * (uint64_t)no_cells * sizeof(PARAVIEW_DATATYPE) 
     	+ sizeof(uint64_t);
     fputs( "</DataArray>\n", fp );
+    free( paraview_name );    
   }
   fputs( "</CellData>\n", fp );
   fputs( "<Points>\n", fp );
@@ -1134,10 +1160,16 @@ void output_vtu_ascii_foreach_MPIIO( scalar* list, vector* vlist,
   	sizeof(char) );    
   for (vector v in vlist) 
   {
+    char* paraview_name;
+    size_t trunc_len = (size_t)(strlen(v.x.name) - 2);
+    paraview_name = malloc((trunc_len + 1) * sizeof(char));
+    strncpy( paraview_name, v.x.name, trunc_len );
+    paraview_name[trunc_len] = '\0';
     mpifile_offset += strlen(header) * sizeof(char);    
     sprintf( header, "<DataArray type=\"%s\" "
     	"NumberOfComponents=\"3\" Name=\"%s\" format=\"ascii\">\n", 
-	PARAVIEW_DATANAME, v.x.name );    
+	PARAVIEW_DATANAME, paraview_name ); 
+    free( paraview_name );   
     if ( rank == 0 )
       MPI_File_write_at( file, mpifile_offset, header, strlen(header),
     	MPI_CHAR, &status );  
@@ -1642,12 +1674,18 @@ void output_vtu_bin_foreach_MPIIO( scalar* list, vector* vlist,
   ivc = 0;
   for (vector v in vlist)
   {  
+    char* paraview_name;
+    size_t trunc_len = (size_t)(strlen(v.x.name) - 2);
+    paraview_name = malloc((trunc_len + 1) * sizeof(char));
+    strncpy( paraview_name, v.x.name, trunc_len );
+    paraview_name[trunc_len] = '\0';
     sprintf( line, "<DataArray type=\"%s\" Name=\"%s\" "
     	"NumberOfComponents=\"3\" offset=\""
     	"%lu\" format=\"appended\"></DataArray>\n", 
-	PARAVIEW_DATANAME, v.x.name, cumul_binary_offset_per_proc[rank] 
+	PARAVIEW_DATANAME, paraview_name, cumul_binary_offset_per_proc[rank] 
 	+ (uint64_t)vector_binary_offset[ivc] );
-    strcat( header, line );  	  
+    strcat( header, line ); 
+    free( paraview_name ); 	  
     ++ivc;
   }
   sprintf( line, "</CellData>\n</Piece>\n" );

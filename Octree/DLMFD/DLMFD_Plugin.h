@@ -113,7 +113,17 @@
 #   define VORTICITY 0
 # endif
 
-# ifndef PARAVIEW
+# ifndef PARAVIEW_VTU
+#   define PARAVIEW_VTU 0
+# endif
+
+# ifndef PARAVIEW_HTG
+#   define PARAVIEW_HTG 0
+# endif
+
+# if PARAVIEW_VTU || PARAVIEW_HTG
+#   define PARAVIEW 1
+# else 
 #   define PARAVIEW 0
 # endif
 
@@ -156,7 +166,12 @@
 
 double deltau;
 int restarted_simu = 0;
-char vtk_field_times_series[100000] = "";
+# if PARAVIEW_VTU
+    char vtu_field_times_series[100000] = "";
+# endif
+# if PARAVIEW_HTG
+    char htg_field_times_series[100000] = "";
+# endif
 # if PARAVIEW_DLMFD_BNDPTS
     char vtk_bndpts_times_series[100000] = "";      
 # endif 
@@ -180,7 +195,7 @@ size_t NbObstacles = 0;
 # include "DLMFD_Uzawa_velocity.h"
 
 /** Paraview output functions */
-# include "save_data_vtu.h"
+# include "save_data_vtk.h"
 
 /** Lambda criterion for visualizing wakes */
 # include "lambda2.h"
@@ -575,11 +590,11 @@ void do_output( char const* mess )
 #   endif         
     };
     vector* paraview_vectorlist = {PARAVIEW_VECTOR_LIST
-#   if LAMBDA2
+#   if VORTICITY
       , omega
 #   endif         
     };    
-    save_data( paraview_scalarlist, paraview_vectorlist, allRigidBodies, 
+    save_data_vtk( paraview_scalarlist, paraview_vectorlist, allRigidBodies, 
     	nbRigidBodies, t );
 # endif  
   
@@ -596,7 +611,7 @@ void do_output( char const* mess )
 #   if LAMBDA2
       , l2
 #   endif     
-#   if LAMBDA2
+#   if VORTICITY
       , omega
 #   endif        
     };

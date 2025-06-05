@@ -164,7 +164,7 @@ ParaviewPostProcessingWriter::ParaviewPostProcessingWriter(
   , m_network( false )
   , m_mpiio_singlefile( false ) 
   , m_pertype( true )
-  , m_useGlyphWheneverPossible( true )        
+  , m_useGlyphWheneverPossible( false )        
   , BUFFER( NULL )
   , ALLOCATED( 0 )
   , OFFSET( 0 )
@@ -187,7 +187,7 @@ ParaviewPostProcessingWriter::ParaviewPostProcessingWriter(
     cout << GrainsExec::m_shift12 << "Per particle type = " 
     	<< ( m_pertype ? "True" : "False" ) << endl;
     cout << GrainsExec::m_shift12 << "Use Glyph whenever possible = " 
-    	<< ( m_useGlyphWheneverPossible ? "True" : "False" ) << endl;					
+    	<< ( m_useGlyphWheneverPossible ? "True" : "False" ) << endl;
   }
 }	
 
