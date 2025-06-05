@@ -545,7 +545,7 @@ void TruncatedCone::write_convex_OBJ( ostream& f, Transform  const& transform,
   	<< firstpoint_number << " "
   	<< firstpoint_number + 2 * m_visuNodeNbOnPer << endl;
   f << "f "<< firstpoint_number << " "
-    	<< firstpoint_number + 2 * m_visuNodeNbOnPer + 1 << " "
+    	<< firstpoint_number + m_visuNodeNbOnPer + 1 << " "
     	<< firstpoint_number + 2 * m_visuNodeNbOnPer << endl;
 
   // Triangular bottom faces 
