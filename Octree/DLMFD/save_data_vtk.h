@@ -471,7 +471,10 @@ void save_data_vtk( scalar* list, vector* vlist, RigidBody const* allrb,
       sprintf( suffix, "\"%.4e\"", time );
       strcat( time_line, suffix );
       strcat( time_line, " group=\"\" part=\"0\" file=\"" );
-      strcat( time_line, filename_bnd_vtu );         
+      sprintf( filename_bnd_vtu, PARAVIEW_DLMFD_BNDPTS_FILENAME );
+      sprintf( suffix, "_T%d.vtu", cycle_number );
+      strcat( filename_bnd_vtu, suffix );
+      strcat( time_line, filename_bnd_vtu );        
       strcat( time_line, "\"/>\n" );  
       strcat( vtk_bndpts_times_series, time_line );    
       output_pvd( fpvtk, vtk_bndpts_times_series );
@@ -504,7 +507,10 @@ void save_data_vtk( scalar* list, vector* vlist, RigidBody const* allrb,
       sprintf( suffix, "\"%.4e\"", time );
       strcat( time_line, suffix );
       strcat( time_line, " group=\"\" part=\"0\" file=\"" );
-      strcat( time_line, filename_int_vtu );        
+      sprintf( filename_int_vtu, PARAVIEW_DLMFD_INTPTS_FILENAME );
+      sprintf( suffix, "_T%d.vtu", cycle_number );
+      strcat( filename_int_vtu, suffix );       
+      strcat( time_line, filename_int_vtu );   
       strcat( time_line, "\"/>\n" );  
       strcat( vtk_intpts_times_series, time_line );    
       output_pvd( fpvtk, vtk_intpts_times_series );

@@ -164,7 +164,7 @@ void create_FD_Boundary_CircularCylinder3D( GeomParameter const* gcp,
 
     for (size_t j=0;j<npts_local_radius;++j)
     {
-      local_angle = ( 2. * (double)(j) + pi * bin ) * dangle ;      
+      local_angle = ( 2. * (double)(j) + bin ) * dangle ;      
       
       foreach_dimension() 
         pos.x = cos( local_angle ) * gcp->cgp->RadialRefVec.x

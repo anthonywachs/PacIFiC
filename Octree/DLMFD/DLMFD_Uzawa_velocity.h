@@ -300,7 +300,12 @@ void DLMFD_construction()
         case CIRCULARCYLINDER3D:
 	  create_FD_Interior_CircularCylinder3D( &allRigidBodies[k], DLM_Index, 
 	  	DLM_PeriodicRefCenter );
-	  break;	  	  	  		  
+	  break;
+	  
+        case TRUNCATEDCONE:
+	  create_FD_Interior_TruncatedCone( &allRigidBodies[k], DLM_Index, 
+	  	DLM_PeriodicRefCenter );
+	  break;	  	  	  	  		  
 	  
 	default:
           fprintf( stderr,"Unknown Rigid Body shape !!\n" );

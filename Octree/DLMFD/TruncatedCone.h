@@ -120,16 +120,44 @@ void compute_nboundary_TruncatedCone( GeomParameter const* gcp, int* nb )
   double delta = L0 / (double)(1 << MAXLEVEL) ;
   double spacing = INTERBPCOEF * delta;
   
-  *nb = 1;
-  
+  *nb = 2;
+ 
   size_t npts_radius = (size_t)( gcp->tcgp->BottomRadius / spacing ) + 1 ;
   double delta_radius = gcp->tcgp->BottomRadius 
   	/ ( (double)(npts_radius) - 1. ) ;
-  for (size_t i=1;i<npts_radius-1;++i)
+  for (size_t i=1;i<npts_radius;++i)
   {
     double local_radius = (double)(i) * delta_radius ;
     *nb += (size_t)( 2. * pi * local_radius / spacing ) ;    
-  }      
+  }
+  
+  npts_radius = (size_t)( gcp->tcgp->TopRadius / spacing ) + 1 ;
+  if ( npts_radius > 1 )
+  {  
+    delta_radius = gcp->tcgp->TopRadius 
+  	/ ( (double)(npts_radius) - 1. ) ;
+    for (size_t i=1;i<npts_radius;++i)
+    {
+      double local_radius = (double)(i) * delta_radius ;
+      *nb += (size_t)( 2. * pi * local_radius / spacing ) ;                
+    }  
+  } 
+  
+  coord pos;
+  foreach_dimension()
+    pos.x = gcp->tcgp->BottomToTopVec.x + gcp->tcgp->TopRadialRefVec.x
+    	- gcp->tcgp->BottomRadialRefVec.x;
+  double inclined_height = sqrt( sq( pos.x ) + sq( pos.y ) + sq( pos.z ) );
+  size_t npts_height = (size_t)( 2. * inclined_height / ( sqrt(3.) * spacing ) )
+  	+ 1;
+  double delta_height = gcp->tcgp->height / ( (double)(npts_height) - 1. ) ;	
+  for (size_t i=1;i<npts_height-1;++i)
+  {
+    double local_radius = ( gcp->tcgp->TopRadius - gcp->tcgp->BottomRadius )
+    	* (double)(i) * delta_height / gcp->tcgp->height 
+	+ gcp->tcgp->BottomRadius;
+    *nb += (size_t)( 2. * pi * local_radius / spacing ) ;         		    	
+  }    
         
   if( *nb == 0 )
     printf( "nboundary = 0: No boundary points !!!\n" );
@@ -146,10 +174,12 @@ void create_FD_Boundary_TruncatedCone( GeomParameter const* gcp,
 //----------------------------------------------------------------------------
 {
   double delta = L0 / (double)(1 << MAXLEVEL) ;
-  double spacing = INTERBPCOEF * delta, local_angle;
+  double spacing = INTERBPCOEF * delta, local_angle, local_radius,
+  	local_radius_ratio, delta_radius, inclined_height, bin, dangle, 
+	delta_height;
   int isb = 0;
   coord pos, unit_axial, n_cross_rad;
-  size_t npts_local_radius;
+  size_t npts_local_radius, npts_radius, npts_height;
   
   foreach_dimension() 
     unit_axial.x = gcp->tcgp->BottomToTopVec.x / gcp->tcgp->height;  
@@ -168,13 +198,13 @@ void create_FD_Boundary_TruncatedCone( GeomParameter const* gcp,
   	- unit_axial.x * gcp->tcgp->BottomRadialRefVec.z;    
   n_cross_rad.z = unit_axial.x * gcp->tcgp->BottomRadialRefVec.y 
   	- unit_axial.y * gcp->tcgp->BottomRadialRefVec.x;   
-  size_t npts_radius = (size_t)( gcp->tcgp->BottomRadius / spacing ) + 1 ;
-  double delta_radius = gcp->tcgp->BottomRadius 
+  npts_radius = (size_t)( gcp->tcgp->BottomRadius / spacing ) + 1 ;
+  delta_radius = gcp->tcgp->BottomRadius 
   	/ ( (double)(npts_radius) - 1. ) ;
-  for (size_t i=1;i<npts_radius-1;++i)
+  for (size_t i=1;i<npts_radius;++i)
   {
-    double local_radius = (double)(i) * delta_radius ;
-    double local_radius_ratio = local_radius / gcp->tcgp->BottomRadius ;
+    local_radius = (double)(i) * delta_radius ;
+    local_radius_ratio = local_radius / gcp->tcgp->BottomRadius ;
     npts_local_radius = (size_t)( 2. * pi * local_radius / spacing ) ;
       
     for (size_t j=0;j<npts_local_radius;++j)
@@ -193,8 +223,91 @@ void create_FD_Boundary_TruncatedCone( GeomParameter const* gcp,
       foreach_dimension() dlm_bd->x[isb] = pos.x;
       isb++;          
     }
-  }      
+  }
+  
+  // Top center
+  foreach_dimension() pos.x = gcp->tcgp->TopCenter.x;
+  periodic_correction( gcp, &pos, pPeriodicRefCenter, 
+		setPeriodicRefCenter );
+  foreach_dimension() dlm_bd->x[isb] = pos.x;
+  isb++;
+  
+  // Top disk in concentric circles 
+  npts_radius = (size_t)( gcp->tcgp->TopRadius / spacing ) + 1 ;
+  if ( npts_radius > 1 )
+  {
+    n_cross_rad.x = unit_axial.y * gcp->tcgp->TopRadialRefVec.z 
+  	- unit_axial.z * gcp->tcgp->TopRadialRefVec.y; 
+    n_cross_rad.y = unit_axial.z * gcp->tcgp->TopRadialRefVec.x 
+  	- unit_axial.x * gcp->tcgp->TopRadialRefVec.z;    
+    n_cross_rad.z = unit_axial.x * gcp->tcgp->TopRadialRefVec.y 
+  	- unit_axial.y * gcp->tcgp->TopRadialRefVec.x;   
+    delta_radius = gcp->tcgp->TopRadius 
+  	/ ( (double)(npts_radius) - 1. ) ;
+    for (size_t i=1;i<npts_radius;++i)
+    {
+      local_radius = (double)(i) * delta_radius ;
+      local_radius_ratio = local_radius / gcp->tcgp->TopRadius ;
+      npts_local_radius = (size_t)( 2. * pi * local_radius / spacing ) ;
+      
+      for (size_t j=0;j<npts_local_radius;++j)
+      {      
+        local_angle = 2. * pi * (double)(j) / (double)(npts_local_radius) ;
+      
+        foreach_dimension() 
+          pos.x = local_radius_ratio * ( 
+			cos( local_angle ) * gcp->tcgp->TopRadialRefVec.x
+			+ sin( local_angle ) * n_cross_rad.x );     	
+      
+        foreach_dimension() 
+          pos.x += gcp->tcgp->TopCenter.x;
+        periodic_correction( gcp, &pos, pPeriodicRefCenter, 
+		setPeriodicRefCenter );
+        foreach_dimension() dlm_bd->x[isb] = pos.x;
+        isb++;          
+      }
+    }  
+  }
 
+  // Lateral surface
+  foreach_dimension()
+    pos.x = gcp->tcgp->BottomToTopVec.x + gcp->tcgp->TopRadialRefVec.x
+    	- gcp->tcgp->BottomRadialRefVec.x;
+  inclined_height = sqrt( sq( pos.x ) + sq( pos.y ) + sq( pos.z ) );
+  npts_height = (size_t)( 2. * inclined_height / ( sqrt(3.) * spacing ) )
+  	+ 1;
+  delta_height = gcp->tcgp->height / ( (double)(npts_height) - 1. ) ;	
+  for (size_t i=1;i<npts_height-1;++i)
+  {
+    local_radius = ( gcp->tcgp->TopRadius - gcp->tcgp->BottomRadius )
+    	* (double)(i) * delta_height / gcp->tcgp->height 
+	+ gcp->tcgp->BottomRadius;
+    npts_local_radius = (size_t)( 2. * pi * local_radius / spacing ) ;
+    dangle = pi / (double)(npts_local_radius);
+     
+    // odd or even
+    if ( i % 2 == 0 ) bin = 0.;
+    else bin = 1.;
+    
+    for (size_t j=0;j<npts_local_radius;++j)
+    {
+      local_angle = ( 2. * (double)(j) + bin ) * dangle ;      
+      
+      foreach_dimension() 
+        pos.x = cos( local_angle ) * gcp->tcgp->TopRadialRefVec.x 
+		* local_radius / gcp->tcgp->TopRadius 
+      		+ sin( local_angle ) * n_cross_rad.x * local_radius 
+			/ gcp->tcgp->TopRadius
+		+ (double)(i) * delta_height * unit_axial.x
+		+ gcp->tcgp->BottomCenter.x;                
+
+      periodic_correction( gcp, &pos, pPeriodicRefCenter, 
+		setPeriodicRefCenter );
+		
+      foreach_dimension() dlm_bd->x[isb] = pos.x;
+      isb++;
+    }         		    	
+  }           
   
   if ( setPeriodicRefCenter ) synchronize((scalar*){pPeriodicRefCenter->x,
   	pPeriodicRefCenter->y, pPeriodicRefCenter->z});      
@@ -239,7 +352,7 @@ void update_TruncatedCone( GeomParameter* gcp )
 {    
   char* token = NULL;
 
-  // Read number of points, check that it is 3
+  // Read number of points, check that it is 4
   size_t np = 0;
   token = strtok(NULL, " " );
   sscanf( token, "%lu", &np );
@@ -262,8 +375,7 @@ void update_TruncatedCone( GeomParameter* gcp )
   {
     token = strtok(NULL, " " );
     sscanf( token, "%lf", &(gcp->tcgp->BottomRadialRefVec.x) );
-    gcp->tcgp->BottomRadialRefVec.x = gcp->tcgp->TopCenter.x 
-    	- gcp->tcgp->BottomRadialRefVec.x;
+    gcp->tcgp->BottomRadialRefVec.x -= gcp->tcgp->BottomCenter.x;
   }
 
   // Read the top disk center
@@ -278,8 +390,7 @@ void update_TruncatedCone( GeomParameter* gcp )
   {
     token = strtok(NULL, " " );
     sscanf( token, "%lf", &(gcp->tcgp->TopRadialRefVec.x) );
-    gcp->tcgp->TopRadialRefVec.x = gcp->tcgp->TopCenter.x 
-    	- gcp->tcgp->TopRadialRefVec.x;
+    gcp->tcgp->TopRadialRefVec.x -= gcp->tcgp->TopCenter.x;
   }  
   
   // We already have all parameters for the 3D circular cylinder but the input 
@@ -301,7 +412,7 @@ void update_TruncatedCone( GeomParameter* gcp )
   	+ sq( gcp->tcgp->TopRadialRefVec.z ) );	
   gcp->tcgp->height = sqrt( sq( gcp->tcgp->BottomToTopVec.x ) 
   	+ sq( gcp->tcgp->BottomToTopVec.y )
-  	+ sq( gcp->tcgp->BottomToTopVec.z ) );	  
+  	+ sq( gcp->tcgp->BottomToTopVec.z ) );			  
 }
 
 
