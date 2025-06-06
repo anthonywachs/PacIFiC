@@ -149,13 +149,15 @@ Point3 TruncatedCone::support( Vector3 const& v ) const
     double s = sqrt( v[X] * v[X] + v[Z] * v[Z] );
     if ( s > EPSILON )
     {      
-      if (v[Y] > norm * m_sinAngle){
+      if (v[Y] > norm * m_sinAngle)
+      {
         double d = m_topRadius / s;
-        return ( Point3(v[X] * d,   m_topHeight, v[Z] * d ) );
+        return ( Point3( v[X] * d,   m_topHeight, v[Z] * d ) );
       }
-      else{
+      else
+      {
         double d = m_bottomRadius / s;
-        return ( Point3(v[X] * d, - m_bottomHeight, v[Z] * d ) );
+        return ( Point3( v[X] * d, - m_bottomHeight, v[Z] * d ) );
       }
     }
     else
@@ -170,17 +172,19 @@ Point3 TruncatedCone::support( Vector3 const& v ) const
 
 // ----------------------------------------------------------------------------
 // Returns a vector of points describing the envelope of the
-// truncated cone. Here simply returns 3 points as follows: center of bottom 
-// circular face, center of top circular face and an arbitrary point on the 
-// lateral surface of the truncated cone
+// truncated cone. Here simply returns 4 points as follows: center of bottom 
+// circular face, an arbitrary point on the bottom perimeter, center of top 
+// circular face and an arbitrary point on the top perimeter
 vector<Point3> TruncatedCone::getEnvelope() const
 {
   Point3 point(0.,0.,0.);
-  vector<Point3> enveloppe( 3, point );
+  vector<Point3> enveloppe( 4, point );
   enveloppe[0][Y] = - m_bottomHeight;
   enveloppe[1][Y] = - m_bottomHeight;
   enveloppe[1][X] = m_bottomRadius;
   enveloppe[2][Y] = m_topHeight;
+  enveloppe[3][Y] = m_topHeight;
+  enveloppe[3][X] = m_topRadius;  
   return ( enveloppe );
 }
 

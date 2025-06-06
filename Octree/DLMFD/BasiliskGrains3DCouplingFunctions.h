@@ -496,7 +496,12 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
        case 777: 
          allrb[k].shape = CIRCULARCYLINDER3D;
 	 update_CircularCylinder3D( gg );
-         break;	        	  
+         break;
+	 
+       case 8888: 
+         allrb[k].shape = TRUNCATEDCONE;
+	 update_TruncatedCone( gg );
+         break;	 	        	  
 #     else
         case 1: 
           allrb[k].shape = CIRCULARCYLINDER2D;

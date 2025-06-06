@@ -46,7 +46,8 @@ enum RigidBodyShape {
   DODECAHEDRON,
   ICOSAHEDRON,
   BOX,
-  CIRCULARCYLINDER3D
+  CIRCULARCYLINDER3D,
+  TRUNCATEDCONE
 };
 
 
@@ -98,6 +99,21 @@ typedef struct {
 
 
 
+/** Additional geometric parameters for truncated cones */
+typedef struct {
+  coord BottomCenter;
+  coord TopCenter;
+  coord BottomToTopVec;
+  coord BottomRadialRefVec;
+  coord TopRadialRefVec;  
+  double BottomRadius;
+  double TopRadius;  
+  double height;
+} TruncConeGeomParameter;
+
+
+
+
 /** Rigid body geometric parameters */
 typedef struct {
   coord center;
@@ -106,7 +122,8 @@ typedef struct {
   int ncorners;
   int nperclones;
   PolyGeomParameter* pgp;
-  CylGeomParameter* cgp;  
+  CylGeomParameter* cgp; 
+  TruncConeGeomParameter* tcgp;  
 } GeomParameter;
 
 
@@ -353,6 +370,7 @@ void initialize_and_allocate_Cache( Cache* p )
 # include "Icosahedron.h"
 # include "Box.h"
 # include "CircularCylinder3D.h"
+# include "TruncatedCone.h"
 
 /** Frees the rigid body data that were dynamically allocated */
 //----------------------------------------------------------------------------
@@ -426,7 +444,11 @@ void free_rigidbodies( RigidBody* allrbs, const size_t nrb, bool full_free )
 	  
         case CIRCULARCYLINDER3D:
 	  free_CircularCylinder3D( &(allrbs[k].g) );
-	  break;	  	  	
+	  break;
+	  
+        case TRUNCATEDCONE:
+	  free_TruncatedCone( &(allrbs[k].g) );
+	  break;	  	  	  	
 	  
         default:
           fprintf( stderr,"Unknown Rigid Body shape !!\n" );
@@ -484,7 +506,11 @@ void print_rigidbody( RigidBody const* p, char const* poshift )
 	
       case CIRCULARCYLINDER3D:
         printf( "CIRCULARCYLINDER3D" );
-	break;			
+	break;
+	
+      case TRUNCATEDCONE:
+        printf( "TRUNCATEDCONE" );
+	break;				
 	  
       default:
         fprintf( stderr,"Unknown Rigid Body shape !!\n" );
@@ -712,7 +738,11 @@ bool is_in_rigidbody( RigidBody const* p, double x, double y, double z )
       
     case CIRCULARCYLINDER3D:
       is_in = is_in_CircularCylinder3D( x, y, z, gcp );             
-      break;            
+      break; 
+      
+    case TRUNCATEDCONE:
+      is_in = is_in_TruncatedCone( x, y, z, gcp );             
+      break;                  
 	  
     default:
       fprintf( stderr,"Unknown Rigid Body shape !!\n" );
@@ -1202,7 +1232,14 @@ void create_boundary_points( RigidBody* p, vector* pPeriodicRefCenter,
       allocate_RigidBodyBoundary( &(p->s), m );
       create_FD_Boundary_CircularCylinder3D( &gci, &(p->s), m, 
       		pPeriodicRefCenter, setPeriodicRefCenter );
-      break;            	
+      break; 
+      
+    case TRUNCATEDCONE:     
+      compute_nboundary_TruncatedCone( &gci, &m );	
+      allocate_RigidBodyBoundary( &(p->s), m );
+      create_FD_Boundary_TruncatedCone( &gci, &(p->s), m, 
+      		pPeriodicRefCenter, setPeriodicRefCenter );
+      break;                 	
 	  
     default:
       fprintf( stderr, "Unknown Rigid Body shape !!\n" );
