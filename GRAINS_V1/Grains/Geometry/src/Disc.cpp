@@ -110,14 +110,14 @@ Point3 Disc::support( Vector3 const& v ) const
 
 
 // ----------------------------------------------------------------------------
-// Returns a vector of points describing the envelope of the disc.
+// Returns a vector of points describing the surface of the disc.
 // Here simply returns the point (0,0,0) as a convention
 vector<Point3> Disc::getEnvelope() const
 {
-  vector<Point3> envelope;
+  vector<Point3> surface;
   Point3 point( 0.,0.,0. );
-  envelope.push_back( point );
-  return ( envelope );
+  surface.push_back( point );
+  return ( surface );
 }
 
 

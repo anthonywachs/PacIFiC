@@ -52,7 +52,7 @@ class Cylinder : public Convex
     /** @brief Returns the convex type */
     ConvexType getConvexType() const;
 
-    /** @brief Returns a vector of points describing the envelope of the
+    /** @brief Returns a vector of points describing the surface of the
     cylinder. Here simply returns 3 points as follows: center of bottom circular
     face, center of top circular face and an arbitrary point on the lateral
     surface of the cylinder */

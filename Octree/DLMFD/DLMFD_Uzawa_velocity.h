@@ -301,6 +301,11 @@ void DLMFD_construction()
 	  create_FD_Interior_CircularCylinder3D( &allRigidBodies[k], DLM_Index, 
 	  	DLM_PeriodicRefCenter );
 	  break;
+
+        case CONE:
+	  create_FD_Interior_Cone( &allRigidBodies[k], DLM_Index, 
+	  	DLM_PeriodicRefCenter );
+	  break;
 	  
         case TRUNCATEDCONE:
 	  create_FD_Interior_TruncatedCone( &allRigidBodies[k], DLM_Index, 

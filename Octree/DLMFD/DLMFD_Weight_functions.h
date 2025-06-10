@@ -4077,6 +4077,12 @@ void assign_dial_fd_boundary( RigidBody* p, const coord posb,
       isin_zp = is_in_CircularCylinder3D( posb.x, posb.y, posb.z + RDelta, 
       		gcp );
       break; 
+
+    case CONE:
+      isin_xp = is_in_Cone( posb.x + RDelta, posb.y, posb.z, gcp );
+      isin_yp = is_in_Cone( posb.x, posb.y + RDelta, posb.z, gcp );
+      isin_zp = is_in_Cone( posb.x, posb.y, posb.z + RDelta, gcp );
+      break; 
       
     case TRUNCATEDCONE:
       isin_xp = is_in_TruncatedCone( posb.x + RDelta, posb.y, posb.z, gcp );

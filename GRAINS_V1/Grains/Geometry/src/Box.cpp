@@ -232,7 +232,7 @@ double Box::computeCircumscribedRadius() const
 
 
 // ----------------------------------------------------------------------------
-// Returns a vector of points describing the envelope of the box
+// Returns a vector of points describing the surface of the box
 vector<Point3> Box::getEnvelope() const
 {
   if ( GrainsBuilderFactory::getContext() == DIM_2 )

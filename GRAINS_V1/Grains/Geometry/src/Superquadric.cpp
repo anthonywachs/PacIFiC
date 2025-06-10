@@ -217,16 +217,16 @@ Point3 Superquadric::support( Vector3 const& v ) const
 
 
 // ----------------------------------------------------------------------------
-// Returns a vector of points describing the envelope of the sphere
+// Returns a vector of points describing the surface of the sphere
 vector<Point3> Superquadric::getEnvelope() const
 {
   Point3 point( 0., 0., 0. );
-  vector<Point3> envelope( 3, point );
-  /**  envelope[0][Y] = - halfHeight;
-  envelope[1][Y] = - halfHeight;
-  envelope[1][X] = radius;
-  envelope[2][Y] = halfHeight; */
-  return ( envelope );
+  vector<Point3> surface( 3, point );
+  /**  surface[0][Y] = - halfHeight;
+  surface[1][Y] = - halfHeight;
+  surface[1][X] = radius;
+  surface[2][Y] = halfHeight; */
+  return ( surface );
 }
 
 

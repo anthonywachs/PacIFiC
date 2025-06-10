@@ -107,7 +107,7 @@ class Convex : public Shape
     /** @brief Returns a clone copy of the convex */
     virtual Convex* clone() const = 0;
 
-    /** @brief Returns a vector of points describing the envelope of the convex
+    /** @brief Returns a vector of points describing the surface of the convex
     */
     virtual vector<Point3> getEnvelope() const;
 

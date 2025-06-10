@@ -72,16 +72,16 @@ int Polytope::numVerts() const
 
 
 // ----------------------------------------------------------------------------
-// Returns a vector of points describing the envelope of the polytope
+// Returns a vector of points describing the surface of the polytope
 vector<Point3> Polytope::getEnvelope() const
 {
-  vector<Point3> envelope;
+  vector<Point3> surface;
   for (int i=0; i<numVerts(); i++) 
   {
     Point3 const& p = (*this)[i];
-    envelope.push_back( p );
+    surface.push_back( p );
   }
-  return ( envelope );
+  return ( surface );
 }
 
 

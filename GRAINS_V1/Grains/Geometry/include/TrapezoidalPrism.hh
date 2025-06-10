@@ -58,7 +58,7 @@ class TrapezoidalPrism : public Convex
     /** @brief Returns the edge half-lengths of the trapezoidal prism */
     double const* getExtent() const;
 
-    /** @brief Returns a vector of points describing the envelope of the 
+    /** @brief Returns a vector of points describing the surface of the 
     trapezoidal prism */
     vector<Point3> getEnvelope() const;
 

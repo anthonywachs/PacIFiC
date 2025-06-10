@@ -63,7 +63,7 @@ BVolume* Convex::computeBVolume( unsigned int type ) const
 
 
 // ----------------------------------------------------------------------------
-// Returns a vector of points describing the envelope of the convex
+// Returns a vector of points describing the surface of the convex
 vector<Point3> Convex::getEnvelope() const
 {
   cout << "Warning for this Convex the method Convex::getEnvelope() "
@@ -71,8 +71,8 @@ vector<Point3> Convex::getEnvelope() const
        << "Need for an assistance ! Stop running !\n";
   exit(10);
 
-  vector<Point3> envelope;
-  return ( envelope );
+  vector<Point3> surface;
+  return ( surface );
 }
 
 

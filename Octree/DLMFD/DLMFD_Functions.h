@@ -47,6 +47,7 @@ enum RigidBodyShape {
   ICOSAHEDRON,
   BOX,
   CIRCULARCYLINDER3D,
+  CONE,
   TRUNCATEDCONE
 };
 
@@ -99,7 +100,7 @@ typedef struct {
 
 
 
-/** Additional geometric parameters for truncated cones */
+/** Additional geometric parameters for full or truncated cones */
 typedef struct {
   coord BottomCenter;
   coord TopCenter;
@@ -371,6 +372,7 @@ void initialize_and_allocate_Cache( Cache* p )
 # include "Box.h"
 # include "CircularCylinder3D.h"
 # include "TruncatedCone.h"
+# include "Cone.h"
 
 /** Frees the rigid body data that were dynamically allocated */
 //----------------------------------------------------------------------------
@@ -445,6 +447,10 @@ void free_rigidbodies( RigidBody* allrbs, const size_t nrb, bool full_free )
         case CIRCULARCYLINDER3D:
 	  free_CircularCylinder3D( &(allrbs[k].g) );
 	  break;
+
+        case CONE:
+	  free_Cone( &(allrbs[k].g) );
+	  break;
 	  
         case TRUNCATEDCONE:
 	  free_TruncatedCone( &(allrbs[k].g) );
@@ -507,6 +513,10 @@ void print_rigidbody( RigidBody const* p, char const* poshift )
       case CIRCULARCYLINDER3D:
         printf( "CIRCULARCYLINDER3D" );
 	break;
+
+      case CONE:
+        printf( "CONE" );
+	break;	
 	
       case TRUNCATEDCONE:
         printf( "TRUNCATEDCONE" );
@@ -738,6 +748,10 @@ bool is_in_rigidbody( RigidBody const* p, double x, double y, double z )
       
     case CIRCULARCYLINDER3D:
       is_in = is_in_CircularCylinder3D( x, y, z, gcp );             
+      break; 
+
+    case CONE:
+      is_in = is_in_Cone( x, y, z, gcp );             
       break; 
       
     case TRUNCATEDCONE:
@@ -1233,6 +1247,13 @@ void create_boundary_points( RigidBody* p, vector* pPeriodicRefCenter,
       create_FD_Boundary_CircularCylinder3D( &gci, &(p->s), m, 
       		pPeriodicRefCenter, setPeriodicRefCenter );
       break; 
+
+    case CONE:     
+      compute_nboundary_Cone( &gci, &m );	
+      allocate_RigidBodyBoundary( &(p->s), m );
+      create_FD_Boundary_Cone( &gci, &(p->s), m, pPeriodicRefCenter, 
+      	setPeriodicRefCenter );
+      break;
       
     case TRUNCATEDCONE:     
       compute_nboundary_TruncatedCone( &gci, &m );	

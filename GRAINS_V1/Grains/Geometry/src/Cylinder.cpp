@@ -135,19 +135,19 @@ Point3 Cylinder::support( Vector3 const& v ) const
 
 
 // ----------------------------------------------------------------------------
-// Returns a vector of points describing the envelope of the
+// Returns a vector of points describing the surface of the
 // cylinder. Here simply returns 3 points as follows: center of bottom circular
 // face, an arbitrary point on the lateral surface of the cylinder and center 
 // of top circular face
 vector<Point3> Cylinder::getEnvelope() const
 {
   Point3 point( 0., 0., 0. );
-  vector<Point3> envelope( 3, point );
-  envelope[0][Y] = - m_halfHeight;
-  envelope[1][Y] = - m_halfHeight;
-  envelope[1][X] = m_radius;
-  envelope[2][Y] = m_halfHeight;
-  return ( envelope );
+  vector<Point3> surface( 3, point );
+  surface[0][Y] = - m_halfHeight;
+  surface[1][Y] = - m_halfHeight;
+  surface[1][X] = m_radius;
+  surface[2][Y] = m_halfHeight;
+  return ( surface );
 }
 
 

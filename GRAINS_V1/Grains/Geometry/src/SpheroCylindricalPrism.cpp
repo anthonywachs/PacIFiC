@@ -112,7 +112,7 @@ double SpheroCylindricalPrism::computeCircumscribedRadius() const
 
 
 // ----------------------------------------------------------------------------
-// Returns a vector of points describing the envelope of the
+// Returns a vector of points describing the surface of the
 // cylinder. Here simply returns 3 points as follows: center of bottom circular
 // face of the elementary cylinder, an arbitrary point on the lateral surface 
 // of the elementary cylinder and center of top circular face of the elementary 
@@ -120,11 +120,11 @@ double SpheroCylindricalPrism::computeCircumscribedRadius() const
 vector<Point3> SpheroCylindricalPrism::getEnvelope() const
 {
   Point3 point;
-  vector<Point3> envelope( 1, point );
+  vector<Point3> surface( 1, point );
 
   // TO DO
 
-  return ( envelope );
+  return ( surface );
 }
 
 

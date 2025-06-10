@@ -50,7 +50,7 @@ class Sphere : public Convex
     /** @brief Returns the convex type */
     ConvexType getConvexType() const;
 
-    /** @brief Returns a vector of points describing the envelope of the sphere.
+    /** @brief Returns a vector of points describing the surface of the sphere.
     Here simply returns the point (0,0,0) as a convention */
     vector<Point3> getEnvelope() const;
 

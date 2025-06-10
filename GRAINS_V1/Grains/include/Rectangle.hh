@@ -47,7 +47,7 @@ class Rectangle : public Convex
     /** @brief Returns the convex type */
     ConvexType getConvexType() const;
 
-    /** @brief Returns a vector of points describing the envelope of the box */
+    /** @brief Returns a vector of points describing the surface of the box */
     vector<Point3> getEnvelope() const;
 
     /** @brief Returns a pointer to a 2D array describing the relationship

@@ -64,7 +64,7 @@ class Box : public Convex
     /** @brief Returns the edge half-lengths of the box */
     Vector3 const& getExtent() const;
 
-    /** @brief Returns a vector of points describing the envelope of the box */
+    /** @brief Returns a vector of points describing the surface of the box */
     vector<Point3> getEnvelope() const;
 
     /** @brief Returns point[0] in face number i

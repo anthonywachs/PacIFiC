@@ -44,7 +44,7 @@ class Polytope : public Convex
     /** @brief Returns the number of vertices of the polytope */
     int numVerts() const;
 
-    /** @brief Returns a vector of points describing the envelope of the
+    /** @brief Returns a vector of points describing the surface of the
     polytope */
     vector<Point3> getEnvelope() const;
   

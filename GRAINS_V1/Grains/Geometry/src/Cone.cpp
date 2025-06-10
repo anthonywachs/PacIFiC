@@ -85,16 +85,17 @@ Point3 Cone::support( Vector3 const& v ) const
 
 
 // ----------------------------------------------------------------------------
-// Returns a vector of points describing the envelope of the
+// Returns a vector of points describing the surface of the
 // cone. TO DO
 vector<Point3> Cone::getEnvelope() const
 {
   Point3 point(0.,0.,0.);
-  vector<Point3> envelope(1,point);
-
-  // TO DO
-
-  return ( envelope );
+  vector<Point3> surface( 3, point );
+  surface[0][Y] = - m_quarterHeight;
+  surface[1][Y] = - m_quarterHeight;
+  surface[1][X] = m_bottomRadius;
+  surface[2][Y] = 3. * m_quarterHeight;
+  return ( surface );
 }
 
 
@@ -180,8 +181,8 @@ double Cone::computeCircumscribedRadius() const
 // Output operator
 void Cone::writeShape( ostream& fileOut ) const 
 {
-  fileOut << "*Cone\n";
-  fileOut << m_bottomRadius     << '\t' << 4.0 * m_quarterHeight << '\n' ;
+  fileOut << "*Cone " << m_bottomRadius << " " << 4.0 * m_quarterHeight 
+  	<< " *END";
 }
 
 

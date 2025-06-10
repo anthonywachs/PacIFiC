@@ -104,7 +104,7 @@ double SpheroCyl::computeCircumscribedRadius() const
 
 
 // ----------------------------------------------------------------------------
-// Returns a vector of points describing the envelope of the
+// Returns a vector of points describing the surface of the
 // cylinder. Here simply returns 3 points as follows: center of bottom circular
 // face of the elementary cylinder, an arbitrary point on the lateral surface 
 // of the elementary cylinder and center of top circular face of the elementary 
@@ -112,12 +112,12 @@ double SpheroCyl::computeCircumscribedRadius() const
 vector<Point3> SpheroCyl::getEnvelope() const
 {
   Point3 point( 0., 0., 0. );
-  vector<Point3> envelope( 3, point );
-  envelope[0][Y] = - 0.5 * m_height;
-  envelope[1][Y] = - 0.5 * m_height;
-  envelope[1][X] = m_radius;
-  envelope[2][Y] = 0.5 * m_height;
-  return ( envelope );
+  vector<Point3> surface( 3, point );
+  surface[0][Y] = - 0.5 * m_height;
+  surface[1][Y] = - 0.5 * m_height;
+  surface[1][X] = m_radius;
+  surface[2][Y] = 0.5 * m_height;
+  return ( surface );
 }
 
 

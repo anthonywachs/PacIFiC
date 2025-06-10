@@ -171,21 +171,21 @@ Point3 TruncatedCone::support( Vector3 const& v ) const
 
 
 // ----------------------------------------------------------------------------
-// Returns a vector of points describing the envelope of the
+// Returns a vector of points describing the surface of the
 // truncated cone. Here simply returns 4 points as follows: center of bottom 
 // circular face, an arbitrary point on the bottom perimeter, center of top 
 // circular face and an arbitrary point on the top perimeter
 vector<Point3> TruncatedCone::getEnvelope() const
 {
   Point3 point(0.,0.,0.);
-  vector<Point3> enveloppe( 4, point );
-  enveloppe[0][Y] = - m_bottomHeight;
-  enveloppe[1][Y] = - m_bottomHeight;
-  enveloppe[1][X] = m_bottomRadius;
-  enveloppe[2][Y] = m_topHeight;
-  enveloppe[3][Y] = m_topHeight;
-  enveloppe[3][X] = m_topRadius;  
-  return ( enveloppe );
+  vector<Point3> surface( 4, point );
+  surface[0][Y] = - m_bottomHeight;
+  surface[1][Y] = - m_bottomHeight;
+  surface[1][X] = m_bottomRadius;
+  surface[2][Y] = m_topHeight;
+  surface[3][Y] = m_topHeight;
+  surface[3][X] = m_topRadius;  
+  return ( surface );
 }
 
 

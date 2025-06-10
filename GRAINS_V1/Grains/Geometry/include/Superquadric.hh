@@ -53,7 +53,7 @@ class Superquadric : public Convex
     /** @brief Returns the convex type */
     ConvexType getConvexType() const;
 
-    /** @brief Returns a vector of points describing the envelope of 
+    /** @brief Returns a vector of points describing the surface of 
     superquadric. Here returns the peak (sharp/corner?) points */
     vector<Point3> getEnvelope() const;
 

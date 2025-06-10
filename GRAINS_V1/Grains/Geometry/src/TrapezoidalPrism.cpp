@@ -234,7 +234,7 @@ double TrapezoidalPrism::computeCircumscribedRadius() const
 
 
 // ----------------------------------------------------------------------------
-// Returns a vector of points describing the envelope of the trapezoidal prism
+// Returns a vector of points describing the surface of the trapezoidal prism
 vector<Point3> TrapezoidalPrism::getEnvelope() const
 {
   return ( m_corners );

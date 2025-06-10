@@ -54,7 +54,7 @@ class SpheroCylindricalPrism : public Convex
     /** @brief Returns the convex type */
     ConvexType getConvexType() const;
 
-    /** @brief Returns a vector of points describing the envelope of the 
+    /** @brief Returns a vector of points describing the surface of the 
     spherocylindrical prism */
     vector<Point3> getEnvelope() const;
 
