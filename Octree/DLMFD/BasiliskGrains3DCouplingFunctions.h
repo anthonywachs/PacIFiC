@@ -6,7 +6,7 @@
 /** Transfers particles velocity into a 2D array to be sent to the 
 granular solver */
 //----------------------------------------------------------------------------
-void UpdateDLMFDtoGS_vel( double** arrayv, RigidBody* allrb, 
+void UpdateDLMFDtoGS_vel( double** arrayv, RigidBody* allrbs, 
 	const int npart )
 //---------------------------------------------------------------------------- 
 {
@@ -14,14 +14,14 @@ void UpdateDLMFDtoGS_vel( double** arrayv, RigidBody* allrb,
   coord w = {0., 0., 0.};
   
   // We only transfer the particles velocity, i.e. the npart first elements
-  // of the allrb array
+  // of the allrbs array
   for (size_t k=0;k<npart;k++) 
   {    
 #   if TRANSLATION
-      U = allrb[k].U;
+      U = allrbs[k].U;
 #   endif
 #   if ROTATION
-      w = allrb[k].w;
+      w = allrbs[k].w;
 #   endif
  
     arrayv[k][0] = U.x;
@@ -40,8 +40,7 @@ void UpdateDLMFDtoGS_vel( double** arrayv, RigidBody* allrb,
 from the granular solver */
 //----------------------------------------------------------------------------
 char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
-	RigidBody* allrb, const size_t nrb_, 
-	bool fluidCorrectedAcceleration_, double rho_f_ )
+	RigidBody* allrbs, const size_t nrb_, double rho_f_, bool init_ )
 //----------------------------------------------------------------------------
 {
 # if _MPI
@@ -87,14 +86,14 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
   for (size_t k = 0; k < nrb_; k++) 
   { 
     nperclonesp = 0;
-    GeomParameter* gg = &(allrb[k].g);
+    GeomParameter* gg = &(allrbs[k].g);
     gg->pgp = NULL;
     gg->cgp = NULL;    
-    allrb[k].toygsp = NULL;
+    allrbs[k].toygsp = NULL;
     
     // Read the rigid body number but assign k
     token = strtok( NULL, " " );
-    allrb[k].pnum = k;
+    allrbs[k].pnum = k;
 
     // Read the rigid body's number of corners or code
     token = strtok( NULL, " " );
@@ -103,13 +102,13 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
     // Read the rigid body type: particle, periodic particle or obstacle 
     token = strtok( NULL, " " );
     sscanf( token, "%s", RBTag );
-    strcpy( allrb[k].typetag, RBTag );     
+    strcpy( allrbs[k].typetag, RBTag );     
     if ( !strcmp( RBTag, particleDefaultTag ) )
-      allrb[k].type = PARTICLE;
+      allrbs[k].type = PARTICLE;
     else if ( !strcmp( RBTag, periodicParticleDefaultTag ) )
-      allrb[k].type = PERIODICPARTICLE; 
+      allrbs[k].type = PERIODICPARTICLE; 
     else if ( !strcmp( RBTag, obstacleDefaultTag ) )
-      allrb[k].type = OBSTACLE;
+      allrbs[k].type = OBSTACLE;
     else
       printf( "Warning: Unknown rigid body type in the string sent by Grains3D"
       	"\n" );          
@@ -227,7 +226,7 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
 #   endif                    
 
     // If RBTag is "PP", read periodic clone vectors
-    if ( allrb[k].type == PERIODICPARTICLE )
+    if ( allrbs[k].type == PERIODICPARTICLE )
     {
       // Read the number of clones
       token = strtok( NULL, " " );
@@ -259,74 +258,10 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
     token = strtok( NULL, " " );
     sscanf( token, "%lf", &radiusp );
 
-    // Assign the values read to the rigid body data
-    if ( allrb[k].type != OBSTACLE )
-    {
-      // Save previous velocity before updating
-#     if TRANSLATION
-        allrb[k].Unm1 = allrb[k].U;
-	foreach_dimension() allrb[k].imposedU.x = 0.;
-#     endif 
-#     if ROTATION   	 
-        allrb[k].wnm1 = allrb[k].w;
-	foreach_dimension() allrb[k].imposedw.x = 0.;
-#     endif
-
-#     if TRANSLATION
-        allrb[k].U.x = Ux;
-        allrb[k].U.y = Uy;	
-#       if dimension == 3
-          allrb[k].U.z = Uz;
-#       else
-          allrb[k].U.z = 0.;  	  
-#       endif       
-#     endif
-#     if ROTATION
-        allrb[k].w.z = omz;
-#       if dimension == 3
-          allrb[k].w.x = omx;
-          allrb[k].w.y = omy;	
-#       else
-          allrb[k].w.x = 0.;
-          allrb[k].w.y = 0.;	    
-#       endif 	
-#     endif
-    }
-    else
-    {
-#     if TRANSLATION
-        allrb[k].Unm1 = allrb[k].imposedU;
-	foreach_dimension() allrb[k].U.x = 0.;
-#     endif 
-#     if ROTATION   	 
-        allrb[k].wnm1 = allrb[k].imposedw;
-	foreach_dimension() allrb[k].w.x = 0.; 
-#     endif 
-   
-#     if TRANSLATION
-        allrb[k].imposedU.x = Ux;
-        allrb[k].imposedU.y = Uy;	
-#       if dimension == 3
-          allrb[k].imposedU.z = Uz;
-#       else
-          allrb[k].imposedU.z = 0.;  	  
-#       endif       
-#     endif
-#     if ROTATION
-        allrb[k].imposedw.z = omz;
-#       if dimension == 3
-          allrb[k].imposedw.x = omx;
-          allrb[k].imposedw.y = omy;	
-#       else
-          allrb[k].imposedw.x = 0.;
-          allrb[k].imposedw.y = 0.;	    
-#       endif 	
-#     endif
-    }
-    
-    allrb[k].rho_s = rhop;
-    allrb[k].M = massp;
-    allrb[k].Vp = (allrb[k].M)/(allrb[k].rho_s); 
+    // Assign the values read to the rigid body data    
+    allrbs[k].rho_s = rhop;
+    allrbs[k].M = massp;
+    allrbs[k].Vp = (allrbs[k].M)/(allrbs[k].rho_s); 
     /* Inertia tensor: Grains stores them as */
     /* inertie[0] = Ixx; */
     /* inertie[1] = Ixy; */
@@ -342,39 +277,39 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
     /* Ip[4] = Ixz */
     /* Ip[5] = Iyz */
 #   if dimension == 3
-      allrb[k].Ip[0] = Ixx;
-      allrb[k].Ip[1] = Iyy;
-      allrb[k].Ip[3] = Ixy;
-      allrb[k].Ip[4] = Ixz;
-      allrb[k].Ip[5] = Iyz;      
+      allrbs[k].Ip[0] = Ixx;
+      allrbs[k].Ip[1] = Iyy;
+      allrbs[k].Ip[3] = Ixy;
+      allrbs[k].Ip[4] = Ixz;
+      allrbs[k].Ip[5] = Iyz;      
 #   else
-      allrb[k].Ip[0] = 0.;
-      allrb[k].Ip[1] = 0.;
-      allrb[k].Ip[3] = 0.;
-      allrb[k].Ip[4] = 0.;
-      allrb[k].Ip[5] = 0.;
+      allrbs[k].Ip[0] = 0.;
+      allrbs[k].Ip[1] = 0.;
+      allrbs[k].Ip[3] = 0.;
+      allrbs[k].Ip[4] = 0.;
+      allrbs[k].Ip[5] = 0.;
 #   endif
-    allrb[k].Ip[2] = Izz;
+    allrbs[k].Ip[2] = Izz;
 #   if dimension == 3
-      allrb[k].RotMat[0][0] = MRxx;
-      allrb[k].RotMat[0][1] = MRxy;
-      allrb[k].RotMat[0][2] = MRxz;
-      allrb[k].RotMat[1][0] = MRyx;
-      allrb[k].RotMat[1][1] = MRyy;
-      allrb[k].RotMat[1][2] = MRyz;
-      allrb[k].RotMat[2][0] = MRzx;
-      allrb[k].RotMat[2][1] = MRzy;                        
+      allrbs[k].RotMat[0][0] = MRxx;
+      allrbs[k].RotMat[0][1] = MRxy;
+      allrbs[k].RotMat[0][2] = MRxz;
+      allrbs[k].RotMat[1][0] = MRyx;
+      allrbs[k].RotMat[1][1] = MRyy;
+      allrbs[k].RotMat[1][2] = MRyz;
+      allrbs[k].RotMat[2][0] = MRzx;
+      allrbs[k].RotMat[2][1] = MRzy;                        
 #   else
-      allrb[k].RotMat[0][0] = 0.;
-      allrb[k].RotMat[0][1] = 0.;
-      allrb[k].RotMat[0][2] = 0.;
-      allrb[k].RotMat[1][0] = 0.;
-      allrb[k].RotMat[1][1] = 0.;
-      allrb[k].RotMat[1][2] = 0.;
-      allrb[k].RotMat[2][0] = 0.;
-      allrb[k].RotMat[2][1] = 0.;
+      allrbs[k].RotMat[0][0] = 0.;
+      allrbs[k].RotMat[0][1] = 0.;
+      allrbs[k].RotMat[0][2] = 0.;
+      allrbs[k].RotMat[1][0] = 0.;
+      allrbs[k].RotMat[1][1] = 0.;
+      allrbs[k].RotMat[1][2] = 0.;
+      allrbs[k].RotMat[2][0] = 0.;
+      allrbs[k].RotMat[2][1] = 0.;
 #   endif
-    allrb[k].RotMat[2][2] = MRzz;        
+    allrbs[k].RotMat[2][2] = MRzz;        
     gg->center.x = gx;
     gg->center.y = gy;
 #   if dimension == 3
@@ -382,9 +317,87 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
 #   else
       gg->center.z = 0.;      
 #   endif
+    if ( allrbs[k].type != OBSTACLE )
+    {
+#     if TRANSLATION
+        allrbs[k].U.x = Ux;
+        allrbs[k].U.y = Uy;	
+#       if dimension == 3
+          allrbs[k].U.z = Uz;
+#       else
+          allrbs[k].U.z = 0.;  	  
+#       endif       
+#     endif
+#     if ROTATION
+        allrbs[k].w.z = omz;
+#       if dimension == 3
+          allrbs[k].w.x = omx;
+          allrbs[k].w.y = omy;	
+#       else
+          allrbs[k].w.x = 0.;
+          allrbs[k].w.y = 0.;	    
+#       endif 	
+#     endif
+
+#     if TRANSLATION
+        if ( init_ ) allrbs[k].Unm1 = allrbs[k].U;
+	foreach_dimension() allrbs[k].imposedU.x = 0.;
+#     endif 
+#     if ROTATION   	 
+        if ( init_ ) 
+	{
+	  allrbs[k].wnm1 = allrbs[k].w;
+#         if B_SPLIT_EXPLICIT_ACCELERATION
+#           if dimension == 3
+              allrbs[k].Iwnm1.x = allrbs[k].Ip[0] * omx 
+	  	+ allrbs[k].Ip[3] * omy + allrbs[k].Ip[4] * omz;
+              allrbs[k].Iwnm1.y = allrbs[k].Ip[3] * omx 
+	  	+ allrbs[k].Ip[1] * omy + allrbs[k].Ip[5] * omz;
+              allrbs[k].Iwnm1.z = allrbs[k].Ip[4] * omx 
+	  	+ allrbs[k].Ip[5] * omy + allrbs[k].Ip[2] * omz;
+#           else
+              allrbs[k].Iwnm1.z = allrbs[k].Ip[2] * omz;
+#           endif
+#         endif		  
+	}
+	foreach_dimension() allrbs[k].imposedw.x = 0.;
+#     endif
+    }
+    else
+    {   
+#     if TRANSLATION
+        allrbs[k].imposedU.x = Ux;
+        allrbs[k].imposedU.y = Uy;	
+#       if dimension == 3
+          allrbs[k].imposedU.z = Uz;
+#       else
+          allrbs[k].imposedU.z = 0.;  	  
+#       endif       
+#     endif
+#     if ROTATION
+        allrbs[k].imposedw.z = omz;
+#       if dimension == 3
+          allrbs[k].imposedw.x = omx;
+          allrbs[k].imposedw.y = omy;	
+#       else
+          allrbs[k].imposedw.x = 0.;
+          allrbs[k].imposedw.y = 0.;	    
+#       endif 	
+#     endif
+
+#     if TRANSLATION
+        if ( init_ ) allrbs[k].Unm1 = allrbs[k].imposedU;
+	foreach_dimension() allrbs[k].U.x = 0.;
+#     endif 
+#     if ROTATION   	 
+        if ( init_ ) allrbs[k].wnm1 = allrbs[k].imposedw;
+	foreach_dimension() allrbs[k].w.x = 0.; 
+#     endif 
+    }
     gg->ncorners = ncornersp;
     if ( gg->ncorners == 666 ) gg->ncorners = 8;
-    else if ( gg->ncorners == 777 ) gg->ncorners = 0;
+    else if ( gg->ncorners == 777 || gg->ncorners == 777
+    	|| gg->ncorners == 8888 ) gg->ncorners = 0;
     gg->radius = radiusp; 
     gg->nperclones = nperclonesp;    
     if ( nperclonesp )
@@ -408,49 +421,50 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
     }            
     
     // DLMFD coupling factor
-    // If fluidCorrectedAcceleration_ == true, DLMFD_couplingFactor = 
+    // If B_SPLIT_EXPLICIT_ACCELERATION == false, DLMFD_couplingFactor = 
     //   ( 1 - FLUID_DENSITY / rho_s )
     // otherwise DLMFD_couplingFactor = 1
-    allrb[k].DLMFD_couplingfactor = 1. ;
-    if ( fluidCorrectedAcceleration_ ) 
-      allrb[k].DLMFD_couplingfactor -= rho_f_ / allrb[k].rho_s ;
+    allrbs[k].DLMFD_couplingfactor = 1. ;
+#   if !B_SPLIT_EXPLICIT_ACCELERATION
+      allrbs[k].DLMFD_couplingfactor -= rho_f_ / allrbs[k].rho_s ;
+#   endif
 
     // In case rigid bodies are treated as fixed obstacles
     if ( RIGIDBODIES_AS_FIXED_OBSTACLES )
     {
-      strcpy( allrb[k].typetag, obstacleDefaultTag ); 
-      allrb[k].type = OBSTACLE; 
-      allrb[k].imposedU.x = 0.;
-      allrb[k].imposedU.y = 0.;	
+      strcpy( allrbs[k].typetag, obstacleDefaultTag ); 
+      allrbs[k].type = OBSTACLE; 
+      allrbs[k].imposedU.x = 0.;
+      allrbs[k].imposedU.y = 0.;	
 #     if dimension == 3
-        allrb[k].imposedU.z = 0.;
-        allrb[k].imposedw.x = 0.;
-        allrb[k].imposedw.y = 0.;
+        allrbs[k].imposedU.z = 0.;
+        allrbs[k].imposedw.x = 0.;
+        allrbs[k].imposedw.y = 0.;
 #     else
-        allrb[k].imposedU.z = 0.;
-        allrb[k].imposedw.x = 0.;
-        allrb[k].imposedw.y = 0.;		  
+        allrbs[k].imposedU.z = 0.;
+        allrbs[k].imposedw.x = 0.;
+        allrbs[k].imposedw.y = 0.;		  
 #     endif
-      allrb[k].imposedw.z = 0.; 
+      allrbs[k].imposedw.z = 0.; 
 #     if TRANSLATION
         foreach_dimension() 
 	{
-	  allrb[k].U.x = 0.;
-	  allrb[k].Unm1.x = 0.;
+	  allrbs[k].U.x = 0.;
+	  allrbs[k].Unm1.x = 0.;
 	}
 #     endif 
 #     if ROTATION   	 
         foreach_dimension() 
 	{
-	  allrb[k].w.x = 0.;
-	  allrb[k].wnm1.x = 0.; 
+	  allrbs[k].w.x = 0.;
+	  allrbs[k].wnm1.x = 0.; 
 	}
 #     endif           
     }
       
     // Compute the inverse of the moment of inertia matrix
-    if ( allrb[k].type != OBSTACLE )
-      compute_inv_inertia( &(allrb[k]) );
+    if ( allrbs[k].type != OBSTACLE )
+      compute_inv_inertia( &(allrbs[k]) );
     
     // Read the additional geometric features of the rigid body
     // Note that the C function strtok keeps track of the pointer to 
@@ -460,56 +474,56 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
     {
 #     if dimension == 3
         case 1: 
-          allrb[k].shape = SPHERE;
+          allrbs[k].shape = SPHERE;
 	  update_Sphere( gg ); 
           break;
 
         // For now, we assume that all 4-corner polyhedrons are tetrahedrons
 	case 4: 
-          allrb[k].shape = TETRAHEDRON;
+          allrbs[k].shape = TETRAHEDRON;
 	  update_Tetrahedron( gg );
           break;
 	  
         // For now, we assume that all 8-corner polyhedrons are cubes
 	case 8: 
-          allrb[k].shape = CUBE;
+          allrbs[k].shape = CUBE;
 	  update_Cube( gg );
           break;
 	  
        // For now, we assume that all 12-corner polyhedrons are icosahedrons
        case 12: 
-         allrb[k].shape = ICOSAHEDRON;
+         allrbs[k].shape = ICOSAHEDRON;
 	 update_Icosahedron( gg );
          break;  
           
        // For now, we assume that all 20-corner polyhedrons are dodecahedrons
        case 20: 
-         allrb[k].shape = DODECAHEDRON;
+         allrbs[k].shape = DODECAHEDRON;
 	 update_Dodecahedron( gg );
          break;
 	 
        case 666: 
-         allrb[k].shape = BOX;
+         allrbs[k].shape = BOX;
 	 update_Box( gg );
          break;	
 	 
        case 777: 
-         allrb[k].shape = CIRCULARCYLINDER3D;
+         allrbs[k].shape = CIRCULARCYLINDER3D;
 	 update_CircularCylinder3D( gg );
          break;
 
        case 888: 
-         allrb[k].shape = CONE;
+         allrbs[k].shape = CONE;
 	 update_Cone( gg );
          break;
 	 
        case 8888: 
-         allrb[k].shape = TRUNCATEDCONE;
+         allrbs[k].shape = TRUNCATEDCONE;
 	 update_TruncatedCone( gg );
          break;	 	        	  
 #     else
         case 1: 
-          allrb[k].shape = CIRCULARCYLINDER2D;
+          allrbs[k].shape = CIRCULARCYLINDER2D;
 	  update_CircularCylinder2D( gg );
           break;
 #     endif	  	  

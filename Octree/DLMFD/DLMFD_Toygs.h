@@ -326,6 +326,9 @@ event GranularSolver_init (t < -1.)
   }
 } 
 
+
+
+
 /** Overloading of the granular solver predictor event */
 // ------------------------------------------------------
 event GranularSolver_predictor (t < -1.) 
@@ -334,6 +337,9 @@ event GranularSolver_predictor (t < -1.)
   RigidBody* pp = particles;
   granular_subproblem( pp, 1, dt, FLUID_DENSITY );
 }
+
+
+
 
 /** Overloading of the granular solver velocity update event */
 // ------------------------------------------------------------

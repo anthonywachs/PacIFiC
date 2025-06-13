@@ -362,7 +362,10 @@ class AllComponents
     /** @brief Sets the center of mass coordinate in a given direction 
     at the previous time of all particles to the current value (generally called
     at the start of a time step) */
-    void setPositionDir_nm1( Direction dir );    
+    void setPositionDir_nm1( Direction dir ); 
+    
+    /** @brief Sets all particles' momentum equation coupling factor */
+    void setParticlesCouplingFactor();       
     //@}
 
 

@@ -2484,3 +2484,15 @@ void AllComponents::setPositionDir_nm1( Direction dir )
   	particle!=m_ActiveParticles.end();particle++) 
     (*particle)->setPositionDir_nm1( dir ); 
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets all particles' momentum equation coupling factor
+void AllComponents::setParticlesCouplingFactor()
+{
+  for (list<Particle*>::iterator particle=m_ActiveParticles.begin();
+  	particle!=m_ActiveParticles.end();particle++) 
+    (*particle)->setCouplingFactor(); 
+}

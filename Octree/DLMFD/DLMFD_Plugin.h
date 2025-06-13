@@ -336,6 +336,14 @@ event init (i = 0)
   {    
     totalcell = totalcells();
     if ( pid() == 0 ) printf( "Initial total cells = %d\n", totalcell );
+    
+    // If particles are lighter or neutrally buoyant and the flag 
+    // B_SPLIT_EXPLICIT_ACCELERATION is on, we read the explication part of the 
+    // particle split acceleration
+#   if B_SPLIT_EXPLICIT_ACCELERATION
+      read_explicit_splitAcceleration( DUMP_DIR, allRigidBodies, 
+      	nbRigidBodies );
+#   endif    
   }
   else // Simulation from t=0
   {
@@ -624,7 +632,16 @@ void do_output( char const* mess )
 # else
     dump_list = (scalar *){u, g};    
 # endif     
-  dump( FLUID_DUMP_FILENAME, dump_list );    
+  dump( FLUID_DUMP_FILENAME, dump_list );
+      
+  // If particles are lighter or neutrally buoyant and the flag 
+  // B_SPLIT_EXPLICIT_ACCELERATION is on, we save the explication part of the 
+  // particle split acceleration for restart purposes
+# if B_SPLIT_EXPLICIT_ACCELERATION
+    if ( pid() == 0 ) 
+      save_explicit_splitAcceleration( DUMP_DIR, allRigidBodies, 
+      	nbRigidBodies );
+# endif        
 
   // Granular solver output for both post-processing & restart
   event( "GranularSolver_saveResults" );
@@ -678,7 +695,7 @@ event last_output_data (t = end)
 
   do_output( mess );    
   output_dlmfd_perf ( &DLMFD_UzawaTiming, &DLMFD_ConstructionTiming, i, 
-  	&allDLMFDptscells );       
+  	&allDLMFDptscells );	       
 }	
 
 
@@ -694,7 +711,7 @@ event once_timestep_is_determined (i++)
   {
     if ( pid() == 0 ) printf( "Write t and dt in time restart file\n" );
     save_t_dt_restart( DUMP_DIR, t, dt, imposed_periodicpressuredrop );        
-    save_data_restart = false;
+    save_data_restart = false;   
   } 
   if ( i == 0 ) save_data_restart = false;
 
@@ -854,29 +871,7 @@ event end_timestep (i++)
 	  u.y[] += deltaflowrate / ( L0 * L0 ); 
 #     else 
         flowrate = compute_flowrate_front( u, PERIODICFLOWRATE_LEVEL );
-	deltaflowrate = imposed_periodicflowrate - flowrate;
-	
-//         // PID controller
-//         double Kp = 1.e-1 / ( Q1 * L0 * L0 ) ;
-//         double Ki = 2. * Kp / dt ;
-//         double Kd = Kp * dt / 8.;
-//       
-//         static double deltaflowrate_nm1 = 0.;
-//         static double deltaflowrate_nm2 = 0.;
-//         static double imposed_periodicpressuredrop_nm1 = 0.;
-//         static double dt_nm1 = 1.e-10; 
-// 
-// 	imposed_periodicpressuredrop = imposed_periodicpressuredrop_nm1 
-// 		+ ( Kp + Ki * dt + Kd / dt ) * deltaflowrate
-//       		- ( Kp + Kd * ( 1. / dt_nm1 + 1. / dt ) ) 
-// 			* deltaflowrate_nm1 
-// 		+ ( Kd / dt_nm1 ) * deltaflowrate_nm2;
-// 
-//         deltaflowrate_nm2 = deltaflowrate_nm1;
-//         deltaflowrate_nm1 = deltaflowrate;
-//         imposed_periodicpressuredrop_nm1 = imposed_periodicpressuredrop;
-// 	dt_nm1 = dt;	
-		
+	deltaflowrate = imposed_periodicflowrate - flowrate;		
 	imposed_periodicpressuredrop += deltaflowrate / ( Q1 * L0 * L0 );
 	foreach()
 	  u.z[] += deltaflowrate / ( L0 * L0 );    

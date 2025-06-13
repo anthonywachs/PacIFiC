@@ -1200,7 +1200,7 @@ void GrainsCoupledWithFluid::updateParticlesHydroFT(
 void GrainsCoupledWithFluid::setFluidCorrectedAcceleration( bool correct )
 {
   Particle::setFluidCorrectedAcceleration( correct );
-  // TO DO: update coupling factor in ParticleKinematics
+  m_allcomponents.setParticlesCouplingFactor();
 }
 
 

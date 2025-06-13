@@ -857,7 +857,11 @@ void DLMFD_Uzawa_velocity( const int i )
     			allRigidBodies[k].M * ( GRAVITY_VECTOR.x 
 				+ allRigidBodies[k].addforce.x ) 
 			+ allRigidBodies[k].DLMFD_couplingfactor 
-				* allRigidBodies[k].M * (*U[k]).x / dt ;
+				* allRigidBodies[k].M * (*U[k]).x / dt
+#               	if B_SPLIT_EXPLICIT_ACCELERATION
+			  + allRigidBodies[k].splitUacc.x
+#               	endif 				
+			;	
 	
               /* Solution of M * DLMFD_couplingfactor * U / dt = qU */
               /* U = ( dt * qU ) / ( DLMFD_couplingfactor * M ) */
@@ -883,17 +887,29 @@ void DLMFD_Uzawa_velocity( const int i )
 	      		( (allRigidBodies[k].Ip[0]) * (*w[k]).x
     			+ (allRigidBodies[k].Ip[3]) * (*w[k]).y 
 			+ (allRigidBodies[k].Ip[4]) * (*w[k]).z ) 
-			/ dt;
+			/ dt
+#               	if B_SPLIT_EXPLICIT_ACCELERATION
+			  + allRigidBodies[k].splitwacc.x
+#               	endif 	
+                        ;			
                 (*qw[k]).y += allRigidBodies[k].DLMFD_couplingfactor * 
 	      		( (allRigidBodies[k].Ip[3]) * (*w[k]).x
     			+ (allRigidBodies[k].Ip[1]) * (*w[k]).y 
 			+ (allRigidBodies[k].Ip[5]) * (*w[k]).z ) 
-			/ dt;
+			/ dt
+#               	if B_SPLIT_EXPLICIT_ACCELERATION
+			  + allRigidBodies[k].splitwacc.y
+#               	endif
+			;			
 #             endif
               (*qw[k]).z += allRigidBodies[k].DLMFD_couplingfactor * 
 	    	( (allRigidBodies[k].Ip[4]) * (*w[k]).x 
     		+ (allRigidBodies[k].Ip[5]) * (*w[k]).y 
-		+ (allRigidBodies[k].Ip[2]) * (*w[k]).z ) / dt;   
+		+ (allRigidBodies[k].Ip[2]) * (*w[k]).z ) / dt
+#               if B_SPLIT_EXPLICIT_ACCELERATION
+		  + allRigidBodies[k].splitwacc.z
+#               endif
+		;		   
 
               /* Solution of Ip * DLMFD_couplingfactor * w / dt = qw */
               /* w = ( dt / ( DLMFD_couplingfactor ) * Ip_inv * qw 
@@ -1966,6 +1982,11 @@ void DLMFD_Uzawa_velocity( const int i )
   
   // To guarantee that u is the same on all sub-domains
   synchronize((scalar*) {u});
+
+
+  // Compute and store velocity and acceleration at previous times
+  update_previoustimes_velocity_splitAcceleration( allRigidBodies, 
+  	nbRigidBodies, dt );
 
 
   /* Timers and Timings */

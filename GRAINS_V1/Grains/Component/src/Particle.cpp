@@ -1950,3 +1950,13 @@ void Particle::write_OBJ( ostream& f, size_t const& group_number,
   f << "g Object" << GrainsExec::intToString( int( group_number ) ) << endl;
   m_geoRBWC->write_OBJ( f, firstpoint_number ); 
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets momentum equation coupling factor
+void Particle::setCouplingFactor()
+{
+  m_kinematics->setCouplingFactor( m_density );  
+}

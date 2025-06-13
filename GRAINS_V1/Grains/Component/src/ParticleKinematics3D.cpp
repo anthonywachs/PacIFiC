@@ -61,15 +61,12 @@ void ParticleKinematics3D::computeAngularAccelerationBodyFixed(
   double const* inertia = particle->getInertiaTensorBodyFixed();    
   if ( Grains::isModePredictor() )
   {   
-    dOmdt_bf[X] = ( torque_bf[X] / inertia[0] 
-    	+ om_bf[Y] * om_bf[Z] * ( inertia[3] - inertia[5] ) / inertia[0] )
-    	/ m_coupling_factor;
-    dOmdt_bf[Y] = ( torque_bf[Y] / inertia[3] 
-    	+ om_bf[Z] * om_bf[X] * ( inertia[5] - inertia[0] ) / inertia[3] )
-    	/ m_coupling_factor;
-    dOmdt_bf[Z] = ( torque_bf[Z] / inertia[5] 
-    	+ om_bf[X] * om_bf[Y] * ( inertia[0] - inertia[3] ) / inertia[5] )
-    	/ m_coupling_factor;	
+    dOmdt_bf[X] = torque_bf[X] / ( m_coupling_factor * inertia[0] )
+    	+ om_bf[Y] * om_bf[Z] * ( inertia[3] - inertia[5] ) / inertia[0];
+    dOmdt_bf[Y] = torque_bf[Y] / ( m_coupling_factor * inertia[3] )
+    	+ om_bf[Z] * om_bf[X] * ( inertia[5] - inertia[0] ) / inertia[3];
+    dOmdt_bf[Z] = torque_bf[Z] / ( m_coupling_factor * inertia[5] )
+    	+ om_bf[X] * om_bf[Y] * ( inertia[0] - inertia[3] ) / inertia[5];	
   }
   else
   {
@@ -113,7 +110,7 @@ istream& operator >> ( istream& fileIn, ParticleKinematics3D& kine_ )
 
 // ----------------------------------------------------------------------------
 // Computes explicitly Idw/dt
-Vector3 ParticleKinematics3D::computeExplicitDJomDt( Vector3 const & dw,
+Vector3 ParticleKinematics3D::computeExplicitDJomDt( Vector3 const& dw,
 	double const* inertie ) const
 {
   Vector3 Idw;

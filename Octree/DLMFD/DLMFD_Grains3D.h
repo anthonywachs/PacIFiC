@@ -13,7 +13,7 @@
 # endif
 
 /** Split explicit acceleration treatment in case of particles are lighter 
-than the fluid */
+than the fluid or neutrally buoyant */
 # ifndef B_SPLIT_EXPLICIT_ACCELERATION
 #   define B_SPLIT_EXPLICIT_ACCELERATION 0
 # endif
@@ -45,17 +45,11 @@ event GranularSolver_init (t < -1.)
     printf( "Grains3D\n" );
     
     // Initialize Grains
-    Init_Grains( GRAINS_INPUTFILE, FLUID_DENSITY, restarted_simu );
+    Init_Grains( GRAINS_INPUTFILE, FLUID_DENSITY, restarted_simu,
+    	!B_SPLIT_EXPLICIT_ACCELERATION );
 
     // Set initial time
     SetInitialTime( trestart );
-
-    // In case part of the particle acceleration is computed explicitly
-    // when particles are lighter than the fluid
-    if ( B_SPLIT_EXPLICIT_ACCELERATION )
-    {
-      // TO DO
-    }
 
     // Get the number of rigid bodies sent by Grains to Basilisk
     // Note: this number must be constant over the simulation
@@ -99,7 +93,7 @@ event GranularSolver_init (t < -1.)
 
   // Update all rigid body data 
   pstr = UpdateParticlesBasilisk( pstr, pstrsize, allRigidBodies, nbRigidBodies,
-  	!B_SPLIT_EXPLICIT_ACCELERATION, FLUID_DENSITY ); 	 
+  	FLUID_DENSITY, true ); 	 
   free( pstr );       
 } 
 
@@ -133,19 +127,12 @@ event GranularSolver_predictor (t < -1.)
     }
 
     // Transfer the data from Grains to an array of characters
-    pstr = GrainsToBasilisk( &pstrsize );     
-    
-    // Set dt for split explicit acceleration computation in Grains3D at 
-    // next time step
-    if ( B_SPLIT_EXPLICIT_ACCELERATION ) 
-    {
-      // TO DO
-    }    
+    pstr = GrainsToBasilisk( &pstrsize );         
   }
     
   // Update all rigid body data 
   pstr = UpdateParticlesBasilisk( pstr, pstrsize, allRigidBodies, nbRigidBodies,
-    	!B_SPLIT_EXPLICIT_ACCELERATION, FLUID_DENSITY );  
+    	FLUID_DENSITY, false );  
   free( pstr ); 
 }
 
@@ -166,8 +153,7 @@ event GranularSolver_updateVelocity (t < -1.)
     UpdateDLMFDtoGS_vel( DLMFDtoGS_vel, allRigidBodies, nbRigidBodies );  
 
     // Update particle velocity in Grains using the 2D array
-    UpdateVelocityGrains( DLMFDtoGS_vel, nbRigidBodies, 
-    	B_SPLIT_EXPLICIT_ACCELERATION );
+    UpdateVelocityGrains( DLMFDtoGS_vel, nbRigidBodies );
   }
 }
 

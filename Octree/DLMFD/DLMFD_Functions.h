@@ -153,10 +153,10 @@ typedef struct {
   double Ip_inv[3][3];
   coord addforce;    
 # if TRANSLATION
-    coord U, Unm1, qU, tU, imposedU;    
+    coord U, Unm1, splitUacc, qU, tU, imposedU;    
 # endif
 # if ROTATION
-    coord w, wnm1, qw, tw, imposedw;
+    coord w, wnm1, Iwnm1, splitwacc, qw, tw, imposedw;
 # endif
   Cache Interior;
   Cache Boundary;
@@ -963,7 +963,8 @@ void deactivate_critical_boundary_points( RigidBody* allrbs, const size_t nrb,
 // 		  deactivate = true;
 		  
 		if ( abs( allrbs[RBid1].s.x[PTid1] - x0 ) < critical_distance 
-			|| abs( allrbs[RBid1].s.y[PTid1] - y0 ) < critical_distance
+			|| abs( allrbs[RBid1].s.y[PTid1] - y0 ) 
+				< critical_distance
 #                 if dimension == 3	
 	            || abs( allrbs[RBid1].s.z[PTid1] - z0 ) < critical_distance
 #                 endif
@@ -974,7 +975,7 @@ void deactivate_critical_boundary_points( RigidBody* allrbs, const size_t nrb,
         if ( deactivate ) 
 	{
           append_dynUIarray( deactivatedBPindices_, (size_t)Index.y[] );
-	  append_dynUIarray( deactivatedBPindices_, (size_t)Index.x[] );	  
+	  append_dynUIarray( deactivatedBPindices_, (size_t)Index.x[] );
 	  append_dynPDBarray( deactivatedIndexFieldValues_, &(Index.x[]) );
 	  append_dynPDBarray( deactivatedIndexFieldValues_, &(Index.y[]) );
           *at_least_one_deactivated_ = true;
@@ -1090,7 +1091,7 @@ void reverse_fill_DLM_Flag( RigidBody* allrbs, const size_t nrb, scalar Flag,
       foreach_neighbor loop, it stays at 1.      
       Later, when we compute the contribution of this cell to the different 
       stencils in DLM_Uzawa_velocity with the function reversed_weight, the 
-      contribution of this cell to each stencil will be properly computed. */    
+      contribution of this cell to each stencil will be properly computed. */
       goflag = 0; 
              
       // Check if there is a Lagrange multiplier in the neigborhood of this 
@@ -2228,4 +2229,124 @@ void free_np_dep_arrays( const size_t npart, RigidBody* allrb_,
   free( vpartbuf_ );
   if ( pdata_is_open ) free( pdata_ );
   free( fdata_ );  
+}
+
+
+
+
+/** Compute and store velocity and explicit part of the split acceleration 
+at previous times */
+//----------------------------------------------------------------------------
+void update_previoustimes_velocity_splitAcceleration( RigidBody* allrbs, 
+	const size_t nrb, const double dt ) 
+//----------------------------------------------------------------------------
+{  
+  for (size_t k = 0; k < nrb; k++) 
+  {
+    if ( allrbs[k].type != OBSTACLE )
+    {
+      // Save previous velocity before updating
+#     if TRANSLATION
+#       if B_SPLIT_EXPLICIT_ACCELERATION
+          foreach_dimension()
+	    allrbs[k].splitUacc.x = ( FLUID_DENSITY / allrbs[k].rho_s )
+	    	* allrbs[k].M * ( allrbs[k].U.x
+		- allrbs[k].Unm1.x ) / dt;
+#       endif 
+        allrbs[k].Unm1 = allrbs[k].U;
+#     endif 
+#     if ROTATION
+#       if B_SPLIT_EXPLICIT_ACCELERATION
+          coord Iom;
+#         if dimension == 3
+            Iom.x = allrbs[k].Ip[0] * allrbs[k].w.x 
+	  	+ allrbs[k].Ip[3] * allrbs[k].w.y 
+		+ allrbs[k].Ip[4] * allrbs[k].w.z;
+            Iom.y = allrbs[k].Ip[3] * allrbs[k].w.x 
+	  	+ allrbs[k].Ip[1] * allrbs[k].w.y 
+		+ allrbs[k].Ip[5] * allrbs[k].w.z;
+            Iom.z = allrbs[k].Ip[4] * allrbs[k].w.x 
+	  	+ allrbs[k].Ip[5] * allrbs[k].w.y 
+		+ allrbs[k].Ip[2] * allrbs[k].w.z;
+#         else
+            Iom.z = allrbs[k].Ip[2] * allrbs[k].w.z;
+#         endif
+          foreach_dimension()
+	    allrbs[k].splitwacc.x = ( FLUID_DENSITY / allrbs[k].rho_s )
+	    	* ( Iom.x - allrbs[k].Iwnm1.x ) / dt;
+	  allrbs[k].Iwnm1 = Iom;
+#       endif    	 
+        allrbs[k].wnm1 = allrbs[k].w;
+#     endif
+    }
+    else
+    {
+#     if TRANSLATION
+        allrbs[k].Unm1 = allrbs[k].imposedU;
+#     endif 
+#     if ROTATION   	 
+        allrbs[k].wnm1 = allrbs[k].imposedw;
+#     endif 
+    }
+  }
+}
+
+
+
+
+/** Save the explicit part of the split acceleration of all particles for 
+restart purposes in a file */
+//----------------------------------------------------------------------------
+void save_explicit_splitAcceleration( char* dirname, RigidBody const* allrbs, 
+	const size_t nrb )
+//----------------------------------------------------------------------------
+{
+  char dump_name[160] = "";
+  strcpy( dump_name, dirname );
+  strcat( dump_name, "/particle_explicit_acceleration.res" );
+  FILE* ft = fopen( dump_name, "w" );
+
+  for (size_t k = 0; k < nrb; k++)
+  { 
+    fprintf ( ft, "%.10e", allrbs[k].splitUacc.x );
+    fprintf ( ft, " %.10e", allrbs[k].splitUacc.y );
+#   if dimension == 3
+      fprintf ( ft, " %.10e", allrbs[k].splitUacc.z );
+      fprintf ( ft, " %.10e", allrbs[k].splitwacc.x );
+      fprintf ( ft, " %.10e", allrbs[k].splitwacc.y );      
+#   endif
+    fprintf ( ft, " %.10e\n", allrbs[k].splitwacc.z );                        
+  }  
+
+  fclose( ft );  
+}
+
+
+
+
+/** Read the explicit part of the split acceleration of all particles for 
+restart purposes from a file */
+//----------------------------------------------------------------------------
+void read_explicit_splitAcceleration( char* dirname, RigidBody* allrbs, 
+	const size_t nrb )
+//----------------------------------------------------------------------------
+{
+  char dump_name[160] = "";
+  strcpy( dump_name, dirname );
+  strcat( dump_name, "/particle_explicit_acceleration.res" );
+  FILE* ft = fopen( dump_name, "r" );
+
+  for (size_t k = 0; k < nrb; k++)
+  { 
+    fscanf ( ft, "%lf", &(allrbs[k].splitUacc.x) );
+    fscanf ( ft, "%lf", &(allrbs[k].splitUacc.y) );
+#   if dimension == 3
+      fscanf ( ft, "%lf", &(allrbs[k].splitUacc.z) );
+      fscanf ( ft, "%lf", &(allrbs[k].splitwacc.x) );
+      fscanf ( ft, "%lf", &(allrbs[k].splitwacc.y) );      
+#   endif
+    fscanf ( ft, "%lf", &(allrbs[k].splitwacc.z) );                        
+  }  
+
+  fclose( ft ); 
 }
