@@ -1,4 +1,5 @@
 #include "Cone.hh"
+#include "GrainsExec.hh"
 
 int Cone::m_visuNodeNbOnPer = 32;
 
@@ -84,16 +85,17 @@ Point3 Cone::support( Vector3 const& v ) const
 
 
 // ----------------------------------------------------------------------------
-// Returns a vector of points describing the envelope of the
+// Returns a vector of points describing the surface of the
 // cone. TO DO
 vector<Point3> Cone::getEnvelope() const
 {
   Point3 point(0.,0.,0.);
-  vector<Point3> envelope(1,point);
-
-  // TO DO
-
-  return ( envelope );
+  vector<Point3> surface( 3, point );
+  surface[0][Y] = - m_quarterHeight;
+  surface[1][Y] = - m_quarterHeight;
+  surface[1][X] = m_bottomRadius;
+  surface[2][Y] = 3. * m_quarterHeight;
+  return ( surface );
 }
 
 
@@ -179,8 +181,8 @@ double Cone::computeCircumscribedRadius() const
 // Output operator
 void Cone::writeShape( ostream& fileOut ) const 
 {
-  fileOut << "*Cone\n";
-  fileOut << m_bottomRadius     << '\t' << 4.0 * m_quarterHeight << '\n' ;
+  fileOut << "*Cone " << m_bottomRadius << " " << 4.0 * m_quarterHeight 
+  	<< " *END";
 }
 
 
@@ -340,3 +342,131 @@ bool Cone::isIn( Point3 const& pt ) const
 		( 3. * m_quarterHeight - pt[Y] ) * m_sinAngle 
 			/ sqrt( 1. - m_sinAngle * m_sinAngle ) );
 }  
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the bounding volume to cone
+BVolume* Cone::computeBVolume( unsigned int type ) const
+{
+  BVolume* bvol = NULL;
+  if ( type == 1 ) // OBB
+    bvol = new OBB( Vector3( m_bottomRadius, 
+	3. * m_quarterHeight, m_bottomRadius ), Matrix() );
+  else if ( type == 2 ) // OBC
+    bvol = new OBC( m_bottomRadius, 6. * m_quarterHeight, Vector3(0., 1., 0.) );
+
+  return( bvol );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Performs advanced comparison of the two cones and returns whether 
+// they match
+bool Cone::equalType_level2( Convex const* other ) const
+{
+  // We know that other points to a Cone, we dynamically cast it to actual type
+  Cone const* other_ = dynamic_cast<Cone const*>(other);
+  
+  double lmin = min( computeCircumscribedRadius(),
+  	other_->computeCircumscribedRadius() );    
+
+  bool same = ( 
+  	fabs( m_bottomRadius - other_->m_bottomRadius ) <  LOWEPS * lmin 
+	&& fabs( m_quarterHeight - other_->m_quarterHeight ) <  LOWEPS * lmin
+	&& fabs( m_sinAngle - other_->m_sinAngle ) <  LOWEPS );
+  
+  return ( same );
+}
+
+
+
+ 
+// ----------------------------------------------------------------------------
+// Sets the number of point over the cone perimeter for Paraview 
+// post-processing, i.e., controls the number of facets in the cone 
+// reconstruction in Paraview
+void Cone::SetvisuNodeNbOverPer( int nbpts )
+{
+  m_visuNodeNbOnPer = nbpts;
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Writes the cone in an OBJ format
+void Cone::write_convex_OBJ( ostream& f, Transform  const& transform,
+    	size_t& firstpoint_number ) const
+{
+  Point3 pp, p;
+  double dtheta = 2.* PI / m_visuNodeNbOnPer;
+
+  // Vertices  
+  // Disk rim
+  p[Y] = - m_quarterHeight;
+  for (int i=0;i<m_visuNodeNbOnPer;++i)
+  {
+    p[X] = m_bottomRadius * cos ( i * dtheta );
+    p[Z] = m_bottomRadius * sin ( i * dtheta );
+    pp = transform( p );
+    f << "v " << GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+		pp[X] ) << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+		pp[Y] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+		pp[Z] ) << " " << endl;	
+  }
+
+  // Disk center
+  p[X] = 0.;
+  p[Y] = - m_quarterHeight;
+  p[Z] = 0.;
+  pp = transform( p );
+  f << "v " << GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[X] ) << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Y] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Z] ) << " " << endl;
+
+  // Upper tip
+  p[X] = 0.;
+  p[Y] = 3. * m_quarterHeight;
+  p[Z] = 0.;
+  pp = transform( p );
+  f << "v " << GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[X] ) << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Y] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Z] ) << " " << endl;
+  
+  // Faces 
+  // Triangular lateral faces 
+  for (int i=0;i<m_visuNodeNbOnPer-1;++i)
+  {
+    f << "f "<< firstpoint_number + i << " "
+    	<< firstpoint_number + i + 1 << " "
+    	<< firstpoint_number + m_visuNodeNbOnPer + 1 << endl;
+  }
+  f << "f " << firstpoint_number + m_visuNodeNbOnPer - 1 << " "
+  	<< firstpoint_number << " "
+  	<< firstpoint_number + m_visuNodeNbOnPer + 1 << endl;
+
+  // Triangular bottom faces 
+  for (int i=0;i<m_visuNodeNbOnPer-1;++i)
+  {
+    f << "f "<< firstpoint_number + i << " "
+    	<< firstpoint_number + i + 1 << " "
+    	<< firstpoint_number + m_visuNodeNbOnPer << endl;
+  }
+  f << "f " << firstpoint_number + m_visuNodeNbOnPer - 1 << " "
+  	<< firstpoint_number << " "
+  	<< firstpoint_number + m_visuNodeNbOnPer << endl;
+
+  firstpoint_number += m_visuNodeNbOnPer + 2;    			  
+}

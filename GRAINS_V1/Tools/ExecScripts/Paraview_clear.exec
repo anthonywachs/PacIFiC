@@ -23,6 +23,22 @@ for file in $1/$2*.pvtu
         rm -f $file
     fi
   done
+  
+for file in $1/$2*.vtp
+  do
+    if [ -f $file ]
+      then
+        rm -f $file
+    fi
+  done
+  
+for file in $1/$2*.pvtp
+  do
+    if [ -f $file ]
+      then
+        rm -f $file
+    fi
+  done    
 
 for file in $1/ErreurContact*
   do
@@ -32,7 +48,7 @@ for file in $1/ErreurContact*
     fi
   done
 
-for file in $1/ErreurDeplacement*
+for file in $1/ErreurImposedMotion*
   do
     if [ -f $file ]
       then

@@ -34,24 +34,22 @@ class ObstacleKinematicsForce : public Kinematics
     /**@name Methods */
     //@{
     /** @brief Adds an imposed force load to the obstacle kinematics
-    @param chargement the imposed force load */
-    void append( ObstacleImposedForce* chargement );
+    @param oif the imposed force load */
+    void append( ObstacleImposedForce* oif );
 
     /** @brief Composes the obstacle kinematics with another "higher level"
     force kinematics
-    @param other the higher level kinematics
-    @param centre not clear what this parameter is */
-    void Compose( ObstacleKinematicsForce const& other, 
-    	Point3 const& centre );
+    @param other the higher level kinematics */
+    void Compose( ObstacleKinematicsForce const& other );
 	
     /** @brief Computes the obstacle velocity and returns whether the obstacle 
-    moved from t to t+dt
+    moved from time - dt to time
     @param time physical time
     @param dt time step magnitude 
     @param obstacle obstacle the kinematics is related to */
-    bool Deplacement( double time, double dt, Obstacle* obstacle );	
+    bool ImposedMotion( double time, double dt, Obstacle* obstacle );	
 
-    /** @brief Returns translational displacement over dt 
+    /** @brief Returns translational motion over dt 
     @param dt time step magnitude */
     Vector3 getTranslation( double dt ) const;
 
@@ -61,6 +59,9 @@ class ObstacleKinematicsForce : public Kinematics
     /** @brief Computes the total velocity of the obstacle using the arm lever
     @param om arm lever */
     Vector3 Velocity( const Vector3 &om ) const; 
+    
+    /** @brief Returns a pointer to the current translational velocity vector */
+    Vector3 const* getTranslationalVelocity() const;    
     //@}
 
 
@@ -79,9 +80,7 @@ class ObstacleKinematicsForce : public Kinematics
     double m_vitesseD; /**< norm of obstacle translational velocity */  
     list<ObstacleImposedForce*> m_imposedForces; /**< list of imposed force 
     	loads */
-    ObstacleImposedForce* m_currentImposedForce; /**< Current imposed force 
-    	load */
-    Vector3 m_translationOverTimeStep; /**< Translational displacement over 
+    Vector3 m_translationOverTimeStep; /**< Translational motion over 
     	dt */
     //@}
 };

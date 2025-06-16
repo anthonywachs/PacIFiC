@@ -50,7 +50,7 @@ class Sphere : public Convex
     /** @brief Returns the convex type */
     ConvexType getConvexType() const;
 
-    /** @brief Returns a vector of points describing the envelope of the sphere.
+    /** @brief Returns a vector of points describing the surface of the sphere.
     Here simply returns the point (0,0,0) as a convention */
     vector<Point3> getEnvelope() const;
 
@@ -108,6 +108,13 @@ class Sphere : public Convex
     @param transform geometric transformation */
     void write_convex_STL( ostream& f, Transform const& transform ) const;
 
+    /** @brief Writes the sphere in an OBJ format
+    @param f output stream
+    @param transform geometric transformation 
+    @param firstpoint_number number of the 1st point */
+    void write_convex_OBJ( ostream& f, Transform const& transform,
+    	size_t& firstpoint_number ) const;	
+
     /** @brief Writes the sphere in a Paraview format
     @param connectivity connectivity of Paraview polytopes
     @param offsets connectivity offsets
@@ -118,23 +125,24 @@ class Sphere : public Convex
     	list<int>& offsets, list<int>& cellstype, int& firstpoint_globalnumber,
 	int& last_offset ) const;
 
-    /** @brief Sets the number of point per quarter of the equator line for
+    /** @brief Sets the number of points per quarter of the equator line for
     Paraview post-processing, i.e., controls the number of facets in the sphere
     reconstruction in Paraview
     @param nbpts number of point per quarter of the equator line */
     static void SetvisuNodeNbPerQar( int nbpts );
 
-    /** @brief Returns whether the convex shape is a sphere */
-    bool isSphere() const;
-
-    /** @brief Returns an orientation vector describing the convex shape angular
-    position
-    @param transform geometric transformation */
-    Vector3 computeOrientationVector( Transform const* transform ) const;
-
     /** @ brief Returns whether a point lies inside the sphere
     @param pt point */
     bool isIn( Point3 const& pt ) const;
+    
+    /** @brief Performs advanced comparison of the two spheres and returns
+    whether they match
+    @param other the other sphere */
+    bool equalType_level2( Convex const* other ) const;
+    
+    /** @brief Returns the sphere bounding volume
+    @param type 1 = OBB, 2 = OBC */
+    BVolume* computeBVolume( unsigned int type ) const;        
     //@}
 
 

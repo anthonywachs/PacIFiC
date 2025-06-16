@@ -9,7 +9,6 @@
 // ----------------------------------------------------------------------------
 // Default constructor
 ObstacleKinematicsForce::ObstacleKinematicsForce() 
-  : m_currentImposedForce( NULL )
 {}
 
 
@@ -25,9 +24,9 @@ ObstacleKinematicsForce::~ObstacleKinematicsForce()
 
 // ----------------------------------------------------------------------------
 // Adds an imposed force load to the obstacle kinematics
-void ObstacleKinematicsForce::append( ObstacleImposedForce* chargement_ )
+void ObstacleKinematicsForce::append( ObstacleImposedForce* oif )
 {
-  m_imposedForces.push_back( chargement_ );
+  m_imposedForces.push_back( oif );
 }
 
 
@@ -38,12 +37,9 @@ void ObstacleKinematicsForce::append( ObstacleImposedForce* chargement_ )
 void ObstacleKinematicsForce::clearAndDestroy()
 {
   list<ObstacleImposedForce*>::iterator iter;
-
   for (iter=m_imposedForces.begin(); iter!=m_imposedForces.end(); iter++)
     delete *iter;
   m_imposedForces.clear();
-
-  if ( m_currentImposedForce ) delete m_currentImposedForce;
 }
 
 
@@ -52,12 +48,10 @@ void ObstacleKinematicsForce::clearAndDestroy()
 // ----------------------------------------------------------------------------
 // Composes the obstacle kinematics with another "higher level"
 // force kinematics
-void ObstacleKinematicsForce::Compose( ObstacleKinematicsForce const& other, 
-    	Point3 const& centre )
+void ObstacleKinematicsForce::Compose( ObstacleKinematicsForce const& other )
 {
-  Vector3 direction = *(other.m_currentImposedForce->getDirection()) - centre;
-  double ratio = other.m_vitesseD / Norm( direction );
-  m_translationalVelocity += direction * ratio;
+  m_translationalVelocity += other.m_translationalVelocity;
+  m_translationOverTimeStep += other.m_translationOverTimeStep;
 }
 
 
@@ -65,76 +59,42 @@ void ObstacleKinematicsForce::Compose( ObstacleKinematicsForce const& other,
 
 // ----------------------------------------------------------------------------
 // Computes the obstacle velocity and returns whether the obstacle 
-// moved from t to t+dt
-bool ObstacleKinematicsForce::Deplacement( double time, double dt, 
+// moved from time - dt to time
+bool ObstacleKinematicsForce::ImposedMotion( double time, double dt, 
 	Obstacle* obstacle )
 {
-  // Recherche du chargement dans l'increment de time
-  double fin = time + dt;
+  // Force load over [time-dt,time]
   double dtt = 0.;
-  if ( m_currentImposedForce ) 
-  {
-    if ( m_currentImposedForce->isActif( time, fin ) ) 
-    {
-      dtt = m_currentImposedForce->getTime( time, fin );
-      m_translationalVelocity = *m_currentImposedForce->translationalVelocity( 
-      	time, dtt, obstacle );
-    }
-    else 
-    {
-      delete m_currentImposedForce;
-      m_currentImposedForce = NULL;
-    }
-  }
-
-  if ( !m_currentImposedForce ) 
-  {
-    list<ObstacleImposedForce*>::iterator iter;
-    for (iter=m_imposedForces.begin(); iter!=m_imposedForces.end(); iter++)
-      if ( (*iter)->isActif( time, fin ) ) 
-      {
-	m_currentImposedForce = *iter;
-	iter = m_imposedForces.erase( iter );
-	iter = m_imposedForces.end();
-	//dtt = m_currentImposedForce->getTime( time, fin );
-      }
-  }
+  bool found = false;
+  ObstacleImposedForce* currentImposedForce = NULL;
+  list<ObstacleImposedForce*>::iterator iter;
   
-//  // Il existe un chargement dans l'increment de time
-//  if ( m_currentImposedForce ) 
-//  {
-
-    // ratio : direction du deplacement pour compenser la force
-    // Cas 0 : force de reaction = force de confinement +/- epsilon
-    //         deplacement - null
-    // Cas 1 : force de reaction < force de confinement - epsilon
-    //         deplacement + direction
-    // Cas 2 : force de reaction > force de confinement + epsilon
-    //         deplacement - direction
-    /*
-    double ratio = 0.;
-    if (force < chargement->getForceImpMin())
-      ratio = 1.;
-    else if (force > chargement->getForceImpMax())
-      ratio = -1.;
-
-    vitesseD = ratio + chargement->getDeplacement() / dt;
-    Vector3 direction = chargement->getDirection();
-    vtrans += vitesseD * direction;
-    */
-
-//  }
-  return ( Norm( m_translationalVelocity ) != 0. );
+  // Note: only a single imposed force can be active over [time-dt,time]
+  // Therefore we impose the first force that is active in the list, it is up 
+  // to the user to impose forces properly
+  for (iter=m_imposedForces.begin(); iter!=m_imposedForces.end() && !found; 
+  	iter++)
+    if ( (*iter)->isActif( time - dt, time, dt, dtt ) ) 
+    {
+      currentImposedForce = *iter;
+      currentImposedForce->translationalVelocity( 
+      	time, dt, dtt, m_translationalVelocity, m_translationOverTimeStep,
+	obstacle );
+    }  
+  
+  m_vitesseD = Norm( m_translationalVelocity );
+  
+  return ( m_vitesseD != 0. );
 }
 
 
 
 
 // ----------------------------------------------------------------------------
-// Returns translational displacement over dt 
+// Returns translational motion over dt 
 Vector3 ObstacleKinematicsForce::getTranslation( double dt ) const
 {
-  return ( m_translationalVelocity * dt );
+  return ( m_translationOverTimeStep );
 }
 
 
@@ -145,6 +105,7 @@ Vector3 ObstacleKinematicsForce::getTranslation( double dt ) const
 void ObstacleKinematicsForce::reset()
 {
   m_translationalVelocity = 0.;
+  m_translationOverTimeStep = 0.;
   m_vitesseD = 0.;
 }
 
@@ -156,4 +117,14 @@ void ObstacleKinematicsForce::reset()
 Vector3 ObstacleKinematicsForce::Velocity( const Vector3 &om ) const
 {
   return ( m_translationalVelocity );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns a pointer to the current translational velocity vector
+Vector3 const* ObstacleKinematicsForce::getTranslationalVelocity() const
+{
+  return ( &m_translationalVelocity );
 }

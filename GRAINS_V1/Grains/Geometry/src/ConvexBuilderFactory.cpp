@@ -9,6 +9,10 @@
 #include "PointC.hh"
 #include "Superquadric.hh"
 #include "Rectangle.hh"
+#include "TrapezoidalPrism.hh"
+#include "SpheroCyl.hh"
+#include "SpheroCylindricalPrism.hh"
+#include "TruncatedCone.hh"
 
 
 // ----------------------------------------------------------------------------
@@ -31,7 +35,15 @@ Convex* ConvexBuilderFactory::create( DOMNode* root )
   else if ( type == "Cone" ) convex = new Cone( element );
   else if ( type == "Superquadric" ) convex = new Superquadric( element );
   else if ( type == "Rectangle" ) convex = new Rectangle( element );
-
+  else if ( type == "TrapezoidalPrism" ) 
+    convex = new TrapezoidalPrism( element );  
+  else if ( type == "SpheroCylinder" || type == "SpheroCyl" ) 
+    convex = new SpheroCyl( element ); 
+  else if ( type == "SpheroCylindricalPrism" ) 
+    convex = new SpheroCylindricalPrism( element );
+  else if ( type == "TruncatedCone" ) 
+    convex = new TruncatedCone( element );         
+    
   assert( convex != NULL );
 
   return ( convex );
@@ -56,6 +68,14 @@ Convex* ConvexBuilderFactory::create( string& type, istream& fileIn )
   else if ( type == "*PointC" ) convex = new PointC();
   else if ( type == "*Superquadric" ) convex = new Superquadric( fileIn );
   else if ( type == "*Rectangle" ) convex = new Rectangle( fileIn );
+  else if ( type == "*TrapezoidalPrism" ) 
+    convex = new TrapezoidalPrism( fileIn ); 
+  else if ( type == "*SpheroCylinder" || type == "*SpheroCyl" ) 
+    convex = new SpheroCyl( fileIn );
+  else if ( type == "*SpheroCylindricalPrism" ) 
+    convex = new SpheroCylindricalPrism( fileIn ); 
+  else if ( type == "*TruncatedCone" ) 
+    convex = new TruncatedCone( fileIn );                
   else
   {
     cout << "Invalid convex type : " << type.c_str() << endl;

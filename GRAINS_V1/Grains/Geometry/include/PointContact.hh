@@ -107,7 +107,7 @@ class PointContact
     PointContact& operator = ( PointContact const& rhs );
     
     /** @brief Output operator
-    @param fileOut output stream
+    @param Out output stream
     @param pc PointContact object */
     friend ostream& operator << ( ostream& Out, PointContact const& pc );
     //@}
@@ -128,7 +128,7 @@ class PointContact
     //@}
 };
 
-static PointContact PointNoContact( OriginePoint, OriginePoint, OriginePoint,
-	Vector3Nul, 1.e20, 0 );	
+static PointContact PointNoContact( Point3Null, Point3Null, Point3Null,
+	Vector3Null, 1.e20, 0 );	
 
 #endif

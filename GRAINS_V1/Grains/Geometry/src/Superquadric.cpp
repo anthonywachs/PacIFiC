@@ -1,22 +1,22 @@
 #define __STDCPP_WANT_MATH_SPEC_FUNCS__ 1
 #include <bits/stdc++.h>
 #include "Superquadric.hh"
+#include "GrainsExec.hh"
 #include "sstream"
-
 using namespace std;
 
-
-int Superquadric::visuNodeNbOnPer = 16; // multiple of 4
+int Superquadric::m_visuNodeNbPerQar = 4; 
 
 // ----------------------------------------------------------------------------
 // Constructor with input parameters
-Superquadric::Superquadric(double a0, double b0, double c0, double n1, double n2)
+Superquadric::Superquadric( double a0, double b0, double c0, double n1, 
+	double n2 )
 {
-    m_a = a0;
-    m_b = b0;
-    m_c = c0;
-    m_n1 = n1;
-    m_n2 = n2;
+  m_a = a0;
+  m_b = b0;
+  m_c = c0;
+  m_n1 = n1;
+  m_n2 = n2;
 }
 
 
@@ -78,12 +78,14 @@ bool Superquadric::isSuperquadric() const
 // Computes the inertia tensor and the inverse of the inertia tensor
 bool Superquadric::BuildInertia( double* inertia, double* inertia_1 ) const
 {
-  const double eps1 = 2.0/m_n1;
-  const double eps2 = 2.0/m_n2;
+  const double eps1 = 2.0 / m_n1;
+  const double eps2 = 2.0 / m_n2;
   const double C = 0.4 * m_a * m_b * m_c * eps1 * eps2 ;
 
-  const double prod1 = beta( 1.5*eps2, 0.5*eps2 ) * beta( 2.0*eps1, 0.5*eps1 );
-  const double prod2 = m_c*m_c*beta(0.5*eps2, 0.5*eps2) * beta(1.5*eps1, eps1);
+  const double prod1 = beta( 1.5 * eps2, 0.5 * eps2 ) 
+  	* beta( 2. * eps1, 0.5 * eps1 );
+  const double prod2 = m_c * m_c * beta( 0.5 * eps2, 0.5 * eps2 ) 
+  	* beta( 1.5 * eps1, eps1 );
 
   inertia[1] = inertia[2] = inertia[4] = 0.0;
   inertia[0] = C * ( m_b * m_b * prod1 + prod2 );
@@ -167,12 +169,9 @@ Point3 Superquadric::support( Vector3 const& v ) const
   double norm = Norm(v);
   if (norm > EPSILON)
   {
-    const double abvx = abs( v[X] );
-    const double abvy = abs( v[Y] );
-    const double abvz = abs( v[Z] );
-    const double signx = copysign( 1.0, v[X] );
-    const double signy = copysign( 1.0, v[Y] );
-    const double signz = copysign( 1.0, v[Z] );
+    double abvx = abs( v[X] ), abvy = abs( v[Y] ), abvz = abs( v[Z] ), 
+    	signx = copysign( 1.0, v[X] ), signy = copysign( 1.0, v[Y] ), 
+	signz = copysign( 1.0, v[Z] );
 
     Point3 sup;
 
@@ -185,8 +184,8 @@ Point3 Superquadric::support( Vector3 const& v ) const
 
       else
       {
-        const double alpha = pow( m_c*abvz / (m_b*abvy), 1.0 / (m_n1 - 1.0) );
-        const double yt = 1.0 / pow( 1.0 + pow( alpha, m_n1 ), 1.0 / m_n1 );
+        double alpha = pow( m_c*abvz / (m_b*abvy), 1.0 / (m_n1 - 1.0) );
+        double yt = 1.0 / pow( 1.0 + pow( alpha, m_n1 ), 1.0 / m_n1 );
 
         return ( Point3( 0., signy * m_b * yt, signz * alpha * m_c * yt ) );
       }
@@ -194,12 +193,13 @@ Point3 Superquadric::support( Vector3 const& v ) const
 
     else
     {
-      const double alpha = pow( m_b*abvy / (m_a*abvx), 1.0 / ( m_n2 - 1.0 ) );
-      // const double gamma = pow( 1.0 + pow( alpha, m_n2 ), m_n1 / m_n2 - 1.0 );
-      // const double beta = pow( gamma*m_c*abvz / (m_a*abvx), 1.0 / (m_n1-1.0) );
-      const double gamma = pow( 1.0 + pow( alpha, m_n2 ), ( m_n1 - m_n2 ) / ( m_n2 * ( m_n1 - 1.0 ) ) );
-      const double beta = gamma * pow( m_c*abvz / (m_a*abvx), 1.0 / (m_n1-1.0) );
-      const double xt = 1.0 / pow( pow( 1.0+pow(alpha,m_n2) , m_n1 / m_n2 )
+      double alpha = pow( m_b * abvy / ( m_a * abvx ), 
+      	1.0 / ( m_n2 - 1.0 ) );
+      double gamma = pow( 1.0 + pow( alpha, m_n2 ), 
+      	( m_n1 - m_n2 ) / ( m_n2 * ( m_n1 - 1.0 ) ) );
+      double beta = gamma * pow( m_c * abvz / ( m_a * abvx ), 
+      	1.0 / ( m_n1 - 1.0 ) );
+      double xt = 1.0 / pow( pow( 1.0 + pow( alpha, m_n2 ), m_n1 / m_n2 )
         + pow( beta , m_n1 ) , 1.0 / m_n1 ) ;
 
       return ( Point3( signx * m_a * xt, signy * alpha * m_b * xt, signz * beta
@@ -217,16 +217,16 @@ Point3 Superquadric::support( Vector3 const& v ) const
 
 
 // ----------------------------------------------------------------------------
-// Returns a vector of points describing the envelope of the sphere
+// Returns a vector of points describing the surface of the sphere
 vector<Point3> Superquadric::getEnvelope() const
 {
   Point3 point( 0., 0., 0. );
-  vector<Point3> envelope( 3, point );
-  /**  envelope[0][Y] = - halfHeight;
-  envelope[1][Y] = - halfHeight;
-  envelope[1][X] = radius;
-  envelope[2][Y] = halfHeight; */
-  return ( envelope );
+  vector<Point3> surface( 3, point );
+  /**  surface[0][Y] = - halfHeight;
+  surface[1][Y] = - halfHeight;
+  surface[1][X] = radius;
+  surface[2][Y] = halfHeight; */
+  return ( surface );
 }
 
 
@@ -236,7 +236,7 @@ vector<Point3> Superquadric::getEnvelope() const
 // Returns the number of vertices/corners
 int Superquadric::getNbCorners() const
 {
-  return ( 777 );
+  return ( 222 );
 }
 
 
@@ -259,10 +259,11 @@ vector< vector<int> > const* Superquadric::getFaces() const
 double Superquadric::getVolume() const
 {
   const double C = 2.0 / 3.0 * m_a * m_b * m_c;
-  const double eps1 = 2.0/m_n1;
-  const double eps2 = 2.0/m_n2;
+  const double eps1 = 2.0 / m_n1;
+  const double eps2 = 2.0 / m_n2;
 
-  return ( C*eps1*eps2 * beta( eps1, 0.5*eps1 ) * beta( 0.5*eps2, 0.5*eps2 ) );
+  return ( C * eps1 * eps2 * beta( eps1, 0.5 * eps1 ) 
+  	* beta( 0.5 * eps2, 0.5 * eps2 ) );
 }
 
 
@@ -283,8 +284,7 @@ void Superquadric::writeShape( ostream &fileOut ) const
 // Input operator
 void Superquadric::readShape( istream &fileIn )
 {
-  cerr << "Program Error :\n" << "Superquadric::readShape non accessible.\n";
-  exit( 3 );
+  fileIn >> m_a >> m_b >> m_c >> m_n1 >> m_n2;
 }
 
 
@@ -294,7 +294,7 @@ void Superquadric::readShape( istream &fileIn )
 // Returns the number of points to write the superquadric in a Paraview format
 int Superquadric::numberOfPoints_PARAVIEW() const
 {
-  return ( visuNodeNbOnPer * ( visuNodeNbOnPer - 1 ) + 3 );
+  return ( 4 * m_visuNodeNbPerQar * ( 2 * m_visuNodeNbPerQar - 1 ) + 3 );
 }
 
 
@@ -305,38 +305,15 @@ int Superquadric::numberOfPoints_PARAVIEW() const
 void Superquadric::write_polygonsPts_PARAVIEW( ostream &f,
   Transform const& transform, Vector3 const* translation ) const
 {
-  const double eps1 = 2.0 / m_n1;
-  const double eps2 = 2.0 / m_n2;
-  const double dtheta = PI / visuNodeNbOnPer;
-  const double dphi = 2.0 * PI / visuNodeNbOnPer;
+  double eps1 = 2. / m_n1;
+  double eps2 = 2. / m_n2;
+  double dtheta = PI / ( 2. * m_visuNodeNbPerQar ), dphi = dtheta;
   Point3 pp, pptrans;
-
-  pp[X] = pp[Y] = 0.;
-  // Center
-  pp[Z] = 0.;
-  pptrans = transform( pp );
-  if ( translation )
-    pptrans += *translation;
-  f << pptrans[X] << " " << pptrans[Y] << " " << pptrans[Z] << endl;
-
-  // Top point
-  pp[Z] = m_c;
-  pptrans = transform( pp );
-  if ( translation )
-    pptrans += *translation;
-  f << pptrans[X] << " " << pptrans[Y] << " " << pptrans[Z] << endl;
-
-  // Bottom point
-  pp[Z] = -m_c;
-  pptrans = transform( pp ) ;
-  if ( translation )
-    pptrans += *translation;
-  f << pptrans[X] << " " << pptrans[Y] << " " << pptrans[Z] << endl;
 
   // Regular points on the surface
   double cost, sint, costeps1, sinteps1, cosp, sinp;
 
-  for ( int i = 1; i < visuNodeNbOnPer; i++ )
+  for ( int i = 1; i < 2*m_visuNodeNbPerQar; i++ )
   {
     cost = cos( i * dtheta );
     sint = sin( i * dtheta );
@@ -351,7 +328,7 @@ void Superquadric::write_polygonsPts_PARAVIEW( ostream &f,
     // Theta is always strictly between 0 and pi so sint is strictly positive
     sinteps1 = pow( sint, eps1 );
 
-    for ( int j = 0; j < visuNodeNbOnPer; j++ )
+    for ( int j = 0; j < 4*m_visuNodeNbPerQar; j++ )
     {
       cosp = cos( j * dphi );
       sinp = sin( j * dphi );
@@ -373,11 +350,30 @@ void Superquadric::write_polygonsPts_PARAVIEW( ostream &f,
       pp[Z] = m_c * costeps1;
 
       pptrans = transform( pp );
-      if ( translation )
-        pptrans += *translation;
+      if ( translation ) pptrans += *translation;
       f << pptrans[X] << " " << pptrans[Y] << " " << pptrans[Z] << endl;
     }
   }
+  
+  pp[X] = 0.;
+  pp[Y] = 0.;
+  // Bottom point
+  pp[Z] = - m_c;
+  pptrans = transform( pp );
+  if ( translation ) pptrans += *translation;
+  f << pptrans[X] << " " << pptrans[Y] << " " << pptrans[Z] << endl;
+	
+  // Top point
+  pp[Z] = m_c;
+  pptrans = transform( pp );
+  if ( translation ) pptrans += *translation;
+  f << pptrans[X] << " " << pptrans[Y] << " " << pptrans[Z] << endl;
+	
+  // Gravity center
+  pp[Z] = 0.;
+  pptrans = transform( pp );
+  if ( translation ) pptrans += *translation;
+  f << pptrans[X] << " " << pptrans[Y] << " " << pptrans[Z] << endl;  
 }
 
 
@@ -387,83 +383,79 @@ void Superquadric::write_polygonsPts_PARAVIEW( ostream &f,
 // Returns a list of points describing the superquadric in a Paraview format
 list<Point3> Superquadric::get_polygonsPts_PARAVIEW( Transform const& transform,
   Vector3 const* translation ) const
+{
+  double eps1 = 2. / m_n1 ;
+  double eps2 = 2. / m_n2 ;
+  double dtheta = PI / ( 2. * m_visuNodeNbPerQar ), dphi = dtheta;
+  list<Point3> ParaviewPoints;
+  Point3 pp, pptrans;
+
+  // Regular points on the surface
+  double cost, sint, costeps1, sinteps1, cosp, sinp;
+
+  for ( int i = 1; i < 2*m_visuNodeNbPerQar; i++ )
   {
-    const double eps1 = 2.0/m_n1 ;
-    const double eps2 = 2.0/m_n2 ;
-    list<Point3> ParaviewPoints;
-    const double dtheta = PI / visuNodeNbOnPer;
-    const double dphi = 2.0 * PI / visuNodeNbOnPer;
-    Point3 pp, pptrans;
+    cost = cos( i * dtheta );
+    sint = sin( i * dtheta );
 
-    pp[X] = pp[Y] = 0.;
-    // Gravity center
-    pp[Z] = 0.;
-    pptrans = transform( pp );
-    if ( translation )
-      pptrans += *translation;
-    ParaviewPoints.push_back( pptrans );
+    if ( cost == 0. )
+      costeps1 = 0.;
+    else if ( cost < 0. )
+      costeps1 = -pow( -cost, eps1 );
+    else
+      costeps1 = pow( cost, eps1 );
 
-    // Top point
-    pp[Z] = m_c;
-    pptrans = transform( pp );
-    if ( translation )
-      pptrans += *translation;
-    ParaviewPoints.push_back( pptrans );
+    // Theta is always strictly between 0 and pi so sint is
+    // strictly positive
+    sinteps1 = pow( sint, eps1 );
 
-    // Bottom point
-    pp[Z] = -m_c;
-    pptrans = transform( pp ) ;
-    if ( translation )
-      pptrans += *translation;
-    ParaviewPoints.push_back( pptrans );
-
-    // Regular points on the surface
-    double cost, sint, costeps1, sinteps1, cosp, sinp;
-
-    for ( int i = 1; i < visuNodeNbOnPer; i++ )
+    for ( int j = 0; j < 4*m_visuNodeNbPerQar; j++ )
     {
-      cost = cos( i * dtheta );
-      sint = sin( i * dtheta );
-
-      if ( cost == 0. )
-        costeps1 = 0.;
-      else if ( cost < 0. )
-        costeps1 = -pow( -cost, eps1 );
+      cosp = cos( j * dphi );
+      sinp = sin( j * dphi );
+      if ( cosp == 0. )
+        pp[X] = 0.;
+      else if ( cosp < 0. )
+        pp[X] = -m_a * sinteps1 * pow( -cosp, eps2 );
       else
-        costeps1 = pow( cost, eps1 );
+        pp[X] = m_a * sinteps1 * pow( cosp, eps2 );
 
-      // Theta is always strictly between 0 and pi so sint is
-      // strictly positive
-      sinteps1 = pow( sint, eps1 );
+      if ( sinp == 0. )
+        pp[Y] = 0.;
+      else if ( sinp < 0. )
+        pp[Y] = -m_b * sinteps1 * pow( -sinp, eps2 );
+      else
+        pp[Y] = m_b * sinteps1 * pow( sinp, eps2 );
 
-      for ( int j = 0; j < visuNodeNbOnPer; j++ )
-      {
-        cosp = cos( j * dphi );
-        sinp = sin( j * dphi );
-        if ( cosp == 0. )
-          pp[X] = 0.;
-        else if ( cosp < 0. )
-          pp[X] = -m_a * sinteps1 * pow( -cosp, eps2 );
-        else
-          pp[X] = m_a * sinteps1 * pow( cosp, eps2 );
+      pp[Z] = m_c * costeps1 ;
 
-        if ( sinp == 0. )
-          pp[Y] = 0.;
-        else if ( sinp < 0. )
-          pp[Y] = -m_b * sinteps1 * pow( -sinp, eps2 );
-        else
-          pp[Y] = m_b * sinteps1 * pow( sinp, eps2 );
-
-        pp[Z] = m_c * costeps1 ;
-
-        pptrans = transform( pp ) ;
-        if ( translation )
-          pptrans += *translation;
-        ParaviewPoints.push_back( pptrans );
-      }
+      pptrans = transform( pp ) ;
+      if ( translation ) pptrans += *translation;
+      ParaviewPoints.push_back( pptrans );
     }
+  }
+  
+  pp[X] = 0.;
+  pp[Y] = 0.;
+  // Bottom point
+  pp[Z] = - m_c;
+  pptrans = transform( pp );
+  if ( translation ) pptrans += *translation;
+  ParaviewPoints.push_back( pptrans );
+	
+  // Top point
+  pp[Z] = m_c;
+  pptrans = transform( pp );
+  if ( translation ) pptrans += *translation;
+  ParaviewPoints.push_back( pptrans );
+	
+  // Gravity center
+  pp[Z] = 0.;
+  pptrans = transform( pp );  
+  if ( translation ) pptrans += *translation;
+  ParaviewPoints.push_back( pptrans );  
 
-    return ( ParaviewPoints );
+  return ( ParaviewPoints );
 }
 
 
@@ -474,7 +466,7 @@ list<Point3> Superquadric::get_polygonsPts_PARAVIEW( Transform const& transform,
 // Paraview format
 int Superquadric::numberOfCells_PARAVIEW() const
 {
-  return ( visuNodeNbOnPer * visuNodeNbOnPer );
+  return ( 8 * m_visuNodeNbPerQar * m_visuNodeNbPerQar );
 }
 
 
@@ -486,98 +478,84 @@ void Superquadric::write_polygonsStr_PARAVIEW( list<int>& connectivity,
       list<int>& offsets, list<int>& cellstype, int& firstpoint_globalnumber,
   int& last_offset ) const
 {
-  // Top cells: tetrahedron
-  for ( int j = 0; j < visuNodeNbOnPer - 1; j++ )
-  {
-    // Center
-    connectivity.push_back( firstpoint_globalnumber );
-    // Top point
-    connectivity.push_back( firstpoint_globalnumber + 1 );
-    connectivity.push_back( firstpoint_globalnumber + 3 + j );
-    connectivity.push_back( firstpoint_globalnumber + 3 + j + 1);
-    last_offset += 4;
-    offsets.push_back( last_offset );
-    cellstype.push_back( 10 );
-  }
-  // Center
-  connectivity.push_back( firstpoint_globalnumber );
-  // Top point
-  connectivity.push_back( firstpoint_globalnumber + 1 );
-  // Last point of the first latitude (i=1)
-  connectivity.push_back( firstpoint_globalnumber + 3 + visuNodeNbOnPer - 1 );
-  // First point of the first latitude (i=1)
-  connectivity.push_back( firstpoint_globalnumber + 3 );
-  last_offset += 4;
-  offsets.push_back( last_offset );
-  cellstype.push_back( 10 );
-
+  int i, k, ptsPerlevel = 4 * m_visuNodeNbPerQar,
+	Bottom_number = ptsPerlevel * ( 2 * m_visuNodeNbPerQar - 1 ),
+	Top_number = ptsPerlevel * ( 2 * m_visuNodeNbPerQar - 1 ) + 1,  
+  	GC_number = ptsPerlevel * ( 2 * m_visuNodeNbPerQar - 1 ) + 2;
+  
   // Regular cells: Pyramid
-  int pointact = 3; // Current point (we will browse the grid)
-
-  for ( int i = 1 ; i < visuNodeNbOnPer - 1; ++i )
-  {
-    for ( int j = 0; j < visuNodeNbOnPer - 1; j++ )
+  for ( k = 0; k < 2*m_visuNodeNbPerQar-2 ; ++k ) 
+  {  
+    for ( i = 0; i < ptsPerlevel-1 ; ++i )
     {
-      // Center
-      connectivity.push_back( firstpoint_globalnumber );
-      // Current point
-      connectivity.push_back( firstpoint_globalnumber + pointact );
-      // same latitude, +1 longitude
-      connectivity.push_back( firstpoint_globalnumber + pointact + 1) ;
-      // +1 latitude, +1 longitude
-      connectivity.push_back( firstpoint_globalnumber + pointact
-        + visuNodeNbOnPer + 1 );
-      // +1 latitude, same longitude
-      connectivity.push_back( firstpoint_globalnumber + pointact
-        + visuNodeNbOnPer );
+      connectivity.push_back( firstpoint_globalnumber + k * ptsPerlevel + i ); 
+      connectivity.push_back( firstpoint_globalnumber + k * ptsPerlevel + i 
+      	+ 1);
+      connectivity.push_back( firstpoint_globalnumber + ( k + 1) * ptsPerlevel
+      	+ i + 1 );	
+      connectivity.push_back( firstpoint_globalnumber + ( k + 1 ) * ptsPerlevel
+	+ i );
+      connectivity.push_back( firstpoint_globalnumber + GC_number );
       last_offset += 5;
       offsets.push_back( last_offset );
-      cellstype.push_back( 14 );
-      pointact++;
+      cellstype.push_back( 14 );		
     }
-    // Center
-    connectivity.push_back( firstpoint_globalnumber );
-    // Current point (last of its latitude)
-    connectivity.push_back( firstpoint_globalnumber + pointact );
-    // First point (j=0) on the same latitude as pointact
-    connectivity.push_back( firstpoint_globalnumber + pointact
-      - ( visuNodeNbOnPer - 1 ) );
-    // First point (j=0) on the latitude under that of pointact
-    connectivity.push_back( firstpoint_globalnumber + pointact + 1 );
-    // +1 latitude, same longitude
-    connectivity.push_back( firstpoint_globalnumber + pointact
-      + visuNodeNbOnPer );
+    connectivity.push_back( firstpoint_globalnumber + k * ptsPerlevel + 
+    	ptsPerlevel - 1 );
+    connectivity.push_back( firstpoint_globalnumber + k * ptsPerlevel );
+    connectivity.push_back( firstpoint_globalnumber + ( k + 1 ) * ptsPerlevel );
+    connectivity.push_back( firstpoint_globalnumber + ( k + 1 ) * ptsPerlevel 
+    	+ ptsPerlevel - 1 );
+    connectivity.push_back( firstpoint_globalnumber + GC_number );
     last_offset += 5;
     offsets.push_back( last_offset );
-    cellstype.push_back( 14 );
-    pointact++;
-  }
+    cellstype.push_back( 14 );    
+  }  
 
-  // Bottom cells: tetrahedron
-  const int Firstptlastlat = 3 + visuNodeNbOnPer * (visuNodeNbOnPer - 2);
-
-  for ( int j = 0; j < visuNodeNbOnPer - 1; j++ )
+  // Top cells: tetraedron
+  for ( i = 0; i < ptsPerlevel-1 ; ++i )
   {
-    connectivity.push_back( firstpoint_globalnumber ); // Center
-    connectivity.push_back( firstpoint_globalnumber + 2 ); // Bottom point
-    connectivity.push_back( firstpoint_globalnumber + Firstptlastlat + j );
-    connectivity.push_back( firstpoint_globalnumber + Firstptlastlat + j + 1 );
+    connectivity.push_back( firstpoint_globalnumber + i ); 
+    connectivity.push_back( firstpoint_globalnumber + i + 1 );
+    connectivity.push_back( firstpoint_globalnumber + Top_number );	
+    connectivity.push_back( firstpoint_globalnumber + GC_number );
     last_offset += 4;
     offsets.push_back( last_offset );
-    cellstype.push_back( 10 );
+    cellstype.push_back( 10 );   
   }
-  connectivity.push_back( firstpoint_globalnumber ); // Center
-  connectivity.push_back( firstpoint_globalnumber + 2 ); // Bottom point
-  // Last point last latitude
-  connectivity.push_back( firstpoint_globalnumber + Firstptlastlat
-    + visuNodeNbOnPer - 1 );
-  // First point last latitude
-  connectivity.push_back( firstpoint_globalnumber + Firstptlastlat );
+  connectivity.push_back( firstpoint_globalnumber + ptsPerlevel - 1 );
+  connectivity.push_back( firstpoint_globalnumber );
+  connectivity.push_back( firstpoint_globalnumber + Top_number );	
+  connectivity.push_back( firstpoint_globalnumber + GC_number );
   last_offset += 4;
   offsets.push_back( last_offset );
-  cellstype.push_back( 10 );
+  cellstype.push_back( 10 );  
+  
+  // Bottom cells: tetraedron  
+  for ( i = 0; i < ptsPerlevel-1 ; ++i )
+  {
+    connectivity.push_back( firstpoint_globalnumber
+    	+ ( 2 * m_visuNodeNbPerQar - 2 ) * ptsPerlevel + i );
+    connectivity.push_back( firstpoint_globalnumber
+    	+ ( 2 * m_visuNodeNbPerQar - 2 ) * ptsPerlevel + i + 1 );
+    connectivity.push_back( firstpoint_globalnumber + Bottom_number );	
+    connectivity.push_back( firstpoint_globalnumber + GC_number );
+    last_offset += 4;
+    offsets.push_back( last_offset );
+    cellstype.push_back( 10 ); 
+  }
+  connectivity.push_back( firstpoint_globalnumber
+  	+ ( 2 * m_visuNodeNbPerQar - 1 ) * ptsPerlevel - 1 );
+  connectivity.push_back( firstpoint_globalnumber
+  	+ ( 2 * m_visuNodeNbPerQar - 2 ) * ptsPerlevel );
+  connectivity.push_back( firstpoint_globalnumber + Bottom_number );	
+  connectivity.push_back( firstpoint_globalnumber + GC_number );
+  last_offset += 4;
+  offsets.push_back( last_offset );
+  cellstype.push_back( 10 ); 
 
-  firstpoint_globalnumber += visuNodeNbOnPer * ( visuNodeNbOnPer - 1 ) + 3;
+  firstpoint_globalnumber += 4 * m_visuNodeNbPerQar * 
+  	( 2 * m_visuNodeNbPerQar - 1 ) + 3 ;
 }
 
 
@@ -594,48 +572,220 @@ bool Superquadric::isIn( Point3 const& pt ) const
 
 
 
-// // ----------------------------------------------------------------------------
-// // Writes the superquadric in a STL format
-// void Superquadric::write_convex_STL( ostream& f,
-//   Transform const& transform ) const
-// {
-//   cerr << "Program Error :\n"
-//        << "Superquadric::write_convex_STL non accessible.\n";
-//   exit( 3 );
-// }
+// ----------------------------------------------------------------------------
+// Returns the bounding volume to superquadrics
+BVolume* Superquadric::computeBVolume( unsigned int type ) const
+{
+  BVolume* bvol = NULL;
+  if ( type == 1 ) // OBB
+    bvol = new OBB( Vector3( m_a, m_b, m_c ), Matrix() );
+  else if ( type == 2 ) // OBC
+  {
+    // cylinder-like SQ -- in this case, bigger from m_a and m_b is radius
+    // and height is 2. * m_c
+    if ( m_n2 == 2. )
+    {
+      Vector3 e( 0., 0., 1. );
+      double r = m_a > m_b ? m_a : m_b;
+      double h = 2. * m_c;
+      bvol = new OBC( r, h, e );
+    }
+    // cube-like SQ -- in this case, the OBC is the same as OBC for a box
+    // if ( m_n1 == m_n2 )
+    else
+    {
+      double xy = fabs( m_a - m_b );
+      double xz = fabs( m_a - m_c );
+      double yz = fabs( m_b - m_c );
+      // pick from xy and xz, store to xy
+      int zAxis = xy < xz ? Z : Y;
+      xy = xy < xz ? xy : xz;
+      // pick from xy and yz
+      zAxis = xy < yz ? zAxis : X;
+          
+      double h;
+      if ( zAxis == X ) h = 2. * m_a;
+      else if ( zAxis == Y ) h = 2. * m_b;
+      else if ( zAxis == Z ) h = 2. * m_c;
+
+      Vector3 e( 0., 0., 0. );
+      e[ zAxis ] = 1.;
+      double r = sqrt( m_a * m_a + m_b * m_b + m_c * m_c - h * h / 4. );
+
+      bvol = new OBC( r, h, e );
+    }
+  }
+
+  return( bvol );
+}
 
 
 
 
 // ----------------------------------------------------------------------------
-// Writes a triangular facet in the STL format based on its 3
-// vertices and the center of mass coordinates
-// void Superquadric::write_STLfacet_sphere( ostream &f, Point3 const& GC,
-//   	Point3 const& pp1,
-//   	Point3 const& pp2,
-//   	Point3 const& pp3 ) const
+// Performs advanced comparison of the two superquadrics and returns whether 
+// they match
+bool Superquadric::equalType_level2( Convex const* other ) const
+{
+  // We know that other points to a Superquadric, we dynamically cast it to 
+  // actual type
+  Superquadric const* other_ = dynamic_cast<Superquadric const*>(other);
+  
+  double lmin = min( computeCircumscribedRadius(),
+  	other_->computeCircumscribedRadius() );    
+
+  bool same = ( 
+  	fabs( m_a - other_->m_a ) <  LOWEPS * lmin 
+	&& fabs( m_b - other_->m_b ) <  LOWEPS * lmin
+	&& fabs( m_c - other_->m_c ) <  LOWEPS * lmin	
+	&& fabs( m_n1 - other_->m_n1 ) <  LOWEPS 
+	&& fabs( m_n2 - other_->m_n2 ) <  LOWEPS );
+  
+  return ( same );
+}
 
 
 
 
-// // ----------------------------------------------------------------------------
-// // Returns an orientation vector describing the convex shape angular position
-// Vector3 Superquadric::computeOrientationVector( Transform const* transform ) const
-// {
-//   Point3 pp( 0., m_radius, 0. );
-//   Point3 pptrans = (*transform)( pp );
-//
-//   return ( pptrans - *transform->getOrigin() );
-// }
-//
-//
-//
-//
-// // ----------------------------------------------------------------------------
-// // Sets the number of point per quarter of the equator line for
-// // Paraview post-processing, i.e., controls the number of facets in the sphere
-// // reconstruction in Paraview
-// void Superquadric::SetvisuNodeNbPerQar( int nbpts )
-// {
-//   m_visuNodeNbPerQar = nbpts;
-// }
+// ----------------------------------------------------------------------------
+// Sets the number of point per quarter of the equator line for Paraview 
+// post-processing, i.e., controls the number of facets in the superquadric
+// reconstruction in Paraview
+void Superquadric::SetvisuNodeNbPerQar( int nbpts )
+{
+  m_visuNodeNbPerQar = nbpts;
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Writes the sphere in an OBJ format
+void Superquadric::write_convex_OBJ( ostream& f, Transform  const& transform,
+    	size_t& firstpoint_number ) const
+{
+  double eps1 = 2. / m_n1;
+  double eps2 = 2. / m_n2;
+  double dtheta = PI / ( 2. * m_visuNodeNbPerQar ), dphi = dtheta;
+  Point3 p, pp;
+  int i, k, ptsPerlevel = 4 * m_visuNodeNbPerQar,
+	Bottom_number = ptsPerlevel * ( 2 * m_visuNodeNbPerQar - 1 ),
+	Top_number = ptsPerlevel * ( 2 * m_visuNodeNbPerQar - 1 ) + 1;
+  double cost, sint, costeps1, sinteps1, cosp, sinp;
+
+  // Vertices
+  for (i = 1; i < 2*m_visuNodeNbPerQar; i++)
+  {
+    cost = cos( i * dtheta );
+    sint = sin( i * dtheta );
+
+    if ( cost == 0. )
+      costeps1 = 0.;
+    else if ( cost < 0. )
+      costeps1 = -pow( -cost, eps1 );
+    else
+      costeps1 = pow( cost, eps1 );
+
+    // Theta is always strictly between 0 and pi so sint is strictly positive
+    sinteps1 = pow( sint, eps1 );
+
+    for ( int j = 0; j < 4*m_visuNodeNbPerQar; j++ )
+    {
+      cosp = cos( j * dphi );
+      sinp = sin( j * dphi );
+
+      if ( cosp == 0. )
+        p[X] = 0.;
+      else if ( cosp < 0. )
+        p[X] = -m_a * sinteps1 * pow( -cosp, eps2 );
+      else
+        p[X] = m_a * sinteps1 * pow( cosp, eps2 );
+
+      if ( sinp == 0. )
+        p[Y] = 0.;
+      else if ( sinp < 0. )
+        p[Y] = -m_b * sinteps1 * pow( -sinp, eps2 );
+      else
+        p[Y] = m_b * sinteps1 * pow( sinp, eps2 );
+
+      p[Z] = m_c * costeps1;
+
+      pp = transform( p );
+      f << "v " << GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[X] ) << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Y] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Z] ) << " " << endl;	
+    }
+  }
+  
+  p[X] = 0.;
+  p[Y] = 0.;
+  // Bottom point
+  p[Z] = - m_c;
+  pp = transform( p );
+  f << "v " << GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[X] ) << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Y] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Z] ) << " " << endl;
+	
+  // Top point
+  p[Z] = m_c;
+  pp = transform( p );
+  f << "v " << GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[X] ) << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Y] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+			pp[Z] ) << " " << endl;
+
+  // Faces  
+  // Square faces
+  for ( k = 0; k < 2*m_visuNodeNbPerQar-2 ; ++k ) 
+  {  
+    for ( i = 0; i < ptsPerlevel-1 ; ++i )
+    {
+      f << "f " << firstpoint_number + k * ptsPerlevel + i << " " 
+      	<< firstpoint_number + k * ptsPerlevel + i + 1 << " "
+      	<< firstpoint_number + ( k + 1) * ptsPerlevel + i + 1 << " "	
+      	<< firstpoint_number + ( k + 1 ) * ptsPerlevel + i << endl;		
+    }
+    f << "f " << firstpoint_number + k * ptsPerlevel + ptsPerlevel - 1 
+    	<< " " << firstpoint_number + k * ptsPerlevel << " " 
+	<< firstpoint_number + ( k + 1 ) * ptsPerlevel << " "
+	<< firstpoint_number + ( k + 1 ) * ptsPerlevel + ptsPerlevel - 1 
+	<< endl;   
+  }  
+
+  // Top triangular faces
+  for ( i = 0; i < ptsPerlevel-1 ; ++i )
+  {
+    f << "f " << firstpoint_number + i << " " 
+    	<< firstpoint_number + i + 1 << " "
+    	<< firstpoint_number + Top_number << endl;
+  }
+  f << "f " << firstpoint_number + ptsPerlevel - 1 << " "
+  	<< firstpoint_number << " "
+	<< firstpoint_number + Top_number << endl;
+  
+  // Bottom triangular faces
+  for ( i = 0; i < ptsPerlevel-1 ; ++i )
+  {
+    f << "f " << firstpoint_number
+    		+ ( 2 * m_visuNodeNbPerQar - 2 ) * ptsPerlevel + i << " " 
+    	<<  firstpoint_number
+    		+ ( 2 * m_visuNodeNbPerQar - 2 ) * ptsPerlevel + i + 1 << " " 
+    	<< firstpoint_number + Bottom_number << endl;
+  }
+  f << "f " << firstpoint_number
+  		+ ( 2 * m_visuNodeNbPerQar - 1 ) * ptsPerlevel - 1 << " " 
+  	<< firstpoint_number
+  		+ ( 2 * m_visuNodeNbPerQar - 2 ) * ptsPerlevel  << " "
+	<< firstpoint_number + Bottom_number << endl;
+
+  firstpoint_number += 4 * m_visuNodeNbPerQar * 
+  	( 2 * m_visuNodeNbPerQar - 1 ) + 2 ;  
+}

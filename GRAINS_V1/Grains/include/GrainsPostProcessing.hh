@@ -11,7 +11,7 @@ using namespace std;
 /** @brief Global porosity */
 struct GlobalPorosity
 {
-  struct Window domain; /**< porosity domain */
+  Window domain; /**< porosity domain */
   size_t nintervals[3]; /**< Number of intervals in each direction */   
 };
 

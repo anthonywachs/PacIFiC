@@ -4,6 +4,8 @@
 #include "PostProcessingWriter.hh"
 #include "ParaviewPostProcessingWriter.hh"
 #include "BBox.hh"
+#include "TrilobeCylinder.hh"
+#include "QuadrilobeCylinder.hh"
 
 
 // ----------------------------------------------------------------------------
@@ -107,14 +109,13 @@ void GrainsCRBFeatures::Construction( DOMElement* rootElement )
       for (XMLSize_t i=0; i<allParticles->getLength(); i++) 
       {
         DOMNode* nParticle = allParticles->item( i );
-        int nb = ReaderXML::getNodeAttr_Int( nParticle, "Number" );
+        size_t nb = ReaderXML::getNodeAttr_Int( nParticle, "Number" );
 
         // Remark: reference particles' ID number is -1, which explains
         // auto_numbering = false in the constructor
-        Particle* particleRef = new Particle( nParticle, false, 
-            nbPC+int(i) );
-        m_allcomponents.AddReferenceParticle( particleRef );
-        pair<Particle*,int> ppp( particleRef, nb );
+        Particle* particleRef = new Particle( nParticle, nbPC+int(i) );
+        m_allcomponents.AddReferenceParticle( particleRef, nb );
+        pair<Particle*,size_t> ppp( particleRef, nb );
         m_newParticles.push_back( ppp );
       }
       
@@ -139,7 +140,7 @@ void GrainsCRBFeatures::Construction( DOMElement* rootElement )
       for (XMLSize_t i=0; i<allCompParticles->getLength(); i++) 
       {
         DOMNode* nCompParticle = allCompParticles->item( i );
-        int nb = ReaderXML::getNodeAttr_Int( nCompParticle, "Number" );
+        size_t nb = ReaderXML::getNodeAttr_Int( nCompParticle, "Number" );
 
         // Remark: reference particles' ID number is -1, which explains
         // auto_numbering = false in the constructor
@@ -148,14 +149,14 @@ void GrainsCRBFeatures::Construction( DOMElement* rootElement )
 	if ( ReaderXML::hasNodeAttr( nCompParticle, "SpecificShape" )  )
 	  sshape = ReaderXML::getNodeAttr_String( nCompParticle, 
 	  	"SpecificShape" );
-	if ( sshape == "SpheroCylinder" )
-	  particleRef = new SpheroCylinder( nCompParticle,
-              false, nbPC+int(i) );
+	if ( sshape == "TrilobeCylinder" )
+	  particleRef = new TrilobeCylinder( nCompParticle, nbPC+int(i) );
+	else if ( sshape == "QuadrilobeCylinder" )
+	  particleRef = new QuadrilobeCylinder( nCompParticle, nbPC+int(i) );
 	else 	
-	  particleRef = new CompositeParticle( nCompParticle,
-              false, nbPC+int(i) );
-        m_allcomponents.AddReferenceParticle( particleRef );
-        pair<Particle*,int> ppp( particleRef, nb );
+	  particleRef = new CompositeParticle( nCompParticle, nbPC+int(i) );
+        m_allcomponents.AddReferenceParticle( particleRef, nb );
+        pair<Particle*,size_t> ppp( particleRef, nb );
         m_newParticles.push_back( ppp );
       }
       
@@ -603,7 +604,7 @@ void GrainsCRBFeatures::Simulation( double time_interval )
     list<Particle*> lcp;
     particle->setActivity( COMPUTE );
     lcp.push_back( particle );
-    ppVTK.writeParticlesPostProcessing_Paraview( &lcp, 
+    ppVTK.writeParticles_Paraview( &lcp, 
     	m_outputfilename + ".vtu", true );     
   }
 }

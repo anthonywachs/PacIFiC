@@ -2,6 +2,7 @@
 #define _OBSTACLEIMPOSEDVELOCITY_HH_
 
 #include "Vector3.hh"
+#include "Point3.hh"
 using namespace solid;
 #include <list>
 #include <string>
@@ -11,6 +12,7 @@ using namespace std;
 
 
 class ObstacleImposedVelocity;
+class LinkedCell;
 bool operator < ( ObstacleImposedVelocity const& c0,
 	ObstacleImposedVelocity const& c1 );
 ostream& operator << ( ostream& fileOut, 
@@ -49,49 +51,63 @@ class ObstacleImposedVelocity
     /**@name Methods */
     //@{
     /** @brief Returns obstacle name */
-    string getNom() const;
+    string getObstacleName() const;
 
-    /** @brief Returns the remaining active time interval of the imposed motion
-    @param debut simulation start time
-    @param fin simulation end time */
-    double getTime( double debut, double fin ) const;
-
-    /** @brief Returns whether the imposed motion is activ at time t
-    @param t physical time
-    @param dt time step magnitude */
-    bool isActif( double t, double dt ) const;
+    /** @brief Returns whether the imposed motion is active over the time
+    interval [td,te] and if it is the sub-interval length within [td,te] when it
+    is actually active 
+    @param td simulation start time
+    @param te simulation end time
+    @param dt time step magnitude 
+    @param subinterval the sub-interval length within [td,te] when it
+    is actually active */
+    bool isActif( double const& td, double const& te, double const& dt,
+    	double& subinterval ) const;
 
     /** @brief Returns whether the imposed motion is completed at time t
     @param t physical time
     @param dt time step magnitude */
     bool isCompleted( double t, double dt ) const;
   
-    /** @brief Returns the translational velocity at time t 
+    /** @brief Returns the translational velocity at time time 
     @param time physical time
-    @param dt time step magnitude */
-    Vector3 const* translationalVelocity( double time, double dt );
+    @param dt time step magnitude 
+    @param cg center of mass of the obstacle */
+    Vector3 const* translationalVelocity( double time, double dt, 
+    	Point3 const& cg );
 
-    /** @brief Returns the angular velocity at time t 
+    /** @brief Returns the angular velocity at time time 
     @param time physical time
     @param dt time step magnitude */
     Vector3 const* angularVelocity( double time, double dt );
  
-    /** @brief Returns the translational displacement over dt at time t 
+    /** @brief Returns the translational motion over [time-dt,time] 
     @param time physical time
-    @param dt time step magnitude */
-    Vector3 translationalDisplacement( double time, double dt );  
+    @param dt time step magnitude 
+    @param subinterval the sub-interval length within [time-dt,time] when it
+    is actually active
+    @param cg center of mass of the obstacle */
+    Vector3 translationalMotion( double time, double dt, 
+    	double const& subinterval, Point3 const& cg );  
   
-    /** @brief Returns the angular displacement over dt at time t 
+    /** @brief Returns the angular motion over [time-dt,time]
     @param time physical time
-    @param dt time step magnitude */  
-    Vector3 angularDisplacement( double time, double dt ); 
+    @param dt time step magnitude 
+    @param subinterval the sub-interval length within [time-dt,time] when it
+    is actually active */  
+    Vector3 angularMotion( double time, double dt, double const& subinterval ); 
 
     /** @brief Debug
     @param c debug message */
     void debug( char *c ); 
   
     /** @brief Returns the imposed motion type */
-    string getType() const; 
+    string getType() const;
+    
+    /** @brief Updates imposed velocity based on a stress criterion (for 
+    cyclic shearing) 
+    @param LC linked cell grid */
+    void updateImposedVelocity( LinkedCell const* LC );     
     //@}
 
 
@@ -109,18 +125,6 @@ class ObstacleImposedVelocity
     Returns true if c0.tdebut < c1.tdebut */
     friend bool operator < ( ObstacleImposedVelocity const& c0,
 	ObstacleImposedVelocity const& c1 );
-
-    /** @brief Output operator
-    @param fileOut output stream
-    @param motion ObstacleImposedVelocity object */
-    friend ostream& operator << ( ostream& fileOut, 
-	ObstacleImposedVelocity const& motion );
-	
-    /** @brief Input operator
-    @param fileIn input stream
-    @param motion ObstacleImposedVelocity object */
-    friend istream& operator >> ( istream& fileIn, 
-	ObstacleImposedVelocity& motion );
     //@}
 
 
@@ -132,19 +136,28 @@ class ObstacleImposedVelocity
     double m_tstart; /**< Start time */
     double m_tend; /**< End time */
     Vector3 m_translationalVelocity; /**< translational velocity */
+    Vector3 m_previous_translationalVelocity; /**< translational velocity at
+    	time - dt */    
     Vector3 m_angularVelocity; /**< angular velocity */
-    double m_Sin_amplitude; /**< sinusoidal velocity amplitude */
-    double m_Sin_period; /**< sinusoidal velocity period */
-    double m_Sin_phase; /**< sinusoidal velocity phase shift */    
-    Vector3 m_Sin_vitRef; /**< sinusoidal velocity reference vector */  
-    double m_freqX; /**< cyclic motion frequency in x */
-    double m_freqY; /**< cyclic motion frequency in y */ 
-    double m_freqZ; /**< cyclic motion frequency in z */
-    double m_phase; /**< cyclic motion phase shift */
-    double m_ampX; /**< cyclic motion amplitude in x */
-    double m_ampY; /**< cyclic motion amplitude in y */
-    double m_ampZ; /**< cyclic motion amplitude in z */
-    Vector3 m_prev; /**< cyclic motion previous position */
+    bool m_rotationCenterIsCenterOfMass; /**< true if the center of rotation
+    	is the center of mass of the obstacle. In this case, there is no
+    	contribution to the translation motion, otherwise there is */
+    Point3 m_rotationCenter; /**< center of rotation */
+    double m_amplitude; /**< sinusoidal or step velocity amplitude */
+    double m_period; /**< sinusoidal or step velocity period */
+    double m_Sin_phase_shift; /**< sinusoidal velocity phase shift */    
+    Vector3 m_unit_vitRef; /**< multi-dimensional sinusoidal velocity unit 
+    	reference vector */  
+    Vector3 m_MultiSin_period; /**< multi-dimensional sinusoidal motion period 
+    	in each direction */
+    Vector3 m_MultiSin_amplitude; /**< multi-dimensional sinusoidal motion 
+    	amplitude in each direction */
+    Vector3 m_MultiSin_phase_shift; /**< multi-dimensional sinusoidal velocity 
+    	phase shift in each direction */ 
+    pair<int,int> m_stressIndices; /**< Stress component indices */
+    double m_stress_max; /**< Maximum stress amplitude to revert the motion */
+    double m_stress; /**< Current stress */
+    double m_previous_stress; /**< Previous stress */ 
     //@}
     
 

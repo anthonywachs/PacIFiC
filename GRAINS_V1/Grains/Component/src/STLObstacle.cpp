@@ -39,7 +39,8 @@ STLObstacle::STLObstacle( const string &s, string const& filename )
   // of the STL triangles. Hence we defines its shape by a point
   // corresponding to its center of mass position (same as in CompositeObstacle
   // and in CompositeParticle)
-  m_geoRBWC = new RigidBodyWithCrust( new PointC(), Transform() );
+  m_geoRBWC = new RigidBodyWithCrust( new PointC(), Transform(), true,
+  	EPSILON );
     
   // Read STL file and construct the triangulation
   readSTL( filename );
@@ -74,7 +75,8 @@ STLObstacle::STLObstacle( DOMNode *root )
   // of the STL triangles. Hence we defines its shape by a point
   // corresponding to its center of mass position (same as in CompositeObstacle
   // and in CompositeParticle)
-  m_geoRBWC = new RigidBodyWithCrust( new PointC(), Transform() );
+  m_geoRBWC = new RigidBodyWithCrust( new PointC(), Transform(), true,
+  	EPSILON );
   
   m_name = ReaderXML::getNodeAttr_String( root, "name" );
   
@@ -163,13 +165,13 @@ bool STLObstacle::isSTLObstacle() const
 // ----------------------------------------------------------------------------
 // Moves the simple obstacle and returns a list of moved obstacles (here itself)
 list<SimpleObstacle*> STLObstacle::Move( double time,
-	double dt, bool const& b_deplaceCine_Comp,
-        bool const& b_deplaceF_Comp )
+	double dt, bool const& motherCompositeHasImposedVelocity,
+        bool const& motherCompositeHasImposedForce )
 {
   // TO DO
 
-  list<SimpleObstacle*> obstacleEnDeplacement;
-  return ( obstacleEnDeplacement );
+  list<SimpleObstacle*> movingObstacles;
+  return ( movingObstacles );
 }
 
 
@@ -185,37 +187,36 @@ void STLObstacle::InterAction( Component* voisin,
 {
   cout << "STLObstacle::InterAction" << endl;
   
-  try {
-  list<ContactInfos*>  listContactInfos;
-
-  // Search all contact points between the STL triangulation and the component
-  // and store them in the list listContactInfos
-  SearchContact( voisin, dt, time, LC, listContactInfos );
-
-  // Loop over all contact points and compute the contact force & torque
-  int nbContact = int(listContactInfos.size());
-  for ( list<ContactInfos*>::iterator il=listContactInfos.begin();
-      il!=listContactInfos.end(); il++ )
+  try 
   {
-    LC->addToContactsFeatures( time, (*il)->ContactPoint );
+    list<ContactInfos*>  listContactInfos;
 
-    if ( ContactBuilderFactory::contactForceModel(
+    // Search all contact points between the STL triangulation and the component
+    // and store them in the list listContactInfos
+    SearchContact( voisin, dt, time, LC, listContactInfos );
+
+    // Loop over all contact points and compute the contact force & torque
+    int nbContact = int(listContactInfos.size());
+    for ( list<ContactInfos*>::iterator il=listContactInfos.begin();
+      il!=listContactInfos.end(); il++ )
+    {
+      LC->addToContactsFeatures( time, (*il)->ContactPoint );
+
+      if ( ContactBuilderFactory::contactForceModel(
 		(*il)->p0->getMaterial(), (*il)->p1->getMaterial() )
       		->computeForces( (*il)->p0, (*il)->p1, (*il)->ContactPoint,
 		LC, dt, nbContact ) )
-    {
-      (*il)->p0->getMasterComponent()->addToCoordinationNumber( 1 );
-      (*il)->p1->getMasterComponent()->addToCoordinationNumber( 1 );
+      {
+        (*il)->p0->getMasterComponent()->addToCoordinationNumber( 1 );
+        (*il)->p1->getMasterComponent()->addToCoordinationNumber( 1 );
+      }
+      delete *il;
     }
-    delete *il;
-  }
 
-  // Free the list
-  listContactInfos.clear();
+    // Free the list
+    listContactInfos.clear();
   }
-  catch (const ContactError&) {
-    throw ContactError();
-  }
+  catch ( ContactError const& ) { throw; }
 }
 
 
@@ -357,7 +358,7 @@ void STLObstacle::write( ostream& fileSave ) const
 // ----------------------------------------------------------------------------
 // Returns the maximum of the absolute value of the obstacle
 // velocity in each direction
-Vector3 STLObstacle::vitesseMaxPerDirection() const
+Vector3 STLObstacle::velocityMaxPerDirection() const
 {
   Vector3 vmax;
 
@@ -1023,3 +1024,16 @@ int STLObstacle::isVinV(STLVertex &v1, STLVertex &v2)
     
    else return 0;
 }*/
+
+
+
+// ----------------------------------------------------------------------------
+// Computes center of mass position
+pair<Point3,double> STLObstacle::computeVolumeCenterOfMass()
+{
+  pair<Point3,double> pp( Vector3Null, 0. );
+  
+  // TO DO
+    
+  return( pp );
+}

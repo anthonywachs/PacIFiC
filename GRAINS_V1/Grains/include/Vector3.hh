@@ -103,7 +103,7 @@ namespace solid
   double Norm( Vector3 const& v );
   //@}
 
-  static Vector3 Vector3Nul; /**< Vector3 nul (0.,0.,0.)  */
+  static Vector3 Vector3Null; /**< Vector3 (0.,0.,0.)  */
 } // namespace solid
 
 #endif

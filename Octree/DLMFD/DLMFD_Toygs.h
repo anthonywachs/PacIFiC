@@ -2,9 +2,8 @@
 # include "DLMFD_Plugin.h"
 
 
-#if DLM_Moving_particle
 #if TRANSLATION
-void compute_contact_distance (particle * p, const coord gci, double * delta) 
+void compute_contact_distance ( RigidBody* p, const coord gci, double* delta ) 
 {
   GeomParameter gc = p->g;
   double radius = gc.radius;
@@ -14,7 +13,7 @@ void compute_contact_distance (particle * p, const coord gci, double * delta)
 
 
 
-double compute_fwo (const double en, const double v, const double wo) 
+double compute_fwo( const double en, const double v, const double wo ) 
 {
 
   double k = log(en)/sqrt(sq(pi) + sq(log(en)));
@@ -26,7 +25,7 @@ double compute_fwo (const double en, const double v, const double wo)
 
 
 
-double derivative_fwo (const double en, const double v, const double wo) 
+double derivative_fwo( const double en, const double v, const double wo ) 
 {
   double k = log(en)/sqrt(sq(pi) + sq(log(en)));
   double g = atan(-sqrt(1 - sq(k))/k);
@@ -37,7 +36,7 @@ double derivative_fwo (const double en, const double v, const double wo)
 
 
 
-void compute_wo (particle * p) 
+void compute_wo( RigidBody* p ) 
 {  
   /* compute an estimate of (kn,gamman) derived from (deltamax,en) */
 
@@ -54,20 +53,20 @@ void compute_wo (particle * p)
   double v = p->toygsp->vzero;
     
   /* Newton iteration to find the root of delta(w0) */
-  if (en < 1) {
-    for (int pp = 1; pp <= maxiter; pp++) {
-
+  if (en < 1) 
+  {
+    for (int pp = 1; pp <= maxiter; pp++) 
+    {
       aa = compute_fwo (wo, v, en) - deltamax;
       bb = derivative_fwo (wo, v, en);
 
-      if (abs(aa-deltamax)/deltamax < epsilo) {
-	break;
-	  }
+      if (abs(aa-deltamax)/deltamax < epsilo) break;
       wo += -aa/bb;
     }
     p->toygsp->kn = (p->M)*sq(wo);
   }
-  else {
+  else 
+  {
     /* if en = 1 the formula simplifies as such */
     p->toygsp->kn = (p->M)*sq(p->toygsp->vzero)/(sq(deltamax));
   }  
@@ -76,18 +75,17 @@ void compute_wo (particle * p)
 
 
 
-void compute_Fontact (coord * Fc, particle * p, coord * gci, coord * U, 
-	const double gamman) 
+void compute_Fontact( coord* Fc, RigidBody * p, coord* gci, coord* U, 
+	const double gamman ) 
 {
   double delta_colision = 0.;
 
-  foreach_dimension() {
-    (*Fc).x = 0.;
-  }
+  foreach_dimension() (*Fc).x = 0.;
   
   compute_contact_distance(p, *gci, &delta_colision);
     
-  if (delta_colision < 0.) {
+  if (delta_colision < 0.) 
+  {
     double kn = p->toygsp->kn;
     double M = p->M;
     coord vrel = *U;
@@ -95,7 +93,8 @@ void compute_Fontact (coord * Fc, particle * p, coord * gci, coord * U,
     coord Fdm = {0., 0., 0.};
     coord normalvec = p->toygsp->normalvector;
 
-    foreach_dimension() {
+    foreach_dimension() 
+    {
       /* compute Hookean elastic restoring force */
       Fel.x = -kn*delta_colision*normalvec.x;
     
@@ -111,7 +110,7 @@ void compute_Fontact (coord * Fc, particle * p, coord * gci, coord * U,
 
 
 
-void granular_subproblem (particle * p, const int gravity_flag, 
+void granular_subproblem( RigidBody* p, const int gravity_flag, 
 	const double dt, const double rho_f) 
 {
   // Mini Granular solver, which solves 
@@ -137,10 +136,10 @@ void granular_subproblem (particle * p, const int gravity_flag,
   coord * U;
   coord * Unm1;
  
-  coord * gravity;
   coord decal = {X0, Y0, Z0};
   
-  for (int k = 0; k < NPARTICLES; k++) {
+  for (size_t k = 0; k < nbRigidBodies; k++) 
+  {
     fsf = (1. - (rho_f)/(p[k].rho_s));
    
     miter = 0;
@@ -176,18 +175,14 @@ void granular_subproblem (particle * p, const int gravity_flag,
     /* translational velocity */
     U = &(p[k].U);
     Unm1 = &(p[k].Unm1);
-
-    gravity = &(p[k].gravity);
-    
-    /* fprintf (stderr,"gravity = (%f,%f,%f)\n",(*gravity).x,(*gravity).y,
-    	(*gravity).z); */
     
     if (gravity_flag) {
       /* Before solving the granular problem: save previous particle's
 	 position and velocity (predictor step
 	 with gravity, first subproblem after N-S) */
       
-      foreach_dimension() {
+      foreach_dimension() 
+      {
 	(*Unm1).x = (*U).x;
 
 	
@@ -207,56 +202,61 @@ void granular_subproblem (particle * p, const int gravity_flag,
       }
     }
     
-    else {
+    else 
+    {
       /* corrector step without gravity: fourth subproblem after the
 	 fictitious domain problem (correction step) */
-      foreach_dimension() { 
-	(*gci).center.x = (*gcinm1).center.x;
-      }
+      foreach_dimension() (*gci).center.x = (*gcinm1).center.x;
     }
     
 
     /*  integrating in time with rk4 */
-    for (gi = 1; gi <= miter; gi++) {
+    for (gi = 1; gi <= miter; gi++) 
+    {
       Uold = (*U);
       Xold = (*gci).center;
 
       /* compute k1 */
       compute_Fontact (&k1, &p[k], &Xold, &Uold, gamman);
-      foreach_dimension() {
+      foreach_dimension() 
+      {
 	k1.x /= (fsf*M);
-	k1.x += gravity_flag*(*gravity).x;
+	k1.x += gravity_flag*GRAVITY_VECTOR.x;
 	Xtemp.x = Xold.x + 0.5*dtg*Uold.x;
 	Utemp.x = Uold.x + 0.5*dtg*k1.x;
       }
 	
       /* compute k2 */
       compute_Fontact (&k2, &p[k], &Xtemp, &Utemp, gamman);
-      foreach_dimension() {
+      foreach_dimension() 
+      {
 	k2.x /= (fsf*M);
-	k2.x += gravity_flag*(*gravity).x;
+	k2.x += gravity_flag*GRAVITY_VECTOR.x;
 	Xtemp.x = Xold.x + 0.5*dtg*Uold.x + 0.25*sq(dtg)*k1.x;
 	Utemp.x = Uold.x + 0.5*dtg*k2.x;
       }
 	
       /* compute k3 */
       compute_Fontact (&k3, &p[k], &Xtemp, &Utemp, gamman);
-      foreach_dimension() {
+      foreach_dimension() 
+      {
 	k3.x /= (fsf*M);
-	k3.x += gravity_flag*(*gravity).x;
+	k3.x += gravity_flag*GRAVITY_VECTOR.x;
 	Xtemp.x = Xold.x + dtg*Uold.x + 0.5*sq(dtg)*k2.x;
 	Utemp.x = Uold.x + dtg*k3.x;
       }
 	
       /* compute k4 */
       compute_Fontact (&k4, &p[k], &Xtemp, &Utemp, gamman);
-      foreach_dimension() {
+      foreach_dimension() 
+      {
 	k4.x /= (fsf*M);
-	k4.x += gravity_flag*(*gravity).x;
+	k4.x += gravity_flag*GRAVITY_VECTOR.x;
       }
 
       
-      foreach_dimension () {
+      foreach_dimension () 
+      {
 	(*gci).center.x = Xold.x + dtg*Uold.x + sq(dtg)*(k1.x + k2.x + k3.x)/6.;
 	
 	/* Check if the domain is periodic, if yes shift the particle's
@@ -270,13 +270,13 @@ void granular_subproblem (particle * p, const int gravity_flag,
 	  }
 	}
 
-
-
 	(*U).x = Uold.x + dtg*(k1.x + 2*k2.x + 2*k3.x + k4.x)/6.;
       }
     }
-    if (k == 0) {
-      if (gravity_flag) {
+    if (k == 0) 
+    {
+      if (gravity_flag) 
+      {
 	fprintf (stderr,"Prediction: particle-0's velocity on thread %d "
 		"is (%20.18f, %20.18f, %20.18f)\n",pid(), (*U).x, (*U).y, 
 		(*U).z);
@@ -285,7 +285,8 @@ void granular_subproblem (particle * p, const int gravity_flag,
 		(*gci).center.y, (*gci).center.z);
       
       }
-      else {
+      else 
+      {
 	fprintf(stderr,"Correction: particle-0's velocity on thread %d "
 		"is (%20.18f, %20.18f, %20.18f)\n",pid(), (*U).x, (*U).y, 
 		(*U).z);
@@ -297,7 +298,6 @@ void granular_subproblem (particle * p, const int gravity_flag,
   }
 }
 #endif
-#endif
 
 
 
@@ -308,9 +308,11 @@ void granular_subproblem (particle * p, const int gravity_flag,
 
 /** Overloading of the granular solver init event */
 // -------------------------------------------------
-event GranularSolver_init (t < -1.) {
-  particle * pp = particles;
-  for (int k = 0; k < NPARTICLES; k++) {
+event GranularSolver_init (t < -1.) 
+{
+  RigidBody* pp = particles;
+  for (size_t k = 0; k < nbRigidBodies; k++) 
+  {
     /* Contact model parameters needed to setup the granular time-step */
     pp[k].toygsp->wished_ratio = 0.1;
     pp[k].toygsp->en = 1;
@@ -320,23 +322,31 @@ event GranularSolver_init (t < -1.) {
     /* add this term to make sure that the gravity is added only once in 
     the granular subproblem (it is already present in the granular solver) */
     foreach_dimension()
-      pp[k].addforce.x = -pp[k].gravity.x;
+      pp[k].addforce.x = - GRAVITY_VECTOR.x;
   }
 } 
 
+
+
+
 /** Overloading of the granular solver predictor event */
 // ------------------------------------------------------
-event GranularSolver_predictor (t < -1.) {
+event GranularSolver_predictor (t < -1.) 
+{
   if ( pid() == 0 ) printf("Prediction: my rk-4 toy granular solver\n");
-  particle * pp = particles;
-  granular_subproblem (pp, 1, dt, rhoval);
+  RigidBody* pp = particles;
+  granular_subproblem( pp, 1, dt, FLUID_DENSITY );
 }
+
+
+
 
 /** Overloading of the granular solver velocity update event */
 // ------------------------------------------------------------
-event GranularSolver_updateVelocity (t < -1.) {
+event GranularSolver_updateVelocity (t < -1.) 
+{
   if ( pid() == 0 ) printf("Correction: my rk-4 toy granular solver\n");
-  particle * pp = particles;
-  granular_subproblem (pp, 0, dt, rhoval);
+  RigidBody* pp = particles;
+  granular_subproblem( pp, 0, dt, FLUID_DENSITY );
 }
 

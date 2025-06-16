@@ -1,6 +1,7 @@
 #include "ObstacleImposedVelocity.hh"
 #include "Obstacle.hh"
 #include "GrainsExec.hh"
+#include "LinkedCell.hh"
 #include <stdlib.h>
 
 
@@ -12,19 +13,21 @@ ObstacleImposedVelocity::ObstacleImposedVelocity()
   m_type = "Undefined";
   m_tstart = 0.; 
   m_tend = 0.;
-  m_translationalVelocity = Vector3Nul;
-  m_angularVelocity = Vector3Nul;
-  m_Sin_amplitude = 0.;
-  m_Sin_period = 0.;
-  m_Sin_vitRef = Vector3Nul;
-  m_freqX = 0.;
-  m_freqY = 0.;
-  m_freqZ = 0.;
-  m_phase = 0.;
-  m_ampX = 0.;
-  m_ampY = 0.;  
-  m_ampZ = 0.;  
-  m_prev = Vector3Nul;
+  m_translationalVelocity = Vector3Null;
+  m_previous_translationalVelocity = Vector3Null;
+  m_angularVelocity = Vector3Null;
+  m_rotationCenterIsCenterOfMass = true;
+  m_rotationCenter = Point3Null;
+  m_amplitude = 0.;
+  m_period = 0.;
+  m_Sin_phase_shift = 0.;  
+  m_unit_vitRef = Vector3Null;
+  m_MultiSin_period = Vector3Null;
+  m_MultiSin_amplitude = Vector3Null;
+  m_MultiSin_phase_shift = Vector3Null; 
+  m_stress_max = 0.;
+  m_stress = 0.;
+  m_previous_stress = 0.; 
 }
 
 
@@ -35,7 +38,25 @@ ObstacleImposedVelocity::ObstacleImposedVelocity()
 ObstacleImposedVelocity::ObstacleImposedVelocity( DOMNode* root, 
 	double dt, int rank, size_t& error )
 {
-  error = 0;
+  m_type = "Undefined";
+  m_translationalVelocity = Vector3Null;
+  m_previous_translationalVelocity = Vector3Null;  
+  m_angularVelocity = Vector3Null;
+  m_rotationCenterIsCenterOfMass = true;
+  m_rotationCenter = Point3Null;
+  m_amplitude = 0.;
+  m_period = 0.;
+  m_Sin_phase_shift = 0.;  
+  m_unit_vitRef = Vector3Null;
+  m_MultiSin_period = Vector3Null;
+  m_MultiSin_amplitude = Vector3Null;
+  m_MultiSin_phase_shift = Vector3Null;
+  m_stress_max = 0.;
+  m_stress = 0.;
+  m_previous_stress = 0.; 
+    
+  error = 0;   
+    
   m_ObstacleName = ReaderXML::getNodeAttr_String( root, "ObstacleName" );
   
   DOMNode* nTimeInterval = ReaderXML::getNode( root, "TimeInterval" );
@@ -68,14 +89,15 @@ ObstacleImposedVelocity::ObstacleImposedVelocity( DOMNode* root,
     m_type = "SinTranslation";
     DOMNode* nVTranslation = ReaderXML::getNode( root, "SinTranslation" ); 
     DOMNode* nTV = ReaderXML::getNode( nVTranslation, "Direction" );
-    m_Sin_vitRef[X] = ReaderXML::getNodeAttr_Double( nTV, "VX" );
-    m_Sin_vitRef[Y] = ReaderXML::getNodeAttr_Double( nTV, "VY" );    
-    m_Sin_vitRef[Z] = ReaderXML::getNodeAttr_Double( nTV, "VZ" ); 
-    m_Sin_vitRef.normalize();
+    m_unit_vitRef[X] = ReaderXML::getNodeAttr_Double( nTV, "VX" );
+    m_unit_vitRef[Y] = ReaderXML::getNodeAttr_Double( nTV, "VY" );    
+    m_unit_vitRef[Z] = ReaderXML::getNodeAttr_Double( nTV, "VZ" ); 
+    m_unit_vitRef.normalize();
     DOMNode* nPar = ReaderXML::getNode( nVTranslation, "Parameters" );        
-    m_Sin_amplitude = ReaderXML::getNodeAttr_Double( nPar, "Amplitude" ); 
-    m_Sin_period = ReaderXML::getNodeAttr_Double( nPar, "Period" ); 
-    m_Sin_phase = ReaderXML::getNodeAttr_Double( nPar, "PhaseShift" );
+    m_amplitude = ReaderXML::getNodeAttr_Double( nPar, "Amplitude" ); 
+    m_period = ReaderXML::getNodeAttr_Double( nPar, "Period" ); 
+    m_Sin_phase_shift = ReaderXML::getNodeAttr_Double( nPar, "PhaseShift" ) 
+    	* PI / 180.;
     if ( rank == 0 )
     {
       cout << GrainsExec::m_shift12 << "Obstacle name = " << m_ObstacleName 
@@ -84,19 +106,92 @@ ObstacleImposedVelocity::ObstacleImposedVelocity( DOMNode* root,
       	<< m_tstart << "," << m_tend << "]" << endl;
       cout << GrainsExec::m_shift12 << "Type = " << m_type << endl;
       cout << GrainsExec::m_shift12 << "Unit direction vector = " << 
-      	m_Sin_vitRef << endl;
+      	m_unit_vitRef << endl;
       cout << GrainsExec::m_shift12 << "Amplitude = " << 
-      	m_Sin_amplitude << endl;
+      	m_amplitude << endl;
       cout << GrainsExec::m_shift12 << "Period = " << 
-      	m_Sin_period << endl;
-      cout << GrainsExec::m_shift12 << "Phase shift = " << 
-      	m_Sin_phase << endl;	
-      cout << GrainsExec::m_shift12 << "Maximum displacement = " << 
-      	m_Sin_amplitude * m_Sin_period / ( 2. * PI ) << endl;
+      	m_period << endl;
+      cout << GrainsExec::m_shift12 << "Phase shift in rad = " << 
+      	m_Sin_phase_shift << endl;	
+      cout << GrainsExec::m_shift12 << "Maximum motion = " << 
+      	m_amplitude * m_period / ( 2. * PI ) << endl;
       cout << GrainsExec::m_shift12 << "Maximum acceleration = " << 
-      	m_Sin_amplitude * 2. * PI / m_Sin_period << endl; 
+      	m_amplitude * 2. * PI / m_period << endl; 
     }             
   }
+  // Sinusoidal translation  
+  else if ( ReaderXML::getNode( root, "CrenelTranslation" ) )
+  {
+    m_type = "CrenelTranslation";
+    DOMNode* nVTranslation = ReaderXML::getNode( root, "CrenelTranslation" ); 
+    DOMNode* nTV = ReaderXML::getNode( nVTranslation, "Direction" );
+    m_unit_vitRef[X] = ReaderXML::getNodeAttr_Double( nTV, "VX" );
+    m_unit_vitRef[Y] = ReaderXML::getNodeAttr_Double( nTV, "VY" );    
+    m_unit_vitRef[Z] = ReaderXML::getNodeAttr_Double( nTV, "VZ" ); 
+    m_unit_vitRef.normalize();
+    DOMNode* nPar = ReaderXML::getNode( nVTranslation, "Parameters" );        
+    m_amplitude = ReaderXML::getNodeAttr_Double( nPar, "Amplitude" ); 
+    m_period = ReaderXML::getNodeAttr_Double( nPar, "Period" ); 
+    if ( rank == 0 )
+    {
+      cout << GrainsExec::m_shift12 << "Obstacle name = " << m_ObstacleName 
+      	<< endl;      
+      cout << GrainsExec::m_shift12 << "Time interval = [" 
+      	<< m_tstart << "," << m_tend << "]" << endl;
+      cout << GrainsExec::m_shift12 << "Type = " << m_type << endl;
+      cout << GrainsExec::m_shift12 << "Unit direction vector = " << 
+      	m_unit_vitRef << endl;
+      cout << GrainsExec::m_shift12 << "Amplitude = " << 
+      	m_amplitude << endl;
+      cout << GrainsExec::m_shift12 << "Period = " << 
+      	m_period << endl;	
+      cout << GrainsExec::m_shift12 << "Maximum motion = " << 
+      	m_amplitude * m_period << endl;
+    }             
+  } 
+  // Shear stress dependent cyclic translation  
+  else if ( ReaderXML::getNode( root, "SSDCyclicTranslation" ) )
+  {
+    m_type = "SSDCyclicTranslation";
+    DOMNode* nVTranslation = ReaderXML::getNode( root, "SSDCyclicTranslation" );
+    DOMNode* nTV = ReaderXML::getNode( nVTranslation, "Direction" );
+    string sfirst = ReaderXML::getNodeAttr_String( nTV, "K" );
+    if ( sfirst == "X" ) m_stressIndices.first = 0;
+    else if ( sfirst == "Y" ) m_stressIndices.first = 1;
+    else if ( sfirst == "Z" ) m_stressIndices.first = 2;
+    else
+      cout << "WARNING: unknown direction in SSDCyclicTranslation associated"
+      	<< " to " << m_ObstacleName << endl;
+    m_unit_vitRef[m_stressIndices.first] = 1.;
+    string ssecond = ReaderXML::getNodeAttr_String( nTV, "L" );
+    if ( ssecond == "X" ) m_stressIndices.second = 0;
+    else if ( ssecond == "Y" ) m_stressIndices.second = 1;
+    else if ( ssecond == "Z" ) m_stressIndices.second = 2;
+    else
+      cout << "WARNING: unknown direction in SSDCyclicTranslation associated"
+      	<< " to " << m_ObstacleName << endl;    
+    DOMNode* nPar = ReaderXML::getNode( nVTranslation, "Parameters" );        
+    m_amplitude = ReaderXML::getNodeAttr_Double( nPar, "Amplitude" ); 
+    m_stress_max = ReaderXML::getNodeAttr_Double( nPar, "MaxStress" );
+    m_translationalVelocity[m_stressIndices.first] = m_amplitude;
+    if ( rank == 0 )
+    {
+      cout << GrainsExec::m_shift12 << "Obstacle name = " << m_ObstacleName 
+      	<< endl;      
+      cout << GrainsExec::m_shift12 << "Time interval = [" 
+      	<< m_tstart << "," << m_tend << "]" << endl;
+      cout << GrainsExec::m_shift12 << "Type = " << m_type << endl;
+      cout << GrainsExec::m_shift12 << "Unit direction vector = " << 
+      	m_unit_vitRef << endl;
+      cout << GrainsExec::m_shift12 << "Amplitude = " << 
+      	m_amplitude << endl;
+      cout << GrainsExec::m_shift12 << "MaxStress = " << 
+      	m_stress_max << endl;	
+      cout << GrainsExec::m_shift12 << "Stress component = " << 
+      	sfirst << ssecond << endl;
+    }             
+  }    
+  // Constant rotation
   else if ( ReaderXML::getNode( root, "ConstantRotation" ) )
   {
     m_type = "ConstantRotation";
@@ -104,7 +199,15 @@ ObstacleImposedVelocity::ObstacleImposedVelocity( DOMNode* root,
     DOMNode* nRV = ReaderXML::getNode( nVRotation, "AngularVelocity" );
     m_angularVelocity[X] = ReaderXML::getNodeAttr_Double( nRV, "WX" );
     m_angularVelocity[Y] = ReaderXML::getNodeAttr_Double( nRV, "WY" );    
-    m_angularVelocity[Z] = ReaderXML::getNodeAttr_Double( nRV, "WZ" ); 
+    m_angularVelocity[Z] = ReaderXML::getNodeAttr_Double( nRV, "WZ" );
+    DOMNode* nRC = ReaderXML::getNode( nVRotation, "RotationCenter" );
+    if ( nRC )
+    {
+      m_rotationCenterIsCenterOfMass = false;
+      m_rotationCenter[X] = ReaderXML::getNodeAttr_Double( nRC, "CX" );
+      m_rotationCenter[Y] = ReaderXML::getNodeAttr_Double( nRC, "CY" );    
+      m_rotationCenter[Z] = ReaderXML::getNodeAttr_Double( nRC, "CZ" );      
+    }      
     if ( rank == 0 )
     {
       cout << GrainsExec::m_shift12 << "Obstacle name = " << m_ObstacleName 
@@ -114,86 +217,65 @@ ObstacleImposedVelocity::ObstacleImposedVelocity( DOMNode* root,
       cout << GrainsExec::m_shift12 << "Type = " << m_type << endl;
       cout << GrainsExec::m_shift12 << "Angular velocity = " << 
       	m_angularVelocity << endl;
+      cout << GrainsExec::m_shift12 << "Center of rotation = ";
+      if ( m_rotationCenterIsCenterOfMass ) cout << "center of mass";
+      else cout << m_rotationCenter[X] << " " << m_rotationCenter[Y] <<
+	" " <<  m_rotationCenter[Z]; 
+      cout << endl;	
     }   
   }
+  // Multi-dimensional sinusoidal translation
+  else if ( ReaderXML::getNode( root, "MultiSinTranslation" ) )
+  {
+    m_type = "MultiSinTranslation";
+    DOMNode* nMS = ReaderXML::getNode( root, "MultiSinTranslation" );    
+    DOMNode* nTV = ReaderXML::getNode( nMS, "Direction" );
+    m_unit_vitRef[X] = ReaderXML::getNodeAttr_Double( nTV, "VX" );
+    m_unit_vitRef[Y] = ReaderXML::getNodeAttr_Double( nTV, "VY" );    
+    m_unit_vitRef[Z] = ReaderXML::getNodeAttr_Double( nTV, "VZ" ); 
+    m_unit_vitRef.normalize();    
+    DOMNode* nPer = ReaderXML::getNode( nMS, "Period" );
+    m_MultiSin_period[X] = ReaderXML::getNodeAttr_Double( nPer, "PX" );
+    m_MultiSin_period[Y] = ReaderXML::getNodeAttr_Double( nPer, "PY" );
+    m_MultiSin_period[Z] = ReaderXML::getNodeAttr_Double( nPer, "PZ" ); 
+    DOMNode* nPhaseShift = ReaderXML::getNode( nMS, "PhaseShift" );    
+    m_MultiSin_phase_shift[X] = ReaderXML::getNodeAttr_Double( nPhaseShift, 
+    	"PhiX" ) * PI / 180.;
+    m_MultiSin_phase_shift[Y] = ReaderXML::getNodeAttr_Double( nPhaseShift, 
+    	"PhiY" ) * PI / 180.;	
+    m_MultiSin_phase_shift[Z] = ReaderXML::getNodeAttr_Double( nPhaseShift, 
+    	"PhiZ" ) * PI / 180.;
+    DOMNode* nAmp = ReaderXML::getNode( nMS, "Amplitude" );
+    m_MultiSin_amplitude[X] = ReaderXML::getNodeAttr_Double( nAmp, "AX" ) 
+    	* m_unit_vitRef[X];
+    m_MultiSin_amplitude[Y] = ReaderXML::getNodeAttr_Double( nAmp, "AY" ) 
+    	* m_unit_vitRef[Y];
+    m_MultiSin_amplitude[Z] = ReaderXML::getNodeAttr_Double( nAmp, "AZ" ) 
+    	* m_unit_vitRef[Z];
+    if ( rank == 0 )
+    {
+      cout << GrainsExec::m_shift12 << "Obstacle name = " << m_ObstacleName 
+      	<< endl;      
+      cout << GrainsExec::m_shift12 << "Time interval = [" 
+      	<< m_tstart << "," << m_tend << "]" << endl;
+      cout << GrainsExec::m_shift12 << "Type = " << m_type << endl;
+      cout << GrainsExec::m_shift12 << "Amplitude = " << 
+      	 m_MultiSin_amplitude[X] << " " << m_MultiSin_amplitude[Y] << " " << 
+	 m_MultiSin_amplitude[Z] << endl;
+      cout << GrainsExec::m_shift12 << "Period = " << 
+      	m_MultiSin_period[X] << " " << m_MultiSin_period[Y] << " " <<
+	m_MultiSin_period[Z] << endl;
+      cout << GrainsExec::m_shift12 << "Phase shift in rad = " << 
+      	m_MultiSin_phase_shift[X] << " " << m_MultiSin_phase_shift[Y] << " " 
+	<< m_MultiSin_phase_shift[Z] << endl;	 
+    }   
+  }    
   else 
   {
     error = 1;
     if ( rank == 0 ) cout << GrainsExec::m_shift6 << 
 	"Unknown or missing obstacle imposed velocity node !!" << endl;
   }
-
-// 
-// 
-//   DOMNode* nVector3 = ReaderXML::getNode( root, "Vector3" );
-//   Vector3 vecteur;
-//   vecteur[X] = ReaderXML::getNodeAttr_Double( nVector3, "X" );
-//   vecteur[Y] = ReaderXML::getNodeAttr_Double( nVector3, "Y" );
-//   vecteur[Z] = ReaderXML::getNodeAttr_Double( nVector3, "Z" );
-// 
-//   double deltaT = m_tend - m_tstart;
-// 
-//   string mode = ReaderXML::getNodeAttr_String( root, "Mode" );
-// 
-//   bool istype = ReaderXML::hasNodeAttr( root, "Type" ); 
-// 
-//   if ( mode == "Translation" ) 
-//   {
-//     if ( !istype )
-//     {
-//       m_translationalVelocity = vecteur / deltaT;
-//       m_type = mode;
-//   
-//       cout << endl << "Chargement translationnel sur " << m_ObstacleName << endl;
-//       cout << "   Vitese constante de translation = " 
-//       	<< m_translationalVelocity[X] << " " << m_translationalVelocity[Y] << " " 
-//   	<< m_translationalVelocity[Z] << endl;
-//     }
-//     else
-//     {
-//       m_type = "Cyclic";
-//       DOMNode* freq = ReaderXML::getNode( root, "Frequence" );
-//       DOMNode* amp = ReaderXML::getNode( root, "Amplitude" );
-//       m_freqX = ReaderXML::getNodeAttr_Double( freq, "FX" );
-//       m_freqY = ReaderXML::getNodeAttr_Double( freq, "FY" );
-//       m_freqZ = ReaderXML::getNodeAttr_Double( freq, "FZ" );
-//       m_phase = ReaderXML::getNodeAttr_Double( freq, "Phi" ) * PI / 180.;
-//       m_ampX = ReaderXML::getNodeAttr_Double( amp, "AX" ) * vecteur[X];
-//       m_ampY = ReaderXML::getNodeAttr_Double( amp, "AY" ) * vecteur[Y];
-//       m_ampZ = ReaderXML::getNodeAttr_Double( amp, "AZ" ) * vecteur[Z];
-//       cout << "Chargement translationnel cyclic sur " << m_ObstacleName << endl;
-//       cout << "   Amplitude de translation = " 
-//       	<< m_ampX << "\t" << m_ampY << "\t" << m_ampZ << endl;
-//       cout << "   Frequence : FX = " << m_freqX << "\tFY = " << m_freqY 
-// 	   << "\tFZ = " << m_freqZ << endl;
-//     }
-//   }
-//   else if ( mode == "Rotation" ) 
-//   {
-//     m_angularVelocity = vecteur / deltaT;
-//     m_type = mode;
-//     
-//     cout << endl << "Chargement rotationnel sur " << m_ObstacleName << endl;
-//     cout << "   Vitese constante de rotation = " 
-//     	<< m_angularVelocity[X] << " " << m_angularVelocity[Y] << " " 
-// 	<< m_angularVelocity[Z] << endl;    
-//   }
-//   else if ( mode == "RotationSinusoidale" ) 
-//   {
-//     m_Sin_vitRef = vecteur / Norm(vecteur);
-//     m_angularVelocity.reset();    
-//     m_type = mode;
-//     m_Sin_amplitude = ReaderXML::getNodeAttr_Double( root, "A" );
-//     m_Sin_period = ReaderXML::getNodeAttr_Double( root, "P" ); 
-//     
-//     cout << endl << "Chargement rotationnel sinusoidal sur " 
-//     	<< m_ObstacleName << endl;
-//     cout << "   Periode du mouvement = " << m_Sin_period << endl;
-//     cout << "   Amplitude angulaire max du mouvement = " << m_Sin_amplitude * 
-//     	m_Sin_period / ( 2. * PI ) << endl;
-//     cout << "   Acceleration angulaire max du mouvement = " << m_Sin_amplitude *
-//     	2. * PI / m_Sin_period << endl;       
-//   }  
 }
 
 
@@ -209,7 +291,7 @@ ObstacleImposedVelocity::~ObstacleImposedVelocity()
 
 // ----------------------------------------------------------------------------
 // Returns obstacle name
-string ObstacleImposedVelocity::getNom() const
+string ObstacleImposedVelocity::getObstacleName() const
 {
   return ( m_ObstacleName );
 }
@@ -218,25 +300,18 @@ string ObstacleImposedVelocity::getNom() const
 
 
 // ----------------------------------------------------------------------------
-// Returns the remaining active time interval of the imposed motion
-double ObstacleImposedVelocity::getTime( double debut, double fin ) const
+// Returns whether the imposed motion is activ over the time interval [td,te] 
+// and if it is the sub-interval length within [td,te] when it is actually 
+// active
+bool ObstacleImposedVelocity::isActif( double const& td, double const& te, 
+	double const& dt, double& subinterval ) const 
 {
-  double activtimeint = fin - debut;
+  subinterval = te - td;
 
-  if ( debut < m_tstart ) activtimeint -= ( m_tstart - debut );
-  if ( m_tend < fin ) activtimeint -= ( fin - m_tend );
+  if ( td < m_tstart ) subinterval -= ( m_tstart - td );
+  if ( m_tend < te ) subinterval -= ( te - m_tend );
 
-  return ( activtimeint );
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// Returns whether the imposed motion is activ at time t
-bool ObstacleImposedVelocity::isActif( double t, double dt ) const 
-{
-  return ( t > m_tstart - dt * 1.e-5  && t < m_tend + dt * 1.e-5 );
+  return ( subinterval > dt * 1.e-5 );
 }
 
 
@@ -255,25 +330,41 @@ bool ObstacleImposedVelocity::isCompleted( double t, double dt ) const
 // ----------------------------------------------------------------------------
 // Returns the translational velocity at time t 
 Vector3 const* ObstacleImposedVelocity::translationalVelocity( double time, 
-	double dt )
+	double dt, Point3 const& cg )
 {
-  if ( m_type == "SinTranslation" )
-    m_translationalVelocity = m_Sin_amplitude * 
-    	sin( 2. * PI * ( time - m_tstart ) / m_Sin_period + m_Sin_phase )
-	* m_Sin_vitRef ;
-//   else if ( m_type == "Cyclic" )
-//   {
-//     Vector3 trans, dx;
-//     trans[X] = m_ampX * sin( 2. * PI * m_freqX 
-// 	* ( time - m_tstart ) ); 
-//     trans[Y] = m_ampY * sin( 2. * PI * m_freqY 
-// 	* ( time - m_tstart ) + m_phase ); 
-//     trans[Z] = m_ampZ * sin( 2. * PI * m_freqZ 
-// 	* ( time - m_tstart ) + m_phase ); 
-//     dx = trans - m_prev; 
-//     m_prev = trans;
-//     m_translationalVelocity = dx / dt;
-//   }
+  if ( isCompleted( time, dt ) ) m_translationalVelocity = 0.;
+  else
+  {
+    if ( m_type == "SinTranslation" )
+      m_translationalVelocity = m_amplitude * 
+    	sin( 2. * PI * ( time - m_tstart ) / m_period + m_Sin_phase_shift )
+	* m_unit_vitRef ;
+    else if ( m_type == "CrenelTranslation" )
+    {
+      m_translationalVelocity = m_amplitude * 
+      	( int( ( time - m_tstart ) / m_period ) % 2 == 0 ? 1 : -1 )
+	* m_unit_vitRef;  
+    }
+    else if ( m_type == "SSDCyclicTranslation" )
+    {
+      m_previous_translationalVelocity = m_translationalVelocity;
+      if ( m_stress > m_stress_max && m_stress > m_previous_stress &&
+      	m_translationalVelocity[m_stressIndices.first] > 0. )
+	m_translationalVelocity[m_stressIndices.first] = - m_amplitude;
+      else if ( m_stress < - m_stress_max && m_stress < m_previous_stress &&
+      	m_translationalVelocity[m_stressIndices.first] < 0. )
+	m_translationalVelocity[m_stressIndices.first] = m_amplitude;
+    }      
+    else if ( m_type == "MultiSinTranslation" )
+    {
+      for (size_t i=0;i<3;++i)
+        m_translationalVelocity[i] = m_MultiSin_amplitude[i] * 
+		sin( 2. * PI * ( time - m_tstart ) / m_MultiSin_period[i] 
+		+ m_MultiSin_phase_shift[i] ) * m_unit_vitRef[i] ;	    	
+    }
+    else if ( m_type == "ConstantRotation" && !m_rotationCenterIsCenterOfMass )
+      m_translationalVelocity = m_angularVelocity ^ ( cg - m_rotationCenter );
+  }
 
   return ( &m_translationalVelocity );
 }
@@ -285,12 +376,8 @@ Vector3 const* ObstacleImposedVelocity::translationalVelocity( double time,
 // Returns the angular velocity at time t 
 Vector3 const* ObstacleImposedVelocity::angularVelocity( double time, 
 	double dt )
-{
-//   if ( m_type == "RotationSinusoidale" )
-//     m_angularVelocity = m_Sin_amplitude * 
-//     	sin( 2. * PI * ( time - m_tstart ) / m_Sin_period )
-// 	* m_Sin_vitRef ;
-     
+{    
+  if ( isCompleted( time, dt ) ) m_angularVelocity = 0.;  
   return ( &m_angularVelocity );
 }
 
@@ -298,21 +385,73 @@ Vector3 const* ObstacleImposedVelocity::angularVelocity( double time,
 
 
 // ----------------------------------------------------------------------------
-// Returns the translational displacement over dt at time t
-Vector3 ObstacleImposedVelocity::translationalDisplacement( double time, 
-	double dt ) 
+// Returns the translational motion over dt at time t
+Vector3 ObstacleImposedVelocity::translationalMotion( double time, 
+	double dt, double const& subinterval, Point3 const& cg ) 
 {
-  return ( m_translationalVelocity * dt );
+  // We integrate analytically the velocity over the subinterval of 
+  // [time-dt,time] where the imposed motion is active
+  Vector3 translation;
+  double ti = time - dt < m_tstart ? m_tstart : time - dt;
+  double te = time > m_tend ? m_tend : time;   
+  
+  if ( m_type == "ConstantTranslation" ) 
+    translation = m_translationalVelocity * subinterval;
+  else if ( m_type == "CrenelTranslation" )
+    translation = m_amplitude * 
+      	( int( ( 0.5 * ( ti + te ) - m_tstart ) / m_period ) % 2 == 0 ? 1 : -1 )
+	* subinterval * m_unit_vitRef;
+  else if ( m_type == "SSDCyclicTranslation" )
+  {
+    translation = 0.5 * ( m_translationalVelocity
+    	+ m_previous_translationalVelocity ) * subinterval ;    
+  }
+  else if ( m_type == "SinTranslation" )
+    translation = ( m_amplitude * m_period / ( 2. * PI ) )
+    	* ( cos( 2. * PI * ( ti - m_tstart ) / m_period 
+		+ m_Sin_phase_shift ) 
+	- cos( 2. * PI * ( te - m_tstart ) / m_period 
+		+ m_Sin_phase_shift ) ) * m_unit_vitRef ;
+  else if ( m_type == "MultiSinTranslation" )
+  {
+    for (size_t i=0;i<3;++i)
+      translation[i] = 
+      	( m_MultiSin_amplitude[i] * m_MultiSin_period[i] / ( 2. * PI ) )
+    	* ( cos( 2. * PI * ( ti - m_tstart ) / m_MultiSin_period[i] 
+		+ m_MultiSin_phase_shift[i] ) 
+	- cos( 2. * PI * ( te - m_tstart ) / m_MultiSin_period[i] 
+		+ m_MultiSin_phase_shift[i] ) ) * m_unit_vitRef[i] ;	    	
+  }
+  else if ( m_type == "ConstantRotation" && !m_rotationCenterIsCenterOfMass )
+  {
+    Vector3 rota = angularMotion( time, dt, subinterval );
+    double d = Norm(rota);
+    Quaternion q;
+
+    if ( d != 0. ) 
+    {
+      Vector3 vect = ( sin( d / 2. ) / d ) * rota;
+      q = Quaternion( vect, cos( d / 2. ) );
+    }
+    else 
+      q = Quaternion( 0., 0., 0., 1. );
+    translation = q.rotateVector( cg - m_rotationCenter ) 
+    	- ( cg - m_rotationCenter );    
+  }
+    
+  return ( translation );
 }  
 
 
 
 
 // ----------------------------------------------------------------------------
-// Returns the angular displacement over dt at time t 
-Vector3 ObstacleImposedVelocity::angularDisplacement( double time, double dt )
+// Returns the angular motion over dt at time t 
+Vector3 ObstacleImposedVelocity::angularMotion( double time, double dt, 
+	double const& subinterval )
 {
-  return ( m_angularVelocity * dt );
+  // We only consider contant angular velocity so far
+  return ( m_angularVelocity * subinterval );
 }  
 
 
@@ -342,42 +481,6 @@ bool operator < ( ObstacleImposedVelocity const& c0,
 
 
 // ----------------------------------------------------------------------------
-// Output operator
-ostream &operator << ( ostream& fileOut, 
-	ObstacleImposedVelocity const& motion )
-{
-  fileOut << motion.m_ObstacleName << '\n';
-  fileOut << motion.m_tstart << '\t' << motion.m_tend << '\n';
-  fileOut << motion.m_translationalVelocity;
-  fileOut << motion.m_angularVelocity;
-
-  return ( fileOut );
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// Input operator
-istream &operator >> ( istream& fileIn, 
-	ObstacleImposedVelocity& motion )
-{
-  fileIn >> motion.m_ObstacleName;
-  fileIn >> motion.m_tstart >> motion.m_tend;
-  fileIn >> motion.m_translationalVelocity;
-  if ( motion.m_translationalVelocity != Vector3Nul ) 
-    motion.m_type = "Translation";
-  fileIn >> motion.m_angularVelocity;
-  if ( motion.m_angularVelocity != Vector3Nul ) 
-    motion.m_type = "Rotation";  
-
-  return ( fileIn );
-}
-
-
-
-
-// ----------------------------------------------------------------------------
 // Debug
 void ObstacleImposedVelocity::debug( char* c )
 {
@@ -393,4 +496,25 @@ string ObstacleImposedVelocity::getType() const
 {
   return ( m_type );
 }
+
+
+
  
+// ----------------------------------------------------------------------------
+// Updates imposed velocity based on a stress criterion (for cyclic shearing) 
+void ObstacleImposedVelocity::updateImposedVelocity( LinkedCell const* LC )
+{
+  if ( m_type == "SSDCyclicTranslation" )
+  {
+    double tau = LC->getStressTensorComponent( m_stressIndices.first,
+    	m_stressIndices.second );
+
+    // Check whether the stress component was updated over the last time step
+    if ( fabs( tau - m_stress ) > EPSILON )
+    {
+      // Update the stress
+      m_previous_stress = m_stress;
+      m_stress = tau;
+    }
+  }
+}

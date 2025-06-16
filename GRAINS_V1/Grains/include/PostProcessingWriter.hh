@@ -49,7 +49,7 @@ class PostProcessingWriter
     @param time physical time
     @param dt time step magnitude
     @param particles active particles
-    @param pwait inactive particles
+    @param inactiveparticles inactive particles
     @param periodic_clones periodic particles
     @param referenceParticles reference particles
     @param obstacle obstacles 
@@ -58,30 +58,32 @@ class PostProcessingWriter
     virtual void PostProcessing_start( double const& time,
   	double const& dt,
   	list<Particle*> const* particles,
-	list<Particle*> const* pwait,
+	list<Particle*> const* inactiveparticles,
 	list<Particle*> const* periodic_clones,	
 	vector<Particle*> const* referenceParticles,
 	Obstacle* obstacle,
 	LinkedCell const* LC,
-	vector<Window> const& insert_windows ) = 0;
+	AllInsertionWindows const& insert_windows ) = 0;
 
     /** @brief Writes data
     @param time physical time
     @param dt time step magnitude
     @param particles active particles
-    @param pwait inactive particles
+    @param inactiveparticles inactive particles
     @param periodic_clones periodic particles
     @param referenceParticles reference particles
     @param obstacle obstacles 
-    @param LC linked-cell grid */
+    @param LC linked-cell grid
+    @param insert_windows insertion windows */
     virtual void PostProcessing( double const& time,
   	double const& dt,
   	list<Particle*> const* particles,
-	list<Particle*> const* pwait,
+	list<Particle*> const* inactiveparticles,
 	list<Particle*> const* periodic_clones,		
 	vector<Particle*> const* referenceParticles,
 	Obstacle* obstacle,
-	LinkedCell const* LC ) = 0;
+	LinkedCell const* LC,
+	AllInsertionWindows const& insert_windows ) = 0;
 
     /** @brief Finalizes writing data */
     virtual void PostProcessing_end() = 0;
@@ -93,10 +95,10 @@ class PostProcessingWriter
     /** @brief Gets the post-processing writer type */
     virtual string getPostProcessingWriterType() const = 0;
   
-    /** @brief Writes components involved in a displacement or a contact error
+    /** @brief Writes components involved in a motion or a contact error
     @param filename file root name
     @param errcomposants list of the 2 components invovled */
-    virtual void writeErreurComponentsPostProcessing( string const& filename,
+    virtual void writeErreurComponents_Paraview( string const& filename,
   	list<Component*> const& errcomposants );  
     //@}
 

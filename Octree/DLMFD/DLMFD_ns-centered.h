@@ -235,6 +235,12 @@ event stability (i++,last) {
 }
 
 /**
+Some derived solvers need to hook themselves once the time step magnitiude
+is determined. */
+
+event once_timestep_is_determined (i++, last);
+
+/**
 If we are using VOF or diffuse tracers, we need to advance them (to
 time $t+\Delta t/2$) here. Note that this assumes that tracer fields
 are defined at time $t-\Delta t/2$ i.e. are lagging the
@@ -356,7 +362,7 @@ event viscous_term (i++,last)
   if (constant(mu.x) != 0.) {
     correction (dt);
     mgu = viscosity (u, mu, rho, dt, mgu.nrelax);
-    correction (-dt);
+    correction (-dt);        
   }
 
   /**
@@ -367,8 +373,14 @@ event viscous_term (i++,last)
     trash ({af});
     foreach_face()
       af.x[] = 0.;
-  }
+  }  
 }
+
+/**
+Some derived solvers need to hook themselves at the end of the
+viscous step. */
+event after_viscous_term (i++, last);
+
 
 /**
 ### Acceleration term

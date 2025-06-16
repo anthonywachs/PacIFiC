@@ -44,7 +44,7 @@ class Polytope : public Convex
     /** @brief Returns the number of vertices of the polytope */
     int numVerts() const;
 
-    /** @brief Returns a vector of points describing the envelope of the
+    /** @brief Returns a vector of points describing the surface of the
     polytope */
     vector<Point3> getEnvelope() const;
   
@@ -73,7 +73,15 @@ class Polytope : public Convex
 	
     /** @ brief Returns whether a point lies inside the polytope
     @param pt point */
-    virtual bool isIn( Point3 const& pt ) const; 	
+    virtual bool isIn( Point3 const& pt ) const;
+
+    /** @ Returns the bounding volume to polytope */
+    virtual BVolume* computeBVolume( unsigned int type ) const;
+    
+    /** @brief Performs advanced comparison of the two convexes and returns
+    whether they match
+    @param other the other convex */
+    virtual bool equalType_level2( Convex const* other ) const;     	
     //@}
 
   

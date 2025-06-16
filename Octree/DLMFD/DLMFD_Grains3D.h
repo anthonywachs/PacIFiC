@@ -5,17 +5,17 @@
 # include "DLMFD_Plugin.h"
 
 /** File names definition */
-# ifndef grains_result_dir
-#   define grains_result_dir "Grains/Simu"
+# ifndef GRAINS_RESULT_DIR
+#   define GRAINS_RESULT_DIR "Grains/Simu"
 # endif
-# ifndef grains_inputfile
-#   define grains_inputfile "Grains/Simu/simul.xml"
+# ifndef GRAINS_INPUTFILE
+#   define GRAINS_INPUTFILE "Grains/Simu/simul.xml"
 # endif
 
 /** Split explicit acceleration treatment in case of particles are lighter 
-than the fluid */
-# ifndef b_split_explicit_acceleration
-#   define b_split_explicit_acceleration false
+than the fluid or neutrally buoyant */
+# ifndef B_SPLIT_EXPLICIT_ACCELERATION
+#   define B_SPLIT_EXPLICIT_ACCELERATION 0
 # endif
 
 /** Coupling Interface for Grains3D */
@@ -45,23 +45,21 @@ event GranularSolver_init (t < -1.)
     printf( "Grains3D\n" );
     
     // Initialize Grains
-    Init_Grains( grains_inputfile, rhoval, restarted_simu );
+    Init_Grains( GRAINS_INPUTFILE, FLUID_DENSITY, restarted_simu,
+    	!B_SPLIT_EXPLICIT_ACCELERATION );
 
     // Set initial time
     SetInitialTime( trestart );
 
-    // In case part of the particle acceleration is computed explicitly
-    // when particles are lighter than the fluid
-    if ( b_split_explicit_acceleration )
-    {
-      // TO DO
-    }
+    // Get the number of rigid bodies sent by Grains to Basilisk
+    // Note: this number must be constant over the simulation
+    NumberOfRigidBodiesInBasilisk( &nbParticles, &NbObstacles );
     
     // Transfer the data from Grains to an array of characters
     pstr = GrainsToBasilisk( &pstrsize ); 
 
     // Check that Paraview writer is activated
-    checkParaviewPostProcessing_Grains( grains_result_dir );
+    checkParaviewPostProcessing_Grains( GRAINS_RESULT_DIR );
     
     // Set the initial cycle number and do initial post-processing
     if ( restarted_simu )
@@ -73,13 +71,30 @@ event GranularSolver_init (t < -1.)
       // initial cycle number
       SaveResults_Grains();
     }
-    else SetInitialCycleNumber( init_cycle_number );    
+    else SetInitialCycleNumber( init_cycle_number );   
   }
+ 
+# if _MPI
+    // Broadcast the number of rigid bodies
+    MPI_Bcast( &nbParticles, 1, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD );
+    MPI_Bcast( &NbObstacles, 1, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD );    
+# endif
+  nbRigidBodies = nbParticles + NbObstacles;  
+  if ( RIGIDBODIES_AS_FIXED_OBSTACLES )
+  {
+    nbParticles = 0;
+    NbObstacles = nbRigidBodies;
+  }    
+  
+  // Allocate number of rigid bodies dependent arrays
+  allocate_np_dep_arrays( nbRigidBodies, nbParticles, NRBDATA, &allRigidBodies, 
+  	&DLMFDtoGS_vel, &vpartbuf, &pdata, !RIGIDBODIES_AS_FIXED_OBSTACLES,
+	&fdata );
 
-  // Update all particle data 
-  pstr = UpdateParticlesBasilisk( pstr, pstrsize, particles, NPARTICLES,
-  	!b_split_explicit_acceleration, rhoval );  
-  free( pstr );      
+  // Update all rigid body data 
+  pstr = UpdateParticlesBasilisk( pstr, pstrsize, allRigidBodies, nbRigidBodies,
+  	FLUID_DENSITY, true ); 	 
+  free( pstr );       
 } 
 
 
@@ -94,29 +109,30 @@ event GranularSolver_predictor (t < -1.)
   int pstrsize = 0;
   
   // Predictor step: pure granular problem solved by Grains (Grains works
-  // in serial only )
+  // in serial only)
   if ( pid() == 0 ) 
   {
-    // Output the call to Grains3D
-    printf ("run Grains3D\n");
-    
-    // Run the granular simulation
-    Simu_Grains( dt );
+    if ( RIGIDBODIES_AS_FIXED_OBSTACLES )
+    {  
+      // Output the call to Grains3D
+      printf ("Grains3D sends RB data\n");
+    }
+    else
+    {    
+      // Output the call to Grains3D
+      printf ("Grains3D runs and sends RB data\n");      
+      
+      // Run the granular simulation
+      Simu_Grains( dt );
+    }
 
     // Transfer the data from Grains to an array of characters
-    pstr = GrainsToBasilisk( &pstrsize );     
-    
-    // Set dt for split explicit acceleration computation in Grains3D at 
-    // next time step
-    if ( b_split_explicit_acceleration ) 
-    {
-      // TO DO
-    }    
+    pstr = GrainsToBasilisk( &pstrsize );         
   }
     
-  // Update all particle data 
-  pstr = UpdateParticlesBasilisk( pstr, pstrsize, particles, NPARTICLES,
-    	!b_split_explicit_acceleration, rhoval );  
+  // Update all rigid body data 
+  pstr = UpdateParticlesBasilisk( pstr, pstrsize, allRigidBodies, nbRigidBodies,
+    	FLUID_DENSITY, false );  
   free( pstr ); 
 }
 
@@ -134,10 +150,20 @@ event GranularSolver_updateVelocity (t < -1.)
     printf ("Grains3D\n");
 
     // Copy velocity in a 2D array
-    UpdateDLMFDtoGS_vel( DLMFDtoGS_vel, particles, NPARTICLES );  
+    UpdateDLMFDtoGS_vel( DLMFDtoGS_vel, allRigidBodies, nbRigidBodies );  
 
     // Update particle velocity in Grains using the 2D array
-    UpdateVelocityGrains( DLMFDtoGS_vel, NPARTICLES, 
-    	b_split_explicit_acceleration );
+    UpdateVelocityGrains( DLMFDtoGS_vel, nbRigidBodies );
   }
+}
+
+
+
+
+/** Overloading of the granular solver result saving event */
+//----------------------------------------------------------------------------
+event GranularSolver_saveResults (t < -1.)
+//----------------------------------------------------------------------------
+{
+  if ( pid() == 0 ) SaveResults_Grains();  
 }

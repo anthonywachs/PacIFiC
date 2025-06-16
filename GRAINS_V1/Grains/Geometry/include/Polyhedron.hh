@@ -95,7 +95,22 @@ class Polyhedron : public Polytope
 	
     /** @ brief Returns whether a point lies inside the polyhedron
     @param pt point */
-    bool isIn( Point3 const& pt ) const;		
+    bool isIn( Point3 const& pt ) const;
+
+    /** @brief Writes the polyhedron in an OBJ format
+    @param f output stream
+    @param transform geometric transformation 
+    @param firstpoint_number number of the 1st point */
+    void write_convex_OBJ( ostream& f, Transform const& transform,
+    	size_t& firstpoint_number ) const;  
+
+    /** @ Returns the bounding volume to polyhedron */
+    BVolume* computeBVolume( unsigned int type ) const;
+    
+    /** @brief Performs advanced comparison of the two polyhedrons and returns
+    whether they match
+    @param other the other convex */
+    bool equalType_level2( Convex const* other ) const;    		
     //@}
   
 
@@ -147,16 +162,6 @@ class Polyhedron : public Polytope
     /** @brief Returns the circumscribed radius of the reference polygon,
     i.e., without applying any transformation */
     double computeCircumscribedRadius() const;
-  
-    /** @brief Computes the contribution to inertia and volume of a tetrahedron
-    defined by the center of mass (assuming that the center of mass is located 
-    at (0,0,0)), the center of mass on a face and 2 consecutives vertices on 
-    this face
-    @param A2 center of mass of the face
-    @param A3 a point of the face that H belongs to
-    @param A4 the next point neighbor of A3 of the face that H belongs to */
-    void computeVolumeInertiaContrib( Point3 const& A2, Point3 const& A3, 
-	Point3 const& A4 );
 
     /** @brief Allocates the inertia tensor array and sets its component and the
     volume to 0 */

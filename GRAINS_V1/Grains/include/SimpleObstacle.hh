@@ -34,20 +34,16 @@ class SimpleObstacle : public Obstacle
     /** @brief Constructor with an XML node as an input parameter
     @param root XML node */
     SimpleObstacle( DOMNode* root );
-
-    /** @brief Copy constructor from a Component
-    @param copy copied Component
-    @param s obstacle name */
-    SimpleObstacle( Component& copy, char const* s = "obstacle" );
-
-    /** @brief Constructor with a rigid body, a name and a material as input
-    parameters
-    @param geoRBWC rigid body
-    @param name obstacle name
-    @param materialName material name
-    @param transferToFluid_ whether the obstacle is transferred to the fluid */
-    SimpleObstacle( RigidBodyWithCrust* geoRBWC, string const& name = "",
-      string const& materialName = "", bool const& transferToFluid_ = false );
+    
+    /** @brief Constructor with input parameters
+    @param name obstacle name 
+    @param georbwc pointer to a rigid body with crust object
+    @param mat obstacle material 
+    @param toFluid whether to transfer the obstacle to the fluid solver 
+    @param autonumbering obstacle autonumbering */
+    SimpleObstacle( string const& name, RigidBodyWithCrust* georbwc, 
+    	string const& mat, bool const& toFluid, 
+	bool const& autonumbering );	    
 
     /** @brief Destructor */
     ~SimpleObstacle();
@@ -96,13 +92,13 @@ class SimpleObstacle : public Obstacle
     obstacles (here itself)
     @param time physical time
     @param dt time step magnitude
-    @param b_deplaceCine_Comp whether to move the composite that the composite
-    obstacle belongs to (imposed velocity)
-    @param b_deplaceF_Comp whether to move the composite that the composite
-    obstacle belongs to (imposed force) */
+    @param motherCompositeHasImposedVelocity whether the composite that the 
+    obstacle belongs to has a non-zero imposed velocity
+    @param motherCompositeHasImposedForce whether the composite that the 
+    obstacle belongs to has a non-zero imposed force */
     virtual list<SimpleObstacle*> Move( double time,
-	double dt, bool const& b_deplaceCine_Comp,
-        bool const& b_deplaceF_Comp ) ;
+	double dt, bool const& motherCompositeHasImposedVelocity,
+        bool const& motherCompositeHasImposedForce ) ;
 
     /** @brief Contact between a simple obstacle and a component. If contact
     exists, computes the contact force and torque and adds to each component
@@ -152,61 +148,79 @@ class SimpleObstacle : public Obstacle
 
     /** @brief Returns the maximum of the absolute value of the obstacle
     velocity in each direction */
-    virtual Vector3 vitesseMaxPerDirection() const;
+    virtual Vector3 velocityMaxPerDirection() const;
 
     /** @brief Update contact map */
     virtual void updateContactMap();
 
-    /** @brief Does the contact exist in the map, if yes return the pointer to 
-    the cumulative tangential displacement
-    @param tangentialDepl pointer to the cumulative tangential displacement
-    @param id id number of the other component */
+    /** @brief Does the contact exist in the map? If so, return true and make
+    kdelta, prev_normal and cumulSpringTorque point to the memorized info. 
+    Otherwise, return false and set those pointers to NULL.
+    @param id key in the map
+    @param kdelta pointer to the memory of the vector kt * delta_t
+    @param prev_normal pointer to the previous vector normal to the contact 
+    plane
+    @param cumulSpringTorque pointer to the memory of the spring-like component 
+    of the friction torque 
+    @param createContact when true, create contact if it does not exist */
     virtual bool getContactMemory( std::tuple<int,int,int> const& id,
-  	Vector3* &tangent, Vector3* &prev_normal, Vector3* &cumulSpringTorque,
+  	Vector3* &kdelta, Vector3* &prev_normal, Vector3* &cumulSpringTorque,
   	bool createContact );
 
     /** @brief Adds new contact in the map
-    @param tangentialDepl initial tangential displacement
-    @param id id number of the other component */
+    @param id key in the map
+    @param kdelta kt * delta_t vector
+    @param prev_normal pointer to the previous vector normal to the contact 
+    plane
+    @param cumulSpringTorque pointer to the memory of the spring-like component 
+    of the friction torque */
     virtual void addNewContactInMap( std::tuple<int,int,int> const& id,
-  	Vector3 const& tangent, Vector3 const& prev_normal,
+  	Vector3 const& kdelta, Vector3 const& prev_normal,
   	Vector3 const& cumulSpringTorque );
 
-    /** @brief Increases cumulative tangential displacement with component id
-    @param tangentialDepl additional tangential displacement
-    @param id id number of the other component */
+    /** @brief Stores memory of the contact with component id: increase 
+    cumulative tangential motion and cumulative spring torque, remember 
+    contact normal.
+    @param id key in the map
+    @param kdelta kt * delta_t vector
+    @param prev_normal pointer to the previous vector normal to the contact 
+    plane
+    @param cumulSpringTorque pointer to the memory of the spring-like component 
+    of the friction torque */
     virtual void addDeplContactInMap( std::tuple<int,int,int> const& id,
-  	Vector3 const& tangent, Vector3 const& prev_normal,
+  	Vector3 const& kdelta, Vector3 const& prev_normal,
   	Vector3 const& cumulSpringTorque );
-
-    /** @brief Updates the ids of the contact map: in the case of a reload with 
-    insertion, the obstacle's ids are reset. This function keeps track of that 
-    change.
-    @param prev_id previous id that should be updated
-    @param new_id updated id */
-    void updateContactMapId( int prev_id, int new_id );
 
     /** @brief Writes the contact map information in an array of doubles
     @param destination the array of double where the contact map should be 
     stored
-    @param start index the index of destination where the copy should start */
-    virtual void copyHistoryContacts( double* &destination, int start_index );
+    @param start_index the index of destination where the copy should start */
+    virtual void copyContactMap( double* destination, int start_index );
 
     /** @brief Adds a single contact info to the contact map
     @param id key in the map
     @param isActive boolean: true if the contact is active, false otherwise
-    @param kdelta pointer to the memory of the vector kt * delta_t
+    @param kdelta kt * delta_t vector
     @param prev_normal pointer to the previous vector normal to the contact 
     plane
     @param cumulSpringTorque pointer to the memory of the spring-like component 
     of the friction torque */
     virtual void copyContactInMap( std::tuple<int,int,int> const& id,
-  	bool const& isActive, Vector3 const& tangent, 
+  	bool const& isActive, Vector3 const& kdelta, 
 	Vector3 const& prev_normal,
   	Vector3 const& cumulSpringTorque );
 
     /** @brief Returns the number of contacts in the contact map */
     virtual int getContactMapSize();
+    
+    /** @brief Displays the active neighbours in the 
+    format "my_elementary_id/neighbour_id/neightbout_elementary_id ; ...". 
+    Useful for debugging only.
+    @param id id of this component */
+    virtual void printActiveNeighbors( int const& id );
+            
+    /** @brief Resets the minimum ID number of an obstacle for autonumbering */
+    virtual void setMinIDnumber();          
     //@}
     
 
@@ -214,6 +228,9 @@ class SimpleObstacle : public Obstacle
     //@{
     /** @brief Initializes all contact map entries to false */
     void setContactMapToFalse();
+    
+    /** @brief Set contact map cumulative features to zero */
+    void setContactMapCumulativeFeaturesToZero();     
 
     /** @brief Sets the frequency at which the obstacle link to
     the cells of the linked-cell grid is updated
@@ -297,6 +314,21 @@ class SimpleObstacle : public Obstacle
   	solver or not in case of coupling to a fluid solver */
     //@}
 
+
+    /** @name Methods */
+    //@{  
+    /** @brief Computes center of mass position */
+    pair<Point3,double> computeVolumeCenterOfMass();
+    //@}
+
+
+  private:
+    /** @name Constructors */
+    //@{
+    /** @brief Copy constructor
+    @param copy copied SimpleObstacle */
+    SimpleObstacle( SimpleObstacle const& copy );
+    //@}   
 };
 
 #endif

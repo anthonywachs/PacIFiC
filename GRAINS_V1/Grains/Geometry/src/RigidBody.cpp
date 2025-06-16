@@ -1,4 +1,5 @@
 #include "GrainsBuilderFactory.hh"
+#include "GrainsExec.hh"
 #include "RigidBody.hh"
 #include "ConvexBuilderFactory.hh"
 #include "Torsor.hh"
@@ -11,8 +12,9 @@
 // Default constructor
 RigidBody::RigidBody()
   : m_convex( NULL )
-  , m_circumscribedRadius( 0.0 )
-  , m_cylinder( BCylinder() )
+  , m_boundingVolume( NULL )
+  , m_circumscribedRadius( 0. )
+  , m_volume( 0. )
 {}
 
 
@@ -24,7 +26,10 @@ RigidBody::RigidBody( Convex* convex_, Transform const& position_ )
   : m_transform( position_ )
   , m_convex( convex_ )
 {
+  m_boundingVolume = 
+                m_convex->computeBVolume( GrainsExec::m_colDetBoundingVolume );
   m_circumscribedRadius = m_convex->computeCircumscribedRadius();
+  m_volume = m_convex->getVolume();
 }
 
 
@@ -35,10 +40,13 @@ RigidBody::RigidBody( Convex* convex_, Transform const& position_ )
 RigidBody::RigidBody( RigidBody const& form )
   : m_transform( form.m_transform )
   , m_convex( NULL )
+  , m_boundingVolume( NULL )
   , m_circumscribedRadius( form.m_circumscribedRadius )
-  , m_cylinder( form.m_cylinder )
+  , m_volume( form.m_volume )
 {
   if ( form.m_convex ) m_convex = form.m_convex->clone();
+  if ( form.m_boundingVolume ) 
+    m_boundingVolume = form.m_boundingVolume->clone();
 }
 
 
@@ -49,6 +57,7 @@ RigidBody::RigidBody( RigidBody const& form )
 RigidBody::~RigidBody()
 {
   delete m_convex;
+  delete m_boundingVolume;
 }
 
 
@@ -192,17 +201,17 @@ double RigidBody::getCircumscribedRadius() const
 // Returns the rigid body volume
 double RigidBody::getVolume() const
 {
-  return ( m_convex->getVolume() );
+  return ( m_volume );
 }
 
 
 
 
 // ----------------------------------------------------------------------------
-// Returns the rigid body bounding cylinder
-BCylinder RigidBody::getBCylinder() const
+// Returns the rigid body bounding volume
+BVolume const& RigidBody::getBVolume() const
 {
-  return ( m_convex->bcylinder() );
+  return ( *m_boundingVolume );
 }
 
 
@@ -377,7 +386,7 @@ void RigidBody::composeLeftByTranslation( Vector3 const& v )
 void RigidBody::readPosition( istream& fileIn )
 {
   fileIn >> m_transform;
-  m_circumscribedRadius = m_convex->computeCircumscribedRadius();
+//  m_circumscribedRadius = m_convex->computeCircumscribedRadius();
 }
 
 
@@ -389,7 +398,7 @@ void RigidBody::readPosition( istream& fileIn )
 void RigidBody::readPosition2014( istream& fileIn )
 {
   m_transform.readTransform2014( fileIn );
-  m_circumscribedRadius = m_convex->computeCircumscribedRadius();
+//  m_circumscribedRadius = m_convex->computeCircumscribedRadius();
 }
 
 
@@ -401,7 +410,7 @@ void RigidBody::readPosition2014( istream& fileIn )
 void RigidBody::readPosition2014_binary( istream& fileIn )
 {
   m_transform.readTransform2014_binary( fileIn );
-  m_circumscribedRadius = m_convex->computeCircumscribedRadius();
+//  m_circumscribedRadius = m_convex->computeCircumscribedRadius();
 }
 
 
@@ -448,11 +457,11 @@ void RigidBody::writePositionInFluid( ostream& fluid )
     for (point=allPoints.begin(); point!=allPoints.end(); point++)
     {
       pointEnvelope = m_transform(*point);
-      fluid << GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+      fluid << GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 		pointEnvelope[X] ) << " " <<
-	GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 		pointEnvelope[Y] ) << " " <<
-	GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 		pointEnvelope[Z] ) << endl;		
     }
   }
@@ -464,11 +473,11 @@ void RigidBody::writePositionInFluid( ostream& fluid )
     for (point=allPoints.begin(); point!=allPoints.end(); point++)
     {
       pointEnvelope = m_transform(*point);
-      fluid << GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+      fluid << GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 		pointEnvelope[X] ) << " " <<
-	GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 		pointEnvelope[Y] ) << " " <<
-	GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 		pointEnvelope[Z] ) << endl;
     }
 
@@ -564,4 +573,36 @@ bool RigidBody::isIn( Point3 const& pt ) const
   Transform invT;
   invT.setToInverseTransform( m_transform );
   return ( m_convex->isIn( invT( pt ) ) );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets the pointer to the rigid body's bounding volume
+void RigidBody::setBoundingVolume( BVolume* bvol )
+{
+  if ( m_boundingVolume ) delete m_boundingVolume;
+  m_boundingVolume = bvol;
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Writes the rigid body's convex shape in an OBJ format
+void RigidBody::write_OBJ( ostream& f, size_t& firstpoint_number ) const
+{
+  m_convex->write_convex_OBJ( f, m_transform, firstpoint_number );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns an orientation vector describing the rigid body angular position
+Vector3 RigidBody::computeOrientationVector() const
+{
+  Point3 p( 0., 1., 0. );
+  return ( m_transform( p ) - *(m_transform.getOrigin()) );
 }

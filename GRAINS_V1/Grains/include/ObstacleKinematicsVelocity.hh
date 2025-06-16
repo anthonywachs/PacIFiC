@@ -39,8 +39,8 @@ class ObstacleKinematicsVelocity : public Kinematics
     /**@name Methods */
     //@{
     /** @brief Adds an imposed velocity motion to the obstacle kinematics
-    @param chargement the imposed velocity motion */
-    void append( ObstacleImposedVelocity* chargement );
+    @param oiv the imposed velocity motion */
+    void append( ObstacleImposedVelocity* oiv );
 
     /** @brief Composes the obstacle kinematics with another "higher level"
     velocity kinematics
@@ -50,20 +50,23 @@ class ObstacleKinematicsVelocity : public Kinematics
     void Compose( ObstacleKinematicsVelocity const& other, 
     	Vector3 const& lever );
 
-    /** @brief Returns whether the obstacle moved from t to t+dt
+    /** @brief Updates the obstacle translational and angular velocity at time 
+    time and translational and angular motion from time - dt to time and 
+    returns whether the obstacle moved from time - dt to time
     @param time physical time
-    @param dt time step magnitude */
-    bool Deplacement( double time, double dt );
+    @param dt time step magnitude 
+    @param cg center of mass of the obstacle */
+    bool ImposedMotion( double time, double dt, Point3 const& cg );
   
     /** @brief Computes the total velocity of the obstacle using the arm lever
     @param om arm lever */
     Vector3 Velocity( Vector3 const& om ) const; 
   
-    /** @brief Returns whether there is an active angular motion imposed from t
-    to t+dt
+    /** @brief Returns whether there is an active angular motion imposed from
+    time - dt to time
     @param time physical time
     @param dt time step magnitude */
-    bool activAngularMotion( double time, double dt ) const; 
+    bool activeAngularMotion( double time, double dt ) const; 
     //@}
   
 
@@ -91,7 +94,7 @@ class ObstacleKinematicsVelocity : public Kinematics
     /** @brief Resets kinematics to 0 */
     void reset();
 
-    /** @brief Sets the velocity and displacement using another velocity 
+    /** @brief Sets the velocity and motion using another velocity 
     kinematics 
     @param kine_ the other velocity kinematics */
     void set( ObstacleKinematicsVelocity& kine_ );
@@ -118,22 +121,6 @@ class ObstacleKinematicsVelocity : public Kinematics
     @param memento_ kinematics state */
     void restoreState( ObstacleKinematicsMemento const* memento_ );  
     //@}
-  
-
-    /**@name Friend methods */
-    //@{
-    /** @brief Output operator
-    @param fileOut output stream
-    @param kine_ ObstacleKinematicsVelocity object */
-    friend ostream& operator << ( ostream& fileOut, 
-    	ObstacleKinematicsVelocity const& kine_ );
-	
-    /** @brief Input operator
-    @param fileIn input stream
-    @param kine_ ObstacleKinematicsVelocity object */
-    friend istream& operator >> ( istream& fileIn, 
-  	ObstacleKinematicsVelocity& kine_ );
-    //@}
 
 
   private:
@@ -146,7 +133,7 @@ class ObstacleKinematicsVelocity : public Kinematics
 
     /**@name Parameters */
     //@{
-    Vector3 m_translationOverTimeStep; /**< Translational displacement over 
+    Vector3 m_translationOverTimeStep; /**< Translational motion over 
     	dt */
     Vector3 m_rotationOverTimeStep; /**< Rotation over dt  */
     Quaternion m_QuaternionRotationOverDt; /**< Quaternion describing the 

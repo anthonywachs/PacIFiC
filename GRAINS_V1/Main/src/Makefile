@@ -33,7 +33,15 @@ XERCESFLAGS := -L$(XERCESLIB) -lxerces-c -lxerces-depdom
 # MPI
 MPIINC	    := $(GRAINS_MPI_INCDIR)
 MPILIB      := $(GRAINS_MPI_LIBDIR)
+#MPIFLAGS    = -L$(MPILIB) $(LIBMPI_FOR_GRAINS___)
+export LIBMPI_FOR_GRAINS___ = `echo ${GRAINS_MPI_LIBS} | sed 's%[^ ][^ ]*%-l&%g'`
 MPIFLAGS    := -L$(MPILIB) $(LIBMPI_FOR_GRAINS___)
+
+
+# Zlib
+ZINC := $(GRAINS_Z_INCDIR)
+ZLIB := $(GRAINS_Z_LIBDIR)
+ZFLAGS := -L$(ZLIB) -lz
 
 
 # Other macros
@@ -41,7 +49,7 @@ MACRO      += -D_TIMER
 
 
 # Compiler flags
-INCFLAGS  := $(XERCESINC:%=-I%) $(GRAINSINC:%=-I%) $(MPIINC:%=-I%)
+INCFLAGS  := $(XERCESINC:%=-I%) $(GRAINSINC:%=-I%) $(MPIINC:%=-I%) $(ZINC:%=-I%)
 COMPFLAGS := $(DEBUG) $(INCFLAGS)
 LINKFLAGS := $(DEBUG)
 
@@ -60,7 +68,7 @@ grains : MESS START $(EXEDIR)/grains
 
 $(EXEDIR)/grains : app
 	@echo 'Building software grains'
-	$(LINK) $(MAINOBJ) -o $@ $(LINKFLAGS) $(GRAINSFLAGS) $(MPIFLAGS) $(XERCESFLAGS)
+	$(LINK) $(MAINOBJ) -o $@ $(LINKFLAGS) $(GRAINSFLAGS)
 
 MESS   :
 	@echo '***********************************************************'

@@ -6,22 +6,25 @@
 
 bool GrainsExec::m_MPI = false;
 string GrainsExec::m_TIScheme = "SecondOrderLeapFrog";
-bool GrainsExec::m_SphereAsPolyParaview = false;
-int GrainsExec::m_MPI_verbose = 2;
+int GrainsExec::m_MPI_verbose = 0;
+bool GrainsExec::m_isReloaded = false;
 string GrainsExec::m_ReloadType = "new" ;
-Vector3 GrainsExec::m_vgravity = Vector3Nul;
+Vector3 GrainsExec::m_vgravity = Vector3Null;
 Vector3* GrainsExec::m_translationParaviewPostProcessing = NULL ;
 bool GrainsExec::m_periodic = false;
 bool GrainsExec::m_isGrainsCompFeatures = false;
 bool GrainsExec::m_isGrainsPorosity = false;
 string GrainsExec::m_ReloadDirectory = "";
 string GrainsExec::m_SaveDirectory = "";
+bool GrainsExec::m_SaveMPIInASingleFile = false;
+bool GrainsExec::m_ReadMPIInASingleFile = false;
 set<string> GrainsExec::m_additionalDataFiles;
 bool GrainsExec::m_writingModeHybrid = false;
+bool GrainsExec::m_readingModeHybrid = false;
 string GrainsExec::m_GRAINS_HOME = ".";
 string GrainsExec::m_reloadFile_suffix = "B";
 bool GrainsExec::m_exception_Contact = false;
-bool GrainsExec::m_exception_Displacement = false;
+bool GrainsExec::m_exception_Motion = false;
 bool GrainsExec::m_exception_Simulation = false;
 string GrainsExec::m_shift0 = "";
 string GrainsExec::m_shift1 = " ";
@@ -32,18 +35,31 @@ string GrainsExec::m_shift9 = "         ";
 string GrainsExec::m_shift12 = "            ";
 string GrainsExec::m_shift15 = "               ";
 bool GrainsExec::m_output_data_at_this_time = false;
+bool GrainsExec::m_postprocess_forces_at_this_time = false;
 GrainsMPIWrapper* GrainsExec::m_wrapper = NULL;
 list<App*> GrainsExec::m_allApp;
-size_t GrainsExec::m_total_nb_particles = 0;
+size_t GrainsExec::m_total_nb_physical_particles = 0;
 list< pair<Point3*,VertexBase *> > GrainsExec::m_allPolytopeRefPointBase;
 list<IndexArray*> GrainsExec::m_allPolytopeNodeNeighbors;
 list<IndexArray*> GrainsExec::m_allPolytopeNodesIndex;
 list<vector< vector<int> >*> GrainsExec::m_allPolyhedronFacesConnectivity;
 string GrainsExec::m_inputFile;
 int GrainsExec::m_return_syscmd = 0;
-bool GrainsExec::m_preCollision_cyl = false;
-
-
+bool GrainsExec::m_colDetGJK_SV = false;
+bool GrainsExec::m_colDetWithHistory = false;
+double GrainsExec::m_colDetTolerance = EPSILON;
+bool GrainsExec::m_colDetAcceleration = false;
+unsigned int GrainsExec::m_colDetBoundingVolume = 0;
+Point3 GrainsExec::m_defaultInactivePos = Point3( -1.e10 );
+int GrainsExec::m_CompositeObstacleDefaultID = 0;
+int GrainsExec::m_ReferenceParticleDefaultID = 0;
+size_t GrainsExec::m_time_counter = 0;
+bool GrainsExec::m_partialPer_is_active = false;
+double GrainsExec::m_minCrustThickness = 1.e20;
+PartialPeriodicity GrainsExec::m_partialPer;
+unsigned long long int GrainsExec::m_nb_GJK_narrow_collision_detections = 0;
+unsigned long long int GrainsExec::m_nb_GJK_calls = 0;
+bool GrainsExec::m_InsertionWithBVonly = false;
 
 
 // ----------------------------------------------------------------------------
@@ -143,20 +159,24 @@ list<App*> GrainsExec::get_listApp()
 
 
 // ----------------------------------------------------------------------------
-// Returns the total number of particles (active and inactive) on all processes
-size_t GrainsExec::getNumberParticlesOnAllProc()
+// Returns the total number of particles in the physical system 
+// (i.e. on all subdomains/processes), i.e. sum of total number of active 
+// particles with tag 0 or 1 and inactive particles
+size_t GrainsExec::getTotalNumberPhysicalParticles()
 {
-  return ( m_total_nb_particles );
+  return ( m_total_nb_physical_particles );
 }
 
 
 
 
 // ----------------------------------------------------------------------------
-// Returns the total number of particles (active and inactive) on all processes
-void GrainsExec::setNumberParticlesOnAllProc( size_t const& nb_ )
+// Sets the total number of particles in the physical system 
+// (i.e. on all subdomains/processes), i.e. sum of total number of active 
+// particles with tag 0 or 1 and inactive particles
+void GrainsExec::setTotalNumberPhysicalParticles( size_t const& nb_ )
 {
-  m_total_nb_particles = nb_;
+  m_total_nb_physical_particles = nb_;
 }
 
 
@@ -264,10 +284,10 @@ void GrainsExec::display_memory( ostream& os, size_t memory )
   static size_t const go = 1024*1024*1024 ;
 
   if( memory > go )
-    os << ( (double) memory )/go << " Go" ;
+    os << ( (double) memory )/go << " Go" << std::flush;
   else if( memory > mo )
-    os << ( (double) memory )/mo << " Mo" ;
-  else os << memory << " octets" ;
+    os << ( (double) memory )/mo << " Mo" << std::flush ;
+  else os << memory << " octets" << std::flush ;
 }
 
 
@@ -407,7 +427,7 @@ string GrainsExec::extractFileName( string const& FileName )
 
 // ----------------------------------------------------------------------------
 // Checks that all reload files are in the same directory (primarily
-// checks that files for polyhedrons et polygons are there)
+// checks that files for polyhedrons and polygons are there)
 void GrainsExec::checkAllFilesForReload()
 {
   if ( !m_additionalDataFiles.empty() )
@@ -678,4 +698,189 @@ bool GrainsExec::isPointInTetrahedron( Point3 const& p1, Point3 const& p2,
       isIn = true;
 
   return ( isIn );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the full result file name
+string GrainsExec::fullResultFileName( string const& rootname, bool addrank ) 
+{
+  string fullname = rootname;
+  ostringstream oss;
+  if ( addrank ) oss << "_" << m_wrapper->get_rank();
+  fullname += oss.str()+".result";
+
+  return ( fullname );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets the minimum crust thickness
+void GrainsExec::setMinCrustThickness( double const& ct )
+{
+  m_minCrustThickness = min( m_minCrustThickness, ct );
+} 
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the minimum crust thickness */
+double GrainsExec::getMinCrustThickness()
+{
+  return ( m_minCrustThickness ); 
+}
+
+
+
+
+// -------------------------------------------------------------------
+// Computes the contribution to inertia and volume of a tetrahedron
+// defined by the center of mass (assuming that the center of mass is located 
+// at (0,0,0)), the center of mass on a face and 2 consecutives vertices on 
+// this face, to the inertia and volume of a polyhedron
+void GrainsExec::computeVolumeInertiaContrib( const Point3 &A2, 
+	const Point3 &A3, const Point3 &A4, double &vol, double* inertia )
+{
+  // From Journal of Mathematics and Statistics 1 (1): 8-11, 2004
+  // "Explicit Exact Formulas for the 3-D Tetrahedron Inertia Tensor
+  // in Terms of its Vertex Coordinates", F. Tonon
+
+  double x1 = 0., x2 = A2[X], x3 = A3[X], x4 = A4[X],
+  	y1 = 0., y2 = A2[Y], y3 = A3[Y], y4 = A4[Y],
+	z1 = 0., z2 = A2[Z], z3 = A3[Z], z4 = A4[Z],
+	det ;
+	
+  det = fabs( ( x2 - x1 ) * ( y3 - y1 ) * ( z4 - z1 )
+  	+ ( y2 - y1 ) * ( z3 - z1 ) * (	x4 - x1 )
+	+ ( z2 - z1 ) * ( x3 - x1 ) * (	y4 - y1 )
+	- ( z2 - z1 ) * ( y3 - y1 ) * (	x4 - x1 )
+	- ( x2 - x1 ) * ( z3 - z1 ) * (	y4 - y1 )
+	- ( y2 - y1 ) * ( x3 - x1 ) * (	z4 - z1 ) );
+
+  vol += det / 6. ;
+  
+  inertia[0] += det * ( y1 * y1 + y1 * y2 + y2 * y2 
+  	+ y1 * y3 + y2 * y3 + y3 * y3
+	+ y1 * y4 + y2 * y4 + y3 * y4 + y4 * y4
+	+ z1 * z1 + z1 * z2 + z2 * z2 
+  	+ z1 * z3 + z2 * z3 + z3 * z3
+	+ z1 * z4 + z2 * z4 + z3 * z4 + z4 * z4 ) / 60. ;
+  inertia[1] -= det * ( 2. * x1 * z1 + x2 * z1 + x3 * z1 + x4 * z1 
+  	+ x1 * z2 + 2. * x2 * z2 + x3 * z2 + x4 * z2 
+	+ x1 * z3 + x2 * z3 + 2. * x3 * z3 + x4 * z3 
+	+ x1 * z4 + x2 * z4 + x3 * z4 + 2. * x4 * z4 ) / 120. ;
+  inertia[2] -= det * ( 2. * x1 * y1 + x2 * y1 + x3 * y1 + x4 * y1 
+  	+ x1 * y2 + 2. * x2 * y2 + x3 * y2 + x4 * y2 
+	+ x1 * y3 + x2 * y3 + 2. * x3 * y3 + x4 * y3 
+	+ x1 * y4 + x2 * y4 + x3 * y4 + 2. * x4 * y4 ) / 120. ;
+  inertia[3] += det * ( x1 * x1 + x1 * x2 + x2 * x2 
+  	+ x1 * x3 + x2 * x3 + x3 * x3
+	+ x1 * x4 + x2 * x4 + x3 * x4 + x4 * x4
+	+ z1 * z1 + z1 * z2 + z2 * z2 
+  	+ z1 * z3 + z2 * z3 + z3 * z3
+	+ z1 * z4 + z2 * z4 + z3 * z4 + z4 * z4 ) / 60. ;
+  inertia[4] -= det * ( 2. * y1 * z1 + y2 * z1 + y3 * z1 + y4 * z1 
+  	+ y1 * z2 + 2. * y2 * z2 + y3 * z2 + y4 * z2 
+	+ y1 * z3 + y2 * z3 + 2. * y3 * z3 + y4 * z3 
+	+ y1 * z4 + y2 * z4 + y3 * z4 + 2. * y4 * z4 ) / 120. ;
+  inertia[5] += det * ( x1 * x1 + x1 * x2 + x2 * x2 
+  	+ x1 * x3 + x2 * x3 + x3 * x3
+	+ x1 * x4 + x2 * x4 + x3 * x4 + x4 * x4
+	+ y1 * y1 + y1 * y2 + y2 * y2 
+  	+ y1 * y3 + y2 * y3 + y3 * y3
+	+ y1 * y4 + y2 * y4 + y3 * y4 + y4 * y4 ) / 60. ;
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Initializes partial periodicity */
+void GrainsExec::initializePartialPeriodicity()
+{
+  m_partialPer.comp = LLO_UNDEF;
+  m_partialPer.dir = NONE; 
+  m_partialPer.limit = -1.e-20;   
+}
+
+
+
+ 
+// ----------------------------------------------------------------------------
+// Sets partial periodicity
+void GrainsExec::setPartialPeriodicity( LargerLowerOp comp_, Direction dir_,
+  	double const& limit_ )
+{
+  m_partialPer.comp = comp_;
+  m_partialPer.dir = dir_; 
+  m_partialPer.limit = limit_;   
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns a pointer to the partial periodicity features */
+PartialPeriodicity const* GrainsExec::getPartialPeriodicity()
+{
+  return( &m_partialPer );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns whether "(*P)[dir] comp limit" where comp is either < 
+// or > is true or false using the PartialPeriodicity structure data   
+bool GrainsExec::partialPeriodicityCompTest( Point3 const* P )
+{
+  bool res = false;
+  switch( m_partialPer.comp )
+  {
+    case LLO_LARGER:
+      res = (*P)[m_partialPer.dir] > m_partialPer.limit;
+      break;
+      
+    case LLO_LOWER:
+      res = (*P)[m_partialPer.dir] < m_partialPer.limit;
+      break;
+            
+    default:
+      cout << "Warning: Undefined operator in "
+      	"GrainsExec::partialPeriodicityCompTest" << endl;   
+  }
+  
+  return ( res );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns whether "coord comp limit" where comp is either < 
+// or > is true or false using the PartialPeriodicity structure data   
+bool GrainsExec::partialPeriodicityCompTest( double const& coord )
+{
+  bool res = false;
+  switch( m_partialPer.comp )
+  {
+    case LLO_LARGER:
+      res = coord > m_partialPer.limit;
+      break;
+            
+    case LLO_LOWER:
+      res = coord < m_partialPer.limit;
+      break;
+            
+    default:
+      cout << "Warning: Undefined operator in "
+      	"GrainsExec::partialPeriodicityCompTest" << endl;   
+  }
+  
+  return ( res );
 }

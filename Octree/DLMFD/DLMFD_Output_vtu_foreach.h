@@ -1,6 +1,93 @@
-// Comment: this is almost a copy & paste of the output_vtu_foreach.h file 
-// in the basilisk src directory. Only the vtu file names are different
-// to match the vtu file names as defined in DLMFD/save_data.h
+/** 
+# Paraview functions 
+*/
+#include <zlib.h>
+
+
+# if dimension == 2
+#   define NVERTCELL 4
+#   define CELLTYPE 9 
+# endif
+# if dimension == 3
+#   define NVERTCELL 8
+#   define CELLTYPE 12  
+# endif
+
+/**
+# init_percelldir
+This function returns an array of 4 or 8 vectors that enables to compute the 
+coordinates of the vertices of a cell.
+The vertex coordinates are : cell.center.x + percelldir[j].x * Delta 
+*/
+coord* init_percelldir()
+{ 
+  # if dimension == 2
+    coord* percelldir = (coord*) malloc( 4 * sizeof(coord) );
+    // Vertex [] = [0,0]
+    percelldir[0].x = - 0.5;
+    percelldir[0].y = - 0.5;
+    percelldir[0].z = 0.;     
+    // Vertex [1,0]
+    percelldir[1].x = 0.5;
+    percelldir[1].y = - 0.5;
+    percelldir[1].z = 0.;         
+    // Vertex [1,1]
+    percelldir[2].x = 0.5;
+    percelldir[2].y = 0.5; 
+    percelldir[2].z = 0.;        
+    // Vertex [0,1]
+    percelldir[3].x = - 0.5;
+    percelldir[3].y = 0.5;
+    percelldir[3].z = 0.;                
+# endif
+# if dimension == 3
+    coord* percelldir = (coord*) malloc( 8 * sizeof(coord) );
+    // Vertex [] = [0,0,0]
+    percelldir[0].x = - 0.5;
+    percelldir[0].y = - 0.5;
+    percelldir[0].z = - 0.5;     
+    // Vertex [1,0,0]
+    percelldir[1].x = 0.5;
+    percelldir[1].y = - 0.5;
+    percelldir[1].z = - 0.5;         
+    // Vertex [1,1,0]
+    percelldir[2].x = 0.5;
+    percelldir[2].y = 0.5; 
+    percelldir[2].z = - 0.5;        
+    // Vertex [0,1,0]
+    percelldir[3].x = - 0.5;
+    percelldir[3].y = 0.5;
+    percelldir[3].z = - 0.5;      
+    // Vertex [] = [0,0,1]
+    percelldir[4].x = - 0.5;
+    percelldir[4].y = - 0.5;
+    percelldir[4].z = 0.5;     
+    // Vertex [1,0,1]
+    percelldir[5].x = 0.5;
+    percelldir[5].y = - 0.5;
+    percelldir[5].z = 0.5;         
+    // Vertex [1,1,1]
+    percelldir[6].x = 0.5;
+    percelldir[6].y = 0.5; 
+    percelldir[6].z = 0.5;        
+    // Vertex [0,1,1]
+    percelldir[7].x = - 0.5;
+    percelldir[7].y = 0.5;
+    percelldir[7].z = 0.5;          
+# endif
+
+  return percelldir;
+}
+
+
+char* BUFFER ;
+uint32_t ALLOCATED ;
+uint32_t OFFSET ;
+uint32_t CURRENT_LENGTH ;
+
+
+
+
 
 /**
 # output_pvtu_ascii
@@ -8,159 +95,265 @@ This function writes one XML file which allows to read the *.vtu files generated
 by output_vtu_ascii_foreach() when used in MPI. Tested in (quad- and oct-)trees
 using MPI.
 */
-void output_pvtu_ascii (scalar * list, vector * vlist, int n, FILE * fp, char * subname)
+void output_pvtu_ascii( scalar* list, vector* vlist, FILE* fp, 
+	char* subname )
 {
-    fputs ("<?xml version=\"1.0\"?>\n"
-    "<VTKFile type=\"PUnstructuredGrid\" version=\"1.0\" byte_order=\"LittleEndian\" header_type=\"UInt64\">\n", fp);
-    fputs ("\t <PUnstructuredGrid GhostLevel=\"0\">\n", fp);
-    fputs ("\t\t\t <PCellData Scalars=\"scalars\">\n", fp);
-    for (scalar s in list) {
-      fprintf (fp,"\t\t\t\t <PDataArray type=\"Float64\" Name=\"%s\" format=\"ascii\">\n", s.name);
-      fputs ("\t\t\t\t </PDataArray>\n", fp);
-    }
-    for (vector v in vlist) {
-      fprintf (fp,"\t\t\t\t <PDataArray type=\"Float64\" NumberOfComponents=\"3\" Name=\"%s\" format=\"ascii\">\n", v.x.name);
-      fputs ("\t\t\t\t </PDataArray>\n", fp);
-    }
-    fputs ("\t\t\t </PCellData>\n", fp);
-    fputs ("\t\t\t <PPoints>\n", fp);
-    fputs ("\t\t\t\t <PDataArray type=\"Float64\" NumberOfComponents=\"3\" format=\"ascii\">\n", fp);
-    fputs ("\t\t\t\t </PDataArray>\n", fp);
-    fputs ("\t\t\t </PPoints>\n", fp);
+  fputs( "<?xml version=\"1.0\"?>\n"
+	"<VTKFile type=\"PUnstructuredGrid\" version=\"1.0\" "
+	"byte_order=\"LittleEndian\" header_type=\"UInt64\">\n", fp );
+  fputs( "<PUnstructuredGrid GhostLevel=\"0\">\n", fp );
+  fputs( "<PCellData Scalars=\"scalars\">\n", fp );
+  for (scalar s in list) 
+  {
+    fprintf( fp, "<PDataArray type=\"%s\" "
+    	"Name=\"%s\" format=\"ascii\">\n", PARAVIEW_DATANAME, s.name );
+    fputs( "</PDataArray>\n", fp );
+  }
+  for (vector v in vlist) 
+  {
+    char* paraview_name;
+    size_t trunc_len = (size_t)(strlen(v.x.name) - 2);
+    paraview_name = malloc((trunc_len + 1) * sizeof(char));
+    strncpy( paraview_name, v.x.name, trunc_len );
+    paraview_name[trunc_len] = '\0';
+    fprintf( fp, "<PDataArray type=\"%s\" "
+    	"NumberOfComponents=\"3\" Name=\"%s\" format=\"ascii\">\n", 
+	PARAVIEW_DATANAME, paraview_name );
+    fputs( "</PDataArray>\n", fp );
+    free( paraview_name );
+  }
+  fputs( "</PCellData>\n", fp );
+  fputs( "<PPoints>\n", fp );
+  fprintf( fp, "<PDataArray type=\"%s\" "
+  	"NumberOfComponents=\"3\" format=\"ascii\">\n", PARAVIEW_DATANAME );
+  fputs( "</PDataArray>\n", fp );
+  fputs( "</PPoints>\n", fp );
 
-    for (int i = 0; i < npe(); i++)
-      fprintf (fp, "<Piece Source=\"%s_%d.vtu\"/> \n", subname, i);
+  for (unsigned int i = 0; i < npe(); i++)
+    fprintf( fp, "<Piece Source=\"%s_%d.vtu\"/> \n", subname, i );
 
-    fputs ("\t </PUnstructuredGrid>\n", fp);
-    fputs ("</VTKFile>\n", fp);
+  fputs( "</PUnstructuredGrid>\n", fp );
+  fputs( "</VTKFile>\n", fp );
 }
 
+
+
+
 /**
-# output_vtu_asci_foreach
+# output_vtu_ascii_foreach
 This function writes one XML VTK file per PID process of type unstructured grid
 (*.vtu) which can be read using Paraview. File stores scalar and vector fields
-defined at the center points. Results are recorded on ASCII format. If one writes
-one *.vtu file per PID process this function may be combined with
-output_pvtu_ascii() above to read in parallel. Tested in (quad- and oct-)trees
-using MPI. Also works with solids (when not using MPI).
-
-Bug correction: %g turns into scientific notation for high integer values. This is 
-not supported by paraview. Hence a fix was needed.
-Oystein Lande 2017
+defined at the center points. Results are written in ASCII format. If one 
+writes one *.vtu file per PID process this function may be combined with
+output_pvtu_ascii() above to read in parallel.  
 */
-void output_vtu_ascii_foreach (scalar * list, vector * vlist, int n, FILE * fp, bool linear)
+void output_vtu_ascii_foreach( scalar* list, vector* vlist, FILE* fp )
 {
-#if defined(_OPENMP)
-  int num_omp = omp_get_max_threads();
-  omp_set_num_threads(1);
-#endif
+# if defined(_OPENMP)
+    int num_omp = omp_get_max_threads();
+    omp_set_num_threads( 1 );
+# endif
 
   vertex scalar marker[];
-  int no_points = 0, no_cells=0 ;
-  foreach_vertex(serial, noauto){
-    marker[] = _k;
+  // We use uint32_t for the 3 following variables because the number
+  // of cells/vertices on a single proc never exceeds the limit of 4,294,967,295
+  uint32_t no_points = 0, no_cells = 0, vertexnum = 0 ;
+
+  // In case of periodicity
+  scalar per_mask[];
+  foreach(serial, noauto) per_mask[] = 1.; 
+  coord* percelldir = NULL;
+  if ( Period.x || Period.y || Period.z )
+  {  
+    percelldir = init_percelldir();
+    foreach(serial, noauto)
+    {
+      if ( Period.x )
+        if ( x + Delta > X0 + L0 || x - Delta < X0 )
+          per_mask[] = 0.;
+#     if dimension > 1
+        if ( Period.y )
+          if ( y + Delta > Y0 + L0 ||  y - Delta < Y0 )
+            per_mask[] = 0.;
+#     endif
+#     if dimension > 2
+        if ( Period.z )
+          if ( z + Delta > Z0 + L0 || z - Delta < Z0 )
+            per_mask[] = 0.;
+#     endif
+    }
+  }
+
+  foreach_vertex(serial, noauto)
+  {
+    marker[] = vertexnum++;
     no_points += 1;
   }
-  foreach(serial, noauto){
+  foreach(serial, noauto)
+  {
+    // Additional (duplicated) vertices per cell that have a face belonging to a
+    // periodic face of the whole domain
+    if ( per_mask[] < 0.5 )
+      no_points += NVERTCELL;
+    
+    // Number of cells on this process
     no_cells += 1;
   }
 
-  fputs ("<?xml version=\"1.0\"?>\n"
-  "<VTKFile type=\"UnstructuredGrid\" version=\"1.0\" byte_order=\"LittleEndian\" header_type=\"UInt64\">\n", fp);
-  fputs ("\t <UnstructuredGrid>\n", fp);
-  fprintf (fp,"\t\t <Piece NumberOfPoints=\"%d\" NumberOfCells=\"%d\">\n", no_points, no_cells);
-  fputs ("\t\t\t <CellData Scalars=\"scalars\">\n", fp);
-  for (scalar s in list) {
-    fprintf (fp,"\t\t\t\t <DataArray type=\"Float64\" Name=\"%s\" format=\"ascii\">\n", s.name);
-    foreach(serial, noauto){
-      fprintf (fp, "%g\n", val(s));
+  fputs( "<?xml version=\"1.0\"?>\n"
+  	"<VTKFile type=\"UnstructuredGrid\" version=\"1.0\" "
+  	"byte_order=\"LittleEndian\" header_type=\"UInt64\">\n", fp );
+  fputs( "<UnstructuredGrid>\n", fp );
+  fprintf( fp, "<Piece NumberOfPoints=\"%u\" NumberOfCells=\"%u\">\n", 
+  	no_points, no_cells );
+  fputs( "<CellData Scalars=\"scalars\">\n", fp );
+  for (scalar s in list) 
+  {
+    fprintf( fp, "<DataArray type=\"%s\" Name=\"%s\" "
+    	"format=\"ascii\">\n", PARAVIEW_DATANAME, s.name );
+    foreach(serial, noauto)
+      fprintf( fp, "%12.5e\n", val(s) );
+    fputs( "</DataArray>\n", fp );
+  }
+  for (vector v in vlist) 
+  {
+    char* paraview_name;
+    size_t trunc_len = (size_t)(strlen(v.x.name) - 2);
+    paraview_name = malloc((trunc_len + 1) * sizeof(char));
+    strncpy( paraview_name, v.x.name, trunc_len );
+    paraview_name[trunc_len] = '\0';
+    fprintf( fp, "<DataArray type=\"%s\" "
+    	"NumberOfComponents=\"3\" Name=\"%s\" format=\"ascii\">\n", 
+	PARAVIEW_DATANAME, paraview_name );
+    free( paraview_name );
+    foreach(serial, noauto)
+    {
+#     if dimension == 2
+        fprintf( fp, "%12.5e %12.5e 0.\n", val(v.x), val(v.y) );
+#     endif
+#     if dimension == 3
+        fprintf( fp, "%12.5e %12.5e %12.5e\n", val(v.x), val(v.y), val(v.z) );
+#     endif
     }
-    fputs ("\t\t\t\t </DataArray>\n", fp);
+    fputs( "</DataArray>\n", fp );
   }
-  for (vector v in vlist) {
-    fprintf (fp,"\t\t\t\t <DataArray type=\"Float64\" NumberOfComponents=\"3\" Name=\"%s\" format=\"ascii\">\n", v.x.name);
-    foreach(serial, noauto){
-#if dimension == 2
-      fprintf (fp, "%g %g 0.\n", val(v.x), val(v.y));
-#endif
-#if dimension == 3
-      fprintf (fp, "%g %g %g\n", val(v.x), val(v.y), val(v.z));
-#endif
+  fputs( "</CellData>\n", fp );
+  fputs( "<Points>\n", fp );
+  fprintf( fp, "<DataArray type=\"%s\" "
+  	"NumberOfComponents=\"3\" format=\"ascii\">\n", PARAVIEW_DATANAME );
+  foreach_vertex(serial, noauto)
+  {
+#   if dimension == 2
+      fprintf( fp, "%12.5e %12.5e 0\n", x, y );
+#   endif
+#   if dimension == 3
+      fprintf( fp, "%12.5e %12.5e %12.5e\n", x, y, z );
+#   endif
+  }
+  // Additional duplicated vertices in case of periodicity
+  coord supvertex = {0., 0., 0.};
+  if ( Period.x || Period.y || Period.z )
+  {
+    foreach(serial, noauto)
+      if ( per_mask[] < 0.5 )
+      {
+#       if dimension == 2
+          for (size_t j=0;j<4;j++)
+	  {
+	    supvertex.x = x + percelldir[j].x * Delta;
+	    supvertex.y = y + percelldir[j].y * Delta;	    
+            fprintf( fp, "%12.5e %12.5e 0.\n", supvertex.x, supvertex.y );
+	  }		
+#       endif
+#       if dimension == 3
+          for (size_t j=0;j<8;j++)
+	  {
+	    supvertex.x = x + percelldir[j].x * Delta;
+	    supvertex.y = y + percelldir[j].y * Delta;	
+	    supvertex.z = z + percelldir[j].z * Delta;	    	    
+            fprintf( fp, "%12.5e %12.5e %12.5e\n", supvertex.x, supvertex.y, 
+	    	supvertex.z );
+	  }	
+#       endif    
+      }
+    free( percelldir );       
+  }  
+  fputs( "</DataArray>\n", fp );
+  fputs( "</Points>\n", fp );
+  fputs( "<Cells>\n", fp );
+  fputs( "<DataArray type=\"UInt32\" Name=\"connectivity\" "
+  	"format=\"ascii\">\n", fp );
+  foreach(serial, noauto)
+    if ( per_mask[] )
+    {
+#     if dimension == 2
+        uint32_t ape1 = (uint32_t)marker[];
+        uint32_t ape2 = (uint32_t)marker[1,0];
+        uint32_t ape3 = (uint32_t)marker[1,1];
+        uint32_t ape4 = (uint32_t)marker[0,1];
+        fprintf( fp, "%u %u %u %u\n", ape1, ape2, ape3, ape4 );
+#     endif
+#     if dimension == 3
+        uint32_t ape1 = (uint32_t)marker[];
+        uint32_t ape2 = (uint32_t)marker[1,0,0];
+        uint32_t ape3 = (uint32_t)marker[1,1,0];
+        uint32_t ape4 = (uint32_t)marker[0,1,0];
+        uint32_t ape5 = (uint32_t)marker[0,0,1];
+        uint32_t ape6 = (uint32_t)marker[1,0,1];
+        uint32_t ape7 = (uint32_t)marker[1,1,1];
+        uint32_t ape8 = (uint32_t)marker[0,1,1];
+        fprintf( fp, "%u %u %u %u %u %u %u %u\n", ape1, ape2, ape3, ape4, ape5, 
+      		ape6, ape7, ape8 );
+#     endif
     }
-    fputs ("\t\t\t\t </DataArray>\n", fp);
-  }
-  fputs ("\t\t\t </CellData>\n", fp);
-  fputs ("\t\t\t <Points>\n", fp);
-  fputs ("\t\t\t\t <DataArray type=\"Float64\" NumberOfComponents=\"3\" format=\"ascii\">\n", fp);
-  foreach_vertex(serial, noauto){
-#if dimension == 2
-    fprintf (fp, "%g %g 0\n", x, y);
-#endif
-#if dimension == 3
-    fprintf (fp, "%g %g %g\n", x, y, z);
-#endif
-  }
-  fputs ("\t\t\t\t </DataArray>\n", fp);
-  fputs ("\t\t\t </Points>\n", fp);
-  fputs ("\t\t\t <Cells>\n", fp);
-  fputs ("\t\t\t\t <DataArray type=\"Int64\" Name=\"connectivity\" format=\"ascii\">\n", fp);
-  foreach(serial, noauto){
-#if dimension == 2
-    // Edit OLAND:
-    // %g will turn into scientific notation for high integer values. this does not work with paraview
-    //fprintf (fp, "%g %g %g %g \n", marker[], marker[1,0], marker[1,1], marker[0,1]);
-    int ape1 = marker[];
-    int ape2 = marker[1,0];
-    int ape3 = marker[1,1];
-    int ape4 = marker[0,1];
-    fprintf (fp, "%u %u %u %u \n", ape1, ape2, ape3, ape4);
-#endif
-#if dimension == 3
-    // Edit OLAND:
-    // %g will turn into scientific notation for high integer values. this does not work with paraview
-    //fprintf (fp, "%g %g %g %g %g %g %g %g\n", marker[], marker[1,0,0], marker[1,1,0], marker[0,1,0],marker[0,0,1], marker[1,0,1], marker[1,1,1], marker[0,1,1]);
-    int ape1 = marker[];
-    int ape2 = marker[1,0,0];
-    int ape3 = marker[1,1,0];
-    int ape4 = marker[0,1,0];
-    int ape5 = marker[0,0,1];
-    int ape6 = marker[1,0,1];
-    int ape7 = marker[1,1,1];
-    int ape8 = marker[0,1,1];
-    fprintf (fp, "%u %u %u %u %u %u %u %u\n", ape1, ape2, ape3, ape4, ape5, ape6, ape7, ape8);
-#endif
-  }
-  fputs ("\t\t\t\t </DataArray>\n", fp);
-  fputs ("\t\t\t\t <DataArray type=\"Int64\" Name=\"offsets\" format=\"ascii\">\n", fp);
-
-  for (int i = 1; i < no_cells+1; i++){
-#if dimension == 2
-    fprintf (fp, "%d \n", i*4);
-#endif
-#if dimension == 3
-    fprintf (fp, "%d \n", i*8);
-#endif
-  }
-  fputs ("\t\t\t\t </DataArray>\n", fp);
-  fputs ("\t\t\t\t <DataArray type=\"UInt8\" Name=\"types\" format=\"ascii\">\n", fp);
-  foreach(serial, noauto){
-#if dimension == 2
-    fputs ("9 \n", fp);
-#endif
-#if dimension == 3
-    fputs ("12 \n", fp);
-#endif
-  }
-  fputs ("\t\t\t\t </DataArray>\n", fp);
-  fputs ("\t\t\t </Cells>\n", fp);
-  fputs ("\t\t </Piece>\n", fp);
-  fputs ("\t </UnstructuredGrid>\n", fp);
-  fputs ("</VTKFile>\n", fp);
-  fflush (fp);
-#if defined(_OPENMP)
-  omp_set_num_threads(num_omp);
-#endif
+    // Additional duplicated vertices
+    else
+    {
+#     if dimension == 2
+        uint32_t ape1 = vertexnum++;
+        uint32_t ape2 = vertexnum++;
+        uint32_t ape3 = vertexnum++;
+        uint32_t ape4 = vertexnum++;
+        fprintf( fp, "%u %u %u %u \n", ape1, ape2, ape3, ape4 );
+#     endif
+#     if dimension == 3
+        uint32_t ape1 = vertexnum++;
+        uint32_t ape2 = vertexnum++;
+        uint32_t ape3 = vertexnum++;
+        uint32_t ape4 = vertexnum++;
+        uint32_t ape5 = vertexnum++;
+        uint32_t ape6 = vertexnum++;
+        uint32_t ape7 = vertexnum++;
+        uint32_t ape8 = vertexnum++;
+        fprintf( fp, "%u %u %u %u %u %u %u %u\n", ape1, ape2, ape3, ape4, ape5, 
+      		ape6, ape7, ape8 );
+#     endif
+    }
+  fputs( "</DataArray>\n", fp );
+  fputs( "<DataArray type=\"UInt32\" Name=\"offsets\" "
+  	"format=\"ascii\">\n", fp );
+  for (uint32_t i = 1; i < no_cells+1; i++)
+    fprintf( fp, "%u ", i * NVERTCELL );
+  fprintf( fp, "\n" );    
+  fputs( "</DataArray>\n", fp );
+  fputs( "<DataArray type=\"UInt8\" Name=\"types\" "
+  	"format=\"ascii\">\n", fp );
+  foreach(serial, noauto)
+    fprintf( fp, "%u ", CELLTYPE );
+  fprintf( fp, "\n" );    
+  fputs( "</DataArray>\n", fp );
+  fputs( "</Cells>\n", fp );
+  fputs( "</Piece>\n", fp );
+  fputs( "</UnstructuredGrid>\n", fp );
+  fputs( "</VTKFile>\n", fp );
+  fflush( fp );
+# if defined(_OPENMP)
+    omp_set_num_threads( num_omp );
+#  endif
 }
+
+
+
 
 /**
 # output_pvtu_bin
@@ -168,174 +361,1389 @@ This function writes one XML file which allows to read the *.vtu files generated
 by output_vtu_bin_foreach() when used in MPI. Tested in (quad- and oct-)trees
 using MPI.
 */
-void output_pvtu_bin (scalar * list, vector * vlist,  FILE * fp, char * subname)
+void output_pvtu_bin( scalar* list, vector* vlist,  FILE* fp, char* subname )
 {
-    fputs ("<?xml version=\"1.0\"?>\n"
-    "<VTKFile type=\"PUnstructuredGrid\" version=\"1.0\" byte_order=\"LittleEndian\" header_type=\"UInt64\">\n", fp);
-    fputs ("\t <PUnstructuredGrid GhostLevel=\"0\">\n", fp);
-    fputs ("\t\t\t <PCellData Scalars=\"scalars\">\n", fp);
-    for (scalar s in list) {
-      fprintf (fp,"\t\t\t\t <PDataArray type=\"Float64\" Name=\"%s\" format=\"appended\">\n", s.name);
-      fputs ("\t\t\t\t </PDataArray>\n", fp);
-    }
-    for (vector v in vlist) {
-      fprintf (fp,"\t\t\t\t <PDataArray type=\"Float64\" NumberOfComponents=\"3\" Name=\"%s\" format=\"appended\">\n", v.x.name);
-      fputs ("\t\t\t\t </PDataArray>\n", fp);
-    }
-    fputs ("\t\t\t </PCellData>\n", fp);
-    fputs ("\t\t\t <PPoints>\n", fp);
-    fputs ("\t\t\t\t <PDataArray type=\"Float64\" NumberOfComponents=\"3\" format=\"ascii\">\n", fp);
-    fputs ("\t\t\t\t </PDataArray>\n", fp);
-    fputs ("\t\t\t </PPoints>\n", fp);
+  fputs( "<?xml version=\"1.0\"?>\n"
+	"<VTKFile type=\"PUnstructuredGrid\" version=\"1.0\" "
+	"byte_order=\"LittleEndian\" header_type=\"UInt64\">\n", fp );
+  fputs( " <PUnstructuredGrid GhostLevel=\"0\">\n", fp );
+  fputs( "<PCellData Scalars=\"scalars\">\n", fp );
+  for (scalar s in list) 
+  {
+    fprintf( fp,"<PDataArray type=\"%s\" Name=\"%s\" "
+    	"format=\"appended\">\n", PARAVIEW_DATANAME, s.name );
+    fputs( "</PDataArray>\n", fp );
+  }
+  for (vector v in vlist) 
+  {
+    char* paraview_name;
+    size_t trunc_len = (size_t)(strlen(v.x.name) - 2);
+    paraview_name = malloc((trunc_len + 1) * sizeof(char));
+    strncpy( paraview_name, v.x.name, trunc_len );
+    paraview_name[trunc_len] = '\0';
+    fprintf( fp,"<PDataArray type=\"%s\" NumberOfComponents=\"3\""
+    	" Name=\"%s\" format=\"appended\">\n", PARAVIEW_DATANAME, 
+	paraview_name );
+    fputs( "</PDataArray>\n", fp );
+    free( paraview_name );    
+  }
+  fputs( "</PCellData>\n", fp );
+  fputs( "<PPoints>\n", fp );
+  fprintf( fp, "<PDataArray type=\"%s\" NumberOfComponents=\"3\" "
+  	"format=\"ascii\">\n", PARAVIEW_DATANAME );
+  fputs( " </PDataArray>\n", fp );
+  fputs( "</PPoints>\n", fp );
 
-    for (int i = 0; i < npe(); i++)
-      fprintf (fp, "<Piece Source=\"%s_%d.vtu\"/> \n", subname, i);
+  for (int i = 0; i < npe(); i++)
+    fprintf( fp, "<Piece Source=\"%s_%d.vtu\"/> \n", subname, i );
 
-    fputs ("\t </PUnstructuredGrid>\n", fp);
-    fputs ("</VTKFile>\n", fp);
+  fputs( "</PUnstructuredGrid>\n", fp );
+  fputs( "</VTKFile>\n", fp );
 }
+
+
+
 
 /**
 # output_vtu_bin_foreach
 This function writes one XML VTK file per PID process of type unstructured grid
 (*.vtu) which can be read using Paraview. File stores scalar and vector fields
-defined at the center points. Results are recorded on binary format. If one writes
-one *.vtu file per PID process this function may be combined with
-output_pvtu_bin() above to read in parallel. Tested in (quad- and oct-)trees
-using MPI. Also works with solids (when not using MPI).
-Bug correction: %g turns into scientific notation for high integer values. This is 
-not supported by paraview. Hence a fix was needed.
-Oystein Lande 2017
+defined at the center points. Results are written in binary format. If one 
+writes one *.vtu file per PID process this function may be combined with
+output_pvtu_bin() above to read in parallel. 
 */
-void output_vtu_bin_foreach (scalar * list, vector * vlist, FILE * fp, bool linear)
+void output_vtu_bin_foreach( scalar* list, vector* vlist, FILE* fp )
 {
-#if defined(_OPENMP)
-  int num_omp = omp_get_max_threads();
-  omp_set_num_threads(1);
-#endif
+# if defined(_OPENMP)
+    int num_omp = omp_get_max_threads();
+    omp_set_num_threads( 1 );
+# endif
 
   vertex scalar marker[];
-  int no_points = 0, no_cells=0 ;
-  foreach_vertex(serial, noauto){
-    marker[] = _k;
+  // We use uint32_t for the 3 following variables because the number
+  // of cells/vertices on a single proc never exceeds the limit of 4,294,967,295
+  uint32_t no_points = 0, no_cells = 0, vertexnum = 0 ;
+
+  // In case of periodicity
+  scalar per_mask[];
+  foreach(serial, noauto) per_mask[] = 1.; 
+  coord* percelldir = NULL;
+  if ( Period.x || Period.y || Period.z )
+  {  
+    percelldir = init_percelldir();
+    foreach(serial, noauto)
+    {
+      if ( Period.x )
+        if ( x + Delta > X0 + L0 || x - Delta < X0 )
+          per_mask[] = 0.;
+#     if dimension > 1
+        if ( Period.y )
+          if ( y + Delta > Y0 + L0 ||  y - Delta < Y0 )
+            per_mask[] = 0.;
+#     endif
+#     if dimension > 2
+        if ( Period.z )
+          if ( z + Delta > Z0 + L0 || z - Delta < Z0 )
+            per_mask[] = 0.;
+#     endif
+    }
+  }
+
+  foreach_vertex(serial, noauto)
+  {
+    marker[] = vertexnum++;
     no_points += 1;
   }
-  foreach(serial, noauto){
+  foreach(serial, noauto)
+  {
+    // Additional (duplicated) vertices per cell that have a face belonging to a
+    // periodic face of the whole domain
+    if ( per_mask[] < 0.5 ) 
+      no_points += NVERTCELL;
+    
+    // Number of cells on this process
     no_cells += 1;
   }
 
-  fputs ("<?xml version=\"1.0\"?>\n"
-  "<VTKFile type=\"UnstructuredGrid\" version=\"1.0\" byte_order=\"LittleEndian\" header_type=\"UInt64\">\n", fp);
-  fputs ("\t <UnstructuredGrid>\n", fp);
-  fprintf (fp,"\t\t <Piece NumberOfPoints=\"%d\" NumberOfCells=\"%d\">\n", no_points, no_cells);
-  fputs ("\t\t\t <CellData Scalars=\"scalars\">\n", fp);
+  fputs( "<?xml version=\"1.0\"?>\n"
+  	"<VTKFile type=\"UnstructuredGrid\" version=\"1.0\" "
+	"byte_order=\"LittleEndian\" header_type=\"UInt64\">\n", fp );
+  fputs( "<UnstructuredGrid>\n", fp );
+  fprintf( fp,"<Piece NumberOfPoints=\"%u\" NumberOfCells=\"%u\">\n", 
+  	no_points, no_cells );
+  fputs( "<CellData Scalars=\"scalars\">\n", fp );
 
-  int count = 0;
-  for (scalar s in list) {
-    fprintf (fp,"\t\t\t\t <DataArray type=\"Float64\" Name=\"%s\" format=\"appended\" offset=\"%d\">\n", s.name,count);
-    count += ((no_cells)+1)*8;
-    fputs ("\t\t\t\t </DataArray>\n", fp);
+  uint64_t count = 0;
+  for (scalar s in list) 
+  {
+    fprintf( fp,"<DataArray type=\"%s\" Name=\"%s\" "
+    	"format=\"appended\" offset=\"%lu\">\n", PARAVIEW_DATANAME, 
+	s.name, count );
+    count += (uint64_t)no_cells * sizeof(PARAVIEW_DATATYPE) + sizeof(uint64_t);
+    fputs( "</DataArray>\n", fp );
   }
-  for (vector v in vlist) {
-    fprintf (fp,"\t\t\t\t <DataArray type=\"Float64\" Name=\"%s\" NumberOfComponents=\"3\"  format=\"appended\" offset=\"%d\">\n", v.x.name,count);
-    count += ((no_cells*3)+1)*8;
-    fputs ("\t\t\t\t </DataArray>\n", fp);
+  for (vector v in vlist) 
+  {
+    char* paraview_name;
+    size_t trunc_len = (size_t)(strlen(v.x.name) - 2);
+    paraview_name = malloc((trunc_len + 1) * sizeof(char));
+    strncpy( paraview_name, v.x.name, trunc_len );
+    paraview_name[trunc_len] = '\0';
+    fprintf( fp,"<DataArray type=\"%s\" Name=\"%s\" "
+    	"NumberOfComponents=\"3\" format=\"appended\" offset=\"%lu\">\n", 
+	PARAVIEW_DATANAME, paraview_name, count );
+    count += 3 * (uint64_t)no_cells * sizeof(PARAVIEW_DATATYPE) 
+    	+ sizeof(uint64_t);
+    fputs( "</DataArray>\n", fp );
+    free( paraview_name );    
   }
-  fputs ("\t\t\t </CellData>\n", fp);
-  fputs ("\t\t\t <Points>\n", fp);
-  fprintf (fp,"\t\t\t\t <DataArray type=\"Float64\" NumberOfComponents=\"3\"  format=\"appended\" offset=\"%d\">\n",count);
-  count += ((no_points*3)+1)*8;
-  fputs ("\t\t\t\t </DataArray>\n", fp);
-  fputs ("\t\t\t </Points>\n", fp);
-  fputs ("\t\t\t <Cells>\n", fp);
-  fputs ("\t\t\t\t <DataArray type=\"Int64\" Name=\"connectivity\" format=\"ascii\">\n", fp);
-  foreach(serial, noauto){
-#if dimension == 2
-// Edit OLAND:
-    // %g will turn into scientific notation for high integer values. this does not work with paraview
-    //fprintf (fp, "%g %g %g %g \n", marker[], marker[1,0], marker[1,1], marker[0,1]);
-    int ape1 = marker[];
-    int ape2 = marker[1,0];
-    int ape3 = marker[1,1];
-    int ape4 = marker[0,1];
-    fprintf (fp, "%u %u %u %u \n", ape1, ape2, ape3, ape4);
-#endif
-#if dimension == 3
-    // Edit OLAND:
-    // %g will turn into scientific notation for high integer values. this does not work with paraview
-    //fprintf (fp, "%g %g %g %g %g %g %g %g\n", marker[], marker[1,0,0], marker[1,1,0], marker[0,1,0],marker[0,0,1], marker[1,0,1], marker[1,1,1], marker[0,1,1]);
-    int ape1 = marker[];
-    int ape2 = marker[1,0,0];
-    int ape3 = marker[1,1,0];
-    int ape4 = marker[0,1,0];
-    int ape5 = marker[0,0,1];
-    int ape6 = marker[1,0,1];
-    int ape7 = marker[1,1,1];
-    int ape8 = marker[0,1,1];
-    fprintf (fp, "%u %u %u %u %u %u %u %u\n", ape1, ape2, ape3, ape4, ape5, ape6, ape7, ape8);
-#endif
-  }
-  fputs ("\t\t\t\t </DataArray>\n", fp);
-  fputs ("\t\t\t\t <DataArray type=\"Int64\" Name=\"offsets\" format=\"ascii\">\n", fp);
-  for (int i = 1; i < no_cells+1; i++){
-#if dimension == 2
-    fprintf (fp, "%d \n", i*4);
-#endif
-#if dimension == 3
-    fprintf (fp, "%d \n", i*8);
-#endif
-  }
-  fputs ("\t\t\t\t </DataArray>\n", fp);
-  fputs ("\t\t\t\t <DataArray type=\"UInt8\" Name=\"types\" format=\"ascii\">\n", fp);
-  foreach(serial, noauto){
-#if dimension == 2
-    fputs ("9 \n", fp);
-#endif
-#if dimension == 3
-    fputs ("12 \n", fp);
-#endif
-  }
-  fputs ("\t\t\t\t </DataArray>\n", fp);
-  fputs ("\t\t\t </Cells>\n", fp);
-  fputs ("\t\t </Piece>\n", fp);
-  fputs ("\t </UnstructuredGrid>\n", fp);
-  fputs ("\t <AppendedData encoding=\"raw\">\n", fp);
-  fputs ("_", fp);
-  unsigned long long block_len=no_cells*8;
-#if dimension == 2
-  double vz=0;
-#endif
-  for (scalar s in list) {
-    fwrite (&block_len, sizeof (unsigned long long), 1, fp);
+  fputs( "</CellData>\n", fp );
+  fputs( "<Points>\n", fp );
+  fprintf( fp, "<DataArray type=\"%s\" NumberOfComponents=\"3\" "
+  	"format=\"appended\" offset=\"%lu\">\n", PARAVIEW_DATANAME, count );
+  count += 3 * (uint64_t)no_points * sizeof(PARAVIEW_DATATYPE) 
+  	+ sizeof(uint64_t);
+  fputs( "</DataArray>\n", fp );
+  fputs( "</Points>\n", fp );
+  fputs( "<Cells>\n", fp );
+  fprintf( fp,"<DataArray type=\"UInt32\" Name=\"connectivity\" "
+  	"format=\"appended\" offset=\"%lu\"/>\n", count );
+  count += (uint64_t)no_cells * NVERTCELL * sizeof(uint32_t) 
+  	+ sizeof(uint64_t);
+  fprintf( fp, "<DataArray type=\"UInt32\" Name=\"offsets\" "
+  	"format=\"appended\" offset=\"%lu\"/>\n", count );
+  count +=  (uint64_t)no_cells * sizeof(uint32_t) + sizeof(uint64_t);  
+  fprintf( fp, "<DataArray type=\"UInt8\" Name=\"types\" format=\"appended\" "
+  	"offset=\"%lu\"/>\n", count );
+  count +=  (uint64_t)no_cells * sizeof(uint8_t) + sizeof(uint64_t);  
+  fputs( "</Cells>\n", fp );
+  fputs( "</Piece>\n", fp );
+  fputs( "</UnstructuredGrid>\n", fp );
+  fputs( "<AppendedData encoding=\"raw\">\n", fp );
+  fputs( "_", fp );
+  uint64_t block_len = (uint64_t)no_cells * sizeof(PARAVIEW_DATATYPE);
+# if dimension == 2
+    PARAVIEW_DATATYPE vz = 0.;
+# endif
+  PARAVIEW_DATATYPE fieldval = 0., vcoord = 0.;
+  for (scalar s in list) 
+  {
+    fwrite( &block_len, sizeof(uint64_t), 1, fp );
     foreach(serial, noauto)
-      fwrite (&val(s), sizeof (double), 1, fp);
-  }
-  block_len=no_cells*8*3;
-  for (vector v in vlist) {
-    fwrite (&block_len, sizeof (unsigned long long), 1, fp);
-    foreach(serial, noauto){
-      fwrite (&val(v.x), sizeof (double), 1, fp);
-      fwrite (&val(v.y), sizeof (double), 1, fp);
-#if dimension == 2
-      fwrite (&vz, sizeof (double), 1, fp);
-#endif
-#if dimension == 3
-      fwrite (&val(v.z), sizeof (double), 1, fp);
-#endif
+    {
+      fieldval = (PARAVIEW_DATATYPE)(val(s));
+      fwrite( &fieldval, sizeof(PARAVIEW_DATATYPE), 1, fp );
     }
   }
-  block_len=no_points*8*3;
-  fwrite (&block_len, sizeof (unsigned long long), 1, fp);
-  foreach_vertex(serial, noauto){
-    fwrite (&x, sizeof (double), 1, fp);
-    fwrite (&y, sizeof (double), 1, fp);
-    fwrite (&z, sizeof (double), 1, fp);
+  block_len = no_cells * 3 * sizeof(PARAVIEW_DATATYPE);
+  for (vector v in vlist) 
+  {
+    fwrite( &block_len, sizeof(uint64_t), 1, fp );
+    foreach(serial, noauto)
+    {
+      fieldval = (PARAVIEW_DATATYPE)(val(v.x));
+      fwrite( &fieldval, sizeof(PARAVIEW_DATATYPE), 1, fp );
+      fieldval = (PARAVIEW_DATATYPE)(val(v.y));      
+      fwrite( &fieldval, sizeof(PARAVIEW_DATATYPE), 1, fp );
+#     if dimension == 2        
+	fwrite( &vz, sizeof(PARAVIEW_DATATYPE), 1, fp );
+#     endif
+#     if dimension == 3
+        fieldval = (PARAVIEW_DATATYPE)(val(v.z));
+	fwrite( &fieldval, sizeof(PARAVIEW_DATATYPE), 1, fp );
+#     endif
+    }
   }
-  fputs ("\t\n", fp);
-  fputs ("\t </AppendedData>\n", fp);
-  fputs ("</VTKFile>\n", fp);
-  fflush (fp);
-#if defined(_OPENMP)
-  omp_set_num_threads(num_omp);
-#endif
+  block_len = no_points * 3 * sizeof(PARAVIEW_DATATYPE);
+  fwrite( &block_len, sizeof(uint64_t), 1, fp );
+  foreach_vertex(serial, noauto)
+  {
+    vcoord = (PARAVIEW_DATATYPE)(x);
+    fwrite( &vcoord, sizeof(PARAVIEW_DATATYPE), 1, fp );
+    vcoord = (PARAVIEW_DATATYPE)(y);    
+    fwrite( &vcoord, sizeof(PARAVIEW_DATATYPE), 1, fp );
+    vcoord = (PARAVIEW_DATATYPE)(z);     
+    fwrite( &vcoord, sizeof(PARAVIEW_DATATYPE), 1, fp );
+  }
+  // Additional duplicated vertices in case of periodicity
+  PARAVIEW_DATATYPE supvertex[3];
+  supvertex[2] = 0.;
+  if ( Period.x || Period.y || Period.z )
+  {
+    foreach(serial, noauto)
+      if ( per_mask[] < 0.5 )
+      {
+        for (size_t j=0;j<NVERTCELL;j++)
+	{
+	  supvertex[0] = (PARAVIEW_DATATYPE)(x + percelldir[j].x * Delta);
+	  supvertex[1] = (PARAVIEW_DATATYPE)(y + percelldir[j].y * Delta);	
+#         if dimension == 3
+	    supvertex[2] = (PARAVIEW_DATATYPE)(z + percelldir[j].z * Delta);
+#         endif	    
+	  for (unsigned int k=0;k<3;k++)  
+	    fwrite( &(supvertex[k]), sizeof(PARAVIEW_DATATYPE), 1, fp );
+	}	  
+      }
+    free( percelldir );  
+  }
+  block_len = (uint64_t)no_cells * NVERTCELL * sizeof(uint32_t);
+  fwrite( &block_len, sizeof(uint64_t), 1, fp );
+  uint32_t connectivity[NVERTCELL];
+  foreach(serial, noauto)
+  {
+    if ( per_mask[] )
+    {
+#     if dimension == 2
+        connectivity[0] = (uint32_t)(marker[]);
+        connectivity[1] = (uint32_t)(marker[1,0]);
+        connectivity[2] = (uint32_t)(marker[1,1]);
+        connectivity[3] = (uint32_t)(marker[0,1]);
+#     endif
+#     if dimension == 3
+        connectivity[0] = (uint32_t)(marker[]);
+        connectivity[1] = (uint32_t)(marker[1,0,0]);
+        connectivity[2] = (uint32_t)(marker[1,1,0]);
+        connectivity[3] = (uint32_t)(marker[0,1,0]);
+        connectivity[4] = (uint32_t)(marker[0,0,1]);
+        connectivity[5] = (uint32_t)(marker[1,0,1]);
+        connectivity[6] = (uint32_t)(marker[1,1,1]);
+        connectivity[7] = (uint32_t)(marker[0,1,1]);
+#     endif
+    }
+    // Additional duplicated vertices
+    else
+    {
+#     if dimension == 2
+        connectivity[0] = vertexnum++;
+        connectivity[1] = vertexnum++;
+        connectivity[2] = vertexnum++;
+        connectivity[3] = vertexnum++;
+#     endif
+#     if dimension == 3
+        connectivity[0] = vertexnum++;
+        connectivity[1] = vertexnum++;
+        connectivity[2] = vertexnum++;
+        connectivity[3] = vertexnum++;
+        connectivity[4] = vertexnum++;
+        connectivity[5] = vertexnum++;
+        connectivity[6] = vertexnum++;
+        connectivity[7] = vertexnum++;
+#     endif
+    }    
+    fwrite( &connectivity, sizeof(uint32_t), NVERTCELL, fp );  
+  }
+  block_len = (uint64_t)no_cells * sizeof(uint32_t);
+  fwrite( &block_len, sizeof(uint64_t), 1, fp );
+  uint32_t offset = 0;
+  for (uint32_t i = 1; i < no_cells+1; i++)
+  {
+    offset = i * NVERTCELL;
+    fwrite( &offset, sizeof(uint32_t), 1, fp );
+  } 
+  block_len = (uint64_t)no_cells * sizeof(uint8_t);
+  fwrite( &block_len, sizeof(uint64_t), 1, fp );
+  uint8_t ctype = CELLTYPE;
+  for (uint32_t i = 1; i < no_cells+1; i++)
+    fwrite( &ctype, sizeof(uint8_t), 1, fp );      
+  fputs( "\n", fp );
+  fputs( "</AppendedData>\n", fp );
+  fputs( "</VTKFile>\n", fp );
+  fflush( fp );
+# if defined(_OPENMP)
+    omp_set_num_threads( num_omp );
+# endif
 }
+
+
+
+
+# if _MPI
+// Returns the number of digits in an integer number up to 99999999999
+uint8_t count_revifs( uint64_t n ) 
+{
+  if (n > 9999999999) return 11;
+  if (n > 999999999) return 10;
+  if (n > 99999999) return 9;
+  if (n > 9999999) return 8;
+  if (n > 999999) return 7;
+  if (n > 99999) return 6;
+  if (n > 9999) return 5;
+  if (n > 999) return 4;
+  if (n > 99) return 3;
+  if (n > 9) return 2;
+  return 1;
+}
+
+
+
+
+/**
+# output_vtu_ascii_foreach_MPIIO
+This function writes a single XML VTK file regardless of the number of processes
+of type unstructured grid (*.vtu) which can be read using Paraview, using MPI IO
+functions. File stores scalar and vector fields defined at the center points. 
+Results are written in ASCII format.
+*/
+void output_vtu_ascii_foreach_MPIIO( scalar* list, vector* vlist, 
+	char* filename )
+{
+  MPI_File file;
+  MPI_Status status;
+  MPI_Datatype num_as_string;
+  char fmt[8] = "%12.5e ";
+  char endfmt[8] = "%12.5e\n";
+  const int charspernum = 13;
+  uint64_t counter = 0; 
+  char header[1000],line[200];
+  uint32_t nprocs = npe(), i, j, m, rank = pid();  
+  
+  // Create a MPI datatype to write doublea as strings with a given format
+  MPI_Type_contiguous( charspernum, MPI_CHAR, &num_as_string ); 
+  MPI_Type_commit( &num_as_string );
+
+  // Open the file 
+  MPI_File_open( MPI_COMM_WORLD, filename, 
+  	MPI_MODE_CREATE | MPI_MODE_WRONLY,
+	MPI_INFO_NULL, &file );
+
+  vertex scalar marker[];
+  // We use uint64_t for the 3 following variables to avoid excessive casting 
+  uint64_t no_points = 0, no_cells = 0, vertexnum = 0, length = 0,
+  	vertexnumref = 0;
+
+  // In case of periodicity
+  scalar per_mask[];
+  foreach(serial, noauto) per_mask[] = 1.; 
+  coord* percelldir = NULL;
+  if ( Period.x || Period.y || Period.z )
+  {  
+    percelldir = init_percelldir();
+    foreach(serial, noauto)
+    {
+      if ( Period.x )
+        if ( x + Delta > X0 + L0 || x - Delta < X0 )
+          per_mask[] = 0.;
+#     if dimension > 1
+        if ( Period.y )
+          if ( y + Delta > Y0 + L0 ||  y - Delta < Y0 )
+            per_mask[] = 0.;
+#     endif
+#     if dimension > 2
+        if ( Period.z )
+          if ( z + Delta > Z0 + L0 || z - Delta < Z0 )
+            per_mask[] = 0.;
+#     endif
+    }
+  }
+
+  foreach_vertex(serial, noauto)
+  {
+    marker[] = vertexnum++;
+    no_points += 1;  
+  }
+  foreach(serial, noauto)
+  {
+    // Additional (duplicated) vertices per cell that have a face belonging to a
+    // periodic face of the whole domain
+    if ( per_mask[] < 0.5 ) no_points += NVERTCELL;
+    
+    // Number of cells on this process
+    no_cells += 1;
+  }
+
+  
+  // Points and cells on all processes
+  uint64_t total_nbpts;
+  MPI_Allreduce( &no_points, &total_nbpts, 1, MPI_UINT64_T, MPI_SUM, 
+  	MPI_COMM_WORLD );
+  uint64_t total_nbcells;
+  MPI_Allreduce( &no_cells, &total_nbcells, 1, MPI_UINT64_T, MPI_SUM, 
+  	MPI_COMM_WORLD );  
+  uint64_t* nbpts_per_proc = (uint64_t*) calloc( nprocs, sizeof(uint64_t) );
+  uint64_t* nbcells_per_proc = (uint64_t*) calloc( nprocs, sizeof(uint64_t) );
+  MPI_Allgather( &no_points, 1, MPI_UINT64_T, nbpts_per_proc, 1, MPI_UINT64_T, 
+  	MPI_COMM_WORLD );
+  MPI_Allgather( &no_cells, 1, MPI_UINT64_T, nbcells_per_proc, 1, MPI_UINT64_T, 
+  	MPI_COMM_WORLD );	
+
+
+  // Header
+  sprintf( header, "<?xml version=\"1.0\"?>\n"
+  	"<VTKFile type=\"UnstructuredGrid\" version=\"1.0\" "
+  	"byte_order=\"LittleEndian\" header_type=\"UInt64\">\n" );
+  strcat( header, "<UnstructuredGrid>\n" );  
+  sprintf( line, "<Piece NumberOfPoints=\"%lu\" NumberOfCells=\"%lu\">\n", 
+  	total_nbpts, total_nbcells );	
+  strcat( header, line );
+  sprintf( line, "<Points>\n" );
+  strcat( header, line );
+  sprintf( line, "<DataArray type=\"%s\" "
+  	"NumberOfComponents=\"3\" format=\"ascii\">\n", PARAVIEW_DATANAME );
+  strcat( header, line );	
+  if ( rank == 0 )
+    MPI_File_write( file, header, strlen(header), MPI_CHAR, &status );  
+
+
+  // Write point coordinates to the MPI file
+  char* pts_coord = (char*) calloc( dimension * no_points * charspernum + 1, 
+  	sizeof(char) ); 
+  foreach_vertex(serial, noauto)
+  {
+#   if dimension == 2
+      sprintf( &pts_coord[2*counter*charspernum], fmt, x );
+      sprintf( &pts_coord[(2*counter+1)*charspernum], endfmt, y );      
+#   endif
+#   if dimension == 3
+      sprintf( &pts_coord[3*counter*charspernum], fmt, x );
+      sprintf( &pts_coord[(3*counter+1)*charspernum], fmt, y );
+      sprintf( &pts_coord[(3*counter+2)*charspernum], endfmt, z );      
+#   endif
+    ++counter;
+  }
+  // Additional duplicated vertices in case of periodicity
+  coord supvertex = {0., 0., 0.};
+  if ( Period.x || Period.y || Period.z )
+  {
+    foreach(serial, noauto)
+      if ( per_mask[] < 0.5 )
+      {
+#       if dimension == 2
+          for (size_t j=0;j<4;j++)
+	  {
+	    supvertex.x = x + percelldir[j].x * Delta;
+	    supvertex.y = y + percelldir[j].y * Delta;	    
+            sprintf( &pts_coord[2*counter*charspernum], fmt, supvertex.x );
+            sprintf( &pts_coord[(2*counter+1)*charspernum], endfmt, 
+	    	supvertex.y );
+	  }		
+#       endif
+#       if dimension == 3
+          for (size_t j=0;j<8;j++)
+	  {
+	    supvertex.x = x + percelldir[j].x * Delta;
+	    supvertex.y = y + percelldir[j].y * Delta;	
+	    supvertex.z = z + percelldir[j].z * Delta;	    	    
+            sprintf( &pts_coord[3*counter*charspernum], fmt, supvertex.x );
+            sprintf( &pts_coord[(3*counter+1)*charspernum], fmt, supvertex.y );
+            sprintf( &pts_coord[(3*counter+2)*charspernum], endfmt, 
+	    	supvertex.z );
+	  }	
+#       endif
+        ++counter;    
+      }
+    free( percelldir );       
+  }
+  
+  uint64_t* mpifile_offsets = (uint64_t*) calloc( nprocs, sizeof(uint64_t) );
+  mpifile_offsets[0] = strlen(header) * sizeof(char);
+  for (i=1;i<nprocs;i++)
+    mpifile_offsets[i] = mpifile_offsets[i-1] 
+    	+ nbpts_per_proc[i-1] * dimension * charspernum * sizeof(char);
+
+  MPI_File_write_at_all( file, mpifile_offsets[pid()], pts_coord, 
+  	dimension * no_points, num_as_string, &status ); 
+
+  free(pts_coord); pts_coord = NULL;   
+
+    
+  // Header for connectivity
+  sprintf( header, "</DataArray>\n</Points>\n<Cells>\n"
+  	"<DataArray type=\"UInt64\" Name=\"connectivity\" "
+	"format=\"ascii\">\n" );
+  uint64_t mpifile_offset = mpifile_offsets[nprocs-1] 
+  	+ nbpts_per_proc[nprocs-1] * dimension * charspernum * sizeof(char);
+  if ( rank == 0 )
+    MPI_File_write_at( file, mpifile_offset, header, strlen(header),
+    	MPI_CHAR, &status ); 
+
+  // Compute the point number shifts 
+  uint64_t* shift = (uint64_t*) calloc( nprocs, sizeof(uint64_t) );
+  for (m=1;m<nprocs;m++)
+    for (j=0;j<m;j++)
+      shift[m] += nbpts_per_proc[j];
+
+  // Length of the connectivity string
+  vertexnumref = vertexnum;
+  foreach(serial, noauto)
+    if ( per_mask[] )
+    {
+#     if dimension == 2
+        uint64_t ape1 = (uint64_t)marker[] + shift[rank];
+        uint64_t ape2 = (uint64_t)marker[1,0] + shift[rank];
+        uint64_t ape3 = (uint64_t)marker[1,1] + shift[rank];
+        uint64_t ape4 = (uint64_t)marker[0,1] + shift[rank];
+	length += count_revifs( ape1 ) + count_revifs( ape2 )
+		+ count_revifs( ape3 ) + count_revifs( ape4 ) + 4;		
+#     endif
+#     if dimension == 3
+        uint64_t ape1 = (uint64_t)marker[] + shift[rank];
+        uint64_t ape2 = (uint64_t)marker[1,0,0] + shift[rank];
+        uint64_t ape3 = (uint64_t)marker[1,1,0] + shift[rank];
+        uint64_t ape4 = (uint64_t)marker[0,1,0] + shift[rank];
+        uint64_t ape5 = (uint64_t)marker[0,0,1] + shift[rank];
+        uint64_t ape6 = (uint64_t)marker[1,0,1] + shift[rank];
+        uint64_t ape7 = (uint64_t)marker[1,1,1] + shift[rank];
+        uint64_t ape8 = (uint64_t)marker[0,1,1] + shift[rank];
+	length += count_revifs( ape1 ) + count_revifs( ape2 )
+		+ count_revifs( ape3 ) + count_revifs( ape4 ) 
+		+ count_revifs( ape5 ) + count_revifs( ape7 )
+		+ count_revifs( ape6 ) + count_revifs( ape8 ) + 8;
+#     endif
+    }
+    // Additional duplicated vertices
+    else
+    {
+#     if dimension == 2
+        uint64_t ape1 = vertexnum + shift[rank]; vertexnum++;
+        uint64_t ape2 = vertexnum + shift[rank]; vertexnum++;
+        uint64_t ape3 = vertexnum + shift[rank]; vertexnum++;
+        uint64_t ape4 = vertexnum + shift[rank]; vertexnum++;
+	length += count_revifs( ape1 ) + count_revifs( ape2 )
+		+ count_revifs( ape3 ) + count_revifs( ape4 ) + 4;    
+#     endif
+#     if dimension == 3
+        uint64_t ape1 = vertexnum + shift[rank]; vertexnum++;
+        uint64_t ape2 = vertexnum + shift[rank]; vertexnum++;
+        uint64_t ape3 = vertexnum + shift[rank]; vertexnum++;
+        uint64_t ape4 = vertexnum + shift[rank]; vertexnum++;
+        uint64_t ape5 = vertexnum + shift[rank]; vertexnum++;
+        uint64_t ape6 = vertexnum + shift[rank]; vertexnum++;
+        uint64_t ape7 = vertexnum + shift[rank]; vertexnum++;
+        uint64_t ape8 = vertexnum + shift[rank]; vertexnum++;
+	length += count_revifs( ape1 ) + count_revifs( ape2 )
+		+ count_revifs( ape3 ) + count_revifs( ape4 ) 
+		+ count_revifs( ape5 ) + count_revifs( ape7 )
+		+ count_revifs( ape6 ) + count_revifs( ape8 ) + 8;
+#     endif
+    }
+  vertexnum = vertexnumref;  
+
+  // Write connectivity
+  char* connectivity = (char*) calloc( length + 1, sizeof(char) ); 
+  counter = 0;  
+  foreach(serial, noauto)
+    if ( per_mask[] )
+    {
+#     if dimension == 2
+        uint64_t ape1 = (uint64_t)marker[] + shift[rank];
+        uint64_t ape2 = (uint64_t)marker[1,0] + shift[rank];
+        uint64_t ape3 = (uint64_t)marker[1,1] + shift[rank];
+        uint64_t ape4 = (uint64_t)marker[0,1] + shift[rank];
+	sprintf( &connectivity[counter], "%lu ", ape1 );
+        counter += count_revifs( ape1 ) + 1;
+	sprintf( &connectivity[counter], "%lu ", ape2 );
+        counter += count_revifs( ape2 ) + 1;
+	sprintf( &connectivity[counter], "%lu ", ape3 );
+        counter += count_revifs( ape3 ) + 1;
+	sprintf( &connectivity[counter], "%lu ", ape4 );
+        counter += count_revifs( ape4 ) + 1;		
+#     endif
+#     if dimension == 3
+        uint64_t ape1 = (uint64_t)marker[] + shift[rank];
+        uint64_t ape2 = (uint64_t)marker[1,0,0] + shift[rank];
+        uint64_t ape3 = (uint64_t)marker[1,1,0] + shift[rank];
+        uint64_t ape4 = (uint64_t)marker[0,1,0] + shift[rank];
+        uint64_t ape5 = (uint64_t)marker[0,0,1] + shift[rank];
+        uint64_t ape6 = (uint64_t)marker[1,0,1] + shift[rank];
+        uint64_t ape7 = (uint64_t)marker[1,1,1] + shift[rank];
+        uint64_t ape8 = (uint64_t)marker[0,1,1] + shift[rank];
+	sprintf( &connectivity[counter], "%lu ", ape1 );
+        counter += count_revifs( ape1 ) + 1;
+	sprintf( &connectivity[counter], "%lu ", ape2 );
+        counter += count_revifs( ape2 ) + 1;
+	sprintf( &connectivity[counter], "%lu ", ape3 );
+        counter += count_revifs( ape3 ) + 1;
+	sprintf( &connectivity[counter], "%lu ", ape4 );
+        counter += count_revifs( ape4 ) + 1;
+	sprintf( &connectivity[counter], "%lu ", ape5 );
+        counter += count_revifs( ape5 ) + 1;
+	sprintf( &connectivity[counter], "%lu ", ape6 );
+        counter += count_revifs( ape6 ) + 1;
+	sprintf( &connectivity[counter], "%lu ", ape7 );
+        counter += count_revifs( ape7 ) + 1;
+	sprintf( &connectivity[counter], "%lu ", ape8 );
+        counter += count_revifs( ape8 ) + 1;		
+#     endif
+    }
+    // Additional duplicated vertices
+    else
+    {
+#     if dimension == 2
+        uint64_t ape1 = vertexnum + shift[rank]; vertexnum++;
+        uint64_t ape2 = vertexnum + shift[rank]; vertexnum++;
+        uint64_t ape3 = vertexnum + shift[rank]; vertexnum++;
+        uint64_t ape4 = vertexnum + shift[rank]; vertexnum++;
+	sprintf( &connectivity[counter], "%lu ", ape1 );
+        counter += count_revifs( ape1 ) + 1;
+	sprintf( &connectivity[counter], "%lu ", ape2 );
+        counter += count_revifs( ape2 ) + 1;
+	sprintf( &connectivity[counter], "%lu ", ape3 );
+        counter += count_revifs( ape3 ) + 1;
+	sprintf( &connectivity[counter], "%lu ", ape4 );
+        counter += count_revifs( ape4 ) + 1;     
+#     endif
+#     if dimension == 3
+        uint64_t ape1 = vertexnum + shift[rank]; vertexnum++;
+        uint64_t ape2 = vertexnum + shift[rank]; vertexnum++;
+        uint64_t ape3 = vertexnum + shift[rank]; vertexnum++;
+        uint64_t ape4 = vertexnum + shift[rank]; vertexnum++;
+        uint64_t ape5 = vertexnum + shift[rank]; vertexnum++;
+        uint64_t ape6 = vertexnum + shift[rank]; vertexnum++;
+        uint64_t ape7 = vertexnum + shift[rank]; vertexnum++;
+        uint64_t ape8 = vertexnum + shift[rank]; vertexnum++;
+	sprintf( &connectivity[counter], "%lu ", ape1 );
+        counter += count_revifs( ape1 ) + 1;
+	sprintf( &connectivity[counter], "%lu ", ape2 );
+        counter += count_revifs( ape2 ) + 1;
+	sprintf( &connectivity[counter], "%lu ", ape3 );
+        counter += count_revifs( ape3 ) + 1;
+	sprintf( &connectivity[counter], "%lu ", ape4 );
+        counter += count_revifs( ape4 ) + 1; 
+	sprintf( &connectivity[counter], "%lu ", ape5 );
+        counter += count_revifs( ape5 ) + 1;
+	sprintf( &connectivity[counter], "%lu ", ape6 );
+        counter += count_revifs( ape6 ) + 1;
+	sprintf( &connectivity[counter], "%lu ", ape7 );
+        counter += count_revifs( ape7 ) + 1;
+	sprintf( &connectivity[counter], "%lu ", ape8 );
+        counter += count_revifs( ape8 ) + 1;
+#     endif
+    }
+
+  uint64_t out_length = counter;
+  uint64_t* out_length_per_proc = (uint64_t*) calloc( nprocs, 
+  	sizeof(uint64_t) );
+  MPI_Allgather( &out_length, 1, MPI_UINT64_T, out_length_per_proc, 1, 
+  	MPI_UINT64_T, MPI_COMM_WORLD );
+  
+  mpifile_offsets[0] = mpifile_offset + strlen(header) * sizeof(char);
+  for (i=1;i<nprocs;i++)
+    mpifile_offsets[i] = mpifile_offsets[i-1] 
+    	+ out_length_per_proc[i-1] * sizeof(char) ;
+
+  MPI_File_write_at_all( file, mpifile_offsets[rank], connectivity, 
+  	out_length, MPI_CHAR, &status );   
+
+  free(connectivity); connectivity = NULL;  
+
+
+  // Header for offset
+  sprintf( header, "\n</DataArray>\n<DataArray type=\"UInt64\" Name=\"offsets\""
+  	" format=\"ascii\">\n" );
+  mpifile_offset = mpifile_offsets[nprocs-1] 
+  	+ out_length_per_proc[nprocs-1] * sizeof(char);
+  if ( rank == 0 )
+    MPI_File_write_at( file, mpifile_offset, header, strlen(header),
+    	MPI_CHAR, &status );
+
+  // Compute the offset shifts 
+  for (m=1;m<nprocs;m++)
+  {
+    shift[m] = 0;
+    for (j=0;j<m;j++)
+      shift[m] += NVERTCELL * nbcells_per_proc[j];
+  }
+
+  // Length of the offset string
+  length = 0;
+  for (i = 1; i < no_cells+1; i++)
+    length += count_revifs( i * NVERTCELL + shift[rank] ) + 1; 
+
+  // Write offset
+  char* offset = (char*) calloc( length + 1, sizeof(char) ); 
+  counter = 0;
+  for (i = 1; i < no_cells+1; i++)
+  {
+    sprintf( &offset[counter], "%lu ", i * NVERTCELL + shift[rank] );
+    counter += count_revifs( i * NVERTCELL + shift[rank] ) + 1;
+  }
+  
+  out_length = counter;
+  MPI_Allgather( &out_length, 1, MPI_UINT64_T, out_length_per_proc, 1, 
+  	MPI_UINT64_T, MPI_COMM_WORLD );
+  
+  mpifile_offsets[0] = mpifile_offset + strlen(header) * sizeof(char);
+  for (i=1;i<nprocs;i++)
+    mpifile_offsets[i] = mpifile_offsets[i-1] 
+    	+ out_length_per_proc[i-1] * sizeof(char) ;
+
+  MPI_File_write_at_all( file, mpifile_offsets[rank], offset, 
+  	out_length, MPI_CHAR, &status );   
+
+  free(offset); offset = NULL;
+    
+
+  // Header for types
+  sprintf( header, "\n</DataArray>\n<DataArray type=\"UInt8\" Name=\"types\" "
+  	"format=\"ascii\">\n" );	
+  mpifile_offset = mpifile_offsets[nprocs-1] 
+  	+ out_length_per_proc[nprocs-1] * sizeof(char);
+  if ( rank == 0 )
+    MPI_File_write_at( file, mpifile_offset, header, strlen(header),
+    	MPI_CHAR, &status );
+
+  // Length of the type string
+  length = no_cells * dimension;
+
+  // Write types
+  char* types = (char*) calloc( length + 1, sizeof(char) ); 
+  counter = 0;
+  for (i = 0; i < no_cells; i++)
+  {
+    sprintf( &types[counter], "%hu ", CELLTYPE );
+    counter += dimension;
+  }
+  
+  out_length = counter;
+  MPI_Allgather( &out_length, 1, MPI_UINT64_T, out_length_per_proc, 1, 
+  	MPI_UINT64_T, MPI_COMM_WORLD );
+  
+  mpifile_offsets[0] = mpifile_offset + strlen(header) * sizeof(char);
+  for (i=1;i<nprocs;i++)
+    mpifile_offsets[i] = mpifile_offsets[i-1] 
+    	+ out_length_per_proc[i-1] * sizeof(char) ;
+
+  MPI_File_write_at_all( file, mpifile_offsets[rank], types, 
+  	out_length, MPI_CHAR, &status );   
+
+  free(types); types = NULL;
+
+
+  // Header for field values
+  sprintf( header, 
+  	"\n</DataArray>\n</Cells>\n<CellData Scalars=\"scalars\">\n" );
+  mpifile_offset = mpifile_offsets[nprocs-1] 
+  	+ out_length_per_proc[nprocs-1] * sizeof(char);
+  if ( rank == 0 )
+    MPI_File_write_at( file, mpifile_offset, header, strlen(header),
+    	MPI_CHAR, &status );  
+
+
+  // Write for each scalar field 
+  char* scalar_data = (char*) calloc( no_cells * charspernum + 1, 
+  	sizeof(char) );    
+  for (scalar s in list) 
+  {
+    mpifile_offset += strlen(header) * sizeof(char);    
+    sprintf( header, "<DataArray type=\"%s\" Name=\"%s\" "
+    	"format=\"ascii\">\n", PARAVIEW_DATANAME, s.name );    
+    if ( rank == 0 )
+      MPI_File_write_at( file, mpifile_offset, header, strlen(header),
+    	MPI_CHAR, &status );  
+
+    counter = 0;
+    foreach(serial, noauto)
+    {
+      sprintf( &scalar_data[counter*charspernum], endfmt, val(s) );
+      ++counter;
+    }
+    
+    mpifile_offsets[0] = mpifile_offset + strlen(header) * sizeof(char);
+    for (i=1;i<nprocs;i++)
+      mpifile_offsets[i] = mpifile_offsets[i-1] 
+    	+ nbcells_per_proc[i-1] * charspernum * sizeof(char);
+
+    MPI_File_write_at_all( file, mpifile_offsets[pid()], scalar_data, 
+  	no_cells, num_as_string, &status );     
+
+    sprintf( header, "</DataArray>\n" );
+    mpifile_offset = mpifile_offsets[nprocs-1] 
+  	+ nbcells_per_proc[nprocs-1] * charspernum * sizeof(char);
+    if ( rank == 0 )
+      MPI_File_write_at( file, mpifile_offset, header, strlen(header),
+    	MPI_CHAR, &status ); 	
+  }
+  
+  free(scalar_data); scalar_data = NULL;
+    
+  char* vector_data = (char*) calloc( no_cells * dimension * charspernum + 1, 
+  	sizeof(char) );    
+  for (vector v in vlist) 
+  {
+    char* paraview_name;
+    size_t trunc_len = (size_t)(strlen(v.x.name) - 2);
+    paraview_name = malloc((trunc_len + 1) * sizeof(char));
+    strncpy( paraview_name, v.x.name, trunc_len );
+    paraview_name[trunc_len] = '\0';
+    mpifile_offset += strlen(header) * sizeof(char);    
+    sprintf( header, "<DataArray type=\"%s\" "
+    	"NumberOfComponents=\"3\" Name=\"%s\" format=\"ascii\">\n", 
+	PARAVIEW_DATANAME, paraview_name ); 
+    free( paraview_name );   
+    if ( rank == 0 )
+      MPI_File_write_at( file, mpifile_offset, header, strlen(header),
+    	MPI_CHAR, &status );  
+
+    counter = 0;
+    foreach(serial, noauto)
+    {
+#     if dimension == 2
+        sprintf( &vector_data[2*counter*charspernum], fmt, val(v.x) );
+        sprintf( &vector_data[(2*counter+1)*charspernum], endfmt, val(v.y) );
+#     endif
+#     if dimension == 3
+        sprintf( &vector_data[3*counter*charspernum], fmt, val(v.x) );
+        sprintf( &vector_data[(3*counter+1)*charspernum], fmt, val(v.y) );
+        sprintf( &vector_data[(3*counter+2)*charspernum], endfmt, val(v.z) );
+#     endif
+      ++counter;
+    }
+    
+    mpifile_offsets[0] = mpifile_offset + strlen(header) * sizeof(char);
+    for (i=1;i<nprocs;i++)
+      mpifile_offsets[i] = mpifile_offsets[i-1] 
+    	+ nbcells_per_proc[i-1] * dimension * charspernum * sizeof(char);
+
+    MPI_File_write_at_all( file, mpifile_offsets[pid()], vector_data, 
+  	dimension * no_cells, num_as_string, &status );     
+
+    sprintf( header, "</DataArray>\n" );
+    mpifile_offset = mpifile_offsets[nprocs-1] 
+  	+ nbcells_per_proc[nprocs-1] * dimension * charspernum * sizeof(char);
+    if ( rank == 0 )
+      MPI_File_write_at( file, mpifile_offset, header, strlen(header),
+    	MPI_CHAR, &status );     
+  }
+
+  free(vector_data); vector_data = NULL;
+  
+  // Closing text
+  mpifile_offset += strlen(header) * sizeof(char);
+  sprintf( header, 
+  	"</CellData>\n</Piece>\n</UnstructuredGrid>\n</VTKFile>\n" ); 	   
+  if ( rank == 0 )
+    MPI_File_write_at( file, mpifile_offset, header, strlen(header),
+    	MPI_CHAR, &status );    
+  
+  
+  // Close MPI file and free remaining pointers
+  MPI_File_close( &file );
+  MPI_Type_free( &num_as_string ); 
+  free(nbpts_per_proc); nbpts_per_proc = NULL;
+  free(nbcells_per_proc); nbcells_per_proc = NULL;
+  free(mpifile_offsets); mpifile_offsets = NULL; 
+  free(out_length_per_proc); out_length_per_proc = NULL;    
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Methods to write binary data
+void check_allocated_binary( uint32_t size )  
+{
+  if ( OFFSET + size >= ALLOCATED ) 
+  {
+    uint32_t new_size = max( 2 * ALLOCATED, (uint32_t)1024 ) ;
+    new_size = max( new_size, 2 * (OFFSET+size) ) ;
+    new_size = 4 * ( new_size / 4 + 1 ) ; // alignment on 4 bytes
+      
+    char* new_buffer = (char*) calloc( new_size, sizeof(char) ); 
+    for( uint32_t i=0 ;i<OFFSET ;i++ ) new_buffer[i] = BUFFER[i] ;
+    if ( BUFFER != 0 ) free(BUFFER) ;
+    BUFFER = new_buffer ;
+    ALLOCATED = new_size ;      
+  }
+}
+
+
+
+
+uint32_t store_uint_binary( uint32_t val )  
+{
+  uint32_t result = OFFSET ;
+  *((uint32_t*)&(BUFFER[OFFSET])) = val ;
+  OFFSET += sizeof(uint32_t)  ;
+  return result ;
+}
+
+
+
+
+void start_output_binary( uint32_t size, uint32_t number )
+{
+  uint32_t current_output_size = size * number ;
+  uint32_t ncomp = current_output_size + ( current_output_size + 999 ) / 1000 
+  	+ 12 + sizeof(uint32_t) ;	
+  check_allocated_binary( ncomp ) ;
+  CURRENT_LENGTH = store_uint_binary( current_output_size ) ;
+}
+
+
+
+
+void write_double_binary( double val )  
+{
+  *((PARAVIEW_DATATYPE*)&(BUFFER[OFFSET])) = (PARAVIEW_DATATYPE)val ;
+  OFFSET += sizeof(PARAVIEW_DATATYPE)  ;
+}
+
+
+
+
+void write_uint_binary( uint32_t val )  
+{
+  *((uint32_t*)&(BUFFER[OFFSET])) = val ;
+  OFFSET += sizeof(uint32_t) ;
+}
+
+
+
+
+void write_uint8_binary( uint8_t val )  
+{
+  *((uint8_t*)&(BUFFER[OFFSET])) = val ;
+  OFFSET += sizeof(uint8_t) ;
+}
+
+
+
+
+void compress_segment_binary( uint32_t seg )  
+{
+   static uint32_t BlockSize = 32768 ;
+   uint32_t size = (uint32_t)(*((uint32_t*)&BUFFER[seg])), i ;
+   
+   uint32_t numFullBlocks = size / BlockSize;
+   uint32_t lastBlockSize = size % BlockSize;
+   uint32_t numBlocks = numFullBlocks + (lastBlockSize?1:0);
+
+   uint32_t headerLength = numBlocks + 3;
+
+   uint32_t* CompressionHeader = (uint32_t*) calloc( headerLength, 
+   	sizeof(uint32_t) ); 
+   CompressionHeader[0] = numBlocks;
+   CompressionHeader[1] = BlockSize;
+   CompressionHeader[2] = lastBlockSize;
+
+   uint64_t encoded_buff_size = max( BlockSize, size )  ;
+   unsigned char* encoded_buff = (unsigned char*) calloc( encoded_buff_size, 
+   	sizeof(unsigned char) ); 
+   uint32_t encoded_offset = 0, block ;
+   for( block=0 ; block<numBlocks ; block++ )
+   {
+      uint32_t buffer_start = seg + sizeof(uint32_t) + block*BlockSize ;
+      uint32_t length = ( block+1<numBlocks || !lastBlockSize ? 
+      	BlockSize : lastBlockSize ) ;
+      unsigned char* to_encode = (unsigned char *)(&BUFFER[buffer_start]) ;
+      unsigned char* encoded = &encoded_buff[encoded_offset] ;
+      uint64_t ncomp = encoded_buff_size - encoded_offset ;
+
+      compress2( (Bytef*)encoded, &ncomp, (const Bytef*)to_encode,
+	length, Z_DEFAULT_COMPRESSION );
+	 
+      CompressionHeader[3+block] = (uint32_t)(ncomp) ;
+      encoded_offset += (uint32_t)(ncomp) ;      
+   }
+   
+   OFFSET = seg ;
+   check_allocated_binary( headerLength * sizeof(uint32_t) + encoded_offset ) ;
+   
+   for( i=0 ; i<headerLength ; i++ )
+      store_uint_binary( CompressionHeader[i] ) ;     
+
+   for( i=0 ; i<encoded_offset ; i++ )
+      BUFFER[OFFSET++] = encoded_buff[i] ;
+
+   if( OFFSET % 4 != 0 )
+      OFFSET = 4 * ( OFFSET / 4 +1 ) ; // Re-alignment
+   
+   free(CompressionHeader); CompressionHeader = NULL;
+   free(encoded_buff); encoded_buff = NULL;
+}
+
+
+
+
+void flush_binary()  
+{
+  compress_segment_binary( CURRENT_LENGTH ) ;         
+}
+// End of Methods to write binary data
+// ----------------------------------------------------------------------------
+
+
+
+/**
+# output_vtu_bin_foreach_MPIIO
+This function writes a single XML VTK file regardless of the number of processes
+of type unstructured grid (*.vtu) which can be read using Paraview, using MPI IO
+functions. File stores scalar and vector fields defined at the center points. 
+Results are written in binary format.
+*/
+void output_vtu_bin_foreach_MPIIO( scalar* list, vector* vlist, 
+	char* filename )
+{
+  MPI_File file;
+  MPI_Status status;
+  uint64_t point_binary_offset = 0, connectivity_binary_offset, 
+  	offsets_binary_offset, cellstype_binary_offset, total_offset;
+  char header[5000], line[500];
+  uint32_t nprocs = npe(), i, m, rank = pid(); 
+  	  
+  // Open the file 
+  MPI_File_open( MPI_COMM_WORLD, filename, 
+  	MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &file );  
+
+
+  vertex scalar marker[];
+  // We use unsigned int for the 2 following variables because the number
+  // of cells/vertices on a single proc never exceeds the limit of 4,294,967,295
+  // on 64-bit systems. Hence there is not need to use long unsigned int
+  uint32_t no_points = 0, no_cells = 0, vertexnum = 0;
+
+  // In case of periodicity
+  scalar per_mask[];
+  foreach(serial, noauto) per_mask[] = 1.; 
+  coord* percelldir = NULL;
+  if ( Period.x || Period.y || Period.z )
+  {  
+    percelldir = init_percelldir();
+    foreach(serial, noauto)
+    {
+      if ( Period.x )
+        if ( x + Delta > X0 + L0 || x - Delta < X0 )
+          per_mask[] = 0.;
+#     if dimension > 1
+        if ( Period.y )
+          if ( y + Delta > Y0 + L0 ||  y - Delta < Y0 )
+            per_mask[] = 0.;
+#     endif
+#     if dimension > 2
+        if ( Period.z )
+          if ( z + Delta > Z0 + L0 || z - Delta < Z0 )
+            per_mask[] = 0.;
+#     endif
+    }
+  }
+
+  foreach_vertex(serial, noauto)
+  {
+    marker[] = vertexnum++;
+    no_points += 1;  
+  }
+  foreach(serial, noauto)
+  {
+    // Additional (duplicated) vertices per cell that have a face belonging to a
+    // periodic face of the whole domain
+    if ( per_mask[] < 0.5 ) no_points += NVERTCELL;
+    
+    // Number of cells on this process
+    no_cells += 1;
+  }
+
+
+  // Write point coordinates to the binary buffer
+  start_output_binary( sizeof(PARAVIEW_DATATYPE), dimension * no_points ) ;
+  foreach_vertex(serial, noauto)
+  {
+#    if dimension == 2
+       write_double_binary( x ) ;
+       write_double_binary( y ) ;     
+#    endif
+#    if dimension == 3
+       write_double_binary( x ) ;
+       write_double_binary( y ) ;     
+       write_double_binary( z ) ;
+#    endif       
+  }     
+  // Additional duplicated vertices in case of periodicity
+  coord supvertex = {0., 0., 0.};
+  if ( Period.x || Period.y || Period.z )
+  {
+    foreach(serial, noauto)
+      if ( per_mask[] < 0.5 )
+      {
+#       if dimension == 2
+          for (size_t j=0;j<4;j++)
+	  {
+	    supvertex.x = x + percelldir[j].x * Delta;
+	    supvertex.y = y + percelldir[j].y * Delta;
+	    write_double_binary( supvertex.x ) ;
+	    write_double_binary( supvertex.y ) ;	    
+	  }		
+#       endif
+#       if dimension == 3
+          for (size_t j=0;j<8;j++)
+	  {
+	    supvertex.x = x + percelldir[j].x * Delta;
+	    supvertex.y = y + percelldir[j].y * Delta;	
+	    supvertex.z = z + percelldir[j].z * Delta;	    	    
+	    write_double_binary( supvertex.x ) ;
+	    write_double_binary( supvertex.y ) ;
+	    write_double_binary( supvertex.z ) ;	    
+	  }	
+#       endif
+      }
+    free( percelldir );       
+  }
+  compress_segment_binary( CURRENT_LENGTH );    
+
+
+  // Write connectivity to the binary buffer
+  connectivity_binary_offset = OFFSET;
+  start_output_binary( sizeof(uint32_t), NVERTCELL * no_cells ) ;  
+  foreach(serial, noauto)
+    if ( per_mask[] )
+    {
+#     if dimension == 2
+        uint32_t ape1 = (uint32_t)marker[];
+        uint32_t ape2 = (uint32_t)marker[1,0];
+        uint32_t ape3 = (uint32_t)marker[1,1];
+        uint32_t ape4 = (uint32_t)marker[0,1];
+	write_uint_binary( ape1 );
+        write_uint_binary( ape2 );
+	write_uint_binary( ape3 );
+        write_uint_binary( ape4 );				
+#     endif
+#     if dimension == 3
+        uint32_t ape1 = (uint32_t)marker[];
+        uint32_t ape2 = (uint32_t)marker[1,0,0];
+        uint32_t ape3 = (uint32_t)marker[1,1,0];
+        uint32_t ape4 = (uint32_t)marker[0,1,0];
+        uint32_t ape5 = (uint32_t)marker[0,0,1];
+        uint32_t ape6 = (uint32_t)marker[1,0,1];
+        uint32_t ape7 = (uint32_t)marker[1,1,1];
+        uint32_t ape8 = (uint32_t)marker[0,1,1];
+	write_uint_binary( ape1 );
+        write_uint_binary( ape2 );
+	write_uint_binary( ape3 );
+        write_uint_binary( ape4 );
+	write_uint_binary( ape5 );
+        write_uint_binary( ape6 );
+	write_uint_binary( ape7 );
+        write_uint_binary( ape8 );			
+#     endif
+    }
+    // Additional duplicated vertices
+    else
+    {
+#     if dimension == 2
+        uint32_t ape1 = vertexnum; vertexnum++;
+        uint32_t ape2 = vertexnum; vertexnum++;
+        uint32_t ape3 = vertexnum; vertexnum++;
+        uint32_t ape4 = vertexnum; vertexnum++;
+	write_uint_binary( ape1 );
+        write_uint_binary( ape2 );
+	write_uint_binary( ape3 );
+        write_uint_binary( ape4 );   
+#     endif
+#     if dimension == 3
+        uint32_t ape1 = vertexnum; vertexnum++;
+        uint32_t ape2 = vertexnum; vertexnum++;
+        uint32_t ape3 = vertexnum; vertexnum++;
+        uint32_t ape4 = vertexnum; vertexnum++;
+        uint32_t ape5 = vertexnum; vertexnum++;
+        uint32_t ape6 = vertexnum; vertexnum++;
+        uint32_t ape7 = vertexnum; vertexnum++;
+        uint32_t ape8 = vertexnum; vertexnum++;
+	write_uint_binary( ape1 );
+        write_uint_binary( ape2 );
+	write_uint_binary( ape3 );
+        write_uint_binary( ape4 );
+	write_uint_binary( ape5 );
+        write_uint_binary( ape6 );
+	write_uint_binary( ape7 );
+        write_uint_binary( ape8 );
+#     endif
+    }  
+  compress_segment_binary( CURRENT_LENGTH ); 
+
+
+  // Write offsets to the binary buffer  
+  offsets_binary_offset = OFFSET;
+  start_output_binary( sizeof(uint32_t), no_cells ) ;  
+  for (i = 1; i < no_cells+1; i++) 
+    write_uint_binary( i * NVERTCELL );
+  compress_segment_binary( CURRENT_LENGTH ); 
+  
+  
+  // Write cell types to the binary buffer  
+  cellstype_binary_offset = OFFSET;
+  start_output_binary( sizeof(uint32_t), no_cells ) ;  
+  for (i = 0; i < no_cells; i++)
+    write_uint8_binary( CELLTYPE );  
+  compress_segment_binary( CURRENT_LENGTH );   
+  
+  
+  // Scalar field values
+  int nscalar = 0, iscal = 0;
+  for (scalar s in list) ++nscalar;
+  uint32_t* scalar_binary_offset = (uint32_t*) calloc( nscalar, 
+  	sizeof(uint32_t) );
+
+  // Write each scalar field to the binary buffer 
+  for (scalar s in list) 
+  {
+    scalar_binary_offset[iscal] = OFFSET;
+    start_output_binary( sizeof(PARAVIEW_DATATYPE), no_cells );    
+    foreach(serial, noauto) write_double_binary( val(s) );
+    compress_segment_binary( CURRENT_LENGTH );
+    ++iscal;      
+  }
+  
+  
+  // Vector field values
+  int nvector = 0, ivc = 0;
+  for (vector v in vlist)  ++nvector;
+  uint32_t* vector_binary_offset = (uint32_t*) calloc( nvector, 
+  	sizeof(uint32_t) );
+
+  // Write each scalar field to the binary buffer 
+  for (vector v in vlist)
+  {
+    vector_binary_offset[ivc] = OFFSET;
+    start_output_binary( sizeof(PARAVIEW_DATATYPE), dimension * no_cells );     
+    foreach(serial, noauto)
+    {
+#     if dimension == 2
+        write_double_binary( val(v.x) );
+        write_double_binary( val(v.y) );
+#     endif
+#     if dimension == 3
+        write_double_binary( val(v.x) );
+        write_double_binary( val(v.y) );
+        write_double_binary( val(v.z) );      
+#     endif
+    }    
+    compress_segment_binary( CURRENT_LENGTH );
+    ++ivc;      
+  }    
+
+
+  total_offset = OFFSET; 
+  uint32_t* total_binary_offset_per_proc = (uint32_t*) calloc( nprocs, 
+  	sizeof(uint32_t) );
+  MPI_Allgather( &total_offset, 1, MPI_UINT32_T, total_binary_offset_per_proc, 
+  	1, MPI_UINT32_T, MPI_COMM_WORLD );    
+  uint64_t* cumul_binary_offset_per_proc = (uint64_t*) calloc( nprocs, 
+  	sizeof(uint64_t) );
+  cumul_binary_offset_per_proc[0] = 0;
+  for (m=1;m<nprocs;m++) 
+    cumul_binary_offset_per_proc[m] = cumul_binary_offset_per_proc[m-1]
+    	+ (uint64_t)total_binary_offset_per_proc[m-1];
+
+
+  // Header per piece + general for 1st and last process
+  if ( rank == 0 )
+  {   
+    sprintf( header, "<?xml version=\"1.0\"?>\n"
+    	"<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" "
+    	"byte_order=\"LittleEndian\" compressor=\"vtkZLibDataCompressor\">\n"
+    	"<UnstructuredGrid>\n<Piece NumberOfPoints=\"%u\" "
+	"NumberOfCells=\"%u\">\n", no_points, no_cells );  
+  }
+  else
+  {
+    sprintf( header, "<Piece NumberOfPoints=\"%u\" NumberOfCells=\"%u\">\n", 
+  	no_points, no_cells );
+  }	
+  sprintf( line, "<Points>\n" );
+  strcat( header, line );  
+  sprintf( line, "<DataArray type=\"%s\" NumberOfComponents=\"3\" "
+  	"offset=\"%lu\" format=\"appended\"></DataArray>\n</Points>\n", 
+	PARAVIEW_DATANAME,
+	cumul_binary_offset_per_proc[rank] + (uint64_t)point_binary_offset );
+  strcat( header, line );     
+  sprintf( line, "<Cells>\n<DataArray type=\"UInt32\" Name=\"connectivity\"" 
+  	" offset=\"%lu\" format=\"appended\"></DataArray>\n",	
+	cumul_binary_offset_per_proc[rank] 
+		+ (uint64_t)connectivity_binary_offset );
+  strcat( header, line );  	
+  sprintf( line, "<DataArray type=\"UInt32\" Name=\"offsets\" offset=\"%lu"
+  	"\" format=\"appended\"></DataArray>\n",	
+	cumul_binary_offset_per_proc[rank] + (uint64_t)offsets_binary_offset );
+  strcat( header, line ); 		
+  sprintf( line, "<DataArray type=\"UInt8\" Name=\"types\" offset=\"%lu"
+  	"\" format=\"appended\"></DataArray>\n</Cells>\n",
+	cumul_binary_offset_per_proc[rank] 
+		+ (uint64_t)cellstype_binary_offset );   
+  strcat( header, line );
+  sprintf( line, "<CellData Scalars=\"scalars\">\n" );
+  strcat( header, line );  
+  iscal = 0;
+  for (scalar s in list) 
+  {
+    sprintf( line, "<DataArray type=\"%s\" Name=\"%s\" offset=\""
+    	"%lu\" format=\"appended\"></DataArray>\n", 
+	PARAVIEW_DATANAME, s.name, cumul_binary_offset_per_proc[rank] 
+	+ (uint64_t)scalar_binary_offset[iscal] );
+    strcat( header, line );  	
+    ++iscal;  
+  }
+  ivc = 0;
+  for (vector v in vlist)
+  {  
+    char* paraview_name;
+    size_t trunc_len = (size_t)(strlen(v.x.name) - 2);
+    paraview_name = malloc((trunc_len + 1) * sizeof(char));
+    strncpy( paraview_name, v.x.name, trunc_len );
+    paraview_name[trunc_len] = '\0';
+    sprintf( line, "<DataArray type=\"%s\" Name=\"%s\" "
+    	"NumberOfComponents=\"3\" offset=\""
+    	"%lu\" format=\"appended\"></DataArray>\n", 
+	PARAVIEW_DATANAME, paraview_name, cumul_binary_offset_per_proc[rank] 
+	+ (uint64_t)vector_binary_offset[ivc] );
+    strcat( header, line ); 
+    free( paraview_name ); 	  
+    ++ivc;
+  }
+  sprintf( line, "</CellData>\n</Piece>\n" );
+  strcat( header, line );   
+  if ( rank == nprocs - 1 )
+  { 
+    sprintf( line, 
+    	"</UnstructuredGrid>\n<AppendedData encoding=\"raw\">\n_" );
+    strcat( header, line ); 	  
+  }            
+
+
+  uint32_t header_length = strlen( header );
+  uint32_t* header_length_per_proc = (uint32_t*) calloc( nprocs, 
+  	sizeof(uint32_t) );  
+  MPI_Allgather( &header_length, 1, MPI_UINT32_T, header_length_per_proc, 1, 
+  	MPI_UINT32_T, MPI_COMM_WORLD ); 
+
+  uint64_t* mpifile_offsets = (uint64_t*) calloc( nprocs, sizeof(uint64_t) );
+  mpifile_offsets[0] = 0;
+  for (m=1;m<nprocs;m++) 
+    mpifile_offsets[m] = mpifile_offsets[m-1]
+    	+ header_length_per_proc[m-1] * sizeof(char);  
+  MPI_File_write_at_all( file, mpifile_offsets[rank], header, 
+  	header_length, MPI_CHAR, &status ); 
+
+
+  // Write the binary buffers
+  uint64_t starting_point = mpifile_offsets[nprocs-1] 
+  	+ header_length_per_proc[nprocs-1] * sizeof(char); 
+  for (m=0;m<nprocs;m++) 
+    mpifile_offsets[m] = starting_point
+    	+ cumul_binary_offset_per_proc[m] * sizeof(char);	
+  MPI_File_write_at_all( file, mpifile_offsets[rank], BUFFER, OFFSET, 
+	MPI_CHAR, &status );	 	
+  free(BUFFER) ; BUFFER = NULL ;
+  ALLOCATED = 0 ;
+  OFFSET = 0 ;
+
+
+  // Closing text
+  sprintf( header, "\n</AppendedData>\n</VTKFile>\n" );
+  header_length = strlen( header );
+  starting_point = mpifile_offsets[nprocs-1] 
+  	+ total_binary_offset_per_proc[nprocs-1] * sizeof(char);
+  if ( rank == 0 )
+    MPI_File_write_at( file, starting_point, header, header_length, 
+    	MPI_CHAR, &status );
+
+  
+  // Close MPI file and free remaining pointers
+  MPI_File_close( &file );
+  free(total_binary_offset_per_proc); total_binary_offset_per_proc = NULL;
+  free(cumul_binary_offset_per_proc); cumul_binary_offset_per_proc = NULL;
+  free(header_length_per_proc); header_length_per_proc = NULL;
+  free(mpifile_offsets); mpifile_offsets = NULL; 
+  free(scalar_binary_offset); scalar_binary_offset = NULL;
+  free(vector_binary_offset); vector_binary_offset = NULL;        
+}
+# endif
+

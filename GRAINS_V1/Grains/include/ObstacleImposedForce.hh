@@ -44,53 +44,49 @@ class ObstacleImposedForce
     /**@name Methods */
     //@{
     /** @brief Returns obstacle name */
-    string getNom() const;
+    string getObstacleName() const;
 
-    /** @brief Returns the remaining active time interval of the imposed motion
-    @param debut simulation start time
-    @param fin simulation end time */
-    double getTime( double debut, double fin ) const;
-
-    /** @brief Returns whether the imposed motion is activ at time t
-    @param t physical time
-    @param dt time step magnitude */
-    bool isActif( double t, double dt ) const;
+    /** @brief Returns whether the imposed motion is active over the time
+    interval [td,te] and if it is the sub-interval length within [td,te] when it
+    is actually active 
+    @param td simulation start time
+    @param te simulation end time
+    @param dt time step magnitude 
+    @param subinterval the sub-interval length within [td,te] when it
+    is actually active */
+    bool isActif( double const& td, double const& te, double const& dt,
+    	double& subinterval ) const;
 
     /** @brief Returns whether the imposed motion is completed at time t
     @param t physical time
     @param dt time step magnitude */
     bool isCompleted( double t, double dt ) const;
 
-    /** @brief Returns the translational velocity at time t 
+    /** @brief Computes the translational velocity at time time and the
+    translation over [time-dt,time]
     @param time physical time
     @param dt time step magnitude 
+    @param subinterval the sub-interval length within [td,te] when it
+    is actually active
+    @param vt translational velocity at time time
+    @param translation translation over [time-dt,time]
     @param obstacle the obstacle the force is imposed on */
-    Vector3 const* translationalVelocity( double time, double dt, 
-      Obstacle* obstacle ); 
+    void translationalVelocity( double time, double dt, 
+      double const& subinterval, Vector3& vt, Vector3& translation, 
+      const Obstacle* obstacle ); 
 
-    /** @brief Returns the imposed force in cyclic mode 
+    /** @brief Returns the imposed force 
     @param time physical time */
-    Vector3 cyclicForce( double time ) const ;
-
-    /** @brief Returns the imposed force */
-    Vector3 getForce() const ;
+    Vector3 getForce( double time );
 
     /** @brief Returns the obstacle virtual mass */
     double getMass() const ;
 
-    /** @brief Returns the direction of displacement */
+    /** @brief Returns the direction of motion */
     Vector3 const* getDirection() const ;
 
     /** @brief Returns the imposed force type */
     string getType() const; 
-    //@}
-
-
-    /**@name Methods Static */
-    //@{
-    /** @brief Creates and reads the imposed force features from an input stream
-    @param fileIn input stream */
-    static ObstacleImposedForce* read( istream& fileIn );
     //@}
 
 
@@ -100,16 +96,20 @@ class ObstacleImposedForce
     string m_ObstacleName; /**< Obstacle name the force is imposed to */  
     double m_tstart; /**< start time */
     double m_tend; /**< end time */
-    Vector3 m_force; /**< Imposed force */
+    Vector3 m_force_amplitude; /**< Imposed force amplitude */
+    Vector3 m_force; /**< Imposed force at time t */    
     string m_type; /**< Force type */
     double m_mass; /**< Virtual mass of obstacle */
-    Vector3 m_direction; /**< Displacement (or force) direction */
+    bool m_automass; /**< true if the mass is determined by the code */
+    Vector3 m_direction; /**< Motion (or force) direction, i.e. unit imposed
+    	force vector */
     Vector3 m_translationalVelocity; /**< translational velocity */
-    double m_freqX; /**< cyclic motion frequency in x */
-    double m_freqY; /**< cyclic motion frequency in y */
-    double m_freqZ; /**< cyclic motion frequency in z */
-    double m_phase; /**< cyclic motion phase shift */
-    Vector3 m_prev; /**< cyclic motion previous position */    
+    Vector3 m_MultiSin_period; /**< multi-dimensional sinusoidal force period 
+    	in each direction */
+    Vector3 m_MultiSin_phase_shift; /**< multi-dimensional sinusoidal velocity 
+    	phase shift in each direction */    
+    double m_vmaxzeroforce; /**< maximum velocity magnitude at early stages if 
+    	the force is zero */        
     //@}
     
     
@@ -117,7 +117,15 @@ class ObstacleImposedForce
     //@{
     /** @brief Copy constructor */
     ObstacleImposedForce( ObstacleImposedForce const& copy );
-    //@}    
+    //@}
+    
+    
+    /**@name Methods */
+    //@{
+    /** @brief Sets the sinusoidal cyclic force at a given time 
+    @param time physical time */
+    void MultiSinForce( double time );
+    //@}        
 };
 
 #endif

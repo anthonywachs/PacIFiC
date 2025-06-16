@@ -1,5 +1,11 @@
 #include "Rectangle.hh"
+#include "GrainsExec.hh"
 
+
+// NOTE: while the Rectangle is a bounded 2D plane in a 3d space and therefore
+// has 0 width, we represent it as a thin plate in Paraview using an arbitrary
+// width of 2*LOWEPS. This facilitates the 3D visualization of Rectangle in 
+// Paraview
 
 
 // ----------------------------------------------------------------------------
@@ -18,6 +24,7 @@ Rectangle::Rectangle( double LX, double LY )
 Rectangle::Rectangle( istream& fileIn )
 {
   readShape( fileIn );
+  setCorners();  
 }
 
 
@@ -28,7 +35,6 @@ Rectangle::Rectangle( DOMNode* root )
 {
   m_LX =  ReaderXML::getNodeAttr_Double( root, "LX" );
   m_LY =  ReaderXML::getNodeAttr_Double( root, "LY" );
-
   setCorners();
 }
 
@@ -44,7 +50,7 @@ Rectangle::~Rectangle()
 
 
 // ----------------------------------------------------------------------------
-// Construit les sommets du pav� et les faces
+// Sets the corner/vertex coordinates
 void Rectangle::setCorners()
 {
   m_corners.reserve( 4 );
@@ -53,9 +59,9 @@ void Rectangle::setCorners()
   m_corners.push_back( pp );
   pp.setValue( m_LX/2., -m_LY/2., 0. );
   m_corners.push_back( pp );
-  pp.setValue( -m_LX/2., m_LY/2., 0. );
-  m_corners.push_back( pp );
   pp.setValue( m_LX/2., m_LY/2., 0. );
+  m_corners.push_back( pp );
+  pp.setValue( -m_LX/2., m_LY/2., 0. );
   m_corners.push_back( pp );
 }
 
@@ -134,14 +140,14 @@ Point3 Rectangle::support( Vector3 const& v ) const
 
 
 // ----------------------------------------------------------------------------
-// Returns a vector of points describing the envelope of the rectangle.
+// Returns a vector of points describing the surface of the rectangle.
 // Here simply returns the point (0,0,0) as a convention
 vector<Point3> Rectangle::getEnvelope() const
 {
-  vector<Point3> envelope;
-  Point3 point( 0.,0.,0. );
-  envelope.push_back( point );
-  return ( envelope );
+  vector<Point3> surface;
+  Point3 point( 0., 0., 0. );
+  surface.push_back( point );
+  return ( surface );
 }
 
 
@@ -172,7 +178,7 @@ double Rectangle::getVolume()const
 // Output operator
 void Rectangle::writeShape( ostream& fileOut ) const
 {
-  fileOut << "*Rectangle " << m_LX << " " << m_LY << " END*";
+  fileOut << "*Rectangle " << m_LX << " " << m_LY << " *END";
 }
 
 
@@ -182,8 +188,7 @@ void Rectangle::writeShape( ostream& fileOut ) const
 // Input operator
 void Rectangle::readShape( istream& fileIn )
 {
-  cerr << "Program Error :\n" << "Rectangle::readShape non accessible.\n";
-  exit( 3 );
+  fileIn >> m_LX >> m_LY;
 }
 
 
@@ -193,7 +198,7 @@ void Rectangle::readShape( istream& fileIn )
 // Returns the number of points to write the rectangle in a Paraview format
 int Rectangle::numberOfPoints_PARAVIEW() const
 {
-  return ( 4 );
+  return ( 8 );
 }
 
 
@@ -229,10 +234,24 @@ void Rectangle::write_polygonsPts_PARAVIEW( ostream& f,
   Point3 pp;
   for ( int i = 0; i < 4; ++i )
   {
-    pp = transform( m_corners[i] );
+    pp = m_corners[i];
+    pp[Z] = - LOWEPS;
+    pp = transform( pp );
     if ( translation ) pp += *translation;
-    f << pp[X] << " " << pp[Y] << " " << pp[Z] << endl;
+    f << pp[X] << " " << pp[Y] << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS, pp[Z] )
+	<< endl;
   }
+  for ( int i = 0; i < 4; ++i )
+  {
+    pp = m_corners[i];
+    pp[Z] = LOWEPS;  
+    pp = transform( pp );
+    if ( translation ) pp += *translation;
+    f << pp[X] << " " << pp[Y] << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS, pp[Z] )
+	<< endl;
+  }  
 }
 
 
@@ -247,10 +266,20 @@ list<Point3> Rectangle::get_polygonsPts_PARAVIEW( Transform const& transform,
   Point3 pp;
   for ( int i = 0; i < 4; ++i )
   {
-    pp = transform( m_corners[i] );
+    pp = m_corners[i];
+    pp[Z] = - LOWEPS;  
+    pp = transform( pp );
     if ( translation ) pp += *translation;
     ParaviewPoints.push_back( pp );
   }
+  for ( int i = 0; i < 4; ++i )
+  {
+    pp = m_corners[i];
+    pp[Z] = LOWEPS;  
+    pp = transform( pp );
+    if ( translation ) pp += *translation;
+    ParaviewPoints.push_back( pp );
+  }  
   return ( ParaviewPoints );
 }
 
@@ -263,17 +292,17 @@ void Rectangle::write_polygonsStr_PARAVIEW( list<int>& connectivity,
     	list<int>& offsets, list<int>& cellstype, int& firstpoint_globalnumber,
 	int& last_offset ) const
 {
-  int count = firstpoint_globalnumber;
-  for ( int i = 0; i < 4; ++i )
+  int count=firstpoint_globalnumber;
+  for (int i=0;i<8;++i)
   {
     connectivity.push_back( count );
     ++count;
   }
-  last_offset += 4;
+  last_offset += 8;
   offsets.push_back( last_offset );
-  cellstype.push_back( 8 );
+  cellstype.push_back( 12 );
 
-  firstpoint_globalnumber += 4;
+  firstpoint_globalnumber += 8;
 }
 
 
@@ -296,4 +325,48 @@ bool Rectangle::isIn( Point3 const& pt ) const
   return ( fabs( pt[Z] ) < EPSILON &&
            fabs( pt[Y] ) < m_LY/2. &&
            fabs( pt[X] ) < m_LX/2. );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Performs advanced comparison of the two rectangles and returns whether 
+// they match
+bool Rectangle::equalType_level2( Convex const* other ) const
+{
+  // We know that other points to a Rectangle, we dynamically cast it to 
+  // actual type
+  Rectangle const* other_ = dynamic_cast<Rectangle const*>(other); 
+  
+  double lmin = min( computeCircumscribedRadius(),
+  	other_->computeCircumscribedRadius() ); 
+  
+  bool same = ( fabs( m_LX - other_->m_LX ) <  LOWEPS * lmin 
+	&& fabs( m_LY - other_->m_LY ) <  LOWEPS * lmin );  
+
+  for (size_t j=0;j<4 && same;++j)
+      same = ( m_corners[j].DistanceTo( (other_->m_corners)[j] ) 
+      	< LOWEPS * lmin );
+  
+  return ( same );
+} 
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the bounding volume to rectangle
+BVolume* Rectangle::computeBVolume( unsigned int type ) const
+{
+  BVolume* bvol = NULL;
+  if ( type == 1 ) // OBB
+    bvol = new OBB( Vector3( m_LX, m_LY, 0. ), Matrix() );
+  else if ( type == 2 ) // OBC
+  {
+    bvol = new OBC( sqrt( m_LX * m_LX + m_LY * m_LY ) / 2., 
+                    EPSILON,
+                    Vector3( 0., 0., 1. ) );
+  }
+  return( bvol );
 }

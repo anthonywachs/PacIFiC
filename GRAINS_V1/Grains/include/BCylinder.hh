@@ -26,7 +26,7 @@ class BCylinder
     /** @brief Constructor with radius, height, and axis
     @param r radius
     @param h height
-    @param e axis */
+    @param v axis */
     BCylinder( double r, double h, Vector3 const& v );
 
     /** @brief Copy constructor
@@ -202,3 +202,4 @@ void E2EContact( double rA, double hA, double rB, double hB,
 // template < typename T > int sgn( T val );
 // //@}
 #endif
+

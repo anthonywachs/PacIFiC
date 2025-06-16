@@ -79,7 +79,7 @@ namespace solid
       /**@name Methods */
       //@{
       /** @brief Writes the object with a high precision format given by
-      POSITIONFORMAT defined in GrainsExec.hh
+      FORMAT16DIGITS defined in GrainsExec.hh
       @param fileOut output stream */
       void writeGroup3( ostream& fileOut ) const;
 
@@ -189,6 +189,12 @@ namespace solid
       @param fileIn input stream
       @param g Group3 object */
       friend istream& operator >> ( istream& fileIn, Group3& g );
+      //@}
+
+
+      /**@name Parameters */
+      //@{
+      static size_t m_sizeofGroup3; /** binary size of the object */
       //@}
 
 

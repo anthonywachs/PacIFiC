@@ -39,16 +39,6 @@ class Obstacle : public Component
   public:
     /** @name Constructors */
     //@{
-    /** @brief Constructor with name and autonumbering as input parameters
-    @param s obstacle name
-    @param autonumbering obstacle autonumbering */
-    Obstacle( string const& s = "obstacle", bool const& autonumbering = true );
-
-    /** @brief Copy constructor from a Component
-    @param copy copied Component
-    @param s obstacle name */
-    Obstacle( Component& copy, char const* s = "obstacle" );
-
     /** @brief Destructor */
     virtual ~Obstacle();
     //@}
@@ -63,13 +53,13 @@ class Obstacle : public Component
     /** @brief Moves the obstacle and returns a list of moved obstacles
     @param time physical time
     @param dt time step magnitude
-    @param b_deplaceCine_Comp whether to move the composite that the obstacle
-    belongs to (imposed velocity)
-    @param b_deplaceF_Comp whether to move the composite that the obstacle
-    belongs to (imposed force) */
+    @param motherCompositeHasImposedVelocity whether the composite that the 
+    obstacle belongs to has a non-zero imposed velocity
+    @param motherCompositeHasImposedForce whether the composite that the 
+    obstacle belongs to has a non-zero imposed force */
     virtual list<SimpleObstacle*> Move( double time,
-	double dt, bool const& b_deplaceCine_Comp,
-        bool const& b_deplaceF_Comp ) = 0;
+	double dt, bool const& motherCompositeHasImposedVelocity,
+        bool const& motherCompositeHasImposedForce ) = 0;
 
     /** @brief Returns a pointer to the obstacle if the name matches
     @param nom_ obstacle name */
@@ -84,7 +74,7 @@ class Obstacle : public Component
     obstacle) */
     virtual list<Obstacle*> getObstaclesToFluid() = 0;
 
-    /** @brief Rotates the obstacle with a quaternion
+    /** @brief Rotates the obstacle with a quaternion about its center of mass
     @param rotation the quaternion defining the rotation */
     virtual void Rotate( Quaternion const& rotation ) = 0;
 
@@ -104,12 +94,19 @@ class Obstacle : public Component
 
     /** @brief Returns obstacle type */
     virtual string getObstacleType() = 0;
+    
+    /** @brief Computes center of mass position */
+    virtual pair<Point3,double> computeVolumeCenterOfMass() = 0;
+    
+    /** @brief Empties the list of cells the obstacle is linked to and deletes
+    the pointer to the obstacle is these cells */
+    virtual void resetInCells() = 0;        
     //@}
 
 
     /** @name Set methods */
     //@{
-    /** @brief Sets kinematics
+    /** @brief Sets imposed velocity kinematics
     @param kine_ the new kinematics */
     void setKinematics( ObstacleKinematicsVelocity& kine_ );
 
@@ -123,6 +120,21 @@ class Obstacle : public Component
 
     /** @brief Initializes all contact map entries to false */
     virtual void setContactMapToFalse();
+        
+    /** @brief Sets contact map cumulative features to zero */
+    virtual void setContactMapCumulativeFeaturesToZero(); 
+    
+    /** @brief Restricts the geometric directions of translational motion 
+    @param dir restricted geometric directions of translational motion */
+    void setRestrictedGeomDirMotion( list<size_t> const& dir );
+    
+    /** @brief Sets the obstacle name
+    @param name_ obstacle name */
+    void setName( string const& name_ );
+    
+    /** @brief Sets obstacle translational and angular velocities from active
+    kinematics with imposed velocity and  with imposed force */
+    void setVelocity();           
     //@}
 
 
@@ -185,26 +197,78 @@ class Obstacle : public Component
     /** @brief Resets kinematics to 0 */
     virtual void resetKinematics();
 
-    /** @brief Updates contact map */
+    /** @brief Update contact map */
     virtual void updateContactMap();
 
-    /** @brief Does the contact exist in the map, if yes return the pointer to
-    the cumulative tangential displacement
-    @param tangentialDepl pointer to the cumulative tangential displacement
-    @param id id number of the other component */
-    virtual bool ContactInMapIsActive( double*& tangentialDepl, int const& id );
+    /** @brief Does the contact exist in the map? If so, return true and make
+    kdelta, prev_normal and cumulSpringTorque point to the memorized info. 
+    Otherwise, return false and set those pointers to NULL.
+    @param id key in the map
+    @param kdelta pointer to the memory of the vector kt * delta_t
+    @param prev_normal pointer to the previous vector normal to the contact 
+    plane
+    @param cumulSpringTorque pointer to the memory of the spring-like component 
+    of the friction torque 
+    @param createContact when true, create contact if it does not exist */
+    virtual bool getContactMemory( std::tuple<int,int,int> const& id,
+  	Vector3* &kdelta, Vector3* &prev_normal, Vector3* &cumulSpringTorque,
+  	bool createContact );
 
     /** @brief Adds new contact in the map
-    @param tangentialDepl initial tangential displacement
-    @param id id number of the other component */
-    virtual void addNewContactInMap( double const& tangentialDepl,
-  	int const& id );
+    @param id key in the map
+    @param kdelta kt * delta_t vector
+    @param prev_normal pointer to the previous vector normal to the contact 
+    plane
+    @param cumulSpringTorque pointer to the memory of the spring-like component 
+    of the friction torque */
+    virtual void addNewContactInMap( std::tuple<int,int,int> const& id,
+  	Vector3 const& kdelta, Vector3 const& prev_normal,
+  	Vector3 const& cumulSpringTorque );
 
-    /** @brief Increases cumulative tangential displacement with component id
-    @param tangentialDepl additional tangential displacement
-    @param id id number of the other component */
-    virtual void addDeplContactInMap( double const& tangentialDepl,
-  	int const& id );
+    /** @brief Stores memory of the contact with component id: increase 
+    cumulative tangential motion and cumulative spring torque, remember 
+    contact normal.
+    @param id key in the map
+    @param kdelta kt * delta_t vector
+    @param prev_normal pointer to the previous vector normal to the contact 
+    plane
+    @param cumulSpringTorque pointer to the memory of the spring-like component 
+    of the friction torque */
+    virtual void addDeplContactInMap( std::tuple<int,int,int> const& id,
+  	Vector3 const& kdelta, Vector3 const& prev_normal,
+  	Vector3 const& cumulSpringTorque );
+
+    /** @brief Writes the contact map information in an array of doubles
+    @param destination the array of double where the contact map should be 
+    stored
+    @param start_index the index of destination where the copy should start */
+    virtual void copyContactMap( double* destination, int start_index );
+
+    /** @brief Adds a single contact info to the contact map
+    @param id key in the map
+    @param isActive boolean: true if the contact is active, false otherwise
+    @param kdelta kt * delta_t vector
+    @param prev_normal pointer to the previous vector normal to the contact 
+    plane
+    @param cumulSpringTorque pointer to the memory of the spring-like component 
+    of the friction torque */
+    virtual void copyContactInMap( std::tuple<int,int,int> const& id,
+  	bool const& isActive, Vector3 const& kdelta, Vector3 const& prev_normal,
+  	Vector3 const& cumulSpringTorque );
+
+    /** @brief Returns the number of contacts in the contact map */
+    virtual int getContactMapSize();
+
+    /** @brief Displays the active neighbours in the 
+    format "my_elementary_id/neighbour_id/neightbout_elementary_id ; ...". 
+    Useful for debugging only.
+    @param id id of this component */
+    virtual void printActiveNeighbors( int const& id );
+    
+    /** @brief Checks if there is anything special to do about periodicity and
+    if there is applies periodicity 
+    @param LC linked-cell grid */
+    virtual void periodicity( LinkedCell* LC );    
     //@}
 
 
@@ -220,9 +284,8 @@ class Obstacle : public Component
 
     /** @brief Composes the obstacle kinematics with another "higher level"
     force kinematics
-    @param other the higher level kinematics
-    @param centre the obstacle center of mass */
-    void Compose( ObstacleKinematicsForce const& other, Point3 const& centre );
+    @param other the higher level kinematics */
+    void Compose( ObstacleKinematicsForce const& other );
 
     /** @brief Returns whether the obstacle has moved over the last time step */
     bool hasMoved() const;
@@ -237,6 +300,25 @@ class Obstacle : public Component
     @param LC linked-cell grid */
     virtual void InterAction( Component* voisin,
 	double dt, double const& time, LinkedCell* LC );
+	
+    /** @brief Adds a force exerted at a point to the torsor (torsor adds torque
+    automatically)
+    @param force force
+    @param point point where the force is exerted 
+    @param tagSecondComp tag of the other compoenent in case of a contact 
+    force */
+    void addForce( Point3 const& point, Vector3 const& force,
+    	int tagSecondComp );
+
+    /** @brief Adds a torque to the torsor
+    @param torque torque 
+    @param tagSecondComp tag of the other compoenent in case of a contact 
+    torque */
+    void addTorque( Vector3 const& torque, int tagSecondComp );	
+    
+    /** @brief Returns whether to store the contact force for post-processing 
+    @param othercomp the other component invovled in the contact */
+    bool storePPForce( Component const* othercomp ) const;    
     //@}
 
 
@@ -251,6 +333,9 @@ class Obstacle : public Component
 
     /** @brief Gets the boolean to actually move obstacles */
     static bool getMoveObstacle();
+    
+    /** @brief Returns the minimum ID number of an obstacle */
+    static int getMinIDnumber();    
     //@}
 
 
@@ -277,7 +362,7 @@ class Obstacle : public Component
     /** @brief Updates indicator for Paraview post-processing
     @param time physical time
     @param dt time step magnitude */
-    virtual void updateIndicator( double time, double dt ) {}
+    virtual void updateIndicator( double time, double dt );
 
     /** @brief Returns the number of points to write the obstacle in a
     Paraview format */
@@ -313,6 +398,9 @@ class Obstacle : public Component
     /**  @brief Outputs information to be transferred to the fluid
     @param fluid output stream */
     virtual void writePositionInFluid( ostream& fluid );
+    
+    /** @brief Resets the minimum ID number of an obstacle for autonumbering */
+    virtual void setMinIDnumber() = 0;     
     //@}
 
 
@@ -325,9 +413,15 @@ class Obstacle : public Component
   	force */
     string m_name; /**< obstacle name */
     bool m_ismoving; /**< whether the obstacle moves or not */
+    Vector3 m_translationalVelocity; /**< obstacle translational velocity */
+    Vector3 m_angularVelocity; /**< obstacle angular velocity */    
     double m_indicator; /**< post-processing indicator for the rotation of
   	composite obstacle in Paraview */
     string m_ObstacleType; /**< obstacle type */
+    bool m_restrict_geommotion; /**< restrict the geometric translation motion
+    	of the obstacle to specific direction */
+    list<size_t> m_dir_restricted_geommotion; /**< geometric direction of 
+    	translational motion that are not allowed */    
     //@}
 
     /** @name Parameters Static */
@@ -338,7 +432,30 @@ class Obstacle : public Component
     	not actually moving obstacles if set to false, useful in periodic
 	cases */
     static bool m_isConfinement; /**< true if imposed force */
-  //@}
+    static int m_minID; /**< Minimum ID number, obstacle ID numbers range
+    	from -1 down to m_minID and are therefore always negative */    
+    //@}
+
+
+    /** @name Constructors */
+    //@{
+    /** @brief Constructor with name and autonumbering as input parameters
+    @param s obstacle name
+    @param autonumbering obstacle autonumbering */
+    Obstacle( string const& s, bool const& autonumbering );
+    //@}
+    
+  
+  private:
+    /** @name Constructors */
+    //@{
+    /** @brief Default constructor */
+    Obstacle();
+
+    /** @brief Copy constructor
+    @param copy copied Obstacle */
+    Obstacle( Obstacle const& copy );
+    //@}      
 
 };
 

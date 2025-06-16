@@ -51,32 +51,13 @@ ParticleKinematics* ParticleKinematics2D::clone() const
 
 
 // ----------------------------------------------------------------------------
-// Computes the momentum change over dt
-void ParticleKinematics2D::computeMomentumChangeOverDt( Torsor const& torseur,
-	double dt, Particle const* particle )
+// Computes the angular acceleration in body fixed space
+void ParticleKinematics2D::computeAngularAccelerationBodyFixed( 
+	Particle const* particle, Vector3 const& torque_bf,
+	Vector3 const& om_bf, Vector3& dOmdt_bf )
 {
-  // Values of the coupling factor:
-  // 1) purely granular
-  //    FluidCorrectedAcceleration is true and fluid density is 0
-  //    so coupling factor = 1
-  // 2) coupled to fluid, fluid density is not 0
-  //    a. FluidCorrectedAcceleration is true so coupling factor = 1 - 
-  //    fluid density / particle density
-  //    b. FluidCorrectedAcceleration is false so coupling factor = 1  
-  double couplingFactor = 1.;
-  if ( Particle::getFluidCorrectedAcceleration() )
-    couplingFactor -=
-    	Particle::getFluidDensity() / particle->getDensity(); 
-
-  // Translational momentum
-  m_dUdt = *torseur.getForce() / ( particle->getMass() * couplingFactor );
-  m_dUdt.round();
-  m_dUdt[Z] = 0.;
-
-  // Angular momentum
-  double const* inverseInertia = particle->getInverseInertiaTensorBodyFixed();
-  m_dOmegadt[Z] = (*torseur.getTorque())[Z] * inverseInertia[5] 
-  	/ couplingFactor;
+  const double *inertia = particle->getInertiaTensorBodyFixed();
+  dOmdt_bf[Z] = torque_bf[Z] / ( m_coupling_factor * inertia[5] );
 }
 
 
@@ -89,7 +70,7 @@ ostream& operator << ( ostream& fileOut, ParticleKinematics2D const& kine_ )
   fileOut << "*ParticleKinematics2D\n";
   fileOut << kine_.m_translationalVelocity
 	<< kine_.m_QuaternionRotation
-	<< kine_.m_dQuaternionRotationdt;
+	<< kine_.m_angularVelocity;
 	
   return ( fileOut );
 }
@@ -103,10 +84,7 @@ istream& operator >> ( istream& fileIn, ParticleKinematics2D& kine_ )
 {
   fileIn >> kine_.m_translationalVelocity
 	>> kine_.m_QuaternionRotation
-	>> kine_.m_dQuaternionRotationdt;
-  kine_.m_angularVelocity = 
-  	2.0 * kine_.m_dQuaternionRotationdt.multConjugateToVector3( 
-  	kine_.m_QuaternionRotation );
+	>> kine_.m_angularVelocity;
   kine_.m_angularVelocity[X] = kine_.m_angularVelocity[Y] = 0.;	
 		
   return ( fileIn );

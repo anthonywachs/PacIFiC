@@ -16,8 +16,8 @@ depend:
 	cd Tools/PrePost ; make depend ; cd ../..
 	
 clean:
-	cd Main/src ; make clean ; cd ../..
-	cd Tools/PrePost ; make clean ; cd ../..
+	cd Main/src ; make --no-print-directory clean ; cd ../..
+	cd Tools/PrePost ; make --no-print-directory clean ; cd ../..
 	@echo 'Grains platform cleaned'
 	
 cleanall: cleanxerces clean cleandepend deletearch cleandtd

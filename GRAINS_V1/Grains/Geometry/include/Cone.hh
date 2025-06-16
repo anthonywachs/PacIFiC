@@ -19,7 +19,7 @@ class Cone : public Convex {
     /** @brief Constructor with flat base radius and height as input parameters
     @param r flat base radius
     @param h height */
-    Cone( double r = 0, double h = 0 ); 
+    Cone( double r = 0., double h = 0. ); 
   
     /** @brief Constructor with an input stream
     @param fileIn input stream */
@@ -44,7 +44,7 @@ class Cone : public Convex {
     /** @brief Returns the convex type */
     ConvexType getConvexType() const;
 
-    /** @brief Returns a vector of points describing the envelope of the
+    /** @brief Returns a vector of points describing the surface of the
     cone. TO DO */
     vector<Point3> getEnvelope() const;
 
@@ -110,29 +110,49 @@ class Cone : public Convex {
     	list<int>& offsets, list<int>& cellstype, int& firstpoint_globalnumber,
 	int& last_offset ) const;
     
-    /** @ brief Returns whether a point lies inside the cone
+    /** @brief Returns whether a point lies inside the cone
     @param pt point */
-    bool isIn( Point3 const& pt ) const;    
+    bool isIn( Point3 const& pt ) const; 
+    
+    /** @brief Writes the cone in an OBJ format
+    @param f output stream
+    @param transform geometric transformation 
+    @param firstpoint_number number of the 1st point */
+    void write_convex_OBJ( ostream& f, Transform const& transform,
+    	size_t& firstpoint_number ) const;     
+
+    /** @ Returns the bounding volume to cone */
+    BVolume* computeBVolume( unsigned int type ) const;
+    
+    /** @brief Performs advanced comparison of the two cones and returns
+    whether they match
+    @param other the other cone */
+    bool equalType_level2( Convex const* other ) const;
+    
+    /** @brief Sets the number of points over the cone perimeter for
+    Paraview post-processing, i.e., controls the number of facets in the
+    cone reconstruction in Paraview
+    @param nbpts number of point over the cone perimeter */
+    static void SetvisuNodeNbOverPer( int nbpts );             
     //@}
   
 
   protected:
-    /**@name Methods */
-    //@{
-    /** @brief Returns the circumscribed radius of the reference box,
-    i.e., without applying any transformation */
-    double computeCircumscribedRadius() const;
-    //@} 
-
-
     /** @name Parameters */
     //@{
     double m_bottomRadius; /**< radius of the flat base */
     double m_quarterHeight; /**< quarter-height */
-    double m_sinAngle; /**< sine of the half-angle at the center */
+    double m_sinAngle; /**< sine of the angle at the pointed tip */
     static int m_visuNodeNbOnPer; /**< number of points over the circular edges
     	for Paraview post-processing */    
     //@}  
+    
+    
+    /** @name Methods */
+    //@{
+    /** @brief Returns the circumscribed radius of the reference box,
+    i.e., without applying any transformation */
+    double computeCircumscribedRadius() const;    
 };
 
 #endif

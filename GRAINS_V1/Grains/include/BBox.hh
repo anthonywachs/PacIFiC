@@ -3,6 +3,7 @@
 
 #include "Vector3.hh"
 #include "Point3.hh"
+#include "Transform.hh"
 using namespace solid;
 
 class BBox;
@@ -121,7 +122,7 @@ class BBox
 
     /** @brief Debugging method
     @param s debugging message to be printed on the default error output cerr */
-    void debug( char const* s) const;
+    void debug( char const* s ) const;
 
     /** @brief Returns whether the bounding box fully contains the other
     bounding box

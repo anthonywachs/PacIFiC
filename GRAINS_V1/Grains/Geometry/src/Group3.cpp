@@ -5,6 +5,8 @@
 
 namespace solid
 {
+  size_t Group3::m_sizeofGroup3 = 3 * sizeof( double );
+
   // --------------------------------------------------------------------------
   // Default constructor
   Group3::Group3( double def )
@@ -345,14 +347,14 @@ namespace solid
 
   // --------------------------------------------------------------------------
   // Writes the object with a high precision format given by
-  // POSITIONFORMAT defined in GrainsExec.hh
+  // FORMAT16DIGITS defined in GrainsExec.hh
   void Group3::writeGroup3( ostream& fileOut ) const
   {
-    fileOut << GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+    fileOut << GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
   	m_comp[X] ) << " " <<
-	GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
   	m_comp[Y] ) << " " <<
-	GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
   	m_comp[Z] );
   }
 

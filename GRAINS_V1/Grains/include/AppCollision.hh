@@ -8,14 +8,16 @@
 using namespace std;
 
 class SimpleObstacle;
+class Matrix;
+class GrainsMPIWrapper;
 
 
 struct PointForcePostProcessing
 {
   Point3 geometricPointOfContact; /**< contact point */
-  Vector3 contactForce; /**< contact force */
-  Component* comp0; /**< component 0 in contact */
-  Component* comp1; /**< component 1 in contact */
+  Vector3 contactForceComp0; /**< contact force exerted on component 0 */
+  Point3 PPptComp0; /**< post processing contact point in component 0 */
+  Point3 PPptComp1; /**< post processing contact point in component 1 */
 }; 
 
 
@@ -53,8 +55,10 @@ class AppCollision : public App
   
     /** @brief Returns whether a particle is in contact with another component
     using the method Component::isContactWithCrust
-    @param particle particle */
-    virtual bool isContactWithCrust( Particle const* particle ) const;
+    @param particle particle 
+    @param BVonly test contact with bounding volume only if true */
+    virtual bool isContactWithCrust( Particle const* particle,
+    	bool BVonly = false ) const;
   
     /** @brief Returns whether a particle is close to another component
     using the method Component::isClose
@@ -65,14 +69,19 @@ class AppCollision : public App
     using the method Component::isCloseWithCrust
     @param particle particle */
     virtual bool isCloseWithCrust( Particle const* particle ) const;
+    
+    /** @brief Returns whether a point lies inside any particle in the domain
+    @param pt point */
+    virtual bool isInParticle( Point3 const& pt ) const;    
   
     /** @brief Links a particle with the contact detection algorithm 
     @param particle particle */
     virtual void Link( Particle* particle ) = 0;
 
-    /** @brief Links the parent obstacle with the contact detection algorithm 
-    @param obstacle obstacle */
-    virtual void Link( Obstacle* obstacle );
+    /** @brief Links the root obstacle with the contact detection algorithm at
+    the start of the simulation
+    @param root_obstacle root obstacle */
+    virtual void Link( Obstacle* root_obstacle );
 
     /** @brief Updates links between particles & obstacles and the contact 
     detection algorithm
@@ -145,6 +154,47 @@ class AppCollision : public App
     
     /** @brief Returns a pointer to the vector of postprocessing forces */
     vector<struct PointForcePostProcessing> const* getPPForces() const;
+    
+    /** @brief Resets the list of simple obstacles */
+    void resetListSimpleObstacles(); 
+    
+    /** @brief Computes the macroscopic stress tensor in the whole domain 
+    @param wrapper MPI wrapper */
+    void computeStressTensor( GrainsMPIWrapper const* wrapper );
+	
+    /** @brief Sets the parameters to output force statistics
+    @param root_ output directory name
+    @param freq_ output frequency */
+    void setForceStatsParameters( string const& root_,
+  	size_t const& freq_ );
+	
+    /** @brief Returns whether to output force statistics at this time 
+    @param enforceOutput force writing   
+    @param increaseCounterOnly increases the writing counter only */
+    bool outputForceStatsAtThisTime( bool enforceOutput, 
+    	bool increaseCounterOnly );
+	
+    /** @brief Writes force statistics in a file
+    @param time physical time
+    @param dt time step magnitude
+    @param rank process rank 
+    @param wrapper MPI wrapper */
+    void outputForceStats( double time, double dt, int rank,
+    	GrainsMPIWrapper const* wrapper );
+	
+    /** @brief Initialises output files to write force statistics
+    @param rank process rank
+    @param coupledFluid whether the simulation is coupled to a fluid solver
+    @param time physical time */
+    void initialiseForceStatsFiles( int rank,
+      	bool coupledFluid, double time );
+	
+    /** @brief Returns the macroscopic stress tensor in the whole domain */
+    Matrix const* getStressTensor() const;
+    
+    /** @brief Returns a component of the macroscopic stress tensor in the 
+    whole domain */
+    double getStressTensorComponent( int k, int l ) const;    		
     //@}  
 
   
@@ -158,8 +208,8 @@ class AppCollision : public App
 
     /** @name Parameters */
     //@{  
-    Obstacle* m_obstacles; /**< Parent obstacle */  
-    list<SimpleObstacle*> m_allObstacles; /**< List of simple obstacles */
+    Obstacle* m_obstacles; /**< Root obstacle */  
+    list<SimpleObstacle*> m_allSimpleObstacles; /**< List of simple obstacles */
     double m_overlap_max; /**< Maximum overlap between 2 colliding
     	components */
     double m_overlap_mean; /**< Average overlap between 2 colliding
@@ -170,7 +220,15 @@ class AppCollision : public App
     double m_nbParticles_mean; /**< Average number of particles */
     vector<struct PointForcePostProcessing> m_allforces;
     size_t m_allforces_index;
+    bool m_outputForceStats; /**< whether to to write force statistics */
+    string m_outputForceStats_dir; /**< directory name where to write force
+  	statistics files, including average macro stress in the whole domain */
+    size_t m_outputForceStats_counter; /**< counter for force statistics 
+    	output */
+    size_t m_outputForceStats_frequency; /**< frequency of force statistics 
+    	output */
     static size_t m_allforces_blocksize;
+    Matrix m_stressTensor; /**< Macroscopic stress tensor in the whole domain */
   //@}
 };
 

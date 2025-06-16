@@ -2,6 +2,9 @@
 #define _CYLINDER_HH_
 
 #include "Convex.hh"
+#include "BVolume.hh"
+#include "PointContact.hh"
+#include "Transform.hh"
 #include "ReaderXML.hh"
 
 
@@ -49,7 +52,7 @@ class Cylinder : public Convex
     /** @brief Returns the convex type */
     ConvexType getConvexType() const;
 
-    /** @brief Returns a vector of points describing the envelope of the
+    /** @brief Returns a vector of points describing the surface of the
     cylinder. Here simply returns 3 points as follows: center of bottom circular
     face, center of top circular face and an arbitrary point on the lateral
     surface of the cylinder */
@@ -114,22 +117,52 @@ class Cylinder : public Convex
     	list<int>& offsets, list<int>& cellstype, int& firstpoint_globalnumber,
 	int& last_offset ) const;
 
-    /** @ brief Returns whether a point lies inside the cylinder
+    /** @brief Returns whether a point lies inside the cylinder
     @param pt point */
     bool isIn( Point3 const& pt ) const;
+    
+    /** @brief Writes the cylinder in an OBJ format
+    @param f output stream
+    @param transform geometric transformation 
+    @param firstpoint_number number of the 1st point */
+    void write_convex_OBJ( ostream& f, Transform const& transform,
+    	size_t& firstpoint_number ) const;      
 
-    /** @ Returns the bounding cylinder to cylinder */
-    BCylinder bcylinder() const;
+    /** @brief Returns the bounding volume to cylinder */
+    BVolume* computeBVolume( unsigned int type ) const;
+
+    /** @brief Performs advanced comparison of the two cylinders and returns
+    whether they match
+    @param other the other cylinder */
+    bool equalType_level2( Convex const* other ) const; 
+    
+    /** @brief Sets the number of points over the cylinder perimeter for
+    Paraview post-processing, i.e., controls the number of facets in the
+    cylinder reconstruction in Paraview
+    @param nbpts number of point over the cylinder perimeter */
+    static void SetvisuNodeNbOverPer( int nbpts );       
     //@}
 
 
+    /** @name Friend methods */
+    //@{
+    /** @brief Returns the contact point of the cylinder with another cylinder
+    @param a 1st cylinder
+    @param b 2nd cylinder
+    @param a2w transformation of the 1st cylinder
+    @param b2w transformation of the 2nd cylinder */
+    friend PointContact intersect( Cylinder const& a,
+	Cylinder const& b, Transform const& a2w, Transform const& b2w );
+    //@}
+
+    
   protected:
     /** @name Parameters */
     //@{
     double m_radius; /**< cylinder radius */
     double m_halfHeight; /**< cylinder half height */
     static int m_visuNodeNbOnPer; /**< number of points over the circular edges
-    	for Paraview post-processing */
+    	for Paraview post-processing */	
     //@}
 
 

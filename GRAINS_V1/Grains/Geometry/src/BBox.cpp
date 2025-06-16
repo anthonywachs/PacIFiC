@@ -6,17 +6,17 @@ using namespace std;
 
 // --------------------------------------------------------------------
 // Default constructor
-BBox::BBox() 
-{} 
+BBox::BBox()
+{}
 
 
 
 
 // --------------------------------------------------------------------
-// Constructors with 2 corners as inputs, the 1st point with the 
+// Constructors with 2 corners as inputs, the 1st point with the
 // lowest coordinates and the 2nd point with the largest coordinates
-BBox::BBox( Point3 const& min, Point3 const& max ) 
-{ 
+BBox::BBox( Point3 const& min, Point3 const& max )
+{
   setValue( min, max );
 }
 
@@ -43,14 +43,14 @@ BBox::~BBox()
 
 
 // --------------------------------------------------------------------
-// Operateur d'affectation 
+// Operateur d'affectation
 // A.WACHS - Aout.2009 - Creation
 BBox& BBox::operator= (const BBox& rhs)
 {
   if ( &rhs != this )
-  {      
+  {
     m_center = rhs.m_center;
-    m_extent = rhs.m_extent;   
+    m_extent = rhs.m_extent;
   }
   return ( *this );
 }
@@ -63,7 +63,7 @@ BBox& BBox::operator= (const BBox& rhs)
 // there is no intersection, leaves the bounding box unchanged
 void BBox::closest( BBox const& a, BBox const& b )
 {
-  if ( intersect(a,b) ) 
+  if ( intersect(a,b) )
   {
     Point3 lower( max( a.getLower(X), b.getLower(X) ),
 	max( a.getLower(Y), b.getLower(Y) ),
@@ -80,7 +80,7 @@ void BBox::closest( BBox const& a, BBox const& b )
 
 // --------------------------------------------------------------------
 // Sets the bounding box to the union of the 2 bounding boxes a and b
-void BBox::enclose( BBox const& a, BBox const& b ) 
+void BBox::enclose( BBox const& a, BBox const& b )
 {
   Point3 lower( min(a.getLower(X), b.getLower(X) ),
 	min( a.getLower(Y), b.getLower(Y) ),
@@ -96,9 +96,9 @@ void BBox::enclose( BBox const& a, BBox const& b )
 
 // --------------------------------------------------------------------
 // Returns the bounding box center
-Point3 const& BBox::getCenter() const 
+Point3 const& BBox::getCenter() const
 {
-  return ( m_center ); 
+  return ( m_center );
 }
 
 
@@ -106,9 +106,9 @@ Point3 const& BBox::getCenter() const
 
 // --------------------------------------------------------------------
 // Returns the bounding box center
-Vector3 const& BBox::getExtent() const 
+Vector3 const& BBox::getExtent() const
 {
-  return ( m_extent ); 
+  return ( m_extent );
 }
 
 
@@ -116,9 +116,9 @@ Vector3 const& BBox::getExtent() const
 
 // --------------------------------------------------------------------
 // Returns the ith minimum coordinate
-double BBox::getLower( int i ) const 
-{ 
-  return ( m_center[i] - m_extent[i] ); 
+double BBox::getLower( int i ) const
+{
+  return ( m_center[i] - m_extent[i] );
 }
 
 
@@ -126,9 +126,9 @@ double BBox::getLower( int i ) const
 
 // --------------------------------------------------------------------
 // Returns the ith maximum coordinate
-double BBox::getUpper( int i ) const 
+double BBox::getUpper( int i ) const
 {
-  return ( m_center[i] + m_extent[i] ); 
+  return ( m_center[i] + m_extent[i] );
 }
 
 
@@ -136,7 +136,7 @@ double BBox::getUpper( int i ) const
 
 // --------------------------------------------------------------------
 // Extends the bounding box to a point p if p is outside the box
-void BBox::include( Point3 const& p ) 
+void BBox::include( Point3 const& p )
 {
   Point3 lower( min( getLower(X), p[X] ),
 	min( getLower(Y), p[Y] ),
@@ -152,18 +152,18 @@ void BBox::include( Point3 const& p )
 
 // ----------------------------------------------------------------------
 // Sets the bounding box to the union of itself and another bounding box
-void BBox::include( BBox const& b )  
+void BBox::include( BBox const& b )
 {
-  enclose( *this, b ); 
+  enclose( *this, b );
 }
 
 
 
 
 // --------------------------------------------------------------------
-// Returns whether a cubic box defined by its center and its half 
+// Returns whether a cubic box defined by its center and its half
 // edge length intersects
-bool BBox::InZone( Point3 const* p, double halfEdgeLength ) const 
+bool BBox::InZone( Point3 const* p, double halfEdgeLength ) const
 {
   return ( fabs( m_center[X] - (*p)[X] ) <= m_extent[X] + halfEdgeLength &&
     fabs( m_center[Y] - (*p)[Y] ) <= m_extent[Y] + halfEdgeLength &&
@@ -174,10 +174,10 @@ bool BBox::InZone( Point3 const* p, double halfEdgeLength ) const
 
 
 // --------------------------------------------------------------------
-// Returns whether a box defined by its center and its half edge lengths 
+// Returns whether a box defined by its center and its half edge lengths
 // intersects
-bool BBox::InZone( Point3 const* p, double halfEdgeLength_X, 
-    	double halfEdgeLength_Y, double halfEdgeLength_Z ) const 
+bool BBox::InZone( Point3 const* p, double halfEdgeLength_X,
+    	double halfEdgeLength_Y, double halfEdgeLength_Z ) const
 {
   return ( fabs( m_center[X] - (*p)[X] ) <= m_extent[X] + halfEdgeLength_X &&
     fabs( m_center[Y] - (*p)[Y] ) <= m_extent[Y] + halfEdgeLength_Y &&
@@ -189,19 +189,19 @@ bool BBox::InZone( Point3 const* p, double halfEdgeLength_X,
 
 // --------------------------------------------------------------------
 // Returns the direction of longest edge
-int BBox::longestAxis() const 
+int BBox::longestAxis() const
 {
-  return ( m_extent.closestAxis() ); 
+  return ( m_extent.closestAxis() );
 }
 
 
 
 
 // --------------------------------------------------------------------
-// Sets the bounding box center 
-void BBox::setCenter( Point3 const& p )  
+// Sets the bounding box center
+void BBox::setCenter( Point3 const& p )
 {
-  m_center = p; 
+  m_center = p;
 }
 
 
@@ -210,9 +210,9 @@ void BBox::setCenter( Point3 const& p )
 // ----------------------------------------------------------------------------
 // Sets the bounding box to an empty bounding box. This is done by
 // assigning minus infinity extensions
-void BBox::setEmpty() 
-{ 
-  m_center.setValue( 0, 0, 0 ); 
+void BBox::setEmpty()
+{
+  m_center.setValue( 0, 0, 0 );
   m_extent.setValue( -INFINITY, -INFINITY, -INFINITY );
 }
 
@@ -220,17 +220,17 @@ void BBox::setEmpty()
 
 
 // --------------------------------------------------------------------
-// Sets the bounding boxes half lengths  
-void BBox::setExtent( Vector3 const& v ) 
+// Sets the bounding boxes half lengths
+void BBox::setExtent( Vector3 const& v )
 {
-  m_extent = v; 
+  m_extent = v;
 }
 
 
 
 
 // --------------------------------------------------------------------
-// Sets the box dimensions using the point with the 
+// Sets the box dimensions using the point with the
 // lowest coordinates and the point with the largest coordinates
 void BBox::setValue( Point3 const& min, Point3 const& max ) 
 { 
@@ -245,7 +245,7 @@ void BBox::setValue( Point3 const& min, Point3 const& max )
 // Returns the largest half length of the bounding box
 double BBox::largestHalfLength() const 
 {
-  return ( max( max( m_extent[X], m_extent[Y] ), m_extent[Z] ) ); 
+  return ( max( max( m_extent[X], m_extent[Y] ), m_extent[Z] ) );
 }
 
 
@@ -264,9 +264,9 @@ double BBox::lowestHalfLength() const
 
 // ----------------------------------------------------------------------------
 // Returns whether the 2 bounding boxes a and b intersect
-bool intersect( BBox const& a, BBox const& b ) 
+bool intersect( BBox const& a, BBox const& b )
 {
-  return ( 
+  return (
     fabs( a.m_center[X] - b.m_center[X] ) <= a.m_extent[X] + b.m_extent[X] &&
     fabs( a.m_center[Y] - b.m_center[Y] ) <= a.m_extent[Y] + b.m_extent[Y] &&
     fabs( a.m_center[Z] - b.m_center[Z] ) <= a.m_extent[Z] + b.m_extent[Z] );
@@ -293,7 +293,7 @@ ostream& operator << ( ostream& f, BBox const& B )
 {
   f << "BBox: Center = " << B.m_center << endl;
   f << "      Extent = " << B.m_extent;
-  return ( f );  
+  return ( f );
 }
 
 
@@ -303,11 +303,11 @@ ostream& operator << ( ostream& f, BBox const& B )
 // Returns whether the bounding box fully contains the other bounding box
 bool BBox::fullyContain( BBox const& a )
 {
-  return ( 
+  return (
     a.m_center[X] - a.m_extent[X] >= m_center[X] - m_extent[X] &&
-    a.m_center[X] + a.m_extent[X] <= m_center[X] + m_extent[X] &&    
+    a.m_center[X] + a.m_extent[X] <= m_center[X] + m_extent[X] &&
     a.m_center[Y] - a.m_extent[Y] >= m_center[Y] - m_extent[Y] &&
-    a.m_center[Y] + a.m_extent[Y] <= m_center[Y] + m_extent[Y] && 
+    a.m_center[Y] + a.m_extent[Y] <= m_center[Y] + m_extent[Y] &&
     a.m_center[Z] - a.m_extent[Z] >= m_center[Z] - m_extent[Z] &&
-    a.m_center[Z] + a.m_extent[Z] <= m_center[Z] + m_extent[Z] ) ;      
+    a.m_center[Z] + a.m_extent[Z] <= m_center[Z] + m_extent[Z] ) ;
 }

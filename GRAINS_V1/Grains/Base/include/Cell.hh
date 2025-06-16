@@ -113,7 +113,13 @@ class Cell
     list<Particle*>* getParticles();
   
     /** @brief Returns the cell geographic position */
-    GeoPosition getGeoPosition() const;  
+    GeoPosition getGeoPosition() const; 
+    
+    /** @brief Returns the cell tag */
+    int getTag() const;
+    
+    /** @brief Returns the cell number */
+    int getID() const;          
     //@}
 
 
@@ -156,8 +162,10 @@ class Cell
     /** @brief Returns whether a particle is in contact with another component
     in the vicinity of the cell. The contact detection is performed with the
     crust width
-    @param particle_ particle */
-    bool isContactWithCrust( Particle const* particle_ ) const;   
+    @param particle_ particle 
+    @param BVonly test contact with bounding volume only if true */
+    bool isContactWithCrust( Particle const* particle_,
+    	bool BVonly = false ) const;   
   
     /** @brief Returns whether a particle is close to another component
     in the vicinity of the cell 
@@ -255,7 +263,7 @@ class Cell
     <ul> 
       <li> 0=interior, 
       <li> 1=buffer zone, 
-      <li> 2=halozone
+      <li> 2=clone zone
     </ul> */
     Point3 m_centre; /**< cell center coordinates */
     GeoPosition m_GeoPosCell; /**< geographic position in the linked-cell

@@ -48,7 +48,7 @@ class Disc : public Convex
     /** @brief Returns the convex type */
     ConvexType getConvexType() const;
 
-    /** @brief Returns a vector of points describing the envelope of the disc.
+    /** @brief Returns a vector of points describing the surface of the disc.
     Here simply returns the point (0,0,0) as a convention */
     vector<Point3> getEnvelope() const;
 
@@ -106,14 +106,23 @@ class Disc : public Convex
     	list<int>& offsets, list<int>& cellstype, int& firstpoint_globalnumber,
 	int& last_offset ) const; 
 
-    /** @brief Sets the number of points over the perimeter of the disc for 
-    Paraview post-processing
-    @param nbpts number of points over the perimeter */
-    static void SetvisuNodeNb( int nbpts );
+    /** @brief Sets the number of points over the disc perimeter for
+    Paraview post-processing, i.e., controls the number of facets in the
+    disc reconstruction in Paraview
+    @param nbpts number of point over the cylinder perimeter */
+    static void SetvisuNodeNbOverPer( int nbpts ); 
     
     /** @ brief Returns whether a point lies inside the disc
     @param pt point */
-    bool isIn( Point3 const& pt ) const; 
+    bool isIn( Point3 const& pt ) const;
+
+    /** @ Returns the bounding volume to disc */
+    BVolume* computeBVolume( unsigned int type ) const;
+    
+    /** @brief Performs advanced comparison of the two discs and returns
+    whether they match
+    @param other the other disc */
+    bool equalType_level2( Convex const* other ) const;     
     //@}
   
 

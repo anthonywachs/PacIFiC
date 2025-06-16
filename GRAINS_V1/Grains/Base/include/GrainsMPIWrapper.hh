@@ -21,7 +21,8 @@ using namespace std;
 
     Manages MPI communications in the parallel version of Grains3D.
 
-    @author A.WACHS - 2021 - Major cleaning & refactoring */
+    @author A.WACHS - 2021 - Major cleaning & refactoring 
+    @author A.WACHS - 2024 - Major cleaning & refactoring - step 2 */
 // ============================================================================
 class GrainsMPIWrapper : public SolverComputingTime
 {
@@ -35,9 +36,10 @@ class GrainsMPIWrapper : public SolverComputingTime
     @param NZ number of processes (=subdomains) in the Z direction
     @param PERX periodicity in the X direction (1 if periodic, 0 otherwise) 
     @param PERY periodicity in the Y direction (1 if periodic, 0 otherwise) 
-    @param PERZ periodicity in the Z direction (1 if periodic, 0 otherwise) */
+    @param PERZ periodicity in the Z direction (1 if periodic, 0 otherwise) 
+    @param oshift empty string to shift the output */
     GrainsMPIWrapper( int NX, int NY, int NZ,
-  	int PERX, int PERY, int PERZ );
+  	int PERX, int PERY, int PERZ, string const& oshift );
   
     /** @brief Destructor */
     ~GrainsMPIWrapper();
@@ -71,15 +73,14 @@ class GrainsMPIWrapper : public SolverComputingTime
     MPI_COMM_activProc communicator */
     int get_total_number_of_active_processes() const;   
   
-    /** @brief Returns the process rank in the MPI_COMM_WORLD communicator */
-    int get_rank_world() const; 
-  
-    /** @brief Returns the process rank in the MPI_COMM_activProc 
-    communicator */
-    int get_rank_active() const;   
+    /** @brief Returns the process rank in all communicators */
+    int get_rank() const;   
   
     /** @brief Returns whether the process is active */
-    bool isActive() const;                  
+    bool isActive() const;
+    
+    /** @brief Returns the active process communicator */
+    MPI_Comm get_active_procs_comm() const;                  
     //@}  
 
 
@@ -89,61 +90,55 @@ class GrainsMPIWrapper : public SolverComputingTime
     with neighboring processes in the MPI cartesian topology
     @param time physical time
     @param particles list of active particles
-    @param particlesHalozone list of active particles in the halo (buffer) zone 
+    @param particlesBufferzone list of active particles in the buffer zone 
     @param particlesClones list of active clone particles
     @param referenceParticles reference particles
-    @param LC linked cell grid */
+    @param LC linked cell grid 
+    @param update update clones if true, otherwise create 
+    @param update_velocity_only update clone velocity only if true, otherwise
+    update all clone features */
     void UpdateOrCreateClones_SendRecvLocal_GeoLoc( double time,  	
 	list<Particle*>* particles,
-  	list<Particle*> const* particlesHalozone,
+  	list<Particle*> const* particlesBufferzone,
   	list<Particle*>* particlesClones,
 	vector<Particle*> const* referenceParticles,
-	LinkedCell* LC );
-	
-    /** @brief Gathers all particles on the master process for post-processing
-    purposes
-    @param particles list of active particles
-    @param pwait list of non-active particles 
-    @param referenceParticles reference particles
-    @param nb_total_particles total number of particles on all processes */	
-    vector<Particle*>* GatherParticles_PostProcessing(
-  	list<Particle*> const& particles,
-	list<Particle*> const& pwait,
-	vector<Particle*> const& referenceParticles,
-	size_t const& nb_total_particles ) const;	
+	LinkedCell* LC, bool update, 
+	bool update_velocity_only );	
 
-    /** @brief Gathers all particle velocity-position data on the master 
-    process for post-processing purposes
+    /** @brief Gathers all particle data on the master process for 
+    post-processing purposes
     @param particles list of active particles
     @param nb_total_particles total number of particles on all processes */
-    vector< vector<double> >* GatherPositionVelocity_PostProcessing(
+    vector< vector<double> >* GatherParticleData_PostProcessing(
   	list<Particle*> const& particles,
 	size_t const& nb_total_particles ) const;	
 
     /** @brief Gathers the class of all particles on the master process 
     @param particles list of active particles
     @param nb_total_particles total number of particles on all processes */
-    vector< vector<double> >* GatherParticlesClass_PostProcessing(
+    vector<int>* GatherParticlesClass_PostProcessing(
   	list<Particle*> const& particles,
-	size_t const& nb_total_particles ) const;	
-
-    /** @brief Gathers all periodic clone particles on the master 
-    process for post-processing purposes
-    @param periodicCloneParticles list of periodic clone particles
-    @param referenceParticles reference particles */	
-    list<Particle*>* GatherPeriodicClones_PostProcessing(
-  	list<Particle*> const& periodicCloneParticles,
-	vector<Particle*> const& referenceParticles ) const;	
+	size_t const& nb_total_particles ) const;
+	
+    /** @brief Returns the map of periodic clones in parallel that each process
+    must not write to avoid duplicated particles in the single restart file
+    @param particles list of active particless 
+    @param LC linked cell grid */
+    multimap<int,Point3>* doNotWritePeriodicClones(
+  	list<Particle*> const& particles,
+	LinkedCell const* LC ) const;    		
 		
-    /** @brief Broadcasts an integer from the master to all processes within the
-    MPI_COMM_activProc communicator
-    @param i integer */
-    int Broadcast_INT( int const& i ) const;
+    /** @brief Broadcasts an integer from one process to all processes within 
+    the MPI_COMM_activProc communicator
+    @param i integer 
+    @param source rank of sending process (default is master = 0 ) */
+    int Broadcast_INT( int const& i, int source = 0 ) const;
 
-    /** @brief Broadcasts a double from the master to all processes within the 
+    /** @brief Broadcasts a double from one process to all processes within the 
     MPI_COMM_activProc communicator
-    @param d double */
-    double Broadcast_DOUBLE( double const& d ) const;
+    @param d double 
+    @param source rank of sending process (default is master = 0 ) */
+    double Broadcast_DOUBLE( double const& d, int source = 0 ) const;
   
     /** @brief Broadcasts an unsigned integer from the master to all processes 
     within the MPI_COMM_activProc communicator
@@ -228,7 +223,22 @@ class GrainsMPIWrapper : public SolverComputingTime
     /** @brief AllGather of an unsigned integer from all processes on all 
     processes within the MPI_COMM_activProc communicator
     @param i unsigned integer */
-    size_t* AllGather_UNSIGNED_INT( size_t const& i ) const;          
+    size_t* AllGather_UNSIGNED_INT( size_t const& i ) const;
+    
+    /** @brief AllGather of a signed integer from all processes on all 
+    processes within the MPI_COMM_activProc communicator
+    @param i integer */
+    int* AllGather_INT( int const& i ) const;    
+    
+    /** @brief Gather of an integer from all processes on the master process 
+    within the MPI_COMM_activProc communicator
+    @param i integer */
+    int* Gather_INT_master( int const& i ) const; 
+    
+    /** @brief Gather of an unsigned integer from all processes on the master
+    process within the MPI_COMM_activProc communicator
+    @param i unsigned integer */
+    size_t* Gather_UNSIGNED_INT_master( size_t const& i ) const;
   
     /** @brief Broadcasts a 3D point from the master to all processes within 
     the MPI_COMM_activProc communicator
@@ -240,17 +250,19 @@ class GrainsMPIWrapper : public SolverComputingTime
     @param v 3D vector */
     Vector3 Broadcast_Vector3( Vector3 const& v ) const;    
 
-    /** @brief Broadcasts a 3D vector from the master to all processes within 
+    /** @brief Broadcasts a 3D matrix from the master to all processes within 
     the MPI_COMM_activProc communicator
     @param mat matrix */
-    Matrix Broadcast_Matrix( Matrix const& mat ) const;   
+    Matrix Broadcast_Matrix( Matrix const& mat ) const;
+    
+    /** @brief Sums a matrix from all processes on all processes 
+    within the MPI_COMM_activProc communicator
+    @param mat matrix */
+    Matrix sum_Matrix( Matrix const& mat ) const;       
   
-    /** @brief Sets the local MPI communicators involving the MPI cartesian 
-    neighbors */
-    void setCommLocal(); 
-  
-    /** @brief Outputs timer summary */
-    void bilanTimer() const;
+    /** @brief Outputs timer summary 
+    @param f output stream */
+    void timerSummary( ostream &f ) const;
   
     /** @brief Outputs the MPI log string per process and reinitialize it to
     empty
@@ -280,51 +292,42 @@ class GrainsMPIWrapper : public SolverComputingTime
     /** @brief Sums force & torque exerted on obstacles on the master process 
     @param allMyObs list of simple obstacles */
     void sumObstaclesLoad( list<SimpleObstacle*> const& allMyObs ) const;
-  
-    /** @brief Distributes the number of particles in each class and on each
-    process in the case of the block structured insertion   
-    @param newPart total number of particles per class
-    @param newPartProc number of particles per class on this process
-    @param npartproc total number of particles to insert on this process
-    @param ntotalinsert total number of particles to insert on all processes */
-    void distributeParticlesClassProc( 
-  	list< pair<Particle*,int> > const& newPart,
-	list< pair<Particle*,int> >& newPartProc,
-	size_t const& npartproc,
-	size_t const& ntotalinsert ) const; 	
-    //@}  
-
-
-    /** @name Test methods */
-    //@{
-    /** @brief AllGather of a 1D array of n integers within the 
-    MPI_COMM_activProc communicator
-    @param n number of elements of the 1D array */
-    void test_AllGatherv_INT( int const& n ) const;
-  
-    /** @brief AllGather of a 1D array of n integers within the 
-    m_commMPINeighbors local communicator
-    @param n number of elements of the 1D array */
-    void testCommLocal_AllGatherv_INT( int const& n ) const;  
-
-    /** @brief AllGather of a 1D array of n doubles within the 
-    MPI_COMM_activProc communicator
-    @param n number of elements of the 1D array */
-    void test_AllGatherv_DOUBLE( int const& n ) const;
-  
-    /** @brief AllGather of a 1D array of n doubles within the 
-    m_commMPINeighbors local communicator
-    @param n number of elements of the 1D array */
-    void testCommLocal_AllGatherv_DOUBLE( int const& n ) const;  
-
-    /** @brief Send-Recv of a 1D array of n doubles within the 
-    m_commMPINeighbors local communicator
-    @param n number of elements of the 1D array */
-    void testCommLocal_SendRecv_DOUBLE( int const& n ) const;  
-
-    /** @brief Gather of an integer within the m_commMPINeighbors local 
-    communicator */
-    void testCommLocal_Gather_INT() const;
+	
+    /** @brief Writes a string per process in a process-id ordered manner
+    @param f output flux
+    @param out string
+    @param creturn use carriage return if true, else ": " 
+    @param shift empty string to shift the output */
+    void writeStringPerProcess( ostream& f, string const& out, 
+    	bool creturn = true, string const& shift="" ) const;
+	
+    /** @brief Sends an array of integers
+    @param tab array of integers
+    @param dim size of the array
+    @param to rank of the recipient */
+    void send( int const* tab, int const& dim, int const& to ) const;
+    
+    /** @brief Receives an array of integers
+    @param recvbuf receive buffer
+    @param dim size of the receive buffer 
+    @param from rank of the sender */
+    void receive( int* &recvbuf, int &dim, int const& from ) const;
+    
+    /** @brief Sends an array of doubles
+    @param tab array of doubles
+    @param dim size of the array
+    @param to rank of the recipient */
+    void send( double const* tab, int const& dim, int const& to ) const;
+    
+    /** @brief Receives an array of doubles
+    @param recvbuf receive buffer
+    @param dim size of the receive buffer
+    @param from rank of the sender */
+    void receive( double* &recvbuf, int &dim, int const& from ) const;
+    
+    /** @brief Returns whether a geoposition is periodic on this process
+    @param geopos geoposition */
+    bool isGeoPositionPeriodic( GeoPosition const& geopos ) const;
     //@}  
 
 
@@ -346,8 +349,9 @@ class GrainsMPIWrapper : public SolverComputingTime
     /** @name I/O methods */
     //@{  
     /** @brief Writes the MPI wrapper features in a stream
-    @param f output stream */
-    void display( ostream& f ) const;
+    @param f output stream 
+    @param oshift empty string to shift the output */
+    void display( ostream& f, string const& oshift ) const;
 
     /** @brief Writes the memory consumption per process in a stream
     @param f output flux */
@@ -359,45 +363,33 @@ class GrainsMPIWrapper : public SolverComputingTime
     /** @name Parameters */
     //@{
     MPI_Group m_MPI_GROUP_activProc; /**< active process group */    
-    MPI_Comm m_MPI_COMM_activProc; /**< active process communicator */
+    MPI_Comm m_MPI_COMM_activeProc; /**< active process communicator */
     int *m_coords; /**< coordinates in the MPI cartesian topology */
     int *m_dim; /**< number of processes in each direction of the MPI cartesian
 	topology */
     int *m_period; /**< Periodicity in each direction */
     bool m_isMPIperiodic; /**< true if at least one direction is periodic */
-    int m_rank; /**< rank in the MPI_COMM_activProc communicator */
-    int m_rank_world; /**< rank in the MPI_COMM_WORLD communicator */
-    int m_rank_masterWorld; /**< rank in the MPI_COMM_activProc communicator of
-    the process that has rank 0 in the MPI_COMM_WORLD communicator */
+    int m_rank; /**< rank in all communicators */
+    int m_rank_master; /**< rank of the master process in all communicators */
     int m_nprocs; /**< number of active processes */
     int m_nprocs_world; /**< total number of processes */
-    bool m_is_activ; /**< is this process active ? */  
-    MPINeighbors *m_voisins; /**< neighbors of the process in the MPI cartesian 
-    	topology */
+    bool m_is_active; /**< is this process active ? */  
+    MPINeighbors *m_neighbors; /**< neighbors of the process in the MPI 
+    	cartesian topology */
     MPI_Comm *m_commgrainsMPI_3D; /**< MPI cartesian communicator */
-    vector<MPI_Group*> m_groupMPINeighbors; /**< local groups involving 
-    	neighbors in the MPI cartesian topology */	
-    vector<MPI_Comm*> m_commMPINeighbors; /**< local MPI communicators involving
-     	neighbors in the MPI cartesian topology */
-    vector<bool> m_isInCommMPINeighbors; /**< local MPI communicators the
-    	process is part of */
-    vector<int> m_masterGeoPos; /**< GeoPosition of the master process
-    	in local MPI communicators the process is part of */
-    int m_nprocs_localComm; /**< number of processes in the local MPI 
-    	communicator */
-    int m_rank_localComm; /**< rank in the local MPI communicator */	
-    int *m_master_localComm; /**< rank of master process in local MPI 
-    	communicators */
     static string *m_MPILogString; /**< MPI log string */
-    static vector< vector<int> > m_particleHalozoneToNeighboringProcs; /**< 
-  	relationship between the GeoPosition in a halo zone from which 
+    static vector< vector<int> > m_particleBufferzoneToNeighboringProcs; /**< 
+  	relationship between the GeoPosition in a buffer zone from which 
 	data are sent and the GeoPosition of the neighboring processes 
 	that receive the data */
     static vector<int> m_GeoLocReciprocity; /**< reciprocal correspondence of
   	GeoPosition (ex: GEOPOS_BEHIND -> GEOPOS_FRONT ) */
     vector<Vector3> m_MPIperiodes; /**< periodic vectors */
-    multimap<int,Particle*> AccessToClones; /**< facilitates access to clone
+    multimap<int,Particle*> m_AccessToClones; /**< facilitates access to clone
     	particles via their ID number */
+    int m_tag_INT; /**< default tag for integer communications */
+    int m_tag_DOUBLE; /**< default tag for double communications */    
+    int m_tag_CHAR; /**< default tag for character communications */     	
     //@}
 
 
@@ -410,34 +402,55 @@ class GrainsMPIWrapper : public SolverComputingTime
 
     /** @name Methods  */
     //@{
-    /** @brief Sets the relationship between the GeoPosition in a halo
+    /** @brief Sets the relationship between the GeoPosition in a buffer
     zone from which data are sent and the GeoPosition of the neighboring
     processes that receive the data */
-    void setParticleHalozoneToNeighboringProcs(); 
-  
-    /** @brief Sets the GeoPosition of the master process in the local
-    communicators involving neighbors only to which this process belongs to */
-    void setMasterGeoLocInLocalComm(); 
-  
-    /** @brief Creates and updates clones with the data sent by the neighboring
-    processes 
+    void setParticleBufferzoneToNeighboringProcs(); 
+	
+    /** @brief Updates clones with the data sent by the neighboring processes 
     @param time physical time
-    @param recvsize number of particles received
+    @param recvsize number of doubles received
     @param recvbuf_DOUBLE array of double containing the data received
-    @param NB_DOUBLE_PART number of doubles per particle       
+    @param NB_DOUBLE_PART number of doubles per particle
+    @param NB_DOUBLE_PER_CONTACT number of doubles per contact           
     @param particlesClones list of active clone particles
     @param particles list of active particles
-    @param particlesHalozone list of active particles in the halo (buffer) zone
+    @param particlesBufferzone list of active particles in the buffer zone
     @param referenceParticles vector of reference particles
-    @param LC linked cell grid */
-    void UpdateOrCreateClones( double time,
+    @param LC linked cell grid
+    @param update_velocity_only update clone velocity only if true, otherwise
+    update all clone features */
+    void UpdateClones( double time,
  	int const& recvsize, double const* recvbuf_DOUBLE,
-	int const& NB_DOUBLE_PART, 
+	int const& NB_DOUBLE_PART,
+	int const& NB_DOUBLE_PER_CONTACT, 
   	list<Particle*>* particlesClones,
 	list<Particle*>* particles,
-  	list<Particle*> const* particlesHalozone,
+  	list<Particle*> const* particlesBufferzone,
 	vector<Particle*> const* referenceParticles,
-	LinkedCell* LC );               
+	LinkedCell* LC, 
+	bool update_velocity_only ); 
+	
+    /** @brief Creates clones with the data sent by the neighboring processes 
+    @param time physical time
+    @param recvsize number of doubles received
+    @param recvbuf_DOUBLE array of double containing the data received
+    @param NB_DOUBLE_PART number of doubles per particle       
+    @param NB_DOUBLE_PER_CONTACT number of doubles per contact 
+    @param particlesClones list of active clone particles
+    @param particles list of active particles
+    @param particlesBufferzone list of active particles in the buffer zone
+    @param referenceParticles vector of reference particles
+    @param LC linked cell grid */
+    void CreateClones( double time,
+ 	int const& recvsize, double const* recvbuf_DOUBLE,
+	int const& NB_DOUBLE_PART, 
+	int const& NB_DOUBLE_PER_CONTACT, 	
+  	list<Particle*>* particlesClones,
+	list<Particle*>* particles,
+  	list<Particle*> const* particlesBufferzone,
+	vector<Particle*> const* referenceParticles,
+	LinkedCell* LC );		              
     //@}  
 };
 

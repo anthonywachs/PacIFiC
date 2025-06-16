@@ -64,7 +64,7 @@ class Box : public Convex
     /** @brief Returns the edge half-lengths of the box */
     Vector3 const& getExtent() const;
 
-    /** @brief Returns a vector of points describing the envelope of the box */
+    /** @brief Returns a vector of points describing the surface of the box */
     vector<Point3> getEnvelope() const;
 
     /** @brief Returns point[0] in face number i
@@ -160,8 +160,20 @@ class Box : public Convex
     @param pt point */
     bool isIn( Point3 const& pt ) const;
 
-    /** @ Returns the bounding cylinder to box */
-    BCylinder bcylinder() const;
+    /** @brief Writes the box in an OBJ format
+    @param f output stream
+    @param transform geometric transformation 
+    @param firstpoint_number number of the 1st point */
+    void write_convex_OBJ( ostream& f, Transform const& transform,
+    	size_t& firstpoint_number ) const; 
+
+    /** @ Returns the bounding volume to box */
+    BVolume* computeBVolume( unsigned int type ) const;
+    
+    /** @brief Performs advanced comparison of the two boxes and returns
+    whether they match
+    @param other the other box */
+    bool equalType_level2( Convex const* other ) const;    
     //@}
 
 
@@ -176,7 +188,7 @@ class Box : public Convex
 
     /** @name Parameters*/
     //@{
-    Vector3 m_extent; /**< vector containing the half-legnth of the edges */
+    Vector3 m_extent; /**< vector containing the half-length of the edges */
     vector<Point3> m_corners; /**< vector of the 8 corners/vertices of the
     	box */
     vector<Point3>* m_corners2D_XY; /**< vector of the 4 corners/vertices in the

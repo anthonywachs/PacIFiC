@@ -44,12 +44,13 @@ class ParticleKinematics : public Kinematics
     /** @brief Returns a clone of ParticleKinematics */
     virtual ParticleKinematics* clone() const = 0;
 
-    /** @brief Computes the momentum change over dt 
-    @param torseur particle torsor 
-    @param dt time step magnitude 
-    @param particle particle related to the kinematics */
-    virtual void computeMomentumChangeOverDt( Torsor const& torseur,
-	double dt, Particle const* particle ) = 0;
+    /** @brief Computes the angular acceleration in body fixed space
+    @param particle particle related to the kinematics 
+    @param torque_bf torque in body fixed space
+    @param om_bf angular velocity in body-fixed coordinates system 
+    @param dOmdt_bf angular acceleration in body fixed space */
+    virtual void computeAngularAccelerationBodyFixed( Particle const* particle,
+    	Vector3 const& torque_bf, Vector3 const& om_bf, Vector3& dOmdt_bf ) = 0;
 			   
     /** @brief Computes explicitly Idw/dt
     @param dw explicit change of angular velocity
@@ -63,8 +64,15 @@ class ParticleKinematics : public Kinematics
     //@{
     /** @brief Integrates Newton's law and moves the particle 
     @param particle the particle
-    @param dt time step magnitude */
-    double Move( Particle* particle, double dt );
+    @param dt_particle_vel velocity time step magnitude 
+    @param dt_particle_disp motion time step magnitude */
+    double Move( Particle* particle, double const& dt_particle_vel, 
+    	double const& dt_particle_disp );
+	
+    /** @brief Advances velocity over dt_particle_vel
+    @param particle the particle    
+    @param dt_particle_vel velocity time step magnitude */
+    void advanceVelocity( Particle* particle, double const& dt_particle_vel ); 	
 
     /** @brief Returns the total velocity U + om x R given R 
     @param lev lever arm vector */
@@ -77,18 +85,30 @@ class ParticleKinematics : public Kinematics
   
     /** @brief Writes particle kinematics in an output stream with a high
     precision and 2014 format
-    @param fileOut output stream */
-    void writeParticleKinematics2014( ostream& fileOut ) const; 
+    @param fileOut output stream 
+    @param particle particle related to the kinematics */
+    void writeParticleKinematics2014( ostream& fileOut, 
+    	Particle const* particle ) const; 
   
     /** @brief Writes particle kinematics in an output stream with a binary 
     and 2014 format
-    @param fileOut output stream */
-    void writeParticleKinematics2014_binary( ostream& fileOut );
+    @param fileOut output stream 
+    @param particle particle related to the kinematics */
+    void writeParticleKinematics2014_binary( ostream& fileOut, 
+    	Particle const* particle );
+
+    /** @brief Reads particle kinematics from a stream in the 2014 format 
+    @param StreamIN input stream 
+    @param particle particle related to the kinematics */
+    void readParticleKinematics2014( istream& StreamIN,
+    	Particle* particle ); 
   
     /** @brief Reads particle kinematics from a stream in a binary form in the
     2014 format 
-    @param StreamIN input stream */
-    void readParticleKinematics2014_binary( istream& StreamIN );       
+    @param StreamIN input stream 
+    @param particle particle related to the kinematics */
+    void readParticleKinematics2014_binary( istream& StreamIN,
+    	Particle* particle );       
   
     /** @brief Copies kinematics at time t-2dt (translational velocity, angular 
     velocity, variation of translational velocity, variation of angular 
@@ -109,6 +129,10 @@ class ParticleKinematics : public Kinematics
 
     /** @brief Returns translational velocity */
     Vector3 const* getTranslationalVelocity() const;
+    
+    /** @brief Returns the number of bytes of the ParticleKinematics when 
+    written in a binary format to an output stream */
+    size_t get_numberOfBytes() const;    
     //@}
   
 
@@ -134,10 +158,24 @@ class ParticleKinematics : public Kinematics
     /** @brief Sets the angular velocity
     @param omega angular velocity */
     void setAngularVelocity( Vector3 const& omega );
+    
+    /** @brief Sets the angular velocity
+    @param omx x-angular velocity component 
+    @param omy y-angular velocity component     
+    @param omz z-angular velocity component */
+    void setAngularVelocity( double const& omx, double const& omy,
+	double const& omz );     
 
     /** @brief Sets the translation velocity
     @param vtrans translation velocity */
     void setTranslationalVelocity( Vector3 const& vtrans );
+    
+    /** @brief Sets the translation velocity
+    @param vx x-translation velocity component 
+    @param vy y-translation velocity component     
+    @param vz z-translation velocity component */
+    void setTranslationalVelocity( double const& vx, double const& vy,
+	double const& vz );    
 
     /** @brief Sets kinematics at time t-2dt from a 1D array of 12 scalars
     (translational velocity, angular velocity, variation of translational
@@ -145,7 +183,15 @@ class ParticleKinematics : public Kinematics
     @param tab 1D array of 4 vectors containing translational velocity, angular
     velocity, variation of translational velocity and variation of angular 
     velocity */
-    void setKinematicsNm2( double const* tab ); 
+    void setKinematicsNm2( double const* tab );
+    
+    /** @brief Sets time integration scheme using the macro variable
+    GrainsExec::m_TIScheme */
+    void setTimeIntegrationScheme();
+    
+    /** @brief Sets momentum equation coupling factor
+    @param particle_density particle density */
+    void setCouplingFactor( double const& particle_density );         
     //@}
 
   
@@ -197,23 +243,23 @@ class ParticleKinematics : public Kinematics
     /** @name Parameters */
     //@{
     Vector3 m_translationalVelocity; /**< Translational velocity */
-    Vector3 m_angularVelocity; /**< Angular velocity */  
-    Quaternion m_dQuaternionRotationdt; /**< Time derivative of the rotation
-  	quaternion m_QuaternionRotation. Note that we have 
-  	m_dQuaternionRotationdt = 0.5 * [0,m_angularVelocity] 
-	* m_QuaternionRotation, and 
-  	m_angularVelocity = 2 * m_dQuaternionRotationdt 
-	* m_QuaternionRotation^* */
+    Vector3 m_angularVelocity; /**< Angular velocity */
+    Vector3 m_angularVelocity_bf; /**< Angular velocity in body-fixed
+    	coordinates system */      
     Quaternion m_QuaternionRotation; /**< Rotation quaternion */ 
-    Vector3 m_dUdt; /**< Translational velocity variation dU/dt */
-    Vector3 m_dOmegadt; /**< Angular velocity variation dom/dt */
-    Vector3 m_translationalDisplacementOverDt; /**< Translational displacement
+    Vector3 m_translationalMotionOverDt; /**< Translational motion
   	over dt */
-    Vector3 m_averageAngularVelocityOverDt; /**< average angular velocity over 
+    Vector3 m_averageAngularVelocityOverDt; /**< Average angular velocity over 
   	dt */
-    Quaternion m_QuaternionRotationOverDt; /**< rotation quaternion over dt */
-    TimeIntegrator* m_timeIntegrationScheme; /**< time integration scheme */
-    ParticleKinematicsMemento* m_memento; /**< object to save the kinematics 
+    Quaternion m_QuaternionRotationOverDt; /**< Rotation quaternion over dt */
+    TimeIntegrator* m_timeIntegrationScheme; /**< Time integration scheme */
+    double m_coupling_factor; /**< Pre-factor of momentum change. 
+    	(1) purely granular: FluidCorrectedAcceleration is true and fluid 
+	density is 0 so coupling factor = 1. (2) coupled to fluid, fluid density
+	is not 0: a. FluidCorrectedAcceleration is true so coupling factor = 
+	1 - fluid density / particle density or b. FluidCorrectedAcceleration 
+	is false so coupling factor = 1 **/
+    ParticleKinematicsMemento* m_memento; /**< Object to save the kinematics 
   	state */ 
     //@}
 };

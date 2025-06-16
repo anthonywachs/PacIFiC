@@ -57,7 +57,7 @@ class ParaviewPostProcessingWriter : public PostProcessingWriter
     @param time physical time
     @param dt time step magnitude
     @param particles active particles
-    @param pwait inactive particles
+    @param inactiveparticles inactive particles
     @param periodic_clones periodic particles
     @param referenceParticles reference particles
     @param obstacle obstacles 
@@ -66,30 +66,32 @@ class ParaviewPostProcessingWriter : public PostProcessingWriter
     void PostProcessing_start( double const& time,
   	double const& dt,
   	list<Particle*> const* particles,
-	list<Particle*> const* pwait,
+	list<Particle*> const* inactiveparticles,
 	list<Particle*> const* periodic_clones,	
 	vector<Particle*> const* referenceParticles,
 	Obstacle* obstacle,
 	LinkedCell const* LC,
-	vector<Window> const& insert_windows );
+	AllInsertionWindows const& insert_windows );
 
     /** @brief Writes data
     @param time physical time
     @param dt time step magnitude
     @param particles active particles
-    @param pwait inactive particles
+    @param inactiveparticles inactive particles
     @param periodic_clones periodic particles
     @param referenceParticles reference particles
     @param obstacle obstacles 
-    @param LC linked-cell grid */
+    @param LC linked-cell grid 
+    @param insert_windows insertion windows */
     void PostProcessing( double const& time,
   	double const& dt,
   	list<Particle*> const* particles,
-	list<Particle*> const* pwait,
+	list<Particle*> const* inactiveparticles,
 	list<Particle*> const* periodic_clones,		
 	vector<Particle*> const* referenceParticles,
 	Obstacle* obstacle,
-	LinkedCell const* LC );
+	LinkedCell const* LC,
+	AllInsertionWindows const& insert_windows );
 
     /** @brief Finalizes writing data */
     void PostProcessing_end();
@@ -101,19 +103,21 @@ class ParaviewPostProcessingWriter : public PostProcessingWriter
     @param cycle0 initial cycle number */
     void setInitialCycleNumber( const int& cycle0 );
 
-    /** @brief Writes components involved in a displacement or a contact error
+    /** @brief Writes components involved in a motion or a contact error
     @param filename file root name
     @param errcomposants list of the 2 components invovled */
-    void writeErreurComponentsPostProcessing( string const& filename,
+    void writeErreurComponents_Paraview( string const& filename,
   	list<Component*> const& errcomposants );  
 
     /** @brief Writes particles data
     @param particles active particles
     @param partFilename output file name
-    @param forceForAllTag writes particle data regardless of the particle tag */
-    void writeParticlesPostProcessing_Paraview(
+    @param forceForAllTag writes particle data regardless of the particle tag 
+    @param processwrites whether this process writes data */
+    void writeParticles_Paraview(
   	list<Particle*> const* particles, string const& partFilename,
-	bool const& forceForAllTag = false );
+	bool const& forceForAllTag = false,
+	bool const& processwrites = true );
     //@}
   
   
@@ -142,14 +146,21 @@ class ParaviewPostProcessingWriter : public PostProcessingWriter
     ostringstream m_Paraview_saveContactForceVectors_pvd; /**< contact force 
     	output stream */		
     ostringstream m_Paraview_saveContactForceChains_pvd; /**< force chain 
-    	network output stream */		
+    	network output stream */
+    ostringstream m_Paraview_saveInsertionWindow_pvd; /**< insertion window
+    	output stream */			
     int m_ParaviewCycleNumber; /**< cycle number */
     bool m_binary; /**< whether to write data in binary */
     bool m_postProcessObstacle; /**< whether to write obstacles data */
     bool m_initialCycleNumber_forced; /**< whether to force the initial cycle
     	number to be equal to a given value */
     bool m_network; /**< whether to write force chain network data */
-    char * BUFFER ;
+    bool m_mpiio_singlefile; /**< whether to use MPI I/O writing routines to
+    	output data in a single file */
+    bool m_pertype; /**< whether to write particle files per type */
+    bool m_useGlyphWheneverPossible; /**< whether to write particles as Glyph
+    	whenever a particle shape allows it */
+    char* BUFFER ;
     int ALLOCATED ;
     int OFFSET ;
     int CURRENT_LENGTH ;
@@ -165,19 +176,26 @@ class ParaviewPostProcessingWriter : public PostProcessingWriter
     @param periodic_clones periodic particles
     @param referenceParticles reference particles
     @param obstacle obstacles 
-    @param LC linked-cell grid */
+    @param LC linked-cell grid
+    @param insert_windows insertion windows */
     void one_output( double const& time,
   	double const& dt,
 	list<Particle*> const* particles,
 	list<Particle*> const* periodic_clones,
 	vector<Particle*> const* referenceParticles,
   	Obstacle* obstacle,
-	LinkedCell const* LC ); 
+	LinkedCell const* LC,
+	AllInsertionWindows const& insert_windows ); 
+
+    /** @brief Writes reference particle data
+    @param referenceParticles reference particles */
+    void writeReferenceParticles_Paraview(
+  	vector<Particle*> const* referenceParticles );
 
     /** @brief Writes obstacles data
     @param allObstacles list of simple obstcales 
     @param obsFilename output file name */
-    void writeObstaclesPostProcessing_Paraview(
+    void writeObstacles_Paraview(
   	list<SimpleObstacle*> const& allObstacles,
   	string const& obsFilename );
 	
@@ -185,25 +203,31 @@ class ParaviewPostProcessingWriter : public PostProcessingWriter
     center of mass coordinates of each particle
     @param particles active particles
     @param partFilename output file name
-    @param forceForAllTag writes particle data regardless of the particle tag */
-    void writeSpheresPostProcessing_Paraview(
+    @param forceForAllTag writes particle data regardless of the particle tag 
+    @param processwrites whether this process writes data */
+    void writeParticlesAsGlyph_Paraview(
   	list<Particle*> const* particles, string const& partFilename,
-	bool const& forceForAllTag = false );	
+	bool const& forceForAllTag = false,
+	bool const& processwrites = true );	
 	
     /** @brief Writes particle translational and angular velocity vectors
     @param particles active particles
-    @param partFilename output file name */
-    void writeParticleVelocityVectorsPostProcessing_Paraview(
-  	list<Particle*> const* particles, string const& partFilename );
+    @param partFilename output file name 
+    @param processwrites whether this process writes data */
+    void writeParticleVelocityVectors_Paraview(
+  	list<Particle*> const* particles, string const& partFilename,
+	bool const& processwrites = true );
 
     /** @brief Writes contact force vectors 
     @param particles active particles   
     @param LC linked-cell gruid
     @param partFilename output file name
-    @param time physical time */
-    void writeContactForceVectorsPostProcessing_Paraview(
+    @param time physical time 
+    @param processwrites whether this process writes data */
+    void writeContactForceVectors_Paraview(
   	list<Particle*> const* particles,
-  	LinkedCell const* LC, string const& partFilename, double const& time );
+  	LinkedCell const* LC, string const& partFilename, double const& time,
+	bool const& processwrites = true );
 				
     /** @brief Writes force chain network data
     @param particles active particles   
@@ -236,21 +260,23 @@ class ParaviewPostProcessingWriter : public PostProcessingWriter
 	
     /** @brief Writes linked-cell grid data
     @param LC linked-cell grid
-    @param partFilename output file name  */
-    void writeLinkedCellPostProcessing_Paraview(
-  	LinkedCell const* LC, string const& partFilename );
+    @param partFilename output file name 
+    @param local use local coordinates if true, global if false */
+    void writeLinked_Paraview(
+  	LinkedCell const* LC, string const& partFilename,
+	bool const& local );
 
     /** @brief Writes insertion windows data
     @param insert_windows insertion windows
-    @param partFilename output file name */
-    void writeInsertionPostProcessing_Paraview(
-   	vector<Window> const& insert_windows,
-  	string const& partFilename );
+    @param IWFilename output file name */
+    void writeInsertion_Paraview(
+   	AllInsertionWindows const& insert_windows,
+  	string const& IWFilename );
 	
     /** @brief Writes periodic boundary data
     @param LC linked-cell grid
     @param partFilename output file name  */
-    void writePeriodicBoundaryPostProcessing_Paraview(
+    void writePeriodicBoundary_Paraview(
   	LinkedCell const* LC, string const& partFilename );	
 		
     /** @brief Updates obstacles indicator
@@ -276,6 +302,122 @@ class ParaviewPostProcessingWriter : public PostProcessingWriter
     @param fileOUT output file name
     @param oss the output stream to be written */  
     void writeBigOSS( ofstream& fileOUT, ostringstream const& oss );
+	
+    /** @brief Writes particles data in a single MPI file in text mode with 
+    MPI I/O routines
+    @param particles active particles
+    @param partFilename output file name
+    @param forceForAllTag writes particle data regardless of the particle tag 
+    @param processwrites whether this process writes data */
+    void writeParticles_Paraview_MPIIO_text(
+  	list<Particle*> const* particles, string const& partFilename,
+	bool const& forceForAllTag = false,
+	bool const& processwrites = true ); 
+	
+    /** @brief Writes particles data in a single MPI file in binary mode with 
+    MPI I/O routines
+    @param particles active particles
+    @param partFilename output file name
+    @param forceForAllTag writes particle data regardless of the particle tag 
+    @param processwrites whether this process writes data */
+    void writeParticles_Paraview_MPIIO_binary(
+  	list<Particle*> const* particles, string const& partFilename,
+	bool const& forceForAllTag = false,
+	bool const& processwrites = true ); 
+	
+    /** @brief Writes spherical particles data in a vector form containing the
+    center of mass coordinates of each particle in a single MPI file in text 
+    mode with MPI I/O routines
+    @param particles active particles
+    @param partFilename output file name
+    @param forceForAllTag writes particle data regardless of the particle tag 
+    @param processwrites whether this process writes data */
+    void writeParticlesAsGlyph_Paraview_MPIIO_text(
+  	list<Particle*> const* particles, string const& partFilename,
+	bool const& forceForAllTag = false,
+	bool const& processwrites = true ); 
+	
+    /** @brief Writes spherical particles data in a vector form containing the
+    center of mass coordinates of each particle in a single MPI file in binary 
+    mode with MPI I/O routines
+    @param particles active particles
+    @param partFilename output file name
+    @param forceForAllTag writes particle data regardless of the particle tag 
+    @param processwrites whether this process writes data */
+    void writeParticlesAsGlyph_Paraview_MPIIO_binary(
+  	list<Particle*> const* particles, string const& partFilename,
+	bool const& forceForAllTag = false,
+	bool const& processwrites = true );
+	
+    /** @brief Writes particle translational and angular velocity vectors in a 
+    single MPI file in text mode with MPI I/O routines
+    @param particles active particles
+    @param partFilename output file name 
+    @param forceForAllTag writes particle data regardless of the particle tag
+    @param processwrites whether this process writes data */
+    void writeParticleVelocityVectors_Paraview_MPIIO_text(
+  	list<Particle*> const* particles, string const& partFilename,
+	bool const& forceForAllTag = false,
+	bool const& processwrites = true );
+	
+    /** @brief Writes particle translational and angular velocity vectors in a 
+    single MPI file in binary mode with MPI I/O routines
+    @param particles active particles
+    @param partFilename output file name 
+    @param forceForAllTag writes particle data regardless of the particle tag
+    @param processwrites whether this process writes data */
+    void writeParticleVelocityVectors_Paraview_MPIIO_binary(
+  	list<Particle*> const* particles, string const& partFilename,
+	bool const& forceForAllTag = false,
+	bool const& processwrites = true );
+	
+    /** @brief Writes contact force vectors in a single MPI file in text mode 
+    with MPI I/O routines 
+    @param particles active particles   
+    @param LC linked-cell gruid
+    @param partFilename output file name
+    @param time physical time 
+    @param processwrites whether this process writes data */
+    void writeContactForceVectors_Paraview_MPIIO_text(
+  	list<Particle*> const* particles,
+  	LinkedCell const* LC, string const& partFilename, double const& time,
+	bool const& processwrites = true );
+	
+    /** @brief Writes contact force vectors in a single MPI file in binary mode 
+    with MPI I/O routines 
+    @param particles active particles   
+    @param LC linked-cell gruid
+    @param partFilename output file name
+    @param time physical time 
+    @param processwrites whether this process writes data */
+    void writeContactForceVectors_Paraview_MPIIO_binary(
+  	list<Particle*> const* particles,
+  	LinkedCell const* LC, string const& partFilename, double const& time,
+	bool const& processwrites = true );
+	
+    /** @brief Writes contact force chain network in a single MPI file in text 
+    mode with MPI I/O routines 
+    @param particles active particles   
+    @param LC linked-cell gruid
+    @param filename output file name
+    @param time physical time 
+    @param processwrites whether this process writes data */
+    void writeContactForceChains_Paraview_MPIIO_text(
+  	list<Particle*> const* particles,
+  	LinkedCell const* LC, string const& filename, double const& time,
+	bool const& processwrites = true );
+	
+    /** @brief Writes contact force chain network in a single MPI file in binary
+    mode with MPI I/O routines 
+    @param particles active particles   
+    @param LC linked-cell gruid
+    @param filename output file name
+    @param time physical time 
+    @param processwrites whether this process writes data */
+    void writeContactForceChains_Paraview_MPIIO_binary(
+  	list<Particle*> const* particles,
+  	LinkedCell const* LC, string const& filename, double const& time,
+	bool const& processwrites = true );				
     //@}
       
 

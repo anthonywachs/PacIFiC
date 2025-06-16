@@ -7,6 +7,7 @@
 #include "Convex.hh"
 #include "Vector3.hh"
 #include "Point3.hh"
+#include "BVolume.hh"
 using namespace solid;
 
 class Cell;
@@ -143,10 +144,14 @@ class RigidBody
     /** @brief Sets the rigid body's transformation with a transformation
     @param transform_ transformation */
     void setTransform( Transform const& transform_ );
+    
+    /** @brief Sets the pointer to the rigid body's bounding volume
+    @param bvol pointer to the rigid body's bounding volume */
+    void setBoundingVolume( BVolume* bvol );    
     //@}
 
 
-    /**@name Get methods */
+    /**@name Accessors */
     //@{
     /** @brief Returns a pointer to the rigid body' center of mass position */
     Point3 const* getCentre() const;
@@ -173,7 +178,7 @@ class RigidBody
     double getVolume() const;
 
     /** @brief Returns the rigid body bounding cylinder */
-    BCylinder getBCylinder() const;
+    BVolume const& getBVolume() const;
     //@}
 
 
@@ -225,6 +230,15 @@ class RigidBody
     @param translation additional center of mass translation */
     list<Point3> get_polygonsPts_PARAVIEW( Vector3 const* translation = NULL )
     	const;
+	
+    /** @brief Writes the rigid body's convex shape in an OBJ format
+    @param f output stream 
+    @param firstpoint_number number of the 1st point */
+    void write_OBJ( ostream& f, size_t& firstpoint_number ) const;
+    
+    /** @brief Returns an orientation vector describing the rigid body angular
+    position */
+    Vector3 computeOrientationVector() const;    	
     //@}
 
 
@@ -243,9 +257,9 @@ class RigidBody
     Transform m_transform; /**< rigid body's transformation: center of mass
   	position and body orientation */
     Convex *m_convex; /**< convex shape */
+    BVolume* m_boundingVolume; /** The bounding volume of the convex body **/
     double m_circumscribedRadius; /**< circumscribed radius */
     double m_volume; /**< rigid body volume */
-    BCylinder m_cylinder; /** The bounding cylinder of the convex body **/
     //@}
 };
 

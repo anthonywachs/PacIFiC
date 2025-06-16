@@ -16,7 +16,8 @@ extern "C" {
 
   
   void Init_Grains ( char const* inputfile, 
-  	double fluid_density, const bool b_restart ) 
+  	double fluid_rho, const bool b_restart,
+	const bool b_fluidcorrectedacc ) 
   {
     string simulation_file( inputfile );
     
@@ -28,13 +29,16 @@ extern "C" {
     DOMElement* rootNode = ReaderXML::getRoot( simulation_file_exe );
     
     grains = GrainsBuilderFactory::createCoupledWithFluid( rootNode, 
-    	fluid_density );
+    	fluid_rho );
     if ( b_restart ) grains->setReloadSame();
     grains->do_before_time_stepping( rootNode );
     ReaderXML::terminate();
     
     string cmd = "/bin/rm " + simulation_file_exe;
-    GrainsExec::m_return_syscmd = system( cmd.c_str() ); 
+    GrainsExec::m_return_syscmd = system( cmd.c_str() );
+    
+    if ( !b_fluidcorrectedacc )
+      grains->setFluidCorrectedAcceleration( b_fluidcorrectedacc ); 
          
     cout << "Construction of Grains completed" << endl;
   }
@@ -97,8 +101,7 @@ extern "C" {
 
 
   
-  void UpdateVelocityGrains( double arrayv[][6], const int m, 
-  	bool bsplit_explicit_acceleration ) 
+  void UpdateVelocityGrains( double** arrayv, const int m ) 
   {
     // Transfer into a vector< vector<double> >
     vector<double> buf( 6, 0.);
@@ -108,7 +111,7 @@ extern "C" {
         vecv[i][j] = arrayv[i][j];
 
     // We use the interface function of PeliGRIFF
-    grains->updateParticlesVelocity( vecv, bsplit_explicit_acceleration );
+    grains->updateParticlesVelocity( vecv, false );
   }  
 
 
@@ -125,7 +128,15 @@ extern "C" {
   void SetInitialTime( double tinit ) 
   {
     grains->setInitialTime( tinit );
-  }    
+  } 
+  
+  
+  
+     
+  void NumberOfRigidBodiesInBasilisk( size_t* nparticles, size_t* nobstacles )
+  {
+    grains->numberOfRBToFluid( nparticles, nobstacles );
+  }
   
 #ifdef __cplusplus
 }

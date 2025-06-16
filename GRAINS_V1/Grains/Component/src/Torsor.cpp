@@ -145,6 +145,16 @@ void Torsor::setPoint( Point3 const& point )
 
 
 // ----------------------------------------------------------------------------
+// Sets the total torque of the torsor
+void Torsor::setTorque( Vector3 const& t_ )
+{
+  m_totalTorque = t_;
+}
+
+
+
+
+// ----------------------------------------------------------------------------
 // Sets the total force of the torsor, the reference point of the
 // torsor and initializes the torque to (0,0,0)
 void Torsor::setToBodyForce( Point3 const& point, Vector3 const& f_ )
@@ -335,22 +345,6 @@ Torsor& Torsor::operator += ( Torsor const& k2 )
 
 
 // ----------------------------------------------------------------------------
-// Addition of a torsor whose actual reference point is specified as
-// an additional parameter and not the reference point in the torsor itself.
-// Helpful for periodic particles.
-void Torsor::addWithSpecifiedReferencePoint( Torsor const& rhs, 
-	Point3 const& rp_rhs )
-{
-  m_totalForce += rhs.m_totalForce;
-  Vector3 vecteurA = rhs.m_refPoint - rp_rhs;
-  vecteurA.round();
-  m_totalTorque += rhs.m_totalTorque + ( vecteurA ^ rhs.m_totalForce );    
-}
-
-
-
-
-// ----------------------------------------------------------------------------
 // Comparaison operator
 bool Torsor::operator == ( Torsor const& top2 )
 {
@@ -389,15 +383,22 @@ Torsor Torsor::operator * ( double d )
 
 
 // ----------------------------------------------------------------------------
-// Write the object in a output stream
-void Torsor::write( ostream& fileOut )
+// Writes the object in a output stream
+void Torsor::write( ostream& fileOut ) const
 {
-  fileOut << "*PtContact\t" << m_refPoint;
-  fileOut << "*Fn+Ft\t"     << m_totalForce;
-  if ( Norm( m_totalTorque ) < 1.e20 )
-    fileOut << "*Moment\t"    << m_totalTorque;
-  else
-    fileOut << "*Moment   0.   0.   0.\n";
+  fileOut << "*Torsor " << m_refPoint << " " << m_totalForce << " " <<
+  	m_totalTorque << endl;
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Reads the object from an input stream
+void Torsor::read( istream& fileIn )
+{
+  string buffer;
+  fileIn >> buffer >> m_refPoint >> m_totalForce >> m_totalTorque;
 }
 
 
@@ -407,7 +408,7 @@ void Torsor::write( ostream& fileOut )
 // Output operator
 ostream& operator << ( ostream& fileOut, Torsor const& object )
 {
-  fileOut << "Point3 reduction = " << object.m_refPoint
+  fileOut << "Point = " << object.m_refPoint
 	  << "Force = " << object.m_totalForce
 	  << "Moment = " << object.m_totalTorque;
   return ( fileOut );

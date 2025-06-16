@@ -1,6 +1,8 @@
 #include "Matrix.hh"
 
 
+size_t Matrix::m_sizeofMatrix = 9 * sizeof( double );
+
 // ----------------------------------------------------------------------------
 // Default constructor. Matrix is initialized to the identity matrix
 Matrix::Matrix()
@@ -270,7 +272,7 @@ void Matrix::copyMatrix( double *vit, int i ) const
 
 // ----------------------------------------------------------------------
 // Writes the object with a high precision format given by
-// POSITIONFORMAT defined in GrainsExec.hh
+// FORMAT16DIGITS defined in GrainsExec.hh
 void Matrix::writeMatrix( ostream& fileOut ) const
 {
   (*this)[X].writeGroup3( fileOut );
@@ -285,7 +287,7 @@ void Matrix::writeMatrix( ostream& fileOut ) const
 
 // ----------------------------------------------------------------------
 // Writes the object with a high precision format given by
-// POSITIONFORMAT defined in GrainsExec.hh and the 2014 reload format
+// FORMAT16DIGITS defined in GrainsExec.hh and the 2014 reload format
 void Matrix::writeMatrix2014( ostream& fileOut ) const
 {
   (*this)[X].writeGroup3( fileOut );
@@ -689,4 +691,28 @@ ostream& operator << ( ostream& fileOut, Matrix const& m )
 istream& operator >> ( istream& fileIn, Matrix& m )
 {
   return ( fileIn >> m[X] >> m[Y] >> m[Z] );
+}
+
+
+
+
+// -----------------------------------------------------------------------
+// Operator /= by a float number
+Matrix& Matrix::operator /= ( double const& d )
+{
+  for ( int i=0;i<3;++i )
+    for ( int j=0;j<3;++j )
+        m_elem[i][j] /= d;
+
+  return ( *this );
+} 
+
+
+
+
+// -----------------------------------------------------------------------
+// Returns the trace of the matrix
+double Matrix::trace() const
+{
+  return ( m_elem[X][X] + m_elem[Y][Y] + m_elem[Z][Z] );
 }

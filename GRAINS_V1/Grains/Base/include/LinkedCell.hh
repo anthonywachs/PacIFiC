@@ -51,8 +51,10 @@ class LinkedCell : public AppCollision
 
     /** @brief Returns whether a particle is in contact with another component
     using the method Component::isContactWithCrust
-    @param particle particle */
-    bool isContactWithCrust( Particle const* particle ) const;
+    @param particle particle 
+    @param BVonly test contact with bounding volume only if true */
+    bool isContactWithCrust( Particle const* particle,
+    	bool BVonly = false ) const;
 
     /** @brief Returns whether a particle is close to another component
     using the method Component::isClose
@@ -63,15 +65,20 @@ class LinkedCell : public AppCollision
     using the method Component::isCloseWithCrust
     @param particle particle */
     bool isCloseWithCrust( Particle const* particle ) const;
+    
+    /** @brief Returns whether a point lies inside any particle in the domain
+    @param pt point */
+    bool isInParticle( Point3 const& pt ) const;
 
     /** @brief Links a particle with the linked cell grid without checking if
     the particle overlaps with another rigid body
     @param particle particle */
     void Link( Particle* particle );
 
-    /** @brief Links an obstacle with the linked cell grid
-    @param obstacle obstacle */
-    void Link( Obstacle* obstacle );
+    /** @brief Links the root obstacle with the linked cell grid at the start
+    of the simulation
+    @param root_obstacle root obstacle */
+    void Link( Obstacle* root_obstacle );
 
     /** @brief Updates links between particles & obstacles and the linked cell
     grid
@@ -109,27 +116,6 @@ class LinkedCell : public AppCollision
     @param obs obstacle to be deleted */
     void remove( SimpleObstacle* obs );
 
-    /** @brief Updates active particles with an interior tag (tag=0)
-    @param time physical time
-    @param particles list of active particles
-    @param particlesHalozone list of active particles in the halo (buffer) zone
-    @param wrapper MPI wrapper */
-    void updateInteriorTag( double time,
-  	list<Particle*>* particles,
-  	list<Particle*>* particlesHalozone,
-	GrainsMPIWrapper const* wrapper = NULL );
-
-    /** @brief Updates active particles with a halo tag (tag=1) or a clone tag
-    (tag=2)
-    @param time physical time
-    @param particlesHalozone list of active particles in the halo zone
-    @param particlesClones list of active clone particles
-    @param wrapper MPI wrapper */
-    void updateHalozoneCloneTag( double time,
-  	list<Particle*>* particlesHalozone,
-	list<Particle*>* particlesClones,
-	GrainsMPIWrapper const* wrapper = NULL );
-
     /** @brief Removes clone particles that exited the local linked cell grid
     @param time physical time
     @param particles list of active particles
@@ -160,9 +146,12 @@ class LinkedCell : public AppCollision
     /** @brief Updates periodic clones and destroys those out of the linked cell
     grid in serial mode
     @param particles list of active particles
-    @param particlesPeriodicClones map of active periodic clone particles */
+    @param particlesPeriodicClones map of active periodic clone particles 
+    @param destroyOnly performs periodic clones destruction only when true (i.e.
+    does not update periodic clones in the linked cell grid) */
     void updateDestroyPeriodicClones( list<Particle*>* particles,
-    	multimap<int,Particle*>* particlesPeriodicClones );
+    	multimap<int,Particle*>* particlesPeriodicClones,
+	bool destroyOnly = false );
 
     /** @brief Creates/destroys periodic clones after LinkUpdate in serial mode
     @param particles list of active particles
@@ -171,10 +160,67 @@ class LinkedCell : public AppCollision
     void createDestroyPeriodicClones( list<Particle*>* particles,
     	multimap<int,Particle*>* particlesPeriodicClones,
 	vector<Particle*> const* ReferenceParticles );
+	
+    /** @brief Checks periodic clones in serial mode when a simulation is
+    reloaded
+    @param particles list of active particles
+    @param particlesPeriodicClones map of active periodic clone particles
+    @param ReferenceParticles vector of reference particles 
+    @param time physical time */
+    void checkPeriodicClonesReload( list<Particle*>* particles,
+    	multimap<int,Particle*>* particlesPeriodicClones,
+	vector<Particle*> const* ReferenceParticles, 
+	double const& time );	
+	
+    /** @brief Attempts to insert a particle in parallel mode
+    @param time physical time    
+    @param particle particle
+    @param particles list of active particles
+    @param particlesClones list of active clone particles 
+    @param ReferenceParticles vector of reference particles       
+    @param periodic true if the domain is at least mono-periodic
+    @param force_insertion force insertion regardless of potential contacts with
+    other particles or obstacles 
+    @param wrapper MPI wrapper */
+    pair<bool,bool> insertParticleParallel( double time,
+    	Particle* particle, 
+    	list<Particle*>* particles,
+	list<Particle*>* particlesClones,
+	vector<Particle*> const* ReferenceParticles,
+    	bool const& periodic, bool const& force_insertion,
+	GrainsMPIWrapper const* wrapper = NULL );
+	
+    /** @brief Returns an array of point coordinates of the local grid in a 
+    direction
+    @param dir direction */
+    vector<double> local_coordinates( size_t const& dir ) const;
+    
+    /** @brief Returns an array of point coordinates of the global grid in a 
+    direction
+    @param dir direction */
+    vector<double> global_coordinates( size_t const& dir ) const; 
+    
+    /** @brief Checks that none of the structured array positions is exactly 
+    at a limit of the linked cell grid, otherwise shift by 1e-12 
+    @param InsertionArray structured array positions 
+    @param wrapper MPI wrapper */
+    void checkStructuredArrayPositionsMPI( struct InsertionLattice* 
+    	InsertionArray, GrainsMPIWrapper const* wrapper ) const;
+	
+    /** @brief Removes periodic clones that do not belong to the periodic 
+    subdomain
+    @param time physical time    
+    @param particles list of active particles
+    @param particlesClones list of active clone particles 
+    @param wrapper MPI wrapper */    
+    void managePartialPeriodicity( double time,
+	list<Particle*>* particles,
+	list<Particle*>* particlesClones,
+	GrainsMPIWrapper const* wrapper = NULL );    	  		
     //@}
 
 
-    /**@name Methods Get */
+    /**@name Accessors */
     //@{
     /** @brief Returns a pointer to the cell that contains a point
     @param position the point coordinates */
@@ -195,7 +241,7 @@ class LinkedCell : public AppCollision
     //@}
 
 
-    /**@name Methods Set */
+    /**@name Set methods */
     //@{
     /** @brief Sets the linked cell grid in serial mode
     @param cellsize_ minimum cell edge length in each direction
@@ -207,11 +253,9 @@ class LinkedCell : public AppCollision
     @param nprocsdir number of subdomains in each direction
     @param MPIcoords subdomain coordinates in the MPI Cartesian topology
     @param voisins neighboring subdomain in the MPI Cartesian topology
-    @param MPIperiod periodicity of the MPI Cartesian topology
     @param oshift empty string to shift the output */
-    void set( double cellsize_, int const* nprocsdir, int const* MPIcoords,
-  	MPINeighbors const* voisins, int const* MPIperiod,
-	string const& oshift );
+    size_t set( double cellsize_, int const* nprocsdir, int const* MPIcoords,
+  	MPINeighbors const* voisins, string const& oshift );
     //@}
 
 
@@ -255,19 +299,9 @@ class LinkedCell : public AppCollision
     double m_cellsize_Y; /**< cell size in Y direction */
     double m_cellsize_Z; /**< cell size in Z direction */
     Point3 m_LC_global_origin; /**< Linked cell global origin */
+    Point3 m_LC_global_max; /**< Linked cell global max point */    
     Point3 m_LC_local_origin; /**< Linked cell local origin */
-    double m_LC_local_xmin; /**< Linked cell minimum coordinate in the
-    	X direction */
-    double m_LC_local_ymin; /**< Linked cell minimum coordinate in the
-    	Y direction */
-    double m_LC_local_zmin; /**< Linked cell minimum coordinate in the
-    	Z direction */
-    double m_LC_local_xmax; /**< Linked cell maximum coordinate in the
-    	X direction */
-    double m_LC_local_ymax; /**< Linked cell maximum coordinate in the
-    	Y direction */
-    double m_LC_local_zmax; /**< Linked cell maximum coordinate in the
-    	Z direction */
+    Point3 m_LC_local_max; /**< Linked cell local max point */      
     BBox* m_extendedBBox; /**< Bounding Box of the local Linked cell extended by
     	half a cell in each direction */
     //@}

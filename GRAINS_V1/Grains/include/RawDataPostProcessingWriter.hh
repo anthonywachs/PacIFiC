@@ -39,7 +39,7 @@ class RawDataPostProcessingWriter : public PostProcessingWriter
     @param time physical time
     @param dt time step magnitude
     @param particles active particles
-    @param pwait inactive particles
+    @param inactiveparticles inactive particles
     @param periodic_clones periodic particles
     @param referenceParticles reference particles
     @param obstacle obstacles 
@@ -48,30 +48,32 @@ class RawDataPostProcessingWriter : public PostProcessingWriter
     virtual void PostProcessing_start( double const& time,
   	double const& dt,
   	list<Particle*> const* particles,
-	list<Particle*> const* pwait,
+	list<Particle*> const* inactiveparticles,
 	list<Particle*> const* periodic_clones,	
 	vector<Particle*> const* referenceParticles,
 	Obstacle* obstacle,
 	LinkedCell const* LC,
-	vector<Window> const& insert_windows );
+	AllInsertionWindows const& insert_windows );
 
     /** @brief Writes data
     @param time physical time
     @param dt time step magnitude
     @param particles active particles
-    @param pwait inactive particles
+    @param inactiveparticles inactive particles
     @param periodic_clones periodic particles
     @param referenceParticles reference particles
     @param obstacle obstacles 
-    @param LC linked-cell grid */
+    @param LC linked-cell grid
+    @param insert_windows insertion windows */
     virtual void PostProcessing( double const& time,
   	double const& dt,
   	list<Particle*> const* particles,
-	list<Particle*> const* pwait,
+	list<Particle*> const* inactiveparticles,
 	list<Particle*> const* periodic_clones,		
 	vector<Particle*> const* referenceParticles,
 	Obstacle* obstacle,
-	LinkedCell const* LC );
+	LinkedCell const* LC,
+	AllInsertionWindows const& insert_windows );
 
     /** @brief Finalizes writing data */
     virtual void PostProcessing_end();
@@ -87,17 +89,18 @@ class RawDataPostProcessingWriter : public PostProcessingWriter
     /** @brief Writes data in parallel mode at one physical time
     @param time physical time
     @param nb_total_part total number of particles
-    @param cinematique_Global vector containing particle data  */
-    void one_output_MPI( double const& time, size_t& nb_total_part,
-  	vector< vector<double> > const* cinematique_Global );
+    @param types_Global vector containing particle type
+    @param data_Global vector containing particle data  */
+    void one_output_MPI( double const& time, size_t const& nb_total_part,
+  	vector<int>* types_Global,
+	vector< vector<double> > const* data_Global );
 	
     /** @brief Writes data in serial mode at one physical time
-    @param time physical time 
-    @param particles active particles
-    @param pwait inactive particles */
-    void one_output_Standard( double const& time,
-  	list<Particle*> const* particles,
-  	list<Particle*> const* pwait );
+    @param time physical time
+    @param nb_total_part total number of particles     
+    @param particles active particles */
+    void one_output_Standard( double const& time, size_t const& nb_total_part,
+  	list<Particle*> const* particles );
 	
     /** @brief Delete all result files */
     void clearResultFiles() const ; 	  
@@ -105,17 +108,30 @@ class RawDataPostProcessingWriter : public PostProcessingWriter
     /** @brief Creates output files and open streams
     @param mode File opening mode (here : ios::app) */
     void prepareResultFiles( ios_base::openmode mode ) ;
+        
+    /** @brief Writes particle type file 
+    @param nb_total_part total number of particles     
+    @param particles active particles */
+    void writeParticleTypeFile( size_t const& nb_total_part,
+  	list<Particle*> const* particles ) ;    
     //@}
+    
+
+    /** @name Constructors */
+    //@{
+    /** @brief Default constructor */
+    RawDataPostProcessingWriter();  
+    //@}      
   
 
   private:
     /**@name Parameters */
     //@{  
-    ofstream m_gc_coordinates_x; /**< center of mass x-ccordinate output 
+    ofstream m_gc_coordinates_x; /**< center of mass x-coordinate output 
     	stream */
-    ofstream m_gc_coordinates_y; /**< center of mass y-ccordinate output 
+    ofstream m_gc_coordinates_y; /**< center of mass y-coordinate output 
     	stream */ 
-    ofstream m_gc_coordinates_z; /**< center of mass z-ccordinate output 
+    ofstream m_gc_coordinates_z; /**< center of mass z-coordinate output 
     	stream */
     ofstream m_translational_velocity_x; /**< x-translational velocity output 
     	stream */ 
@@ -129,14 +145,9 @@ class RawDataPostProcessingWriter : public PostProcessingWriter
     ofstream m_coordination_number; /**< coordination number output stream */
     ofstream m_particle_class; /**< particle class output stream */
     string m_filerootname; /**< files root name */
-
-
-  protected:
-    /** @name Constructors */
-    //@{
-    /** @brief Default constructor */
-    RawDataPostProcessingWriter();  
-    //@}  
+    bool m_binary; /**< whether to write data in binary */
+    int m_ndigits; /**< number of digits after the decimal in the scientific
+    	format in text mode writing */ 
 };
 
 #endif

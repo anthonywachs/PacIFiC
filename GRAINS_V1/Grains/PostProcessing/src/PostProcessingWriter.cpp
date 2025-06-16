@@ -50,8 +50,8 @@ void PostProcessingWriter::setInitialCycleNumber( int const& cycle0 )
 
 
 // ----------------------------------------------------------------------------
-// Writes components involved in a displacement or a contact error
-void PostProcessingWriter::writeErreurComponentsPostProcessing( 
+// Writes components involved in a motion or a contact error
+void PostProcessingWriter::writeErreurComponents_Paraview( 
 	string const& filename,
   	list<Component*> const& errcomposants )
 {}

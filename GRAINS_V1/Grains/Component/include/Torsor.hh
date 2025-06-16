@@ -121,10 +121,14 @@ class Torsor
     /** @brief Sets the total force of the torsor
     @param f_ new total force */
     void setForce( Vector3 const& f_ );
-
+    
     /** @brief Sets the reference point of the torsor
     @param point new reference point */
     void setPoint( Point3 const& point );
+    
+    /** @brief Sets the total torque of the torsor
+    @param t_ new total torque */
+    void setTorque( Vector3 const& t_ );    
   
     /** @brief Sets the total force of the torsor, the reference point of the
     torsor and initializes the torque to (0,0,0)
@@ -167,15 +171,7 @@ class Torsor
 
     /** @brief Operator +=. Leaves the reference point unchanged
     @param k2 torsor to be added */
-    Torsor& operator += ( Torsor const& k2 );
-  
-    /** @brief Addition of a torsor whose actual reference point is specified as
-    an additional parameter and not the reference point in the torsor itself.
-    Helpful for periodic particles.
-    @param rhs torsor to be added 
-    @param rp_rhs reference point of the torsor to be added */
-    void addWithSpecifiedReferencePoint( Torsor const& rhs, 
-    	Point3 const& rp_rhs );  
+    Torsor& operator += ( Torsor const& k2 ); 
 
     /** @brief Operator -=. Leaves the reference point unchanged
     @param k2 torsor to be subtracted */
@@ -185,9 +181,13 @@ class Torsor
 
     /**@name I/O methods */
     //@{
-    /** @brief Write the object in a output stream
+    /** @brief Writes the object in a output stream
     @param fileOut output stream */
-    void write( ostream& fileOut );
+    void write( ostream& fileOut ) const;
+    
+    /** @brief Reads the object from an input stream
+    @param fileIN output stream */
+    void read( istream& fileIN );    
     //@}
 
 

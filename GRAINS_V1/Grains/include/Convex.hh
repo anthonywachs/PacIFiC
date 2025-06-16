@@ -2,8 +2,9 @@
 #define _CONVEX_HH_
 
 #include "Shape.hh"
-#include "BBox.hh"
-#include "BCylinder.hh"
+#include "BVolume.hh"
+#include "OBB.hh"
+#include "OBC.hh"
 #include "Transform.hh"
 #include "Point3.hh"
 #include "ReaderXML.hh"
@@ -31,7 +32,11 @@ enum ConvexType {
   POINT,
   SEGMENT,
   SUPERQUADRIC,
-  RECTANGLE2D
+  RECTANGLE2D,
+  TRAPEZOIDALPRISM,
+  SPHEROCYLINDER,
+  SPHEROCYLINDRICALPRISM,
+  TRUNCATEDCONE
 };
 
 
@@ -42,7 +47,8 @@ enum ConvexType {
 
     @author D.PETIT - Institut Francais du Petrole - 2000 - Modification
     @author D.RAKOTONIRINA - IFP Energies Nouvelles - 2014 - Modification
-    @author A.WACHS - 2019 - Major cleaning & refactoring */
+    @author A.WACHS - 2019 - Major cleaning & refactoring
+    @author A.YAZDANI - 2024 - GJK Refactoring */
 // ============================================================================
 class Convex : public Shape
 {
@@ -58,14 +64,23 @@ class Convex : public Shape
     //@{
     /** @brief Returns shape type */
     ShapeType getType() const;
+    
+    /** @brief Returns whether two convexes are of the same type 
+    @param other the other convex
+    @param level2 if true, performs advanced comparison */
+    bool equalType( Convex const* other, bool const& level2 ) const;    
+    //@}    
 
+
+    /**@name Virtual methods */
+    //@{
     /** @brief Returns the convex shape bounding box
     @param t geometric transformation */
     virtual BBox bbox( Transform const& t ) const;
 
-    /** @brief Returns the convex shape bounding box
-    @param t geometric transformation */
-    virtual BCylinder bcylinder() const;
+    /** @brief Returns the convex shape bounding volume
+    @param type 1 = OBB, 2 = OBC */
+    virtual BVolume* computeBVolume( unsigned int type ) const;
 
     /** @brief Convex support function, returns the support point P, i.e. the
     point on the surface of the convex shape that satisfies max(P.v)
@@ -81,9 +96,6 @@ class Convex : public Shape
     the input file */
     virtual double computeCircumscribedRadius() const = 0;
 
-
-    /**@name Virtual methods */
-    //@{
     /** @brief Returns the convex type */
     virtual ConvexType getConvexType() const = 0;
 
@@ -95,7 +107,7 @@ class Convex : public Shape
     /** @brief Returns a clone copy of the convex */
     virtual Convex* clone() const = 0;
 
-    /** @brief Returns a vector of points describing the envelope of the convex
+    /** @brief Returns a vector of points describing the surface of the convex
     */
     virtual vector<Point3> getEnvelope() const;
 
@@ -132,6 +144,13 @@ class Convex : public Shape
     @param transform geometric transformation */
     virtual void write_convex_STL( ostream& f, Transform const& transform )
   	const;
+	
+    /** @brief Writes the convex shape in an OBJ format
+    @param f output stream
+    @param transform geometric transformation 
+    @param firstpoint_number number of the 1st point */
+    virtual void write_convex_OBJ( ostream& f, Transform const& transform,
+    	size_t& firstpoint_number ) const;	
 
     /** @brief Returns a list of points describing the convex shape in a
     Paraview format
@@ -151,18 +170,14 @@ class Convex : public Shape
     	list<int>& offsets, list<int>& cellstype, int& firstpoint_globalnumber,
 	int& last_offset ) const;
 
-    /** @brief Returns whether the convex shape is a sphere */
-    virtual bool isSphere() const;
-
-    /** @brief Returns an orientation vector describing the convex shape angular
-    position
-    @param transform geometric transformation */
-    virtual Vector3 computeOrientationVector( Transform const* transform )
-    	const;
-
     /** @ brief Returns whether a point lies inside the convex shape
     @param pt point */
     virtual bool isIn( Point3 const& pt ) const = 0;
+    
+    /** @brief Performs advanced comparison of the two convexes and returns
+    whether they match
+    @param other the other convex */
+    virtual bool equalType_level2( Convex const* other ) const = 0;       
     //@}
 
 
@@ -224,31 +239,31 @@ of A
 bool intersect( Convex const& a, Convex const& b, Transform const& b2a,
 	Vector3& v );
 
-/** @brief Returns whether 2 convex shapes intersect and if they intersect
-returns an intersection point per convex shape in each convex reference frame
-@param a convex shape A
-@param b convex shape B
-@param a2w geometric tramsformation describing convex A in the world reference
-frame
-@param b2w geometric tramsformation describing convex B in the world reference
-frame
-@param v initial direction of GJK
-@param pa intersection point of A in the reference frame of A
-@param pb intersection point of B in the reference frame of B */
-bool common_point( Convex const& a, Convex const& b, Transform const& a2w,
-	Transform const& b2w, Vector3& v, Point3& pa, Point3& pb );
+// /** @brief Returns whether 2 convex shapes intersect and if they intersect
+// returns an intersection point per convex shape in each convex reference frame
+// @param a convex shape A
+// @param b convex shape B
+// @param a2w geometric tramsformation describing convex A in the world reference
+// frame
+// @param b2w geometric tramsformation describing convex B in the world reference
+// frame
+// @param v initial direction of GJK
+// @param pa intersection point of A in the reference frame of A
+// @param pb intersection point of B in the reference frame of B */
+// bool common_point( Convex const& a, Convex const& b, Transform const& a2w,
+// 	Transform const& b2w, Vector3& v, Point3& pa, Point3& pb );
 
-/** @brief Returns whether 2 convex shapes intersect and if they intersect
-returns an intersection point per convex shape in each convex reference frame
-@param a convex shape A
-@param b convex shape B
-@param b2a geometric tramsformation describing convex B in the reference frame
-of A
-@param v initial direction of GJK
-@param pa intersection point of A in the reference frame of A
-@param pb intersection point of B in the reference frame of B */
-bool common_point( Convex const& a, Convex const& b, Transform const& b2a,
-	Vector3& v, Point3& pa, Point3& pb );
+// /** @brief Returns whether 2 convex shapes intersect and if they intersect
+// returns an intersection point per convex shape in each convex reference frame
+// @param a convex shape A
+// @param b convex shape B
+// @param b2a geometric tramsformation describing convex B in the reference frame
+// of A
+// @param v initial direction of GJK
+// @param pa intersection point of A in the reference frame of A
+// @param pb intersection point of B in the reference frame of B */
+// bool common_point( Convex const& a, Convex const& b, Transform const& b2a,
+// 	Vector3& v, Point3& pa, Point3& pb );
 
 /** @brief Returns the minimal distance between 2 convex shapes and a point per
 convex shape that represents the tips of the minimal distance segment
@@ -264,6 +279,23 @@ B
 @param nbIter number of iterations of GJK for convergence */
 double closest_points( Convex const& a, Convex const& b, Transform const& a2w,
 	Transform const& b2w, Point3& pa, Point3& pb, int& nbIter );
+
+/** @brief Returns the minimal distance between 2 convex shapes and a point per
+convex shape that represents the tips of the minimal distance segment
+@param a convex shape A
+@param b convex shape B
+@param a2w geometric tramsformation describing convex A in the world reference
+frame
+@param b2w geometric tramsformation describing convex B in the world reference
+frame
+@param v initial search direction for GJK
+@param pa point representing one tip of the minimal distance segment on A
+@param pb point representing the other tip of the minimal distance segment on
+B
+@param nbIter number of iterations of GJK for convergence */
+double closest_points( Convex const& a, Convex const& b, 
+	Transform const& a2w, Transform const& b2w, Vector3& v,
+	Point3& pa, Point3& pb, int& nbIter );
 //@}
 
 #endif

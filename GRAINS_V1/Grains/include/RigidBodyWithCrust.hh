@@ -31,14 +31,14 @@ class RigidBodyWithCrust : public RigidBody
     RigidBodyWithCrust( RigidBodyWithCrust const& rbwc );
 
     /** @brief Constructor with input parameters, used by composite component 
-    whose own shape is not defined (composite = true) or to create component 
+    whose own shape is not defined ( composite = true ) or to create component 
     from scratch in the code ( composite = false )         
     @param convex_ convex
     @param position_ transformation 
-    @param noncomposite for standard 
+    @param composite true for composite, false for standard 
     @param crust_thickness crust thickness */
     RigidBodyWithCrust( Convex* convex_, Transform const& position_,
-    	bool composite = true, double const& crust_thickness = 0. );
+    	bool composite, double const& crust_thickness );
 
     /** @brief Constructor from an input stream and a convex type
     @param fileIn input stream
@@ -73,6 +73,23 @@ class RigidBodyWithCrust : public RigidBody
     practice less than EPSILON defined in Basic.H, which means that the shrunk
     rigid bodies already touch or overlap */
     PointContact ClosestPoint( RigidBodyWithCrust &neighbor );
+
+    /** @brief Returns the features of the contact: contact point location,
+    overlap vector (vector joining the points on each rigid body surface that
+    realize the minimal distance between the shrunk rigid bodies, divided by the
+    minimal distance between the shrunk rigid bodies and multiplied by the
+    sum of the crust thicknesses minus the minimal distance between the shrunk
+    rigid bodies, i.e., minus the overlap), overlap distance = minimal distance
+    between the shrunk rigid bodies minus the sum of the crust thicknesses.
+    Note: contact exists if overlap distance is negative, i.e., minimal distance
+    between the shrunk rigid bodies < sum of the crust thicknesses
+    @param neighbor the other rigid body
+    @param initialDirection the initial direction to start GJK with
+    @exception if the minimal distance between the shrunk rigid bodies is 0, in
+    practice less than EPSILON defined in Basic.H, which means that the shrunk
+    rigid bodies already touch or overlap */
+    PointContact ClosestPoint( RigidBodyWithCrust &neighbor,
+	Vector3& initialDirection );
 
     /** @brief Returns the features of the contact when the overlap computed by
     ClosestPoint is too large, the method artificially increases the size of the
@@ -187,7 +204,7 @@ private:
 spheres, i.e., a SPHERE-SPHERE contact
 @param rbA 1st rigid body
 @param rbB 2nd rigid body */
-PointContact ClosestPointSPHERE( RigidBodyWithCrust const& rbA,
+PointContact ClosestPointSPHERESPHERE( RigidBodyWithCrust const& rbA,
 	RigidBodyWithCrust const& rbB );
 
 /** @brief Returns the features of the contact when the 1 rigid body is a sphere
@@ -202,7 +219,7 @@ in the sense of ClosestPoint when the 2 rigid bodies are spheres, i.e., a
 SPHERE-SPHERE contact
 @param rbA 1st rigid body
 @param rbB 2nd rigid body */
-bool isContactSPHERE( RigidBodyWithCrust const& rbA,
+bool isContactSPHERESPHERE( RigidBodyWithCrust const& rbA,
 	RigidBodyWithCrust const& rbB );
 
 /** @brief Returns whether there is geometric contact with another rigid body
@@ -218,20 +235,25 @@ are cylinders
 @param rbA 1st rigid body
 @param rbB 2nd rigid body */
 PointContact ClosestPointCYLINDERS( RigidBodyWithCrust const& rbA,
-  RigidBodyWithCrust const& rbB );
+  RigidBodyWithCrust const& rbB ); 
 
-/** @brief Returns whether there is a contact between the circumscribed
-cylinders of two rigid bodies
+/** @brief Returns whether there is a contact between the bounding volumes of 
+two rigid bodies
 @param rbA 1st rigid body
 @param rbB 2nd rigid body */
-bool isContactCYLINDERS( RigidBodyWithCrust const& rbA,
-  RigidBodyWithCrust const& rbB );
+bool isContactBVolume( RigidBodyWithCrust const& rbA,
+                       RigidBodyWithCrust const& rbB );  
 
 /** @brief Returns the features of the contact when the 1 rigid body is
 a rectangle
 @param rbA 1st rigid body
-@param rbB 2nd rigid body */
+@param rbB 2nd rigid body 
+@param checkoverlap check whether the overlap is lower than the maximum allowed
+overlap 
+@param checkCGInRec check whether the projection of the center of mass of the
+non Rectangle rigid body belongs to the rectangle */
 PointContact ClosestPointRECTANGLE( RigidBodyWithCrust const& rbA ,
-  RigidBodyWithCrust const& rbB );
+  RigidBodyWithCrust const& rbB, bool const& checkoverlap,
+  bool checkCGInRec = false );
 
 #endif

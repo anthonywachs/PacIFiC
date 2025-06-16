@@ -10,7 +10,8 @@ extern "C" {
 #endif
 
   void Init_Grains ( char const* inputfile,
-  	double fluid_density, const bool b_restart );
+  	double fluid_rho, const bool b_restart,
+	const bool b_fluidcorrectedacc );
   
   void Simu_Grains( const double dt_fluid );
   
@@ -22,10 +23,11 @@ extern "C" {
 
   void checkParaviewPostProcessing_Grains( char* solid_resDir );
 
-  void UpdateVelocityGrains( double arrayv[][6], const int m,
-  	bool bsplit_explicit_acceleration );
+  void UpdateVelocityGrains( double** arrayv, const int m );
   
   void SetInitialCycleNumber( int cycle0 );
+  
+  void NumberOfRigidBodiesInBasilisk( size_t* nparticles, size_t* nobstacles );
 
 #ifdef __cplusplus
 }

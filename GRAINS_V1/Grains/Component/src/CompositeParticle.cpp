@@ -25,9 +25,8 @@ CompositeParticle::CompositeParticle( bool const& autonumbering ):
 // ----------------------------------------------------------------------------
 // Constructor with an XML node as an input parameter. This constructor is
 // expected to be used for reference composite particles
-CompositeParticle::CompositeParticle( DOMNode* root,
-	bool const& autonumbering, int const& pc )
-  : Particle( autonumbering )
+CompositeParticle::CompositeParticle( DOMNode* root, int const& pc )
+  : Particle( false )
 {
   // Geometric type
   m_GeomType = pc;
@@ -35,7 +34,8 @@ CompositeParticle::CompositeParticle( DOMNode* root,
   // The composite particle does not have a shape per se, its shape is made
   // of the glued elementary particles. Hence we defines its shape by a point
   // corresponding to its center of mass position (same as in CompositeObstacle)
-  m_geoRBWC = new RigidBodyWithCrust( new PointC(), Transform() );
+  m_geoRBWC = new RigidBodyWithCrust( new PointC(), Transform(), true,
+  	EPSILON );
 
   // Create kinematics
   m_kinematics = KinematicsBuilderFactory::create(
@@ -102,7 +102,7 @@ CompositeParticle::CompositeParticle( DOMNode* root,
   for ( size_t j=0; j<m_nbElemPart; ++j )
   {
     m_elementaryParticles.push_back( ppp );
-    m_InitialRelativePositions.push_back( Vector3Nul );
+    m_InitialRelativePositions.push_back( Vector3Null );
     m_InitialRotationMatrices.push_back( ttt );
   }
 
@@ -112,8 +112,7 @@ CompositeParticle::CompositeParticle( DOMNode* root,
     DOMNode* nElemParticle = allElemParticles->item( i );
 
     // Construction of the elementary particle
-    m_elementaryParticles[i] = new Particle( nElemParticle,
-     	false, pc );
+    m_elementaryParticles[i] = new Particle( nElemParticle, pc );
 
     // Set its material as the composite material
     m_elementaryParticles[i]->setMaterial( m_materialName );
@@ -134,6 +133,9 @@ CompositeParticle::CompositeParticle( DOMNode* root,
 
     // Set the composite as the master particle
     m_elementaryParticles[i]->setMasterParticle( this );
+    
+    // Set its ID number (always > 0 for particles )
+    m_elementaryParticles[i]->setID( int(i) + 1 );
   }
 
   // Set crust thickness of the composite as the minimum of the crust
@@ -156,6 +158,9 @@ CompositeParticle::CompositeParticle( DOMNode* root,
 
   // Compute and set the the circumscribed radius
   setCircumscribedRadius();
+  
+  // Compute and set the non-spherical bounding volume
+  if ( GrainsExec::m_colDetBoundingVolume ) createBoundingVolume();
 
   // In case part of the particle acceleration computed explicity
   if ( Particle::m_splitExplicitAcceleration ) createVelocityInfosNm1();
@@ -176,45 +181,19 @@ CompositeParticle::CompositeParticle( int const& id_,
 	const double m[12],
 	ParticleActivity const& activ,
 	int const& tag_,
-	int const& coordination_number_ ,
- 	bool const& updatePosition )
+	int const& coordination_number_ )
   : Particle( id_, ParticleRef, vx, vy, vz,
 	qrotationx, qrotationy, qrotationz, qrotations,
 	rx, ry, rz, m, activ, tag_, coordination_number_ )
 {
-//   /* Particules elementaires */
-//   m_elementaryParticles.reserve( ParticuleRef->getNbreElemPart() );
-//   ElementParticule* ppp = NULL;
-//   for ( size_t i=0; i<ParticuleRef->getNbreElemPart(); ++i )
-//     m_elementaryParticles.push_back( ppp );
-//
-//   for ( size_t i=0; i<m_elementaryParticles.size(); ++i )
-//     m_elementaryParticles[i] = new ElementParticule(
-//       *(ParticuleRef->getElementParticules()[i]), this );
-//
-//   /* Positions initiales des particules elementaires dans insert.xml */
-//   m_InitialRelativePositions = ParticuleRef->getInitialRelativePositions();
-//
-//   /* Positions des particules elementaires par rapport a (0.,0.,0.) */
-//   /* m_InitialRelativePositions sont les bras de levier                    */
-//   m_InitialRelativePositions = ParticuleRef->getRelativePositions();
-//
-//   m_InitialMatrix = ParticuleRef->getInitialMatrix();
-//
-//   /* Affectation de la cinematique*/
-//   for ( size_t i=0; i<m_elementaryParticles.size(); ++i )
-//   {
-//     m_elementaryParticles[i]->setVitesseTranslation( Vector3( vx, vy, vz )
-//       + ( Vector3( rx, ry, rz ) ^ ( (m_geoRBWC->getTransform()->getBasis())
-//       * m_InitialRelativePositions[i] ) ) );
-//     m_elementaryParticles[i]->setVitesseRotation( Vector3( rx, ry, rz ) );
-//
-//     m_elementaryParticles[i]->setQuaternionRotation( qrotationx, qrotationy,
-//       qrotationz, qrotations );
-//   }
-//
-//   if ( updatePosition )
-//     setElementPosition();
+  // We know that ParticleRef points to a CompositeParticle, such that
+  // we can dynamic cast it to actual type and use -> instead of using
+  // get methods through virtual typing
+  CompositeParticle const* CompParticleRef =
+  	dynamic_cast<CompositeParticle const*>(ParticleRef);
+
+  // Creates and sets the elementary particles
+  createSetElementaryParticles( CompParticleRef );
 }
 
 
@@ -228,8 +207,10 @@ CompositeParticle::CompositeParticle( int const& id_,
 	Quaternion const& qrot,
 	Vector3 const& vrot,
 	Transform const& config,
-	ParticleActivity const& activ )
-  : Particle( id_, ParticleRef, vtrans, qrot, vrot, config, activ )
+	ParticleActivity const& activ,
+     	map< std::tuple<int,int,int>,
+     	std::tuple<bool, Vector3, Vector3, Vector3> > const* contactMap )
+  : Particle( id_, ParticleRef, vtrans, qrot, vrot, config, activ, contactMap )
 {
   // We know that ParticleRef points to a CompositeParticle, such that
   // we can dynamic cast it to actual type and use -> instead of using
@@ -239,14 +220,6 @@ CompositeParticle::CompositeParticle( int const& id_,
 
   // Creates and sets the elementary particles
   createSetElementaryParticles( CompParticleRef );
-
-  // The constructor of Particle called here sets autonumbering to false,
-  // hence there is no need to reset the total number of created components
-  // However, we need to subtracting the number of elementary particles as the
-  // construction of each elementary particle increments the total number of
-  // created components by 1 (from the copy constructor of Particle)
-  Component::setNbCreatedComponents( Component::getNbCreatedComponents()
-	- int( m_nbElemPart ) );
 }
 
 
@@ -266,8 +239,9 @@ CompositeParticle::~CompositeParticle()
 
 // ----------------------------------------------------------------------------
 // Copy constructor (the torsor is initialized to 0)
-CompositeParticle::CompositeParticle( CompositeParticle const& other )
-  : Particle( other )
+CompositeParticle::CompositeParticle( CompositeParticle const& other, 
+    	bool const& autonumbering )
+  : Particle( other, autonumbering )
 {
   // Elementary particles
   m_nbElemPart = other.m_nbElemPart;
@@ -278,8 +252,9 @@ CompositeParticle::CompositeParticle( CompositeParticle const& other )
   for ( size_t i=0; i<m_nbElemPart; ++i )
   {
     m_elementaryParticles[i] = new Particle(
-      *((other.m_elementaryParticles)[i]) );
+      *((other.m_elementaryParticles)[i]), false );    
     m_elementaryParticles[i]->setMasterParticle( this );
+    m_elementaryParticles[i]->setID( int(i) + 1 );
   }
 
   // Initial relative positions
@@ -293,13 +268,6 @@ CompositeParticle::CompositeParticle( CompositeParticle const& other )
   for ( size_t i=0; i<m_nbElemPart; ++i )
     m_InitialRotationMatrices.push_back(
     	(other.m_InitialRotationMatrices)[i] );
-
-  // The copy constructor of Particle called here sets autonumbering to true,
-  // hence we need to reset the total number of created components by
-  // subtracting the number of elementary particles as the construction of each
-  // elementary particle increments the total number of created components by 1
-  Component::setNbCreatedComponents( Component::getNbCreatedComponents()
-    	- int( m_nbElemPart ) );
 }
 
 
@@ -311,9 +279,9 @@ CompositeParticle::CompositeParticle( CompositeParticle const& other )
 // simulation. Numbering is automatic, total number of components is
 // incremented by 1 and activity is set to WAIT. The calling object is
 // expected to be a reference particle
-Particle* CompositeParticle::createCloneCopy() const
+Particle* CompositeParticle::createCloneCopy( bool const& autonumbering ) const
 {
-  Particle* particle = new CompositeParticle( *this );
+  Particle* particle = new CompositeParticle( *this, autonumbering );
 
   return ( particle );
 }
@@ -327,15 +295,16 @@ Particle* CompositeParticle::createCloneCopy() const
 // Vector3 const& vtrans, Quaternion const& qrot, Vector3 const& vrot,
 // Transform const& config, ParticleActivity const& activ ) and is used for
 // periodic clone composite particles to be inserted in the simulation.
-// Numbering is set with the parameter id_ and total number of components left
-// unchanged.
+// Autonumbering is set to false and numbering is set with the parameter id_
 Particle* CompositeParticle::createCloneCopy( int const& id_,
     	Particle const* ParticleRef, Vector3 const& vtrans,
 	Quaternion const& qrot,	Vector3 const& vrot,
-	Transform const& config, ParticleActivity const& activ ) const
+	Transform const& config, ParticleActivity const& activ,
+	map< std::tuple<int,int,int>,
+     	std::tuple<bool, Vector3, Vector3, Vector3> > const* contactMap ) const
 {
   Particle* particle = new CompositeParticle( id_, ParticleRef, vtrans,
-	qrot, vrot, config, activ );
+	qrot, vrot, config, activ, contactMap );
 
   return ( particle );
 }
@@ -517,6 +486,24 @@ void CompositeParticle::setAngularVelocity( Vector3 const& vrot )
 
 
 // ----------------------------------------------------------------------------
+// Sets the angular velocity
+void CompositeParticle::setAngularVelocity( double const& omx, 
+	double const& omy, double const& omz )
+{
+  Particle::setAngularVelocity( omx, omy, omz );
+
+  // Note: my impression is that we never use the elementary particle
+  // velocity anywhere, so it might be valuable not to update it
+  // and save computing time
+
+  for ( size_t i=0; i<m_nbElemPart; ++i )
+    m_elementaryParticles[i]->setAngularVelocity( omx, omy, omz );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
 // Sets the translation velocity
 void CompositeParticle::setTranslationalVelocity( Vector3 const& vtrans )
 {
@@ -534,6 +521,33 @@ void CompositeParticle::setTranslationalVelocity( Vector3 const& vtrans )
   {
     m_elementaryParticles[i]->setTranslationalVelocity(
     	vtrans + ( vrot ^ ( rota * m_InitialRelativePositions[i] ) ) );
+  }
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets the translation velocity
+void CompositeParticle::setTranslationalVelocity( double const& vx, 
+	double const& vy, double const& vz )
+{
+  Particle::setTranslationalVelocity( vx, vy, vz );
+
+  // Note: my impression is that we never use the elementary particle
+  // velocity anywhere, so it might be valuable not to update it
+  // and save computing time
+
+  // Translational velocity of elementary particles satisfies rigid-body motion
+  // so U_elempart = U_composite + om_composite ^ leverarm_at_present_time
+  Matrix rota = m_geoRBWC->getTransform()->getBasis() ;
+  Vector3 vrot = *(m_kinematics->getAngularVelocity());  
+  Vector3 vrotcrossl;
+  for ( size_t i=0; i<m_nbElemPart; ++i )
+  {
+    vrotcrossl = vrot ^ ( rota * m_InitialRelativePositions[i] );
+    m_elementaryParticles[i]->setTranslationalVelocity(
+    	vx + vrotcrossl[X], vy + vrotcrossl[Y], vz + vrotcrossl[Z] );
   }
 }
 
@@ -562,17 +576,29 @@ double CompositeParticle::getVolume() const
 
 
 
+
+// ----------------------------------------------------------------------------
+// Returns the radius of the sphere of volume equivalent to that of the 
+// composite particle 
+double CompositeParticle::getEquivalentSphereRadius() const
+{
+  return ( pow( ( 0.75 / PI ) * m_mass / m_density, 1. / 3. ) );
+}
+
+
+
+
 // ----------------------------------------------------------------------------
 // Sets the elementary particle position given the position of the composite
 // particle
 void CompositeParticle::setElementaryParticlesPosition()
 {
-  // Note: we know the composite particle transformation at this time and we use
-  // it to update the elementary particle transformations.
-  // However, we do not have access to the composite particle relative
-  // tranformation from t to t+dt and cannot simply left compose the elementary
-  // particle transformation by the composite particle relative tranformation.
-  // Instead we work with the elementary particle initial transformation defined
+  // Note: we know the composite particle transformation at this time and we 
+  // use it to update the elementary particle transformations. However, we do 
+  // not have access to the composite particle relative tranformation from t 
+  // to t+dt and cannot simply left compose the elementary particle 
+  // transformation by the composite particle relative tranformation. Instead 
+  // we work with the elementary particle initial transformation defined
   // by their initial relative position with respect to the composite particle
   // center of mass required to be at (0,0,0) and their initial rotation matrix
   // Therefore there is an additional component to the translation coming from
@@ -719,44 +745,43 @@ bool CompositeParticle::isCloseWithCrust( Component const* voisin ) const
 void CompositeParticle::InterAction( Component* voisin,
 	double dt, double const& time, LinkedCell* LC )
 {
-  try {
-  list<ContactInfos*>  listContactInfos;
-
-  // Search all contact points between the composite particle and the component
-  // and store them in the list listContactInfos
-  for ( size_t i=0; i<m_nbElemPart; ++i )
+  try 
   {
-    if ( voisin->isCompositeParticle() || voisin->isSTLObstacle() )
-      voisin->SearchContact( m_elementaryParticles[i], dt,
+    list<ContactInfos*> listContactInfos;
+
+    // Search all contact points between the composite particle and the 
+    // component and store them in the list listContactInfos
+    for ( size_t i=0; i<m_nbElemPart; ++i )
+    {
+      if ( voisin->isCompositeParticle() || voisin->isSTLObstacle() )
+        voisin->SearchContact( m_elementaryParticles[i], dt,
 	  time, LC, listContactInfos );
-    else m_elementaryParticles[i]->SearchContact( voisin, dt,
-	  time, LC, listContactInfos )  ;
-  }
+      else m_elementaryParticles[i]->SearchContact( voisin, dt,
+	  time, LC, listContactInfos );
+    }
 
-  // Loop over all contact points and compute the contact force & torque
-  int nbContact = int(listContactInfos.size());
-  for ( list<ContactInfos*>::iterator il=listContactInfos.begin();
+    // Loop over all contact points and compute the contact force & torque
+    int nbContact = int(listContactInfos.size());
+    for ( list<ContactInfos*>::iterator il=listContactInfos.begin();
       il!=listContactInfos.end(); il++ )
-  {
-    LC->addToContactsFeatures( time, (*il)->ContactPoint );
+    {
+      LC->addToContactsFeatures( time, (*il)->ContactPoint );
 
-    if ( ContactBuilderFactory::contactForceModel(
+      if ( ContactBuilderFactory::contactForceModel(
 		(*il)->p0->getMaterial(), (*il)->p1->getMaterial() )
       		->computeForces( (*il)->p0, (*il)->p1, (*il)->ContactPoint,
 		LC, dt, nbContact ) )
-    {
-      (*il)->p0->getMasterComponent()->addToCoordinationNumber( 1 );
-      (*il)->p1->getMasterComponent()->addToCoordinationNumber( 1 );
+      {
+        (*il)->p0->getMasterComponent()->addToCoordinationNumber( 1 );
+        (*il)->p1->getMasterComponent()->addToCoordinationNumber( 1 );
+      }
+      delete *il;
     }
-    delete *il;
-  }
 
-  // Free the list
-  listContactInfos.clear();
+    // Free the list
+    listContactInfos.clear();
   }
-  catch (const ContactError&) {
-    throw ContactError();
-  }
+  catch ( ContactError const& ) { throw; }
 }
 
 
@@ -769,14 +794,13 @@ void CompositeParticle::SearchContact( Component* voisin, double dt,
       double const& time, LinkedCell *LC,
       list<ContactInfos*>& listContact )
 {
-  try {
-  for ( size_t i=0; i<m_nbElemPart; ++i )
+  try 
+  {
+    for ( size_t i=0; i<m_nbElemPart; ++i )
       m_elementaryParticles[i]->SearchContact( voisin, dt, time, LC,
 	listContact );
   }
-  catch (const ContactError&) {
-    throw ContactError();
-  }
+  catch ( ContactError const& ) { throw; }
 }
 
 
@@ -808,11 +832,12 @@ void CompositeParticle::composePositionRightByTransform( Transform const& t )
 
 // ----------------------------------------------------------------------------
 // Solves the Newton's law and move particle to their new position
-void CompositeParticle::Move( double time, double dt )
+void CompositeParticle::Move( double time, 
+	double const& dt_particle_vel, 
+    	double const& dt_particle_disp )
 {
-  try{
   // Move the composite particle
-  Particle::Move( time, dt );
+  Particle::Move( time, dt_particle_vel, dt_particle_disp );
 
   // Update elementary particles' position
   setElementaryParticlesPosition();
@@ -828,11 +853,7 @@ void CompositeParticle::Move( double time, double dt )
   {
     m_elementaryParticles[i]->setAngularVelocity( vrot );
     m_elementaryParticles[i]->setTranslationalVelocity(
-    	vtrans + ( vrot ^ ( rota * m_InitialRelativePositions[i] ) ) );
-  }
-  }
-  catch (const DisplacementError&) {
-    throw DisplacementError();
+   	vtrans + ( vrot ^ ( rota * m_InitialRelativePositions[i] ) ) );
   }
 }
 
@@ -895,7 +916,7 @@ void CompositeParticle::readAdditionalFeatures( istream& fileIn )
   for ( size_t j=0; j<m_nbElemPart; ++j )
   {
     m_elementaryParticles.push_back( ppp );
-    m_InitialRelativePositions.push_back( Vector3Nul );
+    m_InitialRelativePositions.push_back( Vector3Null );
     m_InitialRotationMatrices.push_back( ttt );
   }
 
@@ -935,6 +956,9 @@ void CompositeParticle::readAdditionalFeatures( istream& fileIn )
 
     // Set the activity as the composite activity
     m_elementaryParticles[j]->setActivity( m_activity );
+    
+    // Set its ID number
+    m_elementaryParticles[j]->setID( int(j) + 1 );    
   }
 
   // Read the buffer "</ElementaryParticles>"
@@ -945,6 +969,9 @@ void CompositeParticle::readAdditionalFeatures( istream& fileIn )
 
   // Compute and set the the circumscribed radius
   setCircumscribedRadius();
+    
+  // Compute and set the non-spherical bounding volume
+  if ( GrainsExec::m_colDetBoundingVolume ) createBoundingVolume();  
 
   // Set elementary particle kinematics
   // Note: again not sure we do anything with the elementary particle kinematics
@@ -1029,8 +1056,9 @@ void CompositeParticle::createSetElementaryParticles(
   for ( size_t i=0; i<m_nbElemPart; ++i )
   {
     m_elementaryParticles[i] = new Particle(
-      *((CompParticleRef->m_elementaryParticles)[i]) );
+      *((CompParticleRef->m_elementaryParticles)[i]), false );
     m_elementaryParticles[i]->setMasterParticle( this );
+    m_elementaryParticles[i]->setID( int(i) + 1 );
   }
 
   // Initial relative positions
@@ -1109,4 +1137,200 @@ BBox CompositeParticle::BoundingBox() const
 vector<Vector3> const* CompositeParticle::getInitialRelativePositions() const
 {
   return ( &m_InitialRelativePositions );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets the rotation quaternion
+void CompositeParticle::setQuaternionRotation( double const& vecteur0,
+	double const& vecteur1,
+	double const& vecteur2,
+	double const& scalaire )
+{
+  Particle::setQuaternionRotation( vecteur0, vecteur1, vecteur2, scalaire );
+  for ( size_t i=0; i<m_nbElemPart; ++i )
+    m_elementaryParticles[i]->setQuaternionRotation( vecteur0, vecteur1, 
+    	vecteur2, scalaire );  
+}	
+	
+	
+// ----------------------------------------------------------------------------
+// Sets the rotation quaternion
+void CompositeParticle::setQuaternionRotation( Quaternion const& qrot )
+{
+  Particle::setQuaternionRotation( qrot );
+  for ( size_t i=0; i<m_nbElemPart; ++i )
+    m_elementaryParticles[i]->setQuaternionRotation( qrot );  
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns whether two particles are of the same type
+bool CompositeParticle::equalType( Particle const* other ) const
+{
+  bool same = false;
+  
+  // Check if particle/composite particle matches
+  same = other->isCompositeParticle();
+
+  // Check if density matches
+  if ( same ) same = fabs( m_density - other->getDensity() ) < LOWEPS;
+
+  // Check if material matches
+  if ( same ) same = ( m_materialName == other->getMaterial() );
+  
+  // Check if geometric features match
+  if ( same )
+  {
+    // We know that ParticleRef points to a CompositeParticle, such that
+    // we can dynamically cast it to actual type
+    CompositeParticle const* other_ =
+  	dynamic_cast<CompositeParticle const*>(other);
+	
+    // Check if number of elementary particles matches
+    same = ( m_nbElemPart == other_->m_nbElemPart ); 
+    
+    // Check if elementary particles match
+    if ( same )
+      for ( size_t i=0; i<m_nbElemPart && same; ++i )
+        same = m_elementaryParticles[i]->equalType( 
+		other_->m_elementaryParticles[i] ); 
+		
+    // Check if relative positions of elementary particles match
+    double lmin = m_geoRBWC->getCircumscribedRadius();
+    if ( same )
+      for ( size_t i=0; i<m_nbElemPart && same; ++i )
+        same = ( Norm( m_InitialRelativePositions[i]
+		- other_->m_InitialRelativePositions[i] ) < LOWEPS * lmin ) ;
+		
+    // Check if initial rotation matrices of elementary particles match
+    if ( same )
+      for ( size_t i=0; i<m_nbElemPart && same; ++i )
+        for ( int j=0; j<int(m_nbElemPart) && same; ++j )  
+        same = ( Norm( m_InitialRotationMatrices[i][j]
+		- other_->m_InitialRotationMatrices[i][j] ) < LOWEPS * lmin ) ;
+  }
+  
+  return ( same );  
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Creates the non-spherical bounding volume */
+void CompositeParticle::createBoundingVolume()
+{
+  BVolume* bvol = NULL;
+  size_t ndim = 3;
+  if ( GrainsBuilderFactory::getContext() == DIM_2 ) ndim = 2;
+  Convex const* convexA = NULL;
+  Transform const* a2w = NULL;
+  RigidBodyWithCrust const* rbA = NULL;
+  Vector3 u;
+  Point3 pointA;
+   
+  if ( GrainsExec::m_colDetBoundingVolume == 1 ) // OBB
+  {
+    Vector3 maxcoord( -1.20 );
+    for ( size_t i=0; i<m_nbElemPart; ++i )
+    {
+      rbA = m_elementaryParticles[i]->getRigidBody();
+      convexA = rbA->getConvex();
+      a2w = rbA->getTransform();
+      for ( size_t m=0; m<ndim; ++m )
+      {
+        u.reset();
+	
+	// Positive coordinate
+	u[m] = 1.;
+	pointA = (*a2w)( convexA->support( ( u ) * a2w->getBasis() ) );
+	maxcoord[m] = max( maxcoord[m], pointA[m] );
+	
+	// Negative coordinate
+	u[m] = - 1.;
+	pointA = (*a2w)( convexA->support( ( u ) * a2w->getBasis() ) );
+	maxcoord[m] = max( maxcoord[m], fabs( pointA[m] ) );		
+      }
+    }
+
+    bvol = new OBB( maxcoord, Matrix() );
+  }
+  else if ( GrainsExec::m_colDetBoundingVolume == 2 ) // OBC
+  {
+    size_t const nn = 720;
+    double const deltatheta = 2. * PI / double(nn);
+    double theta = 0., minVol = 1.e20;
+    Vector3 radius, height( -1.20 );
+    Vector3 initOri[3];
+    size_t coord0, coord1, axisDir = 0;
+    for ( size_t m=0; m<3; ++m ) initOri[m][m] = 1.;
+    
+    for ( size_t i=0; i<m_nbElemPart; ++i )
+    {    
+      rbA = m_elementaryParticles[i]->getRigidBody();
+      convexA = rbA->getConvex();
+      a2w = rbA->getTransform();
+      for ( size_t m=0; m<3; ++m )
+      {      
+        u.reset();
+      
+        // Height
+	// Positive coordinate
+	u[m] = initOri[m][m];
+	pointA = (*a2w)( convexA->support( ( u ) * a2w->getBasis() ) );
+	height[m] = max( height[m], 2. * pointA[m] );
+	
+	// Negative coordinate
+	u[m] = - initOri[m][m];
+	pointA = (*a2w)( convexA->support( ( u ) * a2w->getBasis() ) );
+	height[m] = max( height[m], fabs( 2. * pointA[m] ) );
+	
+	
+	// Radius
+	u[m] = 0.;
+	coord0 = m == 0 ? 1 : 0;
+	coord1 = m == 2 ? 1 : 2;	
+	for ( size_t k=0; k<nn; ++k )
+	{
+	  theta = double(k) * deltatheta;
+	  u[coord0] = cos( theta );
+	  u[coord1] = sin( theta );
+	  pointA = (*a2w)( convexA->support( ( u ) * a2w->getBasis() ) );
+	  radius[m] = max( radius[m], Norm( pointA ) );  
+	}
+      }      
+    }
+    
+    // Select the direction that heads to the smallest volume cylinder
+    for ( size_t m=0; m<3; ++m )  
+      if ( PI * height[m] * pow( radius[m], 2. ) < minVol ) 
+      {  
+        minVol = PI * height[m] * pow( radius[m], 2. );
+	axisDir = m;
+      }
+      
+    bvol = new OBC( radius[axisDir], height[axisDir], initOri[axisDir] );      
+  }
+  
+  m_geoRBWC->setBoundingVolume( bvol ); 
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Writes the particle in an OBJ format
+void CompositeParticle::write_OBJ( ostream& f, size_t const& group_number,
+    	size_t& firstpoint_number ) const
+{
+  for ( size_t i=0; i<m_nbElemPart; ++i )
+  {
+    m_elementaryParticles[i]->write_OBJ( f, i, firstpoint_number );
+    f << endl;
+  } 
 }

@@ -110,14 +110,14 @@ Point3 Disc::support( Vector3 const& v ) const
 
 
 // ----------------------------------------------------------------------------
-// Returns a vector of points describing the envelope of the disc.
+// Returns a vector of points describing the surface of the disc.
 // Here simply returns the point (0,0,0) as a convention
 vector<Point3> Disc::getEnvelope() const
 {
-  vector<Point3> envelope;
+  vector<Point3> surface;
   Point3 point( 0.,0.,0. );
-  envelope.push_back( point );
-  return ( envelope );
+  surface.push_back( point );
+  return ( surface );
 }
 
 
@@ -259,9 +259,10 @@ void Disc::write_polygonsStr_PARAVIEW( list<int>& connectivity,
 
 
 // ----------------------------------------------------------------------------
-// Sets the number of points over the perimeter of the disc for 
-// Paraview post-processing
-void Disc::SetvisuNodeNb( int nbpts )
+// Sets the number of point over the disc perimeter for Paraview 
+// post-processing, i.e., controls the number of facets in the disc 
+// reconstruction in Paraview
+void Disc::SetvisuNodeNbOverPer( int nbpts )
 { 
   m_visuNodeNb = nbpts; 
 }
@@ -275,3 +276,38 @@ bool Disc::isIn( Point3 const& pt ) const
 {
   return ( pt[X] * pt[X] + pt[Y] * pt[Y] <= m_radius * m_radius );
 }  
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the bounding volume to disc
+BVolume* Disc::computeBVolume( unsigned int type ) const
+{
+  BVolume* bvol = NULL;
+  if ( type == 1 ) // OBB
+    bvol = new OBB( Vector3( m_radius, m_radius, 0. ), Matrix() );
+  else if ( type == 2 ) // OBC
+    bvol = new OBC( m_radius, 0., Vector3( 0., 0., 1. ) );
+
+  return( bvol );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Performs advanced comparison of the two discs and returns whether 
+// they match
+bool Disc::equalType_level2( Convex const* other ) const
+{
+  // We know that other points to a Disc, we dynamically cast it to actual 
+  // type
+  Disc const* other_ = dynamic_cast<Disc const*>(other);
+  
+  double lmin = min( m_radius, other_->m_radius );
+
+  bool same = ( fabs( m_radius - other_->m_radius ) <  LOWEPS * lmin );
+  
+  return ( same );
+} 

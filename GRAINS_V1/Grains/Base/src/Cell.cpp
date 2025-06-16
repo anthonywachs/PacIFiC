@@ -171,10 +171,10 @@ bool Cell::contains( Particle* particle_ )
 // Returns the cell ijk indices that contains a point
 void Cell::GetCell( Point3 const& position, int* id )
 {	
-  // Utilisation de floor plutot que int car si x < m_LC_local_origin[X]
-  // int renvoie 0 alors que floor renvoie -1, et -1 est la valeur attendue car
-  // la particle est hors du LinkedCell
-  // Rem: floor renvoie un type double, qu'on re-cast en int 
+  // We use floor instead of int. If x < m_LC_local_origin[X]
+  // then int returns 0 while floor returns -1, and -1 is the correct value
+  // as the position is out of the LinkedCell
+  // Rem: floor returns a double that we recast into an int
   id[X] = int( floor( ( position[X] - Cell::m_LC_local_origin[X] ) 
   	/ Cell::m_edge_X ) );
   id[Y] = int( floor( ( position[Y] - Cell::m_LC_local_origin[Y] ) 
@@ -247,7 +247,7 @@ bool Cell::isContact( Particle const* particle_ ) const
 // Returns whether a particle is in contact with another component
 // in the vicinity of the cell. The contact detection is performed with the
 // crust width
-bool Cell::isContactWithCrust( Particle const* particle_ ) const
+bool Cell::isContactWithCrust( Particle const* particle_, bool BVonly ) const
 {
   bool contact = false;
   
@@ -257,18 +257,36 @@ bool Cell::isContactWithCrust( Particle const* particle_ ) const
     if ( *neighbor != particle_ ) 
     {
       if ( particle_->isCompositeParticle() )
-        contact = particle_->isContactWithCrust( *neighbor ); 
+      {
+        contact = particle_->doBVolumeOverlap( *neighbor );
+	if ( contact && !BVonly )
+	  contact = particle_->isContactWithCrust( *neighbor );
+      } 
       else 
-        contact = (*neighbor)->isContactWithCrust( particle_ );
+      {
+        if ( (*neighbor)->isCompositeParticle() )
+	{  
+	  contact = particle_->doBVolumeOverlap( *neighbor );
+	  if ( contact && !BVonly )
+            contact = (*neighbor)->isContactWithCrust( particle_ );
+	}
+	else contact = (*neighbor)->isContactWithCrust( particle_ );
+      }
     }
 
   // Contact detection with obstacles
   list<SimpleObstacle*>::const_iterator obs = m_obstacles.begin();
   for ( ; obs!=m_obstacles.end() && !contact; obs++)
+  {
     if ( particle_->isCompositeParticle() )
-      contact = particle_->isContactWithCrust( *obs );
+    {
+      contact = particle_->doBVolumeOverlap( *obs );
+      if ( contact && !BVonly ) 
+	contact = particle_->isContactWithCrust( *obs );
+    }
     else
-      contact = (*obs)->isContactWithCrust( particle_ ); 
+      contact = (*obs)->isContactWithCrust( particle_ );
+  } 
 
   return ( contact );
 }
@@ -510,6 +528,26 @@ string Cell::getGeoPositionName( int geoloc_ )
 
 
 // ----------------------------------------------------------------------------
+// Returns the cell tag
+int Cell::getTag() const
+{
+  return ( m_tag );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the cell number
+int Cell::getID() const
+{
+  return ( m_number );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
 // Returns the geographic position name
 string Cell::getGeoPositionName_generic( int geoloc_ )
 {
@@ -596,7 +634,16 @@ string Cell::getGeoPositionName_generic( int geoloc_ )
       break;      
     case GEOPOS_NONE:
       name = "NONE";
-      break;  
+      break; 
+    case GEOPOS_EASTWEST:
+      name = "EAST_WEST";
+      break;      
+    case GEOPOS_NORTHSOUTH:
+      name = "NORTH_SOUTH";
+      break;      
+    case GEOPOS_EASTWESTNORTHSOUTH:
+      name = "EAST_WEST_NORTH_SOUTH";
+      break;              
   }      
       
   return ( name );
@@ -611,8 +658,8 @@ bool Cell::isInParticle( Point3 const& position ) const
 {
   bool isIn = false;
   
-  for ( list<Particle*>::const_iterator particle = m_particles.begin(); 
-  	particle!=m_particles.end() && !isIn; particle++) 
+  for ( list<Particle*>::const_iterator particle = m_particles.cbegin(); 
+  	particle!=m_particles.cend() && !isIn; particle++) 
    isIn = (*particle)->isIn( position );    
       
   return ( isIn );

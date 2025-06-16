@@ -17,17 +17,17 @@
 using namespace std;
 
 
-// Initialisation des attributs static
 double Particle::m_fluidDensity = 0.;
 double Particle::m_fluidViscosity = 0.;
 bool Particle::m_fluidCorrectedAcceleration = true ;
 bool Particle::m_splitExplicitAcceleration = false;
+int Particle::m_maxID = 0;
 
 
 // ----------------------------------------------------------------------------
 // Constructor with autonumbering as input parameter
 Particle::Particle( bool const& autonumbering )
-  : Component( autonumbering )
+  : Component()
   , m_masterParticle( this )
   , m_kinematics( NULL )
   , m_density( 2500. )
@@ -43,7 +43,12 @@ Particle::Particle( bool const& autonumbering )
   , m_coordination_number( 0 )
   , m_specific_composite_shape( "none" )
 {
-  // Initialize inertia
+  if ( autonumbering )
+  {
+    Particle::m_maxID++;
+    m_id = Particle::m_maxID;
+  }
+
   for (int i=0; i<6; i++)
   {
     m_inertia[i] = 0.0;
@@ -56,7 +61,7 @@ Particle::Particle( bool const& autonumbering )
 
 // ----------------------------------------------------------------------------
 // Copy constructor (the torsor is initialized to 0)
-Particle::Particle( Particle const& other )
+Particle::Particle( Particle const& other, bool const& autonumbering )
   : Component( other )
   , m_masterParticle( this )
   , m_density( other.m_density )
@@ -73,6 +78,12 @@ Particle::Particle( Particle const& other )
   , m_weight( other.m_weight )
   , m_specific_composite_shape( other.m_specific_composite_shape )  
 {
+  if ( autonumbering )
+  {
+    Particle::m_maxID++;
+    m_id = Particle::m_maxID;
+  }
+
   m_kinematics = other.m_kinematics->clone();
   copy( &other.m_inertia[0], &other.m_inertia[6], &m_inertia[0] );
   copy( &other.m_inertia_1[0], &other.m_inertia_1[6], &m_inertia_1[0] );
@@ -89,6 +100,8 @@ Particle::Particle( Particle const& other )
     m_VelocityInfosNm1->RotationalVelocity_difference =
     	other.m_VelocityInfosNm1->RotationalVelocity_difference;
   }
+  
+  m_kinematics->setCouplingFactor( m_density );
 }
 
 
@@ -97,9 +110,8 @@ Particle::Particle( Particle const& other )
 // ----------------------------------------------------------------------------
 // Constructor with an XML node as an input parameter. This constructor is
 // expected to be used for reference particles
-Particle::Particle( DOMNode* root, bool const& autonumbering,
-  	int const& pc )
-  : Component( autonumbering )
+Particle::Particle( DOMNode* root, int const& pc )
+  : Component()
   , m_masterParticle( this )
   , m_kinematics( NULL )
   , m_density( 2500. )
@@ -115,6 +127,9 @@ Particle::Particle( DOMNode* root, bool const& autonumbering,
   , m_coordination_number( 0 )
   , m_specific_composite_shape( "none" )
 {
+  // ID number is set to the reference particle default ID 
+  m_id = GrainsExec::m_ReferenceParticleDefaultID;
+  
   for (int i=0; i<6; i++)
   {
     m_inertia[i] = 0.0;
@@ -124,6 +139,7 @@ Particle::Particle( DOMNode* root, bool const& autonumbering,
   m_geoRBWC = new RigidBodyWithCrust( root );
   m_kinematics = KinematicsBuilderFactory::create(
   	m_geoRBWC->getConvex() );
+  m_kinematics->setCouplingFactor( m_density );	
 
   // Particle density
   if ( ReaderXML::hasNodeAttr( root, "Density" ) )
@@ -160,9 +176,8 @@ Particle::Particle( DOMNode* root, bool const& autonumbering,
 // Constructor with input parameters. This constructor is
 // expected to be used for reference particles
 Particle::Particle( RigidBodyWithCrust* georbwc, double const& density,
-    	string const& mat, bool const& autonumbering,
-  	int const& pc )
-  : Component( autonumbering )
+    	string const& mat, int const& pc )
+  : Component()
   , m_masterParticle( this )
   , m_kinematics( NULL )
   , m_density( 2500. )
@@ -178,6 +193,9 @@ Particle::Particle( RigidBodyWithCrust* georbwc, double const& density,
   , m_coordination_number( 0 )
   , m_specific_composite_shape( "none" )
 {
+  // ID number is set to the reference particle default ID 
+  m_id = GrainsExec::m_ReferenceParticleDefaultID;
+
   for (int i=0; i<6; i++)
   {
     m_inertia[i] = 0.0;
@@ -187,6 +205,7 @@ Particle::Particle( RigidBodyWithCrust* georbwc, double const& density,
   m_geoRBWC = georbwc;
   m_kinematics = KinematicsBuilderFactory::create(
   	m_geoRBWC->getConvex() );
+  m_kinematics->setCouplingFactor( m_density );	
 
   // Particle density
   m_density = density;
@@ -225,7 +244,7 @@ Particle::Particle( int const& id_, Particle const* ParticleRef,
 	ParticleActivity const& activ,
 	int const& tag_,
 	int const& coordination_number_ )
-  : Component( false )
+  : Component()
   , m_masterParticle( this )
   , m_kinematics( NULL )
   , m_activity( activ )
@@ -267,6 +286,7 @@ Particle::Particle( int const& id_, Particle const* ParticleRef,
 
   // Mass and inertia
   m_density = ParticleRef->m_density;
+  m_kinematics->setCouplingFactor( m_density );
   m_mass = ParticleRef->m_mass;
   for (int i=0; i<6; i++)
   {
@@ -287,12 +307,12 @@ Particle::Particle( int const& id_, Particle const* ParticleRef,
 // ----------------------------------------------------------------------------
 // Constructor with input parameters
 Particle::Particle( int const& id_, Particle const* ParticleRef,
-	Vector3 const& vtrans,
-	Quaternion const& qrot,
-	Vector3 const& vrot,
-	Transform const& config,
-	ParticleActivity const& activ )
-  : Component( false )
+	Vector3 const& vtrans, Quaternion const& qrot,
+	Vector3 const& vrot, Transform const& config,
+	ParticleActivity const& activ,
+     	map< std::tuple<int,int,int>,
+     	std::tuple<bool, Vector3, Vector3, Vector3> > const* contactMap )
+  : Component()
   , m_masterParticle( this )
   , m_kinematics( NULL )
   , m_activity( activ )
@@ -329,12 +349,16 @@ Particle::Particle( int const& id_, Particle const* ParticleRef,
 
   // Mass and inertia
   m_density = ParticleRef->m_density;
+  m_kinematics->setCouplingFactor( m_density );  
   m_mass = ParticleRef->m_mass;
   for (int i=0; i<6; i++)
   {
     m_inertia[i] = ParticleRef->m_inertia[i];
     m_inertia_1[i] = ParticleRef->m_inertia_1[i];
   }
+  
+  // Contact map
+  if ( contactMap->size() ) m_contactMap = *contactMap;   
 
   // Weight
   computeWeight();
@@ -349,12 +373,11 @@ Particle::Particle( int const& id_, Particle const* ParticleRef,
 // ----------------------------------------------------------------------------
 // Creates a clone of the particle. This method calls the standard
 // copy constructor and is used for new particles to be inserted in the
-// simulation. Numbering is automatic, total number of components is
-// incremented by 1 and activity is set to WAIT. The calling object is
+// simulation. Activity is set to WAIT. The calling object is
 // expected to be a reference particle
-Particle* Particle::createCloneCopy() const
+Particle* Particle::createCloneCopy( bool const& autonumbering ) const
 {
-  Particle* particle = new Particle( *this );
+  Particle* particle = new Particle( *this, autonumbering );
 
   return ( particle );
 }
@@ -367,15 +390,17 @@ Particle* Particle::createCloneCopy() const
 // constructor Particle( int const& id_, Particle const* ParticleRef, Vector3
 // const& vtrans, Quaternion const& qrot, Vector3 const& vrot,	Transform
 // const& config, ParticleActivity const& activ ) and is used for periodic
-// clone particles to be inserted in the simulation. Numbering is set with the
-// parameter id_ and total number of components left unchanged.
+// clone particles to be inserted in the simulation. Autonumbering
+// is set to false and numbering is set with the parameter id_
 Particle* Particle::createCloneCopy( int const& id_,
     	Particle const* ParticleRef, Vector3 const& vtrans,
 	Quaternion const& qrot,	Vector3 const& vrot,
-	Transform const& config, ParticleActivity const& activ ) const
+	Transform const& config, ParticleActivity const& activ,
+     	map< std::tuple<int,int,int>,
+     	std::tuple<bool, Vector3, Vector3, Vector3> > const* contactMap ) const
 {
   Particle* particle = new Particle( id_, ParticleRef, vtrans,
-	qrot, vrot, config, activ );
+	qrot, vrot, config, activ, contactMap );
 
   return ( particle );
 }
@@ -408,29 +433,39 @@ Particle::~Particle()
 
 // ----------------------------------------------------------------------------
 // Solves the Newton's law and move particle to their new position
-void Particle::Move( double time, double dt )
+void Particle::Move( double time, 
+	double const& dt_particle_vel, 
+    	double const& dt_particle_disp )
 {
-  try {
-  // Time integration of Newton's law followed and kinematic equations
-  m_kinematics->computeMomentumChangeOverDt( m_torsor, dt, this );
-  double depl = m_kinematics->Move( this, dt );
-
-  // Check that translational displacement is smaller than crust thickness
-  double rayon = m_geoRBWC->getCrustThickness();
-  if ( depl > rayon )
+  try 
   {
-    cout << endl << "Processor = " <<
-    	(GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank_active() : 0 )
-	<< " has thrown an DisplacementError exception" <<  endl;
-    GrainsExec::m_exception_Displacement = true;
-    DisplacementError erreur( this, depl, rayon, time );
-    throw erreur;
-  }
+    // Time integration of Newton's law and kinematic equations
+    double depl = m_kinematics->Move( this, dt_particle_vel, 
+    	dt_particle_disp );
 
+    // Check that translational motion is smaller than crust thickness
+    double crust = m_geoRBWC->getCrustThickness();
+    if ( depl > crust )
+    {
+      cout << endl << "Processor = " <<
+    	(GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank() : 0 )
+	<< " has thrown an MotionError exception" <<  endl;
+      GrainsExec::m_exception_Motion = true;
+      MotionError error( this, depl, crust, time );
+      throw ( error );
+    }
   }
-  catch (const DisplacementError&) {
-    throw DisplacementError();
-  }
+  catch ( MotionError const& ) { throw; }
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Advances velocity over dt_particle_vel
+void Particle::advanceVelocity( double time, double const& dt_particle_vel )
+{
+  m_kinematics->advanceVelocity( this, dt_particle_vel );
 }
 
 
@@ -442,29 +477,53 @@ void Particle::Move( double time, double dt )
 void Particle::InterAction( Component* voisin,
 	double dt, double const& time, LinkedCell* LC )
 {
-  try {
   PointContact closestPoint;
   double delta=0.;
 
-  try {
-    closestPoint = m_geoRBWC->ClosestPoint( *(voisin->getRigidBody()) );
-  }
-  catch ( ContactError &erreur )
+  try 
   {
-    try {
-      closestPoint = m_geoRBWC->ClosestPoint_ErreurHandling(
-      	*(voisin->getRigidBody()), 10., m_id, voisin->getID() );
+    if ( GrainsExec::m_colDetWithHistory )
+    {
+      int id = voisin->getID();
+      Vector3 initialDirection = this->lookupCollision( id );
+      // we have to check the map for the other component as well in case the
+      // initial direction is null. Note that !(v != Vector3Null) is more 
+      // efficient that v = Vector3Null.
+      // Also, note the negative sign as well.
+      if ( !( initialDirection != Vector3Null ) )
+        initialDirection = -( voisin->lookupCollision( this->getID() ) );
+      // Collision detection
+      closestPoint = m_geoRBWC->ClosestPoint( *( voisin->getRigidBody() ),
+                                               initialDirection );
+      if ( initialDirection != Vector3Null )
+      {
+        m_collisionHistory.updateCollision( id, initialDirection );
+        // cout << initialDirection << endl;
+      }
+      else
+        m_collisionHistory.removeCollision( id );
     }
-    catch (ContactError &erreur_level2)
+    else
+      closestPoint = m_geoRBWC->ClosestPoint( *(voisin->getRigidBody()) );
+  }
+  catch ( ContactError& error ) 
+  {
+    try 
+    {
+      closestPoint = m_geoRBWC->ClosestPoint_ErreurHandling(
+     	*(voisin->getRigidBody()), 10., m_id, voisin->getID() );
+    }
+    catch ( ContactError& error_level2 ) 
     {
       cout << endl << "Processor = "
-	<< ( GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank_active() : 0 )
-	<< " has thrown an ContactError exception" <<  endl;
-      erreur_level2.setMessage( "Particle::InterAction : choc de croute a t="
-      	+ GrainsExec::doubleToString( time, TIMEFORMAT ) );
-      erreur_level2.setComponents( this, voisin, time );
+	<< ( GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank() : 0 )
+	<< " has thrown a ContactError exception" <<  endl;
+	error_level2.setMessage( "Particle::InterAction : max overlap"
+	" exceeded at t="
+	+ GrainsExec::doubleToString( time, FORMAT10DIGITS ) );
+      error_level2.setComponents( this, voisin, time );
       GrainsExec::m_exception_Contact = true;
-      throw(erreur_level2);
+      throw ( error_level2 );
     }
   }
 
@@ -474,8 +533,8 @@ void Particle::InterAction( Component* voisin,
   if( delta < 0. )
   {
     if ( ContactBuilderFactory::contactForceModel(
-		m_materialName, voisin->getMaterial() )
-    		->computeForces( this, voisin, closestPoint, LC, dt ) )
+	m_materialName, voisin->getMaterial() )
+	->computeForces( this, voisin, closestPoint, LC, dt ) )
     {
       // Note: in this method this and voisin cannot be a CompositeParticle
       // thus there is no need to call getMasterComponent() before
@@ -483,11 +542,6 @@ void Particle::InterAction( Component* voisin,
       this->addToCoordinationNumber( 1 );
       voisin->addToCoordinationNumber( 1 );
     }
-  }
-
-  }
-  catch (const ContactError&) {
-    throw ContactError();
   }
 }
 
@@ -500,28 +554,30 @@ void Particle::InterAction( Component* voisin,
 void Particle::SearchContact( Component* voisin, double dt,
       double const& time, LinkedCell *LC, list<ContactInfos*>& listContact )
 {
-  try{
   PointContact closestPoint;
 
-  try {
+  try 
+  {
     closestPoint = m_geoRBWC->ClosestPoint( *(voisin->getRigidBody()) );
   }
-  catch ( ContactError &erreur )
+  catch ( ContactError& error )
   {
-    try {
+    try 
+    {
       closestPoint = m_geoRBWC->ClosestPoint_ErreurHandling(
-      	*(voisin->getRigidBody()), 10., m_id, voisin->getID() );
+		*(voisin->getRigidBody()), 10., m_id, voisin->getID() );
     }
-    catch (ContactError &erreur_level2)
+    catch ( ContactError& error_level2 )
     {
       cout << endl << "Processor = "
-	<< ( GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank_active() : 0 )
+	<< ( GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank() : 0 )
 	<< " has thrown an ContactError exception" <<  endl;
-      erreur_level2.setMessage( "Particle::InterAction : choc de croute a t="
-      	+ GrainsExec::doubleToString( time, TIMEFORMAT ) );
-      erreur_level2.setComponents( this, voisin, time );
+      error_level2.setMessage( "Particle::InterAction : max overlap"
+	" exceeded at t="
+	+ GrainsExec::doubleToString( time, FORMAT10DIGITS ) );
+      error_level2.setComponents( this, voisin, time );
       GrainsExec::m_exception_Contact = true;
-      throw(erreur_level2);
+      throw ( error_level2 );
     }
   }
 
@@ -533,11 +589,6 @@ void Particle::SearchContact( Component* voisin, double dt,
     result->p0 = this;
     result->p1 = voisin;
     listContact.push_back( result );
-  }
-
-  }
-  catch (const ContactError&) {
-    throw ContactError();
   }
 }
 
@@ -605,16 +656,6 @@ double Particle::getDensity() const
 
 
 // ----------------------------------------------------------------------------
-// Returns the radius of the sphere of same volume
-double Particle::getEquivalentSphereRadius() const
-{
-  return ( pow( ( 0.75 / PI ) * m_mass / m_density, 1. / 3. ) );
-}
-
-
-
-
-// ----------------------------------------------------------------------------
 // Returns the velocity at a point in space based on the
 // translational and angular velocity of the particle. This method assumes
 // that the point belongs to the particle but this assumption is not verified.
@@ -642,16 +683,6 @@ Vector3 const* Particle::getAngularVelocity() const
 Vector3 const* Particle::getTranslationalVelocity() const
 {
   return ( m_kinematics->getTranslationalVelocity() );
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// Returns total force exerted on the particle
-Vector3 const* Particle::getForce() const
-{
-  return ( m_torsor.getForce() );
 }
 
 
@@ -719,17 +750,6 @@ void Particle::copyTranslationalVelocity( double* vit, int i ) const
 void Particle::copyKinematicsNm2( double* vit, int i ) const
 {
   m_kinematics->copyKinematicsNm2( vit, i );
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// Adds a force whose point of application is different from the
-// reference point of the torsor (additional torque contribution)
-void Particle::addForce( Point3 const& point, Vector3 const& f_ )
-{
-  m_torsor.addForce( point, f_ );
 }
 
 
@@ -828,10 +848,32 @@ void Particle::setAngularVelocity( Vector3 const& vrot )
 
 
 // ----------------------------------------------------------------------------
+// Sets the angular velocity
+void Particle::setAngularVelocity( double const& omx, double const& omy,
+	double const& omz )
+{
+  m_kinematics->setAngularVelocity( omx, omy, omz );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
 // Sets the translation velocity
 void Particle::setTranslationalVelocity( Vector3 const& vtrans )
 {
   m_kinematics->setTranslationalVelocity( vtrans );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets the translation velocity
+void Particle::setTranslationalVelocity( double const& vx, double const& vy,
+	double const& vz )
+{
+  m_kinematics->setTranslationalVelocity( vx, vy, vz );
 }
 
 
@@ -970,7 +1012,10 @@ void Particle::read2014( istream& fileIn, vector<Particle*> const*
   if ( m_kinematics ) delete m_kinematics;
   m_kinematics = KinematicsBuilderFactory::create(
   	m_geoRBWC->getConvex() );
-  fileIn >> *m_kinematics;
+  m_kinematics->readParticleKinematics2014( fileIn, this );
+  
+  // Read contact map
+  readContactMap2014( fileIn );
 
   // In case part of the particle acceleration is computed explicity
   if ( Particle::m_splitExplicitAcceleration ) createVelocityInfosNm1();
@@ -991,7 +1036,6 @@ void Particle::read2014_binary( istream& fileIn, vector<Particle*> const*
   // ID number
   // Note: the geometric type of particle m_GeomType is read and set prior
   // to constructing the particle
-  // Note: the m_GeomType is read and set prior to constructing the particle
   fileIn.read( reinterpret_cast<char*>( &m_id ), sizeof(int) );
 
   // Create the rigid body using the copy constructor of RigidBodyWithCrust
@@ -1029,7 +1073,10 @@ void Particle::read2014_binary( istream& fileIn, vector<Particle*> const*
   if ( m_kinematics ) delete m_kinematics;
   m_kinematics = KinematicsBuilderFactory::create(
   	m_geoRBWC->getConvex() );
-  m_kinematics->readParticleKinematics2014_binary( fileIn );
+  m_kinematics->readParticleKinematics2014_binary( fileIn, this );
+
+  // Read contact map
+  readContactMap2014_binary( fileIn );
 
   // In case part of the particle acceleration is computed explicity
   if ( Particle::m_splitExplicitAcceleration ) createVelocityInfosNm1();
@@ -1053,36 +1100,36 @@ void Particle::write( ostream& fileSave ) const
   fileSave << "*Type " << m_GeomType << endl;
   fileSave << "*Tag " << m_tag << endl;
   fileSave << "*Mass "
-	   << GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	   << GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
   		m_mass ) << endl;
   fileSave << "*Density "
-	   << GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	   << GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
   		m_density ) << endl;
   fileSave << "*MomentOfInertiaTensor" << endl
-	<< GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	<< GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
   		m_inertia[0] ) << " "
-	<< GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	<< GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
   		m_inertia[1] ) << " "
-	<< GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	<< GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
   		m_inertia[2] ) << " "
-	<< GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	<< GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
   		m_inertia[3] ) << " "
-	<< GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	<< GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
   		m_inertia[4] ) << " "
-	<< GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	<< GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
   		m_inertia[5] ) << endl;
   fileSave << "*InverseOfMOIT" << endl
-	<< GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	<< GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
   		m_inertia_1[0] ) << " "
-	<< GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	<< GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
   		m_inertia_1[1] ) << " "
-	<< GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	<< GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
   		m_inertia_1[2] ) << " "
-	<< GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	<< GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
   		m_inertia_1[3] ) << " "
-	<< GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	<< GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
   		m_inertia_1[4] ) << " "
-	<< GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+	<< GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
   		m_inertia_1[5] ) << endl;
 
   Component::writePosition( fileSave );
@@ -1124,7 +1171,8 @@ void Particle::write2014( ostream& fileSave ) const
   	( m_activity == COMPUTE ? true : false ) << " ";
   m_geoRBWC->getTransform()->writeTransform2014( fileSave );
   fileSave << " ";
-  m_kinematics->writeParticleKinematics2014( fileSave );
+  m_kinematics->writeParticleKinematics2014( fileSave, this );
+  writeContactMemory2014( fileSave );
   fileSave << endl;
 }
 
@@ -1141,7 +1189,23 @@ void Particle::write2014_binary( ostream& fileSave )
   unsigned int iact = m_activity == COMPUTE ? true : false ;
   fileSave.write( reinterpret_cast<char*>( &iact ), sizeof(unsigned int) );
   m_geoRBWC->getTransform()->writeTransform2014_binary( fileSave );
-  m_kinematics->writeParticleKinematics2014_binary( fileSave );
+  m_kinematics->writeParticleKinematics2014_binary( fileSave, this );
+  writeContactMemory2014_binary( fileSave );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the number of bytes of the particle when written in a binary format 
+// to an output stream
+size_t Particle::get_numberOfBytes() const
+{
+  return ( 3 * sizeof(int) + sizeof(unsigned int) 
+  	+ Transform::m_sizeofTransform
+ 	+ m_kinematics->get_numberOfBytes()
+	+ sizeof(int) 
+	+ m_contactMap.size() * Component::m_sizeofContactMemory );
 }
 
 
@@ -1324,8 +1388,7 @@ void Particle::createVelocityInfosNm1()
 // particle
 Vector3 Particle::computeOrientationVector() const
 {
-  return( m_geoRBWC->getConvex()->computeOrientationVector(
-  	m_geoRBWC->getTransform() ) );
+  return( m_geoRBWC->computeOrientationVector() );
 }
 
 
@@ -1347,7 +1410,7 @@ void Particle::InitializeForce( bool const& withWeight )
 {
   if ( withWeight )
     m_torsor.setToBodyForce( *m_geoRBWC->getCentre(), m_weight );
-  else m_torsor.setToBodyForce( *m_geoRBWC->getCentre(), Vector3Nul );
+  else m_torsor.setToBodyForce( *m_geoRBWC->getCentre(), Vector3Null );
   m_coordination_number = 0 ;
 }
 
@@ -1754,4 +1817,146 @@ void Particle::computeInertiaTensorSpaceFixed( vector<double>& inertia ) const
   inertia[3] = inertiaSpaceFixed[Y][Y];
   inertia[4] = inertiaSpaceFixed[Y][Z];
   inertia[5] = inertiaSpaceFixed[Z][Z];
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the specific composite shape name: "none" for standard particles
+// and non-specific composite particle and class name for specific composite
+// particles 
+string Particle::getSpecificCompositeShapeName() const
+{
+  return ( m_specific_composite_shape );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns whether two particles are of the same type
+bool Particle::equalType( Particle const* other ) const
+{
+  bool same = false;
+  
+  // Check if particle/composite particle matches
+  same = !other->isCompositeParticle();
+
+  // Check if density matches
+  if ( same ) same = fabs( m_density - other->m_density ) < LOWEPS;
+
+  // Check if material matches
+  if ( same ) same = ( m_materialName == other->m_materialName );   
+	
+  // Check geometric shape type
+  if ( same ) same = ( m_geoRBWC->getConvex()->equalType( 
+      other->m_geoRBWC->getConvex(), true ) );
+
+  return ( same );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the maximum ID number of a particle
+int Particle::getMaxIDnumber()
+{
+  return ( m_maxID );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Resets the maximum ID number of a particle for autonumbering
+void Particle::setMaxIDnumber( int const& maxID_ )
+{
+  m_maxID = maxID_;
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns whether to store the contact force for post-processing 
+bool Particle::storePPForce( Component const* othercomp ) const
+{
+  bool store = false;
+  // Case of an interior or buffer particle
+  if ( m_tag < 2 )
+  {
+    // Other component is either an obstacle or an interior/buffer particle
+    if ( othercomp->getTag() < 2 ) store = true;
+    // Other component is a clone particle and we store if ID > othercomp.ID
+    // to avoid duplicate storing on multi-procs or with periodic BC
+    else if ( m_id > othercomp->getID() ) store = true; 
+  }
+  // Case of clone particle
+  else
+  {
+    // Other component is an obstacle -> we do not store
+    // Other component is an interior/buffer particle: we store if 
+    // ID > othercomp.ID to avoid duplicate storing on multi-procs or with 
+    // periodic BC
+    if ( !othercomp->isObstacle() && othercomp->getTag() < 2
+    	&& m_id < othercomp->getID() ) store = true;  
+  }
+  
+  return ( store );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets time integration scheme using the macro variable GrainsExec::m_TIScheme
+void Particle::setTimeIntegrationScheme()
+{
+  m_kinematics->setTimeIntegrationScheme();
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets the center of mass coordinate in a given direction at the previous 
+// time to the current value (generally called at the start of a time step)
+void Particle::setPositionDir_nm1( Direction dir )
+{
+  m_pos_dir_nm1 = (*m_geoRBWC->getCentre())[dir];
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the center of mass coordinate in a given direction at the previous 
+// time
+double Particle::getPositionDir_nm1() const
+{
+  return ( m_pos_dir_nm1 );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Writes the particle in an OBJ format
+void Particle::write_OBJ( ostream& f, size_t const& group_number,
+    	size_t& firstpoint_number ) const
+{
+  f << "g Object" << GrainsExec::intToString( int( group_number ) ) << endl;
+  m_geoRBWC->write_OBJ( f, firstpoint_number ); 
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets momentum equation coupling factor
+void Particle::setCouplingFactor()
+{
+  m_kinematics->setCouplingFactor( m_density );  
 }

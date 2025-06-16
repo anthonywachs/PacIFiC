@@ -1,6 +1,7 @@
 #include "GrainsMPIWrapper.hh"
 #include "GrainsExec.hh"
 #include "AllComponents.hh"
+#include "AllInsertionWindows.hh"
 #include "App.hh"
 #include "AppCollision.hh"
 #include "RigidBodyWithCrust.hh"
@@ -9,6 +10,8 @@
 #include "PostProcessingWriter.hh"
 #include "ParaviewPostProcessingWriter.hh"
 #include "GrainsBuilderFactory.hh"
+#include "TrilobeCylinder.hh"
+#include "QuadrilobeCylinder.hh"
 #include <math.h>
 #include <stdlib.h>
 
@@ -17,14 +20,20 @@
 // ----------------------------------------------------------------------------
 // Default constructor
 AllComponents::AllComponents()
-  : m_wait( NULL )
+  : m_nb_physical_particles_to_insert( 0 )
+  , m_wait( NULL )
+  , m_nb_particles( 0 )
   , m_total_nb_particles( 0 )
+  , m_nb_active_particles( 0 )
+  , m_total_nb_active_particles( 0 )
+  , m_nb_active_particles_on_proc( 0 )
+  , m_total_nb_active_particles_on_all_procs( 0 )
+  , m_total_nb_physical_particles( 0 )
   , m_obstacle( NULL )
   , m_outputTorsorObstacles_counter( 1 )
-  , m_outputTorsorObstacles_frequency( 0 )
+  , m_outputTorsorObstacles_frequency( 0 )  
 {
   m_obstacle = new CompositeObstacle( "__AllObstacles___" );
-  Component::setNbCreatedComponents( 0 );
 }
 
 
@@ -40,19 +49,19 @@ AllComponents::~AllComponents()
   	particle!=m_ActiveParticles.end(); particle++)
     delete *particle;
 
-  for (particle=m_InactiveParticles.begin(); particle!=m_InactiveParticles.end();
-       	particle++)  delete *particle;
+  for (particle=m_RemovedParticles.begin(); 
+  	particle!=m_RemovedParticles.end();particle++)  delete *particle;
+	
+  if ( m_wait ) delete m_wait;
 
   m_ActiveParticles.clear();
-  m_InactiveParticles.clear();
+  m_RemovedParticles.clear();
   m_PeriodicCloneParticles.clear();
-
-  m_ParticlesInHalozone.clear();
+  m_ParticlesInBufferzone.clear();
   m_CloneParticles.clear();
 
   vector<Particle*>::iterator ivp;
-  for (ivp=m_ReferenceParticles.begin();
-  	ivp!=m_ReferenceParticles.end(); ivp++)
+  for (ivp=m_ReferenceParticles.begin();ivp!=m_ReferenceParticles.end(); ivp++)
     delete *ivp;
   m_ReferenceParticles.clear();
 
@@ -65,7 +74,7 @@ AllComponents::~AllComponents()
  
   // Note: the loadings are destroyed by the destructors of the classes
   // ObstacleKinematicsVelocity and ObstacleKinematicsForce
-  // Hence we are free the lists here but do not destroy the pointed objects
+  // Hence we free the lists here but do not destroy the pointed objects
   m_AllImposedVelocitiesOnObstacles.clear();
   m_AllImposedForcesOnObstacles.clear();
 }
@@ -89,7 +98,7 @@ void AllComponents::UpdateParticleActivity()
 
       case CLEARandWAIT:
         (*particle)->reset();
-        m_InactiveParticles.push_back(*particle);
+        m_RemovedParticles.push_back(*particle);
         particle = m_ActiveParticles.erase( particle );
         break;
 
@@ -103,33 +112,37 @@ void AllComponents::UpdateParticleActivity()
 
 
 // ----------------------------------------------------------------------------
-// Adds a particle
-void AllComponents::AddParticle( Particle* particle )
-{
-  switch ( particle->getActivity() )
-  {
-    case WAIT:
-      m_InactiveParticles.push_back( particle );
-      break;
-
-    case COMPUTE:
-      m_ActiveParticles.push_back( particle );
-      break;
-
-    default:
-      break;
-  }
-}
-
-
-
-
-// ----------------------------------------------------------------------------
 // Adds a reference particle
-void AllComponents::AddReferenceParticle( Particle* particle )
+void AllComponents::AddReferenceParticle( Particle* particle, size_t const &n )
 {
-  m_ReferenceParticles.reserve( m_ReferenceParticles.size() + 1 );
-  m_ReferenceParticles.push_back( particle );
+  bool exist = false;
+  size_t ntypes = m_ReferenceParticles.size(), i, i0;
+
+  // Check whether such a type of particle already exists
+  for (i=0;i<ntypes && !exist;++i)
+    if ( particle->equalType( m_ReferenceParticles[i] ) ) 
+    {
+      exist = true;
+      i0 = i;
+    }  
+  
+  // If it does not exist, we add it to the vector of reference particles
+  // If it exists, we add the number of new particles to this type
+  if ( !exist )
+  {
+    m_ReferenceParticles.reserve( m_ReferenceParticles.size() + 1 );
+    m_ReferenceParticles.push_back( particle );
+    m_NbRemainingParticlesToInsert.reserve( 
+  	m_NbRemainingParticlesToInsert.size() + 1 );
+    m_NbRemainingParticlesToInsert.push_back( n );
+  }
+  else
+  {
+    m_NbRemainingParticlesToInsert[i0] += n;
+    delete particle;
+    particle = m_ReferenceParticles[i0];
+  }
+  m_nb_physical_particles_to_insert += n;  
 }
 
 
@@ -158,7 +171,7 @@ void AllComponents::LinkImposedMotion( ObstacleImposedVelocity* impvel )
 
 
 // ----------------------------------------------------------------------------
-// Associates the imposed velocity to the obstacle
+// Associates the imposed force to the obstacle
 void AllComponents::LinkImposedMotion( ObstacleImposedForce* load )
 {
   m_obstacle->LinkImposedMotion( load );
@@ -170,46 +183,91 @@ void AllComponents::LinkImposedMotion( ObstacleImposedForce* load )
 
 // ----------------------------------------------------------------------------
 // Moves all components
-list<SimpleObstacle*> AllComponents::Move( double time, double dt )
+list<SimpleObstacle*> AllComponents::Move( double time,
+	double const& dt_particle_vel, 
+    	double const& dt_particle_disp,
+	double const& dt_obstacle,
+	LinkedCell const* LC )
 {
-  try{
-  // Deplacement des particles
+  double subinterval = 0.;
+  bool anyactive = false;
+  static bool anyactive_previousdt = false;
+  
+  try 
+  {
+    // Particles motion
+    list<Particle*>::iterator particle;
+    for (particle=m_ActiveParticles.begin();
+      particle!=m_ActiveParticles.end(); particle++)
+      if ( (*particle)->getTag() != 2 )
+        (*particle)->Move( time, dt_particle_vel, dt_particle_disp );
+
+    // Obstacles motion
+    list<SimpleObstacle*> displacedObstacles;
+    if ( !m_AllImposedVelocitiesOnObstacles.empty()
+  	|| !m_AllImposedForcesOnObstacles.empty() )
+    {            
+      anyactive = false;
+    
+      // Update stress dependent imposed velocity and check if any imposed 
+      // velocity/force is active over this time interval
+      list<ObstacleImposedVelocity*>::iterator il;
+      for (il=m_AllImposedVelocitiesOnObstacles.begin();
+  	il!=m_AllImposedVelocitiesOnObstacles.end();il++)
+        if ( (*il)->isActif( time - dt_obstacle, time, dt_obstacle, 
+      		subinterval ) )
+        {
+	  (*il)->updateImposedVelocity( LC );
+	  anyactive = true;
+        }
+      list<ObstacleImposedForce*>::iterator il_F;
+      for (il_F=m_AllImposedForcesOnObstacles.begin();
+  	il_F!=m_AllImposedForcesOnObstacles.end() && !anyactive;il_F++) 
+        if ( (*il_F)->isActif( time - dt_obstacle, time, dt_obstacle, 
+      		subinterval ) )	
+	  anyactive = true;        
+    	           
+      // Move obstacles
+      if ( anyactive || anyactive_previousdt ) m_obstacle->resetKinematics();   
+      anyactive_previousdt = anyactive;
+      if ( anyactive ) displacedObstacles = 
+    	m_obstacle->Move( time, dt_obstacle, false, false );
+
+      // Update imposed velocity kinematics
+      for (il=m_AllImposedVelocitiesOnObstacles.begin();
+  	il!=m_AllImposedVelocitiesOnObstacles.end(); )
+        if ( (*il)->isCompleted( time, dt_obstacle ) )
+          il = m_AllImposedVelocitiesOnObstacles.erase( il );
+        else il++;
+
+      // Update imposed force kinematics    
+      for (il_F=m_AllImposedForcesOnObstacles.begin();
+  	il_F!=m_AllImposedForcesOnObstacles.end(); )
+      {
+        if ( (*il_F)->isCompleted( time, dt_obstacle ) )
+          il_F = m_AllImposedForcesOnObstacles.erase( il_F );
+        else il_F++;
+      }
+    }
+
+    return ( displacedObstacles );
+  }
+  catch ( MotionError const& ) { throw; }
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Advances particles velocity over dt_particle_vel
+void AllComponents::advanceParticlesVelocity( double time, 
+    	double const& dt_particle_vel )
+{
   list<Particle*>::iterator particle;
   for (particle=m_ActiveParticles.begin();
       particle!=m_ActiveParticles.end(); particle++)
     if ( (*particle)->getTag() != 2 )
-      (*particle)->Move( time, dt );
-
-  // Deplacement des obstacles
-  list<SimpleObstacle*> displacedObstacles;
-  if ( !m_AllImposedVelocitiesOnObstacles.empty()
-  	|| !m_AllImposedForcesOnObstacles.empty() )
-  {
-    m_obstacle->resetKinematics();
-    displacedObstacles = m_obstacle->Move( time, dt, false, false );
-
-    list<ObstacleImposedVelocity*>::iterator chargement;
-    for (chargement=m_AllImposedVelocitiesOnObstacles.begin();
-  	chargement!=m_AllImposedVelocitiesOnObstacles.end(); )
-      if ( (*chargement)->isCompleted( time, dt ) )
-        chargement = m_AllImposedVelocitiesOnObstacles.erase( chargement );
-      else chargement++;
-
-    list<ObstacleImposedForce*>::iterator chargement_F;
-    for (chargement_F=m_AllImposedForcesOnObstacles.begin();
-  	chargement_F!=m_AllImposedForcesOnObstacles.end(); )
-    {
-      if ( (*chargement_F)->isCompleted( time, dt ) )
-        chargement_F = m_AllImposedForcesOnObstacles.erase( chargement_F );
-      else chargement_F++;
-    }
-  }
-
-  return ( displacedObstacles );
-  }
-  catch (const DisplacementError&) {
-    throw DisplacementError();
-  }
+      (*particle)->advanceVelocity( time, dt_particle_vel );
 }
 
 
@@ -293,17 +351,12 @@ void AllComponents::computeWeight( double time, double dt )
   list<Particle*>::iterator particle;
   vector<Particle*>::iterator ivp;
 
-  // Classes de reference
+  // Reference types
   for (ivp=m_ReferenceParticles.begin();
   	ivp!=m_ReferenceParticles.end(); ivp++)
     (*ivp)->computeWeight();
 
-  // Particles en attente
-  for (particle=m_InactiveParticles.begin();
-  	particle!=m_InactiveParticles.end(); particle++)
-    (*particle)->computeWeight();
-
-  // Particles actives
+  // Active particles
   for (particle=m_ActiveParticles.begin();
   	particle!=m_ActiveParticles.end(); particle++)
     (*particle)->computeWeight();
@@ -378,39 +431,62 @@ Component* AllComponents::getComponent( int id )
 
 
 // ----------------------------------------------------------------------------
-// Returns a particle from the list of inactive particles
-Particle* AllComponents::getParticle( PullMode mode,
-	GrainsMPIWrapper const* wrapper )
+// Returns a pointer to the particle to be inserted
+Particle* AllComponents::getParticleToInsert( PullMode mode )
 {
-  if ( !m_InactiveParticles.empty() )
+  if ( m_nb_physical_particles_to_insert )
   {
-    switch ( mode )
+    size_t type = 0;
+    if ( !m_wait )
     {
-      case PM_ORDERED:
-        m_wait = m_InactiveParticles.front();
-        break;
+      switch ( mode )
+      {
+        case PM_ORDERED:                
+          while ( !m_NbRemainingParticlesToInsert[type] ) type++;
+          break;
 
-      case PM_RANDOM:
-        if ( m_wait == NULL )
-	{
-	  double v = double(random()) / double(INT_MAX);
-	  int id = int( double(m_InactiveParticles.size()) * v );
-
-	  // Parall�le: afin que le tirage al�atoire soit le m�me sur tous les
-	  // procs, seul le master envoie la position tiree au hasard dans la
-	  // liste aux autres procs
-	  if ( wrapper ) id = wrapper->Broadcast_INT( id );
-
-	  list<Particle*>::iterator p = m_InactiveParticles.begin();
-	  for (int i=0; i<id && p!=m_InactiveParticles.end(); i++, p++) {}
-	  m_wait = *p;
-        }
-        break;
+        case PM_RANDOM:
+          if ( m_wait == NULL )
+	  {
+	    // Find the set of particle classes that still have particles to
+	    // insert
+	    size_t nrem = 0, j = 0, i;
+	    for (i=0;i<m_NbRemainingParticlesToInsert.size();++i)
+	      if ( m_NbRemainingParticlesToInsert[i] ) nrem++;
+	    vector<size_t> setrem( nrem, 0 );
+	    for (i=0;i<m_NbRemainingParticlesToInsert.size();++i)
+	      if ( m_NbRemainingParticlesToInsert[i] ) 
+	      { 
+	        setrem[j] = i;
+		++j;
+              }
+	      
+	    // Randomly pick a class
+	    double v = double(random()) / double(INT_MAX);   	    
+	    j = size_t( double(setrem.size()) * v );
+	    type = setrem[j];
+          }
+          break;
+      }
+      m_wait = m_ReferenceParticles[type]->createCloneCopy( true );           
     }
   }
   else m_wait = NULL;
 
   return ( m_wait );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns a pointer to the particle to be inserted
+Particle* AllComponents::getParticleToInsert( int const& geomtype )
+{
+  if ( !m_wait )
+    m_wait = m_ReferenceParticles[geomtype]->createCloneCopy( true );
+
+  return ( m_wait );   
 }
 
 
@@ -437,30 +513,30 @@ list<Particle*> const* AllComponents::getActiveParticles() const
 
 
 // ----------------------------------------------------------------------------
-// Returns a pointer to the list of inactive particles
-list<Particle*>* AllComponents::getInactiveParticles()
+// Returns a pointer to the list of removed particles
+list<Particle*>* AllComponents::getRemovedParticles()
 {
-  return ( &m_InactiveParticles );
+  return ( &m_RemovedParticles );
 }
 
 
 
 
 // ----------------------------------------------------------------------------
-// Returns a const pointer to the list of inactive particles
-list<Particle*> const* AllComponents::getInactiveParticles() const
+// Returns a pointer to the list of particles in the buffer zone
+list<Particle*>* AllComponents::getParticlesInBufferzone()
 {
-  return ( &m_InactiveParticles );
+  return ( &m_ParticlesInBufferzone );
 }
 
 
 
 
 // ----------------------------------------------------------------------------
-// Returns a pointer to the list of particles in the halozone
-list<Particle*>* AllComponents::getParticlesInHalozone()
+// Returns a pointer to the list of particles in the buffer zone
+list<Particle*> const* AllComponents::getParticlesInBufferzone() const
 {
-  return ( &m_ParticlesInHalozone );
+  return ( &m_ParticlesInBufferzone );
 }
 
 
@@ -613,19 +689,20 @@ double AllComponents::getCrustThicknessMin()
 
 
 // ----------------------------------------------------------------------------
-// Returns the cumulative volume of all particles, both active and inactive
+// Returns the cumulative volume of all particles, both active and to insert
 double AllComponents::getVolume() const
 {
   double volume = 0.;
   list<Particle*>::const_iterator particle;
+  size_t i, n = m_NbRemainingParticlesToInsert.size();
 
-  for (particle=m_ActiveParticles.begin();
-  	particle!=m_ActiveParticles.end(); particle++)
+  for (particle=m_ActiveParticles.cbegin();
+  	particle!=m_ActiveParticles.cend(); particle++)
     volume += (*particle)->getVolume();
 
-  for (particle=m_InactiveParticles.begin();
-  	particle!=m_InactiveParticles.end(); particle++)
-    volume += (*particle)->getVolume();
+  for (i=0;i<n;++i)
+    volume += double(m_NbRemainingParticlesToInsert[i])
+    	* m_ReferenceParticles[i]->getVolume();
 
   return ( volume );
 }
@@ -640,9 +717,10 @@ double AllComponents::getVolumeIn() const
   double volume = 0.;
   list<Particle*>::const_iterator particle;
 
-  for (particle=m_ActiveParticles.begin();
-  	particle!=m_ActiveParticles.end(); particle++)
-    volume += (*particle)->getVolume();
+  for (particle=m_ActiveParticles.cbegin();
+  	particle!=m_ActiveParticles.cend(); particle++)
+    if ( (*particle)->getTag() != 2 )	
+      volume += (*particle)->getVolume();
 
   return ( volume );
 }
@@ -651,15 +729,15 @@ double AllComponents::getVolumeIn() const
 
 
 // ----------------------------------------------------------------------------
-// Returns the cumulative volume of all inactives particles
+// Returns the cumulative volume of all particles to insert
 double AllComponents::getVolumeOut() const
 {
   double volume = 0.;
-  list<Particle*>::const_iterator particle;
+  size_t i, n = m_NbRemainingParticlesToInsert.size();
 
-  for (particle=m_InactiveParticles.begin();
-  	particle!=m_InactiveParticles.end(); particle++)
-    volume += (*particle)->getVolume();
+  for (i=0;i<n;++i)
+    volume += double(m_NbRemainingParticlesToInsert[i])
+    	* m_ReferenceParticles[i]->getVolume();
 
   return ( volume );
 }
@@ -681,7 +759,7 @@ void AllComponents::Link( AppCollision& app )
 
 
 // ----------------------------------------------------------------------------
-// Set all active particles velocity to 0 if reset == "Reset"
+// Sets all active particles velocity to 0 if reset == "Reset"
 void AllComponents::resetKinematics( string const& reset )
 {
   if ( reset == "Reset" )
@@ -697,16 +775,33 @@ void AllComponents::resetKinematics( string const& reset )
 
 
 // ----------------------------------------------------------------------------
-// Transfer the inactive particle waiting to be inserted to the list
-// of active particles
-void AllComponents::ShiftParticleOutIn()
+// Adds the waiting particle to the list of active particles
+void AllComponents::WaitToActive( bool const& parallel )
 {
   m_wait->setActivity( COMPUTE );
-  removeParticleFromList( m_InactiveParticles, m_wait );
   m_ActiveParticles.push_back( m_wait );
-//   if ( m_wait->getTag() == 1 ) m_ParticlesInHalozone.push_back(m_wait);
-//   else if ( m_wait->getTag() == 2 ) m_CloneParticles.push_back(m_wait);
+  m_nb_physical_particles_to_insert--;
+  m_NbRemainingParticlesToInsert[m_wait->getGeometricType()]--;
+  if ( parallel )
+  {
+    if ( m_wait->getTag() == 1 ) m_ParticlesInBufferzone.push_back( m_wait );
+    else if ( m_wait->getTag() == 2 ) m_CloneParticles.push_back( m_wait );
+  }
+  m_wait->setPositionDir_nm1( Z ); 
   m_wait = NULL;
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Destroys the waiting particle
+void AllComponents::DeleteAndDestroyWait()
+{
+  m_NbRemainingParticlesToInsert[m_wait->getGeometricType()]--;
+  m_nb_physical_particles_to_insert--;    
+  delete m_wait;  
+  m_wait = NULL;  
 }
 
 
@@ -778,7 +873,11 @@ bool removeObstacleFromList( list<SimpleObstacle*>& pointerslist,
 
 // ---------------------------------------------------------------------------
 // Reloads components from an input stream
-void AllComponents::read( istream& fileSave, string const& filename )
+// Note: back-compatibility for old pre-2024 restart files that features 
+// particles to be inserted (previously called inactive particles) is not 
+// handled.
+void AllComponents::read_pre2024( istream& fileSave, string const& filename,
+	GrainsMPIWrapper const* wrapper )
 {
   string buffer, readingMode ;
   int nbreParticles_, nbParticleTypes_, ParticleTag, ParticleGeomType;
@@ -800,8 +899,10 @@ void AllComponents::read( istream& fileSave, string const& filename )
     else
     {
       fileSave >> buffer >> buffer;
-      if ( buffer == "SpheroCylinder" )
-        particle = new SpheroCylinder( false );
+      if ( buffer == "TrilobeCylinder" )
+        particle = new TrilobeCylinder( false );  
+      else if ( buffer == "QuadrilobeCylinder" )
+        particle = new QuadrilobeCylinder( false );        	
       else        
         particle = new CompositeParticle( false );
     }
@@ -818,11 +919,11 @@ void AllComponents::read( istream& fileSave, string const& filename )
 
   // Number of particles in to read
   fileSave >> readingMode >> nbreParticles_;
-  if ( readingMode == "Hybrid" ) GrainsExec::m_writingModeHybrid = true ;
+  if ( readingMode == "Hybrid" ) GrainsExec::m_readingModeHybrid = true ;
 
   // Reload of particles using the reference particles
   ifstream FILEbin;
-  if ( GrainsExec::m_writingModeHybrid )
+  if ( GrainsExec::m_readingModeHybrid )
   {
     string binary_filename = filename + ".bin";
     FILEbin.open( binary_filename.c_str(), ios::in | ios::binary );
@@ -838,7 +939,16 @@ void AllComponents::read( istream& fileSave, string const& filename )
 
     // Particle construction
     if ( m_ReferenceParticles[ParticleGeomType]->isCompositeParticle() )
-      particle = new CompositeParticle( false );
+    {    
+      if ( m_ReferenceParticles[ParticleGeomType]
+      		->getSpecificCompositeShapeName() == "TrilobeCylinder" )
+        particle = new TrilobeCylinder( false );
+      else if ( m_ReferenceParticles[ParticleGeomType]
+      		->getSpecificCompositeShapeName() == "QuadrilobeCylinder" )
+        particle = new QuadrilobeCylinder( false );	
+      else   
+        particle = new CompositeParticle( false );
+    }
     else
       particle = new Particle( false );
 
@@ -863,7 +973,7 @@ void AllComponents::read( istream& fileSave, string const& filename )
 	  switch ( ParticleTag )
           {
             case 1:
-              m_ParticlesInHalozone.push_back( particle );
+              m_ParticlesInBufferzone.push_back( particle );
               break;
 
             case 2:
@@ -881,7 +991,9 @@ void AllComponents::read( istream& fileSave, string const& filename )
         break;
 
       default:
-        m_InactiveParticles.push_back( particle );
+        // Note: back-compatibility for old pre-2024 restart files that
+	// features particles to be inserted (previously called inactive
+	// particles) is not handled.
         break;
     }
   }
@@ -890,8 +1002,7 @@ void AllComponents::read( istream& fileSave, string const& filename )
   // Reload the obstacle tree
   string name;
   fileSave >> buffer;
-  fileSave >> buffer >> name;
-  m_obstacle = new CompositeObstacle( name );
+  fileSave >> buffer >> buffer;
   fileSave >> buffer;
   while ( buffer != "</Composite>" )
   {
@@ -901,58 +1012,560 @@ void AllComponents::read( istream& fileSave, string const& filename )
   fileSave >> buffer;
 
   assert( buffer == "</Obstacle>" );
+  
+  // Set the maximum particle ID number and minimum obstacle ID number
+  setParticleMaxIDObstacleMinID( wrapper );
 }
 
 
 
 
 // ---------------------------------------------------------------------------
-// Writes components to an output stream
-void AllComponents::write( ostream &fileSave, string const& filename ) const
+// Reloads reference particles and obstacles from an input stream
+size_t AllComponents::read( istream& fileSave, vector<Point3>* known_positions, 
+	int const& rank, int const& nprocs )
 {
-  fileSave << endl << "NumberOfParticleTypes\t" <<
+  string buffer, readingMode ;
+  size_t i, nbreParticles_, nbParticleTypes_, nfiles;
+  Particle *particle;
+
+  // Number of particle types
+  fileSave >> buffer >> nbParticleTypes_;
+
+  // Read the reference particles
+  m_ReferenceParticles.reserve( nbParticleTypes_ );
+  for (i=0; i<nbParticleTypes_; i++)
+  {
+    // Read the buffer "<Particle>" or "<CompositeParticle>"
+    fileSave >> buffer;
+
+    // Construct an empty particle
+    if ( buffer == "<Particle>" )
+      particle = new Particle( false );
+    else
+    {
+      fileSave >> buffer >> buffer;
+      if ( buffer == "TrilobeCylinder" )
+        particle = new TrilobeCylinder( false ); 
+      else if ( buffer == "QuadrilobeCylinder" )
+        particle = new QuadrilobeCylinder( false ); 
+      else        
+        particle = new CompositeParticle( false );
+    }
+
+    // Read from stream
+    particle->read( fileSave );
+
+    // Add to the vector of reference particles
+    m_ReferenceParticles.push_back( particle );
+
+    // Read the buffer "</Particle>" or "</CompositeParticle>"
+    fileSave >> buffer;
+  }
+  
+  // Read the number of remaining particles to insert per class
+  m_NbRemainingParticlesToInsert.reserve( nbParticleTypes_ );
+  for (i=0; i<nbParticleTypes_; i++) 
+    m_NbRemainingParticlesToInsert.push_back( 0 );
+  fileSave >> buffer;
+  m_nb_physical_particles_to_insert = 0;
+  for (i=0; i<nbParticleTypes_; i++) 
+  {      
+    fileSave >> m_NbRemainingParticlesToInsert[i];
+    m_nb_physical_particles_to_insert += m_NbRemainingParticlesToInsert[i];
+  }
+    
+  // Read the number of remaining known insertion positions
+  // Only the master process stores the positions
+  size_t npos = 0;
+  fileSave >> buffer >> npos;
+  if ( npos )
+  {
+    Point3 P;
+    if ( rank == 0 ) known_positions->reserve( npos );
+    for (i=0; i<npos; i++) 
+    {
+      fileSave >> P[X] >> P[Y] >> P[Z];
+      if ( rank == 0 ) known_positions->push_back( P );
+    }
+  }      
+  
+  // Reload the obstacle tree
+  // The highest level composite obstacle is a default composite obstacle that 
+  // is created as the root of the obstacle tree, its torsor is physically 
+  // meaningless and is not written, therefore not read here
+  string name;
+  fileSave >> buffer;
+  fileSave >> buffer >> buffer;
+  fileSave >> buffer;
+  while ( buffer != "</Composite>" )
+  {
+    ObstacleBuilderFactory::reload( buffer, *m_obstacle, fileSave );
+    fileSave >> buffer;
+  }
+  fileSave >> buffer;
+  assert( buffer == "</Obstacle>" );
+
+
+  // Read the number of files
+  fileSave >> buffer >> nfiles;
+  assert( nfiles == 1 || nfiles == size_t(nprocs) );  
+  if ( nprocs > 1 && nfiles == 1 )
+    GrainsExec::m_ReadMPIInASingleFile = true;
+
+  // Reload of particles using the reference particles
+  if ( nprocs > 1 && !GrainsExec::m_ReadMPIInASingleFile )
+  {
+    vector<size_t> work( nprocs, 0 );
+    for (i=0;i<size_t(nprocs);++i) 
+      fileSave >> readingMode >> work[i];
+    nbreParticles_ = work[rank];
+  }
+  else
+    fileSave >> readingMode >> nbreParticles_;
+    
+  if ( readingMode == "Hybrid" ) GrainsExec::m_readingModeHybrid = true ;
+  
+  return ( nbreParticles_ );
+}
+
+
+
+
+// ---------------------------------------------------------------------------
+// Reloads particles from an input stream 
+void AllComponents::read_particles( string const& filename, size_t const& npart,
+    	LinkedCell const* LC, int const& rank,
+  	int const& nprocs, GrainsMPIWrapper const* wrapper )
+{
+  ifstream FILEin;
+  int ParticleTag, ParticleGeomType, ParticleID;
+  unsigned int ParticleActivity;
+  Particle *particle;
+  bool construct = false;
+  string tline, buffer;
+  multimap<int,int> PartToCell;
+  pair < multimap<int,int>::iterator, 
+  	multimap<int,int>::iterator > crange;
+  multimap<int,int>::iterator imm;	  
+  Point3 gc;
+  size_t nb;
+    
+  // Particle file
+  string pfile = filename;
+  size_t pos = filename.find_first_of(".");
+  pfile.erase( pos );
+  pfile += "_Particles";  
+  pfile = GrainsExec::fullResultFileName( pfile, nprocs > 1 
+  	&& !GrainsExec::m_ReadMPIInASingleFile );  
+  if ( GrainsExec::m_readingModeHybrid ) 
+  {
+    pfile += ".bin";
+    FILEin.open( pfile.c_str(), ios::in | ios::binary );
+  } 
+  else FILEin.open( pfile.c_str(), ios::in ); 
+
+
+  // Reload of particles using the reference particles
+  for (size_t i=0; i<npart; i++)
+  {
+    istringstream iss;
+    construct = false;  
+
+    // Read data corresponding to this particle
+    // Binary file
+    if ( GrainsExec::m_readingModeHybrid )
+    {
+      FILEin.read( reinterpret_cast<char*>( &nb ), sizeof(size_t) );
+      char* particleData = new char[nb];
+      FILEin.read( particleData, nb );
+      string spData( particleData, nb );
+      iss.str( spData );
+      delete [] particleData;
+    }
+    // Text file
+    else
+    {   
+      getline( FILEin, tline );
+      iss.str( tline ); 
+    }
+    
+    // In parallel, with one restart file per sub-domain, all particles are 
+    // constructed by default
+    if ( !GrainsExec::m_ReadMPIInASingleFile ) construct = true;
+    // With 1 MPI restart file for all sub-domains, we need to check which
+    // particles geometrically belong to this sub-domain 
+    else
+    {        
+      // Extract its ID number and position
+      // Binary file
+      if ( GrainsExec::m_readingModeHybrid )
+      {
+	iss.read( reinterpret_cast<char*>( &ParticleGeomType ), sizeof(int) );
+	iss.read( reinterpret_cast<char*>( &ParticleID ), sizeof(int) );
+	iss.read( reinterpret_cast<char*>( &ParticleTag ), sizeof(int) );	
+	iss.read( reinterpret_cast<char*>( &ParticleActivity ), 
+		sizeof(unsigned int) );
+	iss.read( reinterpret_cast<char*>( &gc[X] ), sizeof(double) );
+	iss.read( reinterpret_cast<char*>( &gc[Y] ), sizeof(double) );
+	iss.read( reinterpret_cast<char*>( &gc[Z] ), sizeof(double) );
+      }
+      // Text file
+      else
+        iss >> buffer >> ParticleID >> buffer >> ParticleActivity >> gc[X] >> 
+		gc[Y] >> gc[Z];
+      
+      // Check whether this particle is in the LinkedCell of this sub-domain
+      // If construct, reset the input stream position to the beginning       
+      if ( LC->isInLinkedCell( gc ) ) 
+      {
+        construct = true; 
+        iss.seekg( 0, iss.beg );
+      }
+    }
+    
+    if ( construct )
+    {
+      // Read the geometric type of the particle
+      if ( GrainsExec::m_readingModeHybrid )
+        iss.read( reinterpret_cast<char*>( &ParticleGeomType ), 
+		sizeof(int) );
+      else
+        iss >> ParticleGeomType;
+
+      // Particle construction
+      if ( m_ReferenceParticles[ParticleGeomType]->isCompositeParticle() )
+      {    
+        if ( m_ReferenceParticles[ParticleGeomType]
+      		->getSpecificCompositeShapeName() == "TrilobeCylinder" )
+          particle = new TrilobeCylinder( false );
+        else if ( m_ReferenceParticles[ParticleGeomType]
+      		->getSpecificCompositeShapeName() == "QuadrilobeCylinder" )
+          particle = new QuadrilobeCylinder( false );	  
+        else   
+          particle = new CompositeParticle( false );
+      }
+      else
+        particle = new Particle( false );
+
+      // Set the geometric type of the particle
+      particle->setGeometricType( ParticleGeomType );
+
+      // Read the particle features
+      if ( GrainsExec::m_readingModeHybrid )
+        particle->read2014_binary( iss, &m_ReferenceParticles );
+      else
+        particle->read2014( iss, &m_ReferenceParticles );
+
+      // Add to lists
+      // We need to reset ParticleTag in case the linked cell changed
+      // from the previous simulation
+      m_ActiveParticles.push_back( particle );
+      ParticleTag = LC->getCell( *(particle->getPosition()) )->getTag(); 
+      particle->setTag( ParticleTag );
+ 
+      // MPI mode
+      if ( GrainsExec::m_MPI )
+	switch ( ParticleTag )
+        {
+          case 1:
+            m_ParticlesInBufferzone.push_back( particle );
+            break;
+
+          case 2:
+            m_CloneParticles.push_back( particle );
+            break;
+
+	  default:
+            break;
+        }
+      // Serial mode: periodicity
+      else
+	if ( ParticleTag == 2 )
+	  m_PeriodicCloneParticles.insert(
+	    	pair<int,Particle*>( particle->getID(), particle ) );
+    }
+  }
+  FILEin.close();
+  // Set the maximum particle ID number and minimum obstacle ID number
+  setParticleMaxIDObstacleMinID( wrapper ); 
+} 
+
+
+
+
+// ---------------------------------------------------------------------------
+// Writes components to an output stream. Only active particles are written 
+// to the stream
+void AllComponents::write( ostream &fileSave, string const& filename, 
+	vector<Point3> const* known_positions, CloneInReload cir, 
+	LinkedCell const* LC, int const& rank,
+	int const& nprocs, GrainsMPIWrapper const* wrapper ) const
+{
+  list<Particle*>::const_iterator particle;
+  size_t nb = 0;
+  
+  if ( rank == 0 )
+  {
+    // Reference particles and obstacles
+    fileSave << endl << "NumberOfParticleTypes " <<
   	m_ReferenceParticles.size() << endl;
 
-  vector<Particle*>::const_iterator iv;
-  for (iv=m_ReferenceParticles.begin();
+    vector<Particle*>::const_iterator iv;
+    for (iv=m_ReferenceParticles.begin();
   	iv!=m_ReferenceParticles.end();iv++) (*iv)->write( fileSave );
 
-  size_t nbActivesNonPer = m_ActiveParticles.size();
-  list<Particle*>::const_iterator particle;
+    fileSave << endl;
+    fileSave << "RemainingNbParticlesToInsertPerType";
+    for (size_t i=0;i<m_NbRemainingParticlesToInsert.size();++i)
+      fileSave << " " << m_NbRemainingParticlesToInsert[i];
+    fileSave << endl << endl;
+    
+    fileSave << "RemainingKnownInsertionPositions " << known_positions->size()
+    	<< endl;
+    if ( known_positions->size() )
+    {
+      vector<Point3>::const_iterator il;
+      for (il=known_positions->cbegin();il!=known_positions->cend();il++)
+        fileSave << GrainsExec::doubleToString(ios::scientific,FORMAT16DIGITS,
+  		(*il)[X]) << " " << 
+		GrainsExec::doubleToString(ios::scientific,FORMAT16DIGITS,
+  		(*il)[Y]) << " " << 
+		GrainsExec::doubleToString(ios::scientific,FORMAT16DIGITS,
+  		(*il)[Z]) << endl;
+    }     
+              
+    fileSave << endl << "<Obstacle>" << endl;
+    m_obstacle->write( fileSave );
+    fileSave << endl << "</Obstacle>" << endl << endl;
+  }
+  
+  // Number of particles to write
+  vector<bool> write( m_nb_active_particles, true );
+  size_t m_write = 0;
+  int i;
+  for (particle=m_ActiveParticles.begin(),i=0;
+	particle!=m_ActiveParticles.end(); particle++,++i)
+  {	
+    switch(cir)
+    {
+      case CIR_NONE: if ( (*particle)->getTag() > 1 ) write[i] = false; break;
+      case CIR_NOPERIODIC: 
+	if ( !LC->isInDomain( (*particle)->getPosition() ) ) write[i] = false; 
+	break;
+      case CIR_ALL: write[i] = true; break;
+    }
+    if ( write[i] ) ++m_write;
+  }    
 
-  fileSave << endl << ( GrainsExec::m_writingModeHybrid ? "Hybrid" :
-  	"Text" ) << " " << nbActivesNonPer + m_InactiveParticles.size()
-	<< endl;
+  size_t* nbpart_proc = NULL;
+  if ( nprocs > 1 )
+    nbpart_proc =  wrapper->Gather_UNSIGNED_INT_master( m_write );
+  else
+  {
+    nbpart_proc = new size_t[1];
+    nbpart_proc[0] = m_write;
+  }
+  
+  if ( rank == 0 )
+  {      
+    fileSave << "NbFiles " << nprocs << endl;    
+    for (i=0;i<nprocs;++i)  
+      fileSave << ( GrainsExec::m_writingModeHybrid ? "Hybrid" :
+  	"Text" ) << " " << nbpart_proc[i] << endl;
+  }
+  
+  if ( nbpart_proc ) delete [] nbpart_proc;
+
+	
+  // Particle file
+  string pfile = filename;
+  size_t pos = filename.find_first_of(".");
+  pfile.erase( pos );
+  pfile += "_Particles";
+  pfile = GrainsExec::fullResultFileName( pfile, nprocs > 1 );
 
   if ( GrainsExec::m_writingModeHybrid )
   {
-    string binary_filename = filename + ".bin";
+    string binary_filename = pfile + ".bin";
     ofstream FILEbin( binary_filename.c_str(), ios::out | ios::binary );
 
-    for (particle=m_ActiveParticles.begin();
-  	particle!=m_ActiveParticles.end(); particle++)
-      (*particle)->write2014_binary( FILEbin );
-
-    for (particle=m_InactiveParticles.begin();
-    	particle!=m_InactiveParticles.end(); particle++)
-      (*particle)->write2014_binary( FILEbin );
+    // Note: we first write the number of bytes corresponding to each particle
+    // to be able to later read exactly the amount of bytes corresponding
+    // to that particle in AllComponents::read_particles
+    for (particle=m_ActiveParticles.begin(),i=0;
+  	particle!=m_ActiveParticles.end(); particle++,++i)      
+      if ( write[i] )
+      {
+        nb = (*particle)->get_numberOfBytes();
+        FILEbin.write( reinterpret_cast<char*>( &nb ), sizeof(size_t) );      
+        (*particle)->write2014_binary( FILEbin );
+      }
 
     FILEbin.close();
   }
   else
   {
+    ofstream FILEtext( pfile.c_str(), ios::out );    
+
+    for (particle=m_ActiveParticles.begin(),i=0;
+  	particle!=m_ActiveParticles.end(); particle++,++i)
+      if ( write[i] ) (*particle)->write2014( FILEtext );
+      
+    FILEtext.close();    
+  }
+}
+
+
+
+
+// ---------------------------------------------------------------------------
+// Writes components to a single file MPI File in parallel
+void AllComponents::write_singleMPIFile( ostream &fileSave, 
+	string const& filename, vector<Point3> const* known_positions, 
+	CloneInReload cir, LinkedCell const* LC, 
+	GrainsMPIWrapper const* wrapper, bool periodic ) const
+{  
+  int rank = wrapper->get_rank(), tag, nb_particles_to_write,
+  	nprocs = wrapper->get_total_number_of_active_processes();  
+  MPI_Comm MPI_COMM_activeProc = wrapper->get_active_procs_comm();
+  MPI_File file;
+  MPI_Status status; 
+  list<Particle*> to_write;
+  list<Particle*>::const_iterator particle;
+  Point3 const* gc;
+  multimap< int, Point3 >* doNotWrite = NULL; 
+  multimap< int, Point3 >::iterator imm;      
+
+  // Particles to write to the reload file: 
+  // * active particles interior and buffer
+  // * actives particles periodic clones if clone writing mode is ALL
+  // Some periodic clones may be duplicated and we first need to determine on 
+  // each process the list of periodic clones that must not be written by this 
+  // process as another process is in charge
+  if ( periodic && cir == CIR_ALL ) 
+  {
+    doNotWrite = wrapper->doNotWritePeriodicClones(
+  	m_ActiveParticles, LC );
+
     for (particle=m_ActiveParticles.begin();
   	particle!=m_ActiveParticles.end(); particle++)
-      (*particle)->write2014( fileSave );
+    {
+      gc = (*particle)->getPosition(); 
+      tag = (*particle)->getTag();
+      if ( tag < 2 ) to_write.push_back( *particle );
+      else if ( !LC->isInDomain( gc ) )
+      {
+        if ( doNotWrite->count( (*particle)->getID() ) )
+        {
+          bool found = false;
+          pair < multimap<int,Point3>::iterator, 
+  		multimap<int,Point3>::iterator > crange = 
+		doNotWrite->equal_range( (*particle)->getID() );
+	  for (imm=crange.first; imm!=crange.second && !found; )
+	    if ( gc->DistanceTo( imm->second ) 
+	  	< 2. * (*particle)->getCrustThickness() )
+	      found = true;
+	    else imm++;
+	  if ( !found ) to_write.push_back( *particle );
+	  else doNotWrite->erase( imm );
+        }
+        else to_write.push_back( *particle );	
+      }      
+    }
+    
+    delete doNotWrite;      
+  }		
+  else
+    for (particle=m_ActiveParticles.begin();
+  	particle!=m_ActiveParticles.end(); particle++)
+      if ( (*particle)->getTag() < 2 ) to_write.push_back( *particle );  
+  
+  nb_particles_to_write = wrapper->sum_INT( int(to_write.size()) );
 
-    for (particle=m_InactiveParticles.begin();
-    	particle!=m_InactiveParticles.end(); particle++)
-      (*particle)->write2014( fileSave );
+  if ( rank == 0 )
+  {
+    // Reference particles and obstacles
+    fileSave << endl << "NumberOfParticleTypes\t" <<
+  	m_ReferenceParticles.size() << endl;
+
+    vector<Particle*>::const_iterator iv;
+    for (iv=m_ReferenceParticles.begin();
+  	iv!=m_ReferenceParticles.end();iv++) (*iv)->write( fileSave );
+
+    fileSave << endl;
+    fileSave << "RemainingNbParticlesToInsertPerType";
+    for (size_t i=0;i<m_NbRemainingParticlesToInsert.size();++i)
+      fileSave << " " << m_NbRemainingParticlesToInsert[i];
+    fileSave << endl << endl;
+    
+    fileSave << "RemainingKnownInsertionPositions " << known_positions->size()
+    	<< endl;
+    if ( known_positions->size() )
+    {
+      vector<Point3>::const_iterator il;
+      for (il=known_positions->cbegin();il!=known_positions->cend();il++)
+        fileSave << GrainsExec::doubleToString(ios::scientific,FORMAT16DIGITS,
+  		(*il)[X]) << " " << 
+		GrainsExec::doubleToString(ios::scientific,FORMAT16DIGITS,
+  		(*il)[Y]) << " " << 
+		GrainsExec::doubleToString(ios::scientific,FORMAT16DIGITS,
+  		(*il)[Z]) << endl;
+    }
+
+    fileSave << endl << "<Obstacle>" << endl;
+    m_obstacle->write( fileSave );
+    fileSave << endl << "</Obstacle>" << endl << endl;
+    fileSave << "NbFiles 1" << endl; 
+    fileSave << ( GrainsExec::m_writingModeHybrid ? "Hybrid" :
+  	"Text" ) << " " << nb_particles_to_write << endl;     
   }
 
-  fileSave << endl << "<Obstacle>" << endl;
-  m_obstacle->write( fileSave );
-  fileSave << endl << "</Obstacle>" << endl;
+
+  // Particle MPI file  
+  string pfile = filename;
+  size_t pos = filename.find_first_of(".");
+  pfile.erase( pos );
+  pfile += "_Particles";
+  pfile = GrainsExec::fullResultFileName( pfile, false );
+  if ( GrainsExec::m_writingModeHybrid ) pfile += ".bin"; 
+   
+  MPI_File_open( MPI_COMM_activeProc, pfile.c_str(), 
+    	MPI_MODE_CREATE | MPI_MODE_WRONLY,
+	MPI_INFO_NULL, &file ); 
+ 
+  // Particle stream
+  ostringstream oss_particles;
+  vector<int> mpifile_offsets( nprocs, 0 ); 
+  size_t nb = 0;
+  if ( GrainsExec::m_writingModeHybrid ) 
+    for (particle=to_write.begin();particle!=to_write.end(); particle++)
+    { 
+      // Note: we first write the number of bytes corresponding to the particle
+      // to be able to later read exactly the amount of bytes corresponding
+      // to that particle in AllComponents::read_particles
+      nb = (*particle)->get_numberOfBytes();
+      oss_particles.write( reinterpret_cast<char*>( &nb ), sizeof(size_t) );
+      (*particle)->write2014_binary( oss_particles );
+    } 
+  else
+    for (particle=to_write.begin();particle!=to_write.end(); particle++) 
+      (*particle)->write2014( oss_particles );       
+
+  int out_length = int(oss_particles.str().size());
+  int* out_length_per_proc = wrapper->AllGather_INT( out_length );
+  
+  mpifile_offsets[0] = 0;
+  for (int i=1;i<nprocs;i++)
+    mpifile_offsets[i] = mpifile_offsets[i-1] 
+    	+ out_length_per_proc[i-1] * sizeof(char) ;
+
+  MPI_File_write_at_all( file, mpifile_offsets[rank], 
+  	oss_particles.str().c_str(), out_length, MPI_CHAR, &status );
+  
+  MPI_File_close( &file );
+  delete out_length_per_proc; 
+
 }
 
 
@@ -964,9 +1577,9 @@ void AllComponents::debug( char* s )
 {
   cout << s << '\n'
        << "Particles " << m_ActiveParticles.size()
-       		+ m_InactiveParticles.size()  << '\n'
+       		+ m_nb_physical_particles_to_insert  << '\n'
        << "   Actives " << m_ActiveParticles.size() << '\t'
-       << "   Wait    " << m_InactiveParticles.size()      << endl;
+       << "   Wait    " << m_nb_physical_particles_to_insert << endl;
 }
 
 
@@ -979,13 +1592,14 @@ ostream& operator << ( ostream& f, AllComponents const& EC )
   f << "Number of particles on all processes = "
   	<< EC.m_total_nb_particles << endl;
   f << "Number of particles = " <<
-  	EC.m_ActiveParticles.size() + EC.m_InactiveParticles.size() << endl;
+  	EC.m_ActiveParticles.size() + EC.m_nb_physical_particles_to_insert 
+	<< endl;
   f << "Number of active particles = " << EC.m_ActiveParticles.size()
   	<< endl;
-  f << "Number of inactive particles = " << EC.m_InactiveParticles.size()
-  	<< endl;
-  f << "Number of particles in halozone = " <<
-  	EC.m_ParticlesInHalozone.size() << endl;
+  f << "Number of particles to insert = " << 
+  	EC.m_nb_physical_particles_to_insert << endl;
+  f << "Number of particles in buffer zone = " <<
+  	EC.m_ParticlesInBufferzone.size() << endl;
   f << "Number of clone particles = " << EC.m_CloneParticles.size() << endl;
   list<Particle*>::const_iterator il;
   for (il=EC.m_ActiveParticles.begin();il!=EC.m_ActiveParticles.end();il++)
@@ -1000,7 +1614,7 @@ ostream& operator << ( ostream& f, AllComponents const& EC )
 // ----------------------------------------------------------------------------
 // Writes components for Post-Processing at the start of the simulation
 void AllComponents::PostProcessing_start( double time, double dt,
-	LinkedCell const* LC, vector<Window> const& insert_windows,
+	LinkedCell const* LC, AllInsertionWindows const& insert_windows,
 	int rank, int nprocs,
 	GrainsMPIWrapper const* wrapper )
 {
@@ -1013,17 +1627,25 @@ void AllComponents::PostProcessing_start( double time, double dt,
     for (pp=m_postProcessors.begin();pp!=m_postProcessors.end() && !written;
     	pp++)
     {
-      cout << "Writing results in post-processing files: START" << endl;
+      cout << "Writing results in post-processing files: START" << endl 
+      	<< std::flush;
       written = true;
     }
 
   // Periodic clones
   if ( GrainsExec::m_periodic )
   {
-    if ( GrainsExec::m_MPI ) {}
+    postProcessingPeriodic = new list<Particle*>;
+    if ( GrainsExec::m_MPI ) 
+    {
+      list<Particle*>::const_iterator particle;
+      for (particle=m_CloneParticles.begin();
+  	particle!=m_CloneParticles.end(); particle++)
+        if ( !LC->isInDomain( (*particle)->getPosition() ) )
+	  postProcessingPeriodic->push_back( *particle );
+    }
     else
     {
-      postProcessingPeriodic = new list<Particle*>;
       multimap<int,Particle*>::iterator imm;
       for (imm=m_PeriodicCloneParticles.begin();
   	imm!=m_PeriodicCloneParticles.end();imm++)
@@ -1034,7 +1656,7 @@ void AllComponents::PostProcessing_start( double time, double dt,
   // Post processing writers
   for (pp=m_postProcessors.begin();pp!=m_postProcessors.end();pp++)
     (*pp)->PostProcessing_start( time, dt, &m_ActiveParticles,
-	&m_InactiveParticles, postProcessingPeriodic,
+	&m_RemovedParticles, postProcessingPeriodic,
 	&m_ReferenceParticles, m_obstacle, LC, insert_windows );
 
   // Destruction of local containers
@@ -1050,7 +1672,8 @@ void AllComponents::PostProcessing_start( double time, double dt,
     for (pp=m_postProcessors.begin();pp!=m_postProcessors.end() && !written;
     	pp++)
     {
-      cout << "Writing results in post-processing files: COMPLETED" << endl;
+      cout << "Writing results in post-processing files: COMPLETED" << endl
+      	<< std::flush;
       written = true;
     }
 }
@@ -1061,8 +1684,8 @@ void AllComponents::PostProcessing_start( double time, double dt,
 // ----------------------------------------------------------------------------
 // Writes components for Post-Processing over the simulation
 void AllComponents::PostProcessing( double time, double dt,
-	LinkedCell const* LC, int rank,
-	int nprocs, GrainsMPIWrapper const* wrapper )
+	LinkedCell const* LC, AllInsertionWindows const& insert_windows,
+	int rank, int nprocs, GrainsMPIWrapper const* wrapper )
 {
   list<Particle*>* postProcessingPeriodic = NULL;
   list<PostProcessingWriter*>::iterator pp;
@@ -1080,10 +1703,17 @@ void AllComponents::PostProcessing( double time, double dt,
   // Periodic clones
   if ( GrainsExec::m_periodic )
   {
-    if ( GrainsExec::m_MPI ) {}
+    postProcessingPeriodic = new list<Particle*>;
+    if ( GrainsExec::m_MPI )
+    {
+      list<Particle*>::const_iterator particle;
+      for (particle=m_CloneParticles.begin();
+  	particle!=m_CloneParticles.end(); particle++)
+        if ( !LC->isInDomain( (*particle)->getPosition() ) )
+	  postProcessingPeriodic->push_back( *particle );
+    }    
     else
     {
-      postProcessingPeriodic = new list<Particle*>;
       multimap<int,Particle*>::iterator imm;
       for (imm=m_PeriodicCloneParticles.begin();
   	imm!=m_PeriodicCloneParticles.end();imm++)
@@ -1094,8 +1724,8 @@ void AllComponents::PostProcessing( double time, double dt,
   // Post processing writers
   for (pp=m_postProcessors.begin();pp!=m_postProcessors.end();pp++)
     (*pp)->PostProcessing( time, dt, &m_ActiveParticles,
-	&m_InactiveParticles, postProcessingPeriodic,
-	&m_ReferenceParticles, m_obstacle, LC );
+	&m_RemovedParticles, postProcessingPeriodic,
+	&m_ReferenceParticles, m_obstacle, LC, insert_windows );
 
   // Destruction of local containers
   if ( GrainsExec::m_periodic )
@@ -1133,14 +1763,14 @@ void AllComponents::PostProcessing_end()
 
 // ----------------------------------------------------------------------------
 // Writes components for Post-Processing in case of an error in
-// contact or displacement
+// contact or motion
 void AllComponents::PostProcessingErreurComponents( string const& filename,
 	list<Component*> const& errcomposants )
 {
   // Post processing writers
   list<PostProcessingWriter*>::iterator pp;
   for (pp=m_postProcessors.begin();pp!=m_postProcessors.end();pp++)
-    (*pp)->writeErreurComponentsPostProcessing( filename, errcomposants );
+    (*pp)->writeErreurComponents_Paraview( filename, errcomposants );
 }
 
 
@@ -1247,19 +1877,6 @@ void AllComponents::monitorParticlesVelocity( double time, ofstream& fileOut,
 
 
 // ----------------------------------------------------------------------------
-// Updates geographic position of particles in the halozone
-void AllComponents::updateGeoPositionParticlesHalozone()
-{
-  list<Particle*>::iterator particle;
-  for (particle=m_ParticlesInHalozone.begin();
-  	particle!=m_ParticlesInHalozone.end();particle++)
-    (*particle)->updateGeoPosition();
-}
-
-
-
-
-// ----------------------------------------------------------------------------
 // Adds a post-processing writer
 void AllComponents::addPostProcessingWriter( PostProcessingWriter* ppw )
 {
@@ -1333,16 +1950,11 @@ void AllComponents::checkParaviewPostProcessing( int const& rank,
 // Returns the highest particle ID number
 int AllComponents::getMaxParticleIDnumber() const
 {
-  int numeroMax = 0;
+  int numeroMax = - 1;
   list<Particle*>::const_iterator particle;
 
   for (particle=m_ActiveParticles.begin();
   	particle!=m_ActiveParticles.end(); particle++)
-    numeroMax = numeroMax < (*particle)->getID() ?
-    	(*particle)->getID() : numeroMax;
-
-  for (particle=m_InactiveParticles.begin();
-  	particle!=m_InactiveParticles.end(); particle++)
     numeroMax = numeroMax < (*particle)->getID() ?
     	(*particle)->getID() : numeroMax;
 
@@ -1380,8 +1992,7 @@ void AllComponents::setOutputObstaclesLoadParameters( string const& root_,
   {
     Obstacle* pobs = const_cast<Obstacle*>(m_obstacle->getObstacleFromName(
     	*il ));
-    if ( pobs )
-      m_outputTorsorObstacles.push_back( pobs );
+    if ( pobs ) m_outputTorsorObstacles.push_back( pobs );
   }
 }
 
@@ -1389,21 +2000,30 @@ void AllComponents::setOutputObstaclesLoadParameters( string const& root_,
 
 
 // ----------------------------------------------------------------------------
+// Computes load on obstacles
+void AllComponents::computeObstaclesLoad( double time, double dt,
+      	GrainsMPIWrapper const* wrapper )
+{
+  // Load on simple obstacles
+  if ( wrapper ) wrapper->sumObstaclesLoad( m_obstacle->getObstacles() );
+    
+  // Load on composite obstacles 
+  m_obstacle->getTorsor(); 
+}
+
+
+
+// ----------------------------------------------------------------------------
 // Writes load on obstacles in a file
 void AllComponents::outputObstaclesLoad( double time, double dt,
-	bool enforceOutput, bool increaseCounterOnly, int rank, int nprocs,
-	GrainsMPIWrapper const* wrapper )
+	bool enforceOutput, bool increaseCounterOnly, int rank )
 {
   if ( !increaseCounterOnly )
   {
     if ( m_outputTorsorObstacles_counter == 0 || enforceOutput )
     {
-      if ( nprocs > 1 )
-        wrapper->sumObstaclesLoad( m_obstacle->getObstacles() );
-
       if ( rank == 0 )
       {
-        Torsor const* torseur = NULL;
         Vector3 const* force = NULL;
         Vector3 const* torque = NULL;
         for (list<Obstacle*>::iterator
@@ -1412,10 +2032,10 @@ void AllComponents::outputObstaclesLoad( double time, double dt,
         {
           ofstream OUT( ( m_outputTorsorObstacles_dir
       	+ "/Loading_" + (*obstacle)->getName() + ".res" ).c_str(), ios::app );
-          torseur = (*obstacle)->getTorsor();
-	  force = torseur->getForce();
-          torque = torseur->getTorque();
-	  OUT << time << " " <<
+	  force = (*obstacle)->getForce();
+          torque = (*obstacle)->getTorque();
+	  OUT << GrainsExec::doubleToString( ios::scientific, 6, time ) 
+	  	<< " " <<
 		GrainsExec::doubleToString( ios::scientific, 6, (*force)[X] )
 		<< " " <<
 		GrainsExec::doubleToString( ios::scientific, 6, (*force)[Y] )
@@ -1477,17 +2097,6 @@ void AllComponents::initialiseOutputObstaclesLoadFiles( int rank,
 
 
 // ----------------------------------------------------------------------------
-// Sets the total number of particles on all processes
-void AllComponents::setNumberParticlesOnAllProc( size_t const& nb_ )
-{
-  m_total_nb_particles = int(nb_);
-  GrainsExec::setNumberParticlesOnAllProc( m_total_nb_particles );
-}
-
-
-
-
-// ----------------------------------------------------------------------------
 // Sets a random translational and angular velocity to all particles
 void AllComponents::setRandomMotion( double const& coefTrans,
 	double const& coefRot )
@@ -1537,35 +2146,39 @@ void AllComponents::updateAllContactMaps()
 
 
 // ----------------------------------------------------------------------------
-// Returns the number of inactive particles
-size_t AllComponents::getNumberInactiveParticles() const
+// Set all contact map cumulative features to zero in all particles
+// and all elementary obstacles */
+void AllComponents::setAllContactMapCumulativeFeaturesToZero()
 {
-  return ( m_InactiveParticles.size() );
+  for (list<Particle*>::iterator particle=m_ActiveParticles.begin();
+	particle!=m_ActiveParticles.end();particle++)
+    (*particle)->setContactMapCumulativeFeaturesToZero();
+
+  list<SimpleObstacle*> obstacles = m_obstacle->getObstacles();
+  list<SimpleObstacle*>::iterator myObs;
+  for( myObs=obstacles.begin(); myObs!=obstacles.end(); myObs++ )
+    (*myObs)->setContactMapCumulativeFeaturesToZero();
 }
 
 
 
 
 // ----------------------------------------------------------------------------
-// Returns the total number of particles on all processes
-size_t AllComponents::getNumberParticlesOnAllProc() const
+// Returns the number of particles in this process
+size_t AllComponents::getNumberParticles() const
+{
+  return ( m_nb_particles );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the number of particles total number of particles in the
+// system (i.e. on all subdomains/processes)
+size_t AllComponents::getTotalNumberParticles() const
 {
   return ( m_total_nb_particles );
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// Returns the number of active particles with tag 0 ou 1
-size_t AllComponents::getNumberActiveParticlesOnProc() const
-{
-  size_t nb_part = m_ActiveParticles.size();
-  for (list<Particle*>::const_iterator il=m_ActiveParticles.begin();
-  	il!=m_ActiveParticles.end();il++)
-    if ( (*il)->getTag() == 2 || (*il)->getID() == -2 ) nb_part--;
-
-  return nb_part;
 }
 
 
@@ -1575,15 +2188,311 @@ size_t AllComponents::getNumberActiveParticlesOnProc() const
 // Returns the number of active particles
 size_t AllComponents::getNumberActiveParticles() const
 {
-  return ( m_ActiveParticles.size() );
+  return ( m_nb_active_particles );
 }
 
 
 
 
 // ----------------------------------------------------------------------------
-// Returns the total number of particles, both active and inactive
-size_t AllComponents::getNumberParticles() const
+// Returns the total number of active particles in the system (i.e. 
+// on all subdomains/processes)
+size_t AllComponents::getTotalNumberActiveParticles() const
 {
-  return ( m_ActiveParticles.size() + m_InactiveParticles.size() );
+  return ( m_total_nb_active_particles );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the number of active particles in this process with tag 0 ou 1
+size_t AllComponents::getNumberActiveParticlesOnProc() const
+{
+  return ( m_nb_active_particles_on_proc );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the total number of active particles with tag 0 ou 1 in the system 
+// (i.e. on all subdomains/processes)
+size_t AllComponents::getNumberActiveParticlesOnAllProc() const
+{
+  return ( m_total_nb_active_particles_on_all_procs );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the total number of particles in the physical system 
+// (i.e. on all subdomains/processes), i.e. sum of total number of active 
+// particles with tag 0 or 1 and particles to be inserted
+size_t AllComponents::getTotalNumberPhysicalParticles() const
+{
+  return ( m_total_nb_physical_particles );
+}
+
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the number of particles to insert in the physical system
+size_t AllComponents::getNumberPhysicalParticlesToInsert() const
+{
+  return ( m_nb_physical_particles_to_insert );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Computes and sets the numbers of particles in the system */
+void AllComponents::computeNumberParticles( GrainsMPIWrapper const* wrapper )
+{
+  m_nb_active_particles = m_ActiveParticles.size();
+
+  if ( wrapper ) 
+    m_total_nb_active_particles = wrapper->sum_UNSIGNED_INT( 
+  	 m_nb_active_particles );
+  else 
+    m_total_nb_active_particles = m_nb_active_particles; 
+
+  m_nb_particles = m_nb_active_particles + m_nb_physical_particles_to_insert;
+
+  m_total_nb_particles = m_total_nb_active_particles 
+  	+ m_nb_physical_particles_to_insert;
+
+  m_nb_active_particles_on_proc = m_nb_active_particles;
+  for (list<Particle*>::const_iterator il=m_ActiveParticles.begin();
+  	il!=m_ActiveParticles.end();il++)
+    if ( (*il)->getTag() == 2 ) m_nb_active_particles_on_proc--; 
+
+  if ( wrapper ) m_total_nb_active_particles_on_all_procs = 
+  	wrapper->sum_UNSIGNED_INT( m_nb_active_particles_on_proc );
+  else m_total_nb_active_particles_on_all_procs = m_nb_active_particles_on_proc;
+  
+  m_total_nb_physical_particles = m_total_nb_active_particles_on_all_procs
+  	+ m_nb_physical_particles_to_insert;
+	
+  GrainsExec::setTotalNumberPhysicalParticles( 
+  	m_total_nb_physical_particles );	
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Updates list of particles in parallel
+void AllComponents::updateParticleLists( double time, 
+	list<Particle*>* newBufPart, GrainsMPIWrapper const* wrapper )
+{
+  newBufPart->clear();
+  
+  list<Particle*>::iterator particle;
+  int tag = 0, tagnm1 = 0;
+  
+  for (particle=m_ActiveParticles.begin();particle!=m_ActiveParticles.end(); 
+  	particle++)
+  { 
+    tag = (*particle)->getTag();
+    tagnm1 = (*particle)->getTagNm1();
+    
+    switch ( tagnm1 )
+    {
+      case 0:
+        // Interior to buffer (0 -> 1)
+	if ( tag == 1 ) 
+	{
+	  m_ParticlesInBufferzone.push_back( *particle);
+	  newBufPart->push_back( *particle );
+          if ( GrainsExec::m_MPI_verbose )
+	  {
+	    ostringstream oss;
+	    oss << "   t=" << GrainsExec::doubleToString( time, 
+	    		FORMAT10DIGITS ) <<
+		" Interior to Buffer (0 -> 1) Id = " <<
+      		(*particle)->getID() << " " << *(*particle)->getPosition()
+		<< endl;
+	    GrainsMPIWrapper::addToMPIString( oss.str() );
+	  } 
+	}
+	break;
+	
+      case 1:
+        switch ( tag )
+	{
+	  // Buffer to interior (1 -> 0)
+	  case 0:
+	    removeParticleFromList( m_ParticlesInBufferzone, *particle );
+            if ( GrainsExec::m_MPI_verbose )
+	    {
+              ostringstream oss;
+              oss << "   t=" << GrainsExec::doubleToString( time, 
+	      		FORMAT10DIGITS )
+      		<< " Buffer to Interior (1 -> 0) Id = " <<
+      		(*particle)->getID() << " " << *(*particle)->getPosition()
+		<< endl;
+              GrainsMPIWrapper::addToMPIString( oss.str() );
+	    } 
+            break;
+	    
+	  // Buffer to buffer ( 1 -> 1)
+	  case 1:
+	    if ( (*particle)->getGeoPosition() 
+	    	!= (*particle)->getGeoPositionNm1() )
+	    {
+	      newBufPart->push_back( *particle );
+              if ( GrainsExec::m_MPI_verbose )
+	      {
+                ostringstream oss;
+                oss << "   t=" << GrainsExec::doubleToString( time, 
+			FORMAT10DIGITS )
+      		<< " Buffer to Buffer (1 -> 1)   Id = " <<
+      		(*particle)->getID() << " " << *(*particle)->getPosition()
+		<< endl;
+		oss << "                From " <<
+		Cell::getGeoPositionName((*particle)->getGeoPositionNm1())
+		<< " to " << Cell::getGeoPositionName(
+			(*particle)->getGeoPosition()) << endl;
+                GrainsMPIWrapper::addToMPIString( oss.str() );
+	      } 
+	    }
+	    else if ( GrainsExec::m_partialPer_is_active )
+	    { 
+	      if ( wrapper->isGeoPositionPeriodic( 
+	      	(*particle)->getCell()->getGeoPosition() ) )
+	        if ( GrainsExec::partialPeriodicityCompTest( 
+			(*particle)->getPosition() ) &&
+		!GrainsExec::partialPeriodicityCompTest(
+			(*particle)->getPositionDir_nm1() ) )
+	        {
+	          newBufPart->push_back( *particle );
+                  if ( GrainsExec::m_MPI_verbose )
+	          {
+                    ostringstream oss;
+                    oss << "   t=" << GrainsExec::doubleToString( time, 
+			FORMAT10DIGITS )
+      		  	<< " Buffer to Buffer (1 -> 1)   Id = " <<
+      			(*particle)->getID() << " " << 
+			*(*particle)->getPosition() << endl;
+		    oss << "                Periodic transition zone" << endl;
+                    GrainsMPIWrapper::addToMPIString( oss.str() );
+	          } 
+	        }
+	    }	    
+	    	      	  
+	    break;
+	    
+	  // Buffer to clone (1 -> 2)
+	  case 2:
+            removeParticleFromList( m_ParticlesInBufferzone, *particle );
+	    m_CloneParticles.push_back( *particle );
+	    if ( GrainsExec::m_MPI_verbose )
+            {
+              ostringstream oss;
+              oss << "   t=" << GrainsExec::doubleToString( time, 
+	      		FORMAT10DIGITS )
+      		<< " Buffer to Clone (1 -> 2)    Id = " <<
+      		(*particle)->getID() << " " << *(*particle)->getPosition()
+		<< endl;
+              GrainsMPIWrapper::addToMPIString( oss.str() );
+            }
+	    break;
+	}
+	break;      
+    
+      case 2:
+        // Clone to buffer (2 -> 1)
+	if ( tag == 1 ) 
+	{
+          removeParticleFromList( m_CloneParticles, *particle );
+	  m_ParticlesInBufferzone.push_back( *particle );
+	  newBufPart->push_back( *particle );          
+          if ( GrainsExec::m_MPI_verbose )
+	  {
+            ostringstream oss;
+            oss << "   t=" << GrainsExec::doubleToString( time, 
+	    		FORMAT10DIGITS ) <<
+      		" Clone to Buffer (2 -> 1)    Id = " <<
+      		(*particle)->getID() << " " << *(*particle)->getPosition()
+		<< endl;
+            GrainsMPIWrapper::addToMPIString( oss.str() );
+	  } 
+	}	
+	break;
+    }
+  }   
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Computes and sets the maximum particle ID number and minimum obstacle ID 
+// number
+void AllComponents::setParticleMaxIDObstacleMinID( 
+	GrainsMPIWrapper const* wrapper )
+{
+  list<Particle*>::iterator particle;
+  int maxID = 0;
+  for (particle=m_ActiveParticles.begin();particle!=m_ActiveParticles.end(); 
+  	particle++)
+    maxID = max( maxID, (*particle)->getID() );
+  
+  if ( wrapper ) maxID = wrapper->max_INT( maxID );
+  Particle::setMaxIDnumber( maxID );
+
+  m_obstacle->setMinIDnumber();
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets time integration scheme in all particles using the macro variable 
+// GrainsExec::m_TIScheme
+void AllComponents::setTimeIntegrationScheme()
+{
+  list<Particle*>::iterator particle;
+  vector<Particle*>::iterator ivp;
+
+  // Reference types
+  for (ivp=m_ReferenceParticles.begin();
+  	ivp!=m_ReferenceParticles.end(); ivp++)
+    (*ivp)->setTimeIntegrationScheme();
+
+  // Active particles
+  for (particle=m_ActiveParticles.begin();
+  	particle!=m_ActiveParticles.end(); particle++)
+    (*particle)->setTimeIntegrationScheme(); 
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets the center of mass coordinate in a given direction at the previous time 
+// of all particles to the current value (generally called at the start of a 
+// time step)
+void AllComponents::setPositionDir_nm1( Direction dir )
+{
+  for (list<Particle*>::iterator particle=m_ActiveParticles.begin();
+  	particle!=m_ActiveParticles.end();particle++) 
+    (*particle)->setPositionDir_nm1( dir ); 
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets all particles' momentum equation coupling factor
+void AllComponents::setParticlesCouplingFactor()
+{
+  for (list<Particle*>::iterator particle=m_ActiveParticles.begin();
+  	particle!=m_ActiveParticles.end();particle++) 
+    (*particle)->setCouplingFactor(); 
 }

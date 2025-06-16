@@ -6,6 +6,7 @@
 #include "Point3.hh"
 #include "PointContact.hh"
 #include "Torsor.hh"
+#include "CollisionHistory.hh"
 #include <list>
 #include <string>
 #include <map>
@@ -31,7 +32,7 @@ struct ContactInfos
 
     @author G.FERRER - Institut Francais du Petrole - 2000 - Creation
     @author A.WACHS - 2019 - Major cleaning & refactoring 
-    @author D. HUET - 2022 - Contact force model with memory */
+    @author D.HUET - 2022 - Contact force model with memory */
 // ============================================================================
 class Component
 {
@@ -82,7 +83,7 @@ class Component
     @param voisin the other component */
     virtual bool isCloseWithCrust( Component const* voisin ) const;
 
-    /** @brief Rotates the component using a quaternion
+    /** @brief Rotates the component using a quaternion about its center of mass
     @param rotation quaternion representing the rotation */
     virtual void Rotate( Quaternion const& rotation );
 
@@ -95,7 +96,7 @@ class Component
     or to 0 is false */
     virtual void InitializeForce( bool const& withWeight );
 
-    /** @brief Update contact map */
+    /** @brief Updates contact map */
     virtual void updateContactMap();
 
     /** @brief Does the contact exist in the map? If so, return true and make
@@ -106,14 +107,15 @@ class Component
     @param prev_normal pointer to the previous vector normal to the contact 
     plane
     @param cumulSpringTorque pointer to the memory of the spring-like component 
-    of the friction torque */
+    of the friction torque 
+    @param createContact when true, create contact if it does not exist */
     virtual bool getContactMemory( std::tuple<int,int,int> const& id,
   	Vector3* &kdelta, Vector3* &prev_normal, Vector3* &cumulSpringTorque,
   	bool createContact );
 
     /** @brief Adds new contact in the map
     @param id key in the map
-    @param kdelta pointer to the memory of the vector kt * delta_t
+    @param kdelta kt * delta_t vector
     @param prev_normal pointer to the previous vector normal to the contact 
     plane
     @param cumulSpringTorque pointer to the memory of the spring-like component 
@@ -123,10 +125,10 @@ class Component
   	Vector3 const& cumulSpringTorque );
 
     /** @brief Stores memory of the contact with component id: increase 
-    cumulative tangential displacement and cumulative spring torque, remember 
+    cumulative tangential motion and cumulative spring torque, remember 
     contact normal.
     @param id key in the map
-    @param kdelta pointer to the memory of the vector kt * delta_t
+    @param kdelta kt * delta_t vector
     @param prev_normal pointer to the previous vector normal to the contact 
     plane
     @param cumulSpringTorque pointer to the memory of the spring-like component 
@@ -138,13 +140,13 @@ class Component
     /** @brief Writes the contact map information in an array of doubles
     @param destination the array of double where the contact map should be 
     stored
-    @param start index the index of destination where the copy should start */
-    virtual void copyHistoryContacts( double* &destination, int start_index );
+    @param start_index the index of destination where the copy should start */
+    virtual void copyContactMap( double* destination, int start_index );
 
     /** @brief Adds a single contact info to the contact map
     @param id key in the map
     @param isActive boolean: true if the contact is active, false otherwise
-    @param kdelta pointer to the memory of the vector kt * delta_t
+    @param kdelta kt * delta_t vector
     @param prev_normal pointer to the previous vector normal to the contact 
     plane
     @param cumulSpringTorque pointer to the memory of the spring-like component 
@@ -162,16 +164,17 @@ class Component
     @param id id of this component */
     virtual void printActiveNeighbors( int const& id );
 
-    /** @brief Updates the ids of the contact map: in the case of a reload with 
-    insertion, the obstacle's ids are reset. This function keeps track of that 
-    change.
-    @param prev_id previous id that should be updated
-    @param new_id updated id */
-    void updateContactMapId( int prev_id, int new_id );
-
     /** @brief Returns whether a point lies inside the component
     @param pt point */
     virtual bool isIn( Point3 const& pt ) const;
+    
+    /** @brief Returns whether to store the contact force for post-processing 
+    @param othercomp the other component involved in the contact */
+    virtual bool storePPForce( Component const* othercomp ) const = 0;
+    
+    /** @brief Returns whether the bounding volumes of two components overlap
+    @param othercomp the other component involved in the overlap test */
+    virtual bool doBVolumeOverlap( Component const* othercomp ) const;    
     //@}
 
 
@@ -196,6 +199,22 @@ class Component
 
     /** @brief Initializes all contact map entries to false */
     virtual void setContactMapToFalse();
+    
+    /** @brief Sets contact map cumulative features to zero */
+    virtual void setContactMapCumulativeFeaturesToZero();
+    
+    /** @brief Sets the contact map 
+    @param othermap the contact map to be copied */
+    void setContactMap( map< std::tuple<int,int,int>,
+     	std::tuple<bool, Vector3, Vector3, Vector3> > const& othermap );
+	
+    /** @brief Sets the total force exerted on the component
+    @param force new total force */
+    void setForce( Vector3 const& force );
+    
+    /** @brief Sets the total torque exerted on the component
+    @param torque new total torque */
+    void setTorque( Vector3 const& torque ); 	         
     //@}
 
 
@@ -225,8 +244,8 @@ class Component
     /** @brief Returns the circumscribed radius of the rigid body */
     double getCircumscribedRadius() const;
 
-    /** @brief Returns the radius ofthe sphere of equivalent volume as the rigid
-    body */
+    /** @brief Returns the radius of the sphere of volume equivalent to that of
+    the rigid body */
     virtual double getEquivalentSphereRadius() const;
 
     /** @brief Returns the crust thickness of the rigid body */
@@ -257,6 +276,15 @@ class Component
 
     /** @brief Returns the particle class */
     virtual int getGeometricType() const;
+    
+    /** @brief Returns a pointer to the contact map */
+    map< std::tuple<int,int,int>,
+     	std::tuple<bool, Vector3, Vector3, Vector3> > const* getContactMap()
+	const;
+	
+    /** @brief Returns component tag at the current discrete time (default 
+    is 0) */
+    virtual int getTag() const;	    
     //@}
 
 
@@ -265,8 +293,11 @@ class Component
     /** @brief Adds a force exerted at a point to the torsor (torsor adds torque
     automatically)
     @param force force
-    @param point point where the force is exerted */
-    virtual void addForce( Point3 const& point, Vector3 const& force );
+    @param point point where the force is exerted 
+    @param tagSecondComp tag of the other compoenent in case of a contact 
+    force */
+    virtual void addForce( Point3 const& point, Vector3 const& force,
+    	int tagSecondComp );
 
     /** @brief Adds a body force exerted at the center of mass of the component
     to the torsor (associated torque is 0)
@@ -274,8 +305,10 @@ class Component
     virtual void addBodyForce( Vector3 const& force );
 
     /** @brief Adds a torque to the torsor
-    @param torque torque */
-    virtual void addTorque( Vector3 const& torque );
+    @param torque torque 
+    @param tagSecondComp tag of the other compoenent in case of a contact 
+    torque */
+    virtual void addTorque( Vector3 const& torque, int tagSecondComp );
 
     /** @brief Copies the center of mass of the component in a 1D array
     @param pos 1D array where center of mass is copied
@@ -319,6 +352,11 @@ class Component
     virtual void SearchContact( Component* voisin, double dt,
       double const& time, LinkedCell *LC,
       list<ContactInfos*>& listContact );
+    
+    /** @brief Searches for the previous direction of contact with component
+    with id = _id
+    @param _id id of the component to search for */
+    Vector3 lookupCollision( int _id ) const;
 
     /** @brief Increments the coordination number by nc
     @param nc increment of the coordination number */
@@ -331,7 +369,7 @@ class Component
     virtual bool isCompositeObstacle() const;
 
     /** @brief Returns whether the component is an obstacle ? (use the fact
-    that obstacle have a zero mass by convention) */
+    that all obstacles have the same very large mass by convention) */
     bool isObstacle() const;
 
     /** @brief Returns whether the component is an elementary particle */
@@ -389,30 +427,26 @@ class Component
 
     /** @brief Writes the contact map to file in plain 2014 format
     @param fileSave output file stream */
-    void writeContactMemory_2014( ostream &fileSave ) const;
+    void writeContactMemory2014( ostream &fileSave ) const;
 
     /** @brief Writes the contact map to file in binary format
-    @param fileSave output file stream */
-    void writeContactMemory_binary( ostream &fileOut );
+    @param fileOut output file stream */
+    void writeContactMemory2014_binary( ostream &fileOut );
 
     /** @brief Reads the contact map to file in plain 2014 format
     @param fileSave input file stream */
-    void readContactMap_2014( istream &fileSave );
+    void readContactMap2014( istream &fileSave );
 
     /** @brief Reads the contact map to file in binary format
     @param fileSave input file stream */
-    void readContactMap_binary( istream &fileSave );
+    void readContactMap2014_binary( istream &fileSave );
     //@}
 
 
     /** @name Static methods */
-    //@{
-    /** @brief Resets the number of created components to nb_
-    @param nb_ number of created components */
-    static void setNbCreatedComponents( const int &nb_ );
-
+    //@{    
     /** @brief Returns the number of created components  */
-    static int getNbCreatedComponents();
+    static size_t getNbCreatedComponents();
     //@}
 
 
@@ -426,16 +460,20 @@ class Component
     //@}
 
 
-
+    /**@name Parameters */
+    //@{
+    static size_t m_sizeofContactMemory; /** binary size of one 
+    	contact memory tuple */
+    //@}
+    
+    
   protected:
     /** @name Constructors */
     //@{
-    /** @brief Default constructor
-    @param autonumbering whether to increase the number of created components or
-    not */
-    Component( bool const& autonumbering = true );
+    /** @brief Default constructor */
+    Component();
 
-    /** @brief Copy constructor
+    /** @brief Copy constructor 
     @param copy copied Component object */
     Component( Component const& copy );
     //@}
@@ -449,27 +487,32 @@ class Component
 
     /** @brief Writes the component's "static" data
     @param fileOut output stream */
-    virtual void writeStatic( ostream& fileOut ) const;
+    virtual void writeStatic( ostream& fileOut ) const;    
     //@}
 
 
     /** @name Parameters */
     //@{
-    int m_id; /**< ID number */
+    int m_id; /**< ID number, particle ID numbers are always positive and
+    	obstacles ID numbers are always negative, reference particle ID number 
+	and composite obstacle ID number are always 0 */
     string m_materialName; /**< Material name */
     double m_mass; /**< Mass */
     RigidBodyWithCrust *m_geoRBWC; /**< geometric shape with crust */
     Torsor m_torsor; /**< Torsor of forces exerted on the component at its 
     	center of mass */
     ConfigurationMemento *m_memento; /**< To store the component features */
-    map < std::tuple<int,int,int>,
+    map< std::tuple<int,int,int>,
      	std::tuple<bool, Vector3, Vector3, Vector3> > m_contactMap; /** List of 
      	active contacts with other components. It reads as follows:
     	map<tuple<own elementary particle id, neighbour id, neighbour elementary
     	particle id>, tuple<isContactActive, kt * cumulative tangential 
 	dispacement, previous normal vector, kr * cumulative rotational 
-	displacement> > */
-    static int m_nb; /**< Number of created components */
+	motion> > */
+    CollisionHistory m_collisionHistory; /**< keep track of collisions */
+    static size_t m_nb; /**< Number of created components */
+    static double m_massObstacle; /**< Mass of obstacle assumed to be infinite
+    */
     //@}
 };
 

@@ -4,15 +4,23 @@
 #include "LinkedCell.hh"
 #include "Torsor.hh"
 #include "PointC.hh"
+#include "GrainsExec.hh"
+
+
+int CompositeObstacle::m_minCompositeObstacleID = 1;
 
 
 // ----------------------------------------------------------------------------
 // Constructor with name as input parameter
-CompositeObstacle::CompositeObstacle( string const& s ) :
-  Obstacle( s, false )
+CompositeObstacle::CompositeObstacle( string const& s ) 
+  : Obstacle( s, false )
+  , m_type( "Standard" )
 {
-  m_id = -4;
-  m_geoRBWC = new RigidBodyWithCrust( new PointC(), Transform() );
+  m_id = GrainsExec::m_CompositeObstacleDefaultID;
+  m_minCompositeObstacleID--;
+  m_CompositeObstacle_id = m_minCompositeObstacleID;   
+  m_geoRBWC = new RigidBodyWithCrust( new PointC(), Transform(), true,
+  	EPSILON ); 
 }
 
 
@@ -20,13 +28,18 @@ CompositeObstacle::CompositeObstacle( string const& s ) :
 
 // ----------------------------------------------------------------------------
 // Constructor with an XML node as an input parameter
-CompositeObstacle::CompositeObstacle( DOMNode* root ) :
-  Obstacle( "obstacle", false )
+CompositeObstacle::CompositeObstacle( DOMNode* root ) 
+  : Obstacle( "obstacle", false )
+  , m_type( "Standard" )  
 {
-  m_id = -4;
+  m_id = GrainsExec::m_CompositeObstacleDefaultID;
+  m_minCompositeObstacleID--;
+  m_CompositeObstacle_id = m_minCompositeObstacleID;   
+    
   assert( root != NULL );
 
-  m_geoRBWC = new RigidBodyWithCrust( new PointC(), Transform() );
+  m_geoRBWC = new RigidBodyWithCrust( new PointC(), Transform(), true,
+  	EPSILON );
 
   m_name = ReaderXML::getNodeAttr_String( root, "name" );
 
@@ -35,9 +48,9 @@ CompositeObstacle::CompositeObstacle( DOMNode* root ) :
   for (XMLSize_t i=0; i<allObstacles->getLength(); i++) 
   {
     obstacle = ObstacleBuilderFactory::create( allObstacles->item( i ) );
-    m_obstacles.push_back(obstacle);
+    m_obstacles.push_back( obstacle );
   }
-  EvalPosition();
+  computeVolumeCenterOfMass();
 }
 
 
@@ -75,7 +88,7 @@ void CompositeObstacle::append( Obstacle* obstacle )
 bool CompositeObstacle::LinkImposedMotion( ObstacleImposedVelocity* imposed )
 {
   bool status = false;
-  if ( m_name == imposed->getNom() ) 
+  if ( m_name == imposed->getObstacleName() ) 
   {
     m_kinematics.append( imposed );
     status = true;
@@ -99,7 +112,7 @@ bool CompositeObstacle::LinkImposedMotion( ObstacleImposedVelocity* imposed )
 bool CompositeObstacle::LinkImposedMotion( ObstacleImposedForce* imposed )
 {
   bool status = false;
-  if ( m_name == imposed->getNom() ) 
+  if ( m_name == imposed->getObstacleName() ) 
   {
     m_confinement.append( imposed );
     status = true;
@@ -120,56 +133,91 @@ bool CompositeObstacle::LinkImposedMotion( ObstacleImposedForce* imposed )
 // ----------------------------------------------------------------------------
 // Moves the composite obstacle and returns a list of moved obstacles
 list<SimpleObstacle*> CompositeObstacle::Move( double time, double dt, 
-	bool const& b_deplaceCine_Comp, 
-        bool const& b_deplaceF_Comp )
+	bool const& motherCompositeHasImposedVelocity, 
+        bool const& motherCompositeHasImposedForce )
 {
-  m_ismoving = m_kinematics.Deplacement( time, dt );
-  m_ismoving = m_ismoving || b_deplaceCine_Comp;
+  list<Obstacle*>::iterator obstacle;
+  list<SimpleObstacle*> movingObstacles;
+  list<SimpleObstacle*>::iterator ilo; 
 
-  // Deplacement du centre du composite
+  // Imposed velocity
+  // Updates the obstacle translational and angular velocity at time t and 
+  // translational and angular motion from t to t+dt and returns whether the 
+  // obstacle moved from t to t+dt
+  m_ismoving = m_kinematics.ImposedMotion( time, dt, *m_geoRBWC->getCentre() );
+  
+  // Check whether the composite obstacle it belongs to has an imposed velocity
+  m_ismoving = m_ismoving || motherCompositeHasImposedVelocity;
+
+  // Composite center motion
   if ( m_ismoving && Obstacle::m_MoveObstacle ) 
   {
-    Vector3 const* translation = m_kinematics.getTranslation();
-    m_geoRBWC->composeLeftByTranslation( *translation );
-    /* Rotation non utilisee pour le centre du composite.
-      Quaternion w = cinematique.getQuaternionRotationOverDt();
-      Rotate(w);
-    */
+    // Translation motion
+    Vector3 translation = *(m_kinematics.getTranslation());
+    if ( m_restrict_geommotion )
+      for (list<size_t>::iterator il=m_dir_restricted_geommotion.begin();
+      	il!=m_dir_restricted_geommotion.end();il++) translation[*il] = 0.;    
+    m_geoRBWC->composeLeftByTranslation( translation );
+
+    // Angular motion
+    Quaternion const* w = m_kinematics.getQuaternionRotationOverDt();
+    m_geoRBWC->Rotate( *w );
   }
+  
+  // Updated center of the composite
   Point3 centre = *getPosition();
 
-  // Deplacement des obstacles
-  list<Obstacle*>::iterator obstacle;
+  // Apply the composite imposed motion to its elementary obstacles
   if ( m_ismoving ) 
   {
-    Vector3 levier;
+    Vector3 lever;
     for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++) 
     {
-      levier = *(*obstacle)->getPosition() - centre;
-      (*obstacle)->Compose( m_kinematics, levier );
+      lever = *(*obstacle)->getPosition() - centre;
+      (*obstacle)->Compose( m_kinematics, lever );
     }
   }
-  
-  
-  bool deplaceF = m_confinement.Deplacement( time, dt, this );
-  deplaceF = deplaceF || b_deplaceF_Comp;    
-  
-  if ( deplaceF ) 
+
+
+  // Imposed force
+  // Updates the obstacle translational velocity at time t and translational 
+  // motion from t to t+dt and returns whether the obstacle moved from t to 
+  // t+dt      
+  bool moveForce = m_confinement.ImposedMotion( time, dt, this );
+  moveForce = moveForce || motherCompositeHasImposedForce;    
+
+  // Composite center motion
+  if ( moveForce && Obstacle::m_MoveObstacle )
+  {
+    Vector3 translation = m_confinement.getTranslation( dt );
+    if ( m_restrict_geommotion )
+      for (list<size_t>::iterator il=m_dir_restricted_geommotion.begin();
+      	il!=m_dir_restricted_geommotion.end();il++) translation[*il] = 0.; 
+    m_geoRBWC->composeLeftByTranslation( translation );
+  }
+
+  // Apply the composite imposed force to its elementary obstacles  
+  if ( moveForce ) 
     for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++)
-      (*obstacle)->Compose( m_confinement, *(*obstacle)->getPosition() );
+      (*obstacle)->Compose( m_confinement );
 
-  m_ismoving = m_ismoving || deplaceF; // ??? demander à Gillos !!
-
-  list<SimpleObstacle*> obstacleEnDeplacement;
-  list<SimpleObstacle*>::iterator ilo;     
-  for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++) {
+  
+  // Finally, move the elementary obstacles     
+  for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++) 
+  {
     list<SimpleObstacle*> lod = (*obstacle)->Move( time, dt, m_ismoving, 
-    	deplaceF );
+    	moveForce );
     for (ilo=lod.begin();ilo!=lod.end();ilo++) 
-      obstacleEnDeplacement.push_back(*ilo);
+      movingObstacles.push_back(*ilo);
   }
   
-  return ( obstacleEnDeplacement );
+  m_ismoving = m_ismoving || moveForce; 
+  
+  // Assign the total translational and angular velocities to the obstacle
+  // from its imposed kinematics
+  if ( m_ismoving ) setVelocity(); 
+  
+  return ( movingObstacles );
 }
 
 
@@ -177,19 +225,33 @@ list<SimpleObstacle*> CompositeObstacle::Move( double time, double dt,
 
 // ----------------------------------------------------------------------------
 // Computes center of mass position
-void CompositeObstacle::EvalPosition()
+pair<Point3,double> CompositeObstacle::computeVolumeCenterOfMass()
 {
+  // Notes: 
+  // 1) Obstacles do not have any density, so we assume that all obstacles 
+  // have the same density when computing the center of mass
+  // 2) This method ignores geometric overlaps between obstacles so this
+  // computation might be erroneous if obstacles overlap signigicantly
+
   Point3 centre;
-  int nbre=0;
+  m_volume = 0.;
+  int nbre = 0;
   list<Obstacle*>::iterator obstacle;
+  pair<Point3,double> pp;
   for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); 
       nbre++, obstacle++)
-    centre += *(*obstacle)->getPosition();
-  centre /= nbre;
-  setPosition(centre);
+  {
+    pp = (*obstacle)->computeVolumeCenterOfMass();
+    centre += pp.first * pp.second;
+    m_volume += pp.second; 
+  }
+  centre /= m_volume;
+  setPosition( centre );
   
-  // Note: this computation works only if the composite has some symmetry
-  // properties and needs to be updated in the future to work for any composite 
+  pp.first = centre;
+  pp.second = m_volume;
+  
+  return ( pp );
 }
 
 
@@ -345,18 +407,38 @@ bool CompositeObstacle::isCloseWithCrust( Component const* voisin ) const
 
 
 // ----------------------------------------------------------------------------
-// Reload du groupe d'Obstacle & publication dans son referent
+// Outputs the composite obstacle for reload
+void CompositeObstacle::write( ostream& fileSave ) const
+{
+  fileSave << "<Composite> " << m_name << " " << m_type << endl;
+  if ( m_CompositeObstacle_id ) m_torsor.write( fileSave );
+  list<Obstacle*>::const_iterator obstacle;
+  for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++)
+  {
+    (*obstacle)->write( fileSave );
+    fileSave << endl;
+  }
+  fileSave << "</Composite>";
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Reloads the composite obstacle and links it to the higher level 
+// obstacle in the obstacle tree
 void CompositeObstacle::reload( Obstacle& mother, istream& file )
 {
   string ttag;
+  if ( m_CompositeObstacle_id ) m_torsor.read( file ); 
   file >> ttag;
   while ( ttag != "</Composite>" ) 
   {
     ObstacleBuilderFactory::reload( ttag, *this, file );
     file >> ttag;
   }
-  EvalPosition();
-  mother.append(this);
+  computeVolumeCenterOfMass();
+  mother.append( this );
 }    
 
 
@@ -368,7 +450,10 @@ void CompositeObstacle::resetKinematics()
 {
   m_kinematics.reset();
   m_confinement.reset();
-
+  m_translationalVelocity = 0.;
+  m_angularVelocity = 0.;
+  m_ismoving = false; 
+  
   list<Obstacle*>::iterator obstacle;
   for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++)
     (*obstacle)->resetKinematics();
@@ -381,9 +466,10 @@ void CompositeObstacle::resetKinematics()
 // Rotates the composite obstacle with a quaternion
 void CompositeObstacle::Rotate( Quaternion const& rotation )
 {
-  list<Obstacle*>::iterator obstacle;
-  for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++)
-    (*obstacle)->Rotate(rotation);
+  cout << "Warning when calling CompositeObstacle::Rotate(rotation) "
+       << "\nShould not go into this class !\n"
+       << "Need for an assistance ! Stop running !\n";
+  exit(10);
 }
 
 
@@ -436,23 +522,6 @@ void CompositeObstacle::writeStatic( ostream& fileOut ) const
   list<Obstacle*>::const_iterator obstacle;
   for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++)
     (*obstacle)->writeStatic( fileOut );
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// Outputs the composite obstacle for reload
-void CompositeObstacle::write( ostream& fileSave ) const
-{
-  fileSave << "<Composite> " << m_name << endl;
-  list<Obstacle*>::const_iterator obstacle;
-  for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++)
-  {
-    (*obstacle)->write( fileSave );
-    fileSave << endl;
-  }
-  fileSave << "</Composite>";
 }
 
 
@@ -512,8 +581,8 @@ void CompositeObstacle::updateIndicator( double time, double dt )
 {
   list<Obstacle*>::iterator obstacle;
   
-  if ( m_kinematics.activAngularMotion( time, dt ) )
-      getObstacles().front()->setIndicator( 1. );  
+  if ( m_kinematics.activeAngularMotion( time, dt ) )
+     getObstacles().front()->setIndicator( 1. );  
   
   for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++)   
     (*obstacle)->updateIndicator( time, dt );
@@ -584,7 +653,7 @@ void CompositeObstacle::InitializeForce( bool const& withWeight )
 // Returns a pointer to the torsor exerted on the composite obstacle
 Torsor const* CompositeObstacle::getTorsor()
 {
-  m_torsor.setToBodyForce( *getPosition(), Vector3Nul );  
+  m_torsor.setToBodyForce( *getPosition(), Vector3Null ); 
 
   for (list<Obstacle*>::iterator obstacle=m_obstacles.begin(); 
   	obstacle!=m_obstacles.end(); obstacle++)
@@ -705,6 +774,20 @@ void CompositeObstacle::setContactMapToFalse()
 
 
 // ----------------------------------------------------------------------------
+// Set contact map cumulative features to zero */
+void CompositeObstacle::setContactMapCumulativeFeaturesToZero()
+{
+  cout << "Warning when calling CompositeObstacle::"
+       << "setContactMapCumulativeFeaturesToZero() "
+       << "\nShould not go into this class !\n"
+       << "Need for an assistance ! Stop running !\n";
+  exit(10);
+}
+
+
+
+
+// ----------------------------------------------------------------------------
 // Updates contact map
 void CompositeObstacle::updateContactMap()
 {
@@ -718,12 +801,14 @@ void CompositeObstacle::updateContactMap()
 
 
 // ----------------------------------------------------------------------------
-// Does the contact exist in the map, if yes return the pointer to the
-// cumulative tangential displacement
-bool CompositeObstacle::ContactInMapIsActive( double* &tangentialDepl, 
-	int const& id )
+// Does the contact exist in the map? If so, return true and make
+// kdelta, prev_normal and cumulSpringTorque point to the memorized info. 
+// Otherwise, return false and set those pointers to NULL.
+bool CompositeObstacle::getContactMemory( std::tuple<int,int,int> const& id,
+  	Vector3* &kdelta, Vector3* &prev_normal, Vector3* &cumulSpringTorque,
+  	bool createContact )
 {
-  cout << "Warning when calling CompositeObstacle::ContactInMapIsActive() "
+  cout << "Warning when calling CompositeObstacle::getContactMemory() "
        << "\nShould not go into this class !\n"
        << "Need for an assistance ! Stop running !\n";
   exit(10);
@@ -734,8 +819,9 @@ bool CompositeObstacle::ContactInMapIsActive( double* &tangentialDepl,
 
 // ----------------------------------------------------------------------------
 // Adds new contact in the map
-void CompositeObstacle::addNewContactInMap( double const& tangentialDepl, 
-	int const& id )
+void CompositeObstacle::addNewContactInMap( std::tuple<int,int,int> const& id,
+  	Vector3 const& kdelta, Vector3 const& prev_normal,
+  	Vector3 const& cumulSpringTorque )
 {
   cout << "Warning when calling CompositeObstacle::addNewContactInMap() "
        << "\nShould not go into this class !\n"
@@ -747,11 +833,68 @@ void CompositeObstacle::addNewContactInMap( double const& tangentialDepl,
 
 
 // ----------------------------------------------------------------------------
-// Increases cumulative tangential displacement with component id
-void CompositeObstacle::addDeplContactInMap( double const& tangentialDepl, 
-	int const& id )
+// Increases cumulative tangential motion with component id
+void CompositeObstacle::addDeplContactInMap( std::tuple<int,int,int> const& id,
+  	Vector3 const& kdelta, Vector3 const& prev_normal,
+  	Vector3 const& cumulSpringTorque )
 {
   cout << "Warning when calling CompositeObstacle::addDeplContactInMap() "
+       << "\nShould not go into this class !\n"
+       << "Need for an assistance ! Stop running !\n";
+  exit(10);
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Writes the contact map information in an array of doubles
+void CompositeObstacle::copyContactMap( double* destination, 
+	int start_index )
+{
+  cout << "Warning when calling CompositeObstacle::copyContactMap() "
+       << "\nShould not go into this class !\n"
+       << "Need for an assistance ! Stop running !\n";
+  exit(10);
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Adds a single contact info to the contact map
+void CompositeObstacle::copyContactInMap( std::tuple<int,int,int> const& id,
+  	bool const& isActive, Vector3 const& kdelta, Vector3 const& prev_normal,
+  	Vector3 const& cumulSpringTorque )
+{
+  cout << "Warning when calling CompositeObstacle::copyContactInMap() "
+       << "\nShould not go into this class !\n"
+       << "Need for an assistance ! Stop running !\n";
+  exit(10);
+}	
+	
+	
+	
+
+// ----------------------------------------------------------------------------
+// Returns the number of contacts in the contact map */
+int CompositeObstacle::getContactMapSize()
+{
+  cout << "Warning when calling CompositeObstacle::getContactMapSize() "
+       << "\nShould not go into this class !\n"
+       << "Need for an assistance ! Stop running !\n";
+  exit(10);
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Displays the active neighbours in the format "my_elementary_id/neighbour_id/
+// neightbout_elementary_id ; ...". Useful for debugging only.
+void CompositeObstacle::printActiveNeighbors( int const& id )
+{
+  cout << "Warning when calling CompositeObstacle::printActiveNeighbors() "
        << "\nShould not go into this class !\n"
        << "Need for an assistance ! Stop running !\n";
   exit(10);
@@ -782,4 +925,63 @@ bool CompositeObstacle::isIn( Point3 const& pt ) const
 bool CompositeObstacle::isCompositeObstacle() const
 {
   return ( true ); 
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Resets the minimum ID number of an obstacle for autonumbering */
+void CompositeObstacle::setMinIDnumber()
+{
+  list<Obstacle*>::iterator obstacle;
+  for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++) 
+    (*obstacle)->setMinIDnumber();
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Checks if there is anything special to do about periodicity and
+// if there is applies periodicity
+void CompositeObstacle::periodicity( LinkedCell* LC )
+{
+  list<Obstacle*>::iterator obstacle;
+  for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++) 
+    (*obstacle)->periodicity( LC );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Empties the list of cells the obstacle is linked to and deletes the pointer 
+// to the obstacle is these cells */
+void CompositeObstacle::resetInCells() 
+{
+  list<Obstacle*>::iterator obstacle;
+  for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++) 
+    (*obstacle)->resetInCells();
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the volume of the composite obstacle
+double CompositeObstacle::getVolume() const
+{
+  return ( m_volume );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the radius of the sphere of volume equivalent to that of the 
+// composite obstacle 
+double CompositeObstacle::getEquivalentSphereRadius() const
+{
+  return ( pow( ( 0.75 / PI ) * m_volume, 1. / 3. ) );
 }

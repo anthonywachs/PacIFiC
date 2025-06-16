@@ -1,7 +1,7 @@
 #include "GrainsExec.hh"
 #include "GrainsBuilderFactory.hh"
 #include "Box.hh"
-#include "BCylinder.hh"
+#include "BBox.hh"
 #include <sstream>
 
 // Static attribute
@@ -97,7 +97,7 @@ void Box::setCornersFaces()
   m_corners.push_back(sommet);
   sommet.setValue( m_extent[X], - m_extent[Y], - m_extent[Z] );
   m_corners.push_back(sommet);
-  sommet.setValue( m_extent[X], -m_extent[Y], m_extent[Z] );
+  sommet.setValue( m_extent[X], - m_extent[Y], m_extent[Z] );
   m_corners.push_back(sommet);
   sommet.setValue( - m_extent[X], - m_extent[Y], m_extent[Z] );
   m_corners.push_back(sommet);
@@ -169,7 +169,8 @@ void Box::setCornersFaces()
 // Returns a clone of the box
 Convex* Box::clone() const
 {
-  return ( new Box( 2.0 * m_extent[X], 2.0 * m_extent[Y], 2.0 * m_extent[Z] ) );
+  return ( new Box( 2.0 * m_extent[X], 2.0 * m_extent[Y], 
+  	2.0 * m_extent[Z] ) );
 }
 
 
@@ -231,7 +232,7 @@ double Box::computeCircumscribedRadius() const
 
 
 // ----------------------------------------------------------------------------
-// Returns a vector of points describing the envelope of the box
+// Returns a vector of points describing the surface of the box
 vector<Point3> Box::getEnvelope() const
 {
   if ( GrainsBuilderFactory::getContext() == DIM_2 )
@@ -339,7 +340,7 @@ int Box::numberOfCells_PARAVIEW() const
 
 
 // ----------------------------------------------------------------------------
-// Writes a list of points describing the sphere in a Paraview format
+// Writes a list of points describing the box in a Paraview format
 void Box::write_polygonsPts_PARAVIEW( ostream& f,
   	Transform const& transform, Vector3 const* translation ) const
 {
@@ -376,7 +377,7 @@ list<Point3> Box::get_polygonsPts_PARAVIEW( Transform const& transform,
 
 
 // ----------------------------------------------------------------------------
-// Ecrit le convexe pour post-processing avec Paraview
+// Writes the box in a Paraview format
 void Box::write_polygonsStr_PARAVIEW( list<int>& connectivity,
     	list<int>& offsets, list<int>& cellstype, int& firstpoint_globalnumber,
 	int& last_offset ) const
@@ -392,6 +393,57 @@ void Box::write_polygonsStr_PARAVIEW( list<int>& connectivity,
   cellstype.push_back( 12 );
 
   firstpoint_globalnumber += 8;
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Writes the box in an OBJ format
+void Box::write_convex_OBJ( ostream& f, Transform  const& transform,
+    	size_t& firstpoint_number ) const
+{
+  Point3 pp;
+
+  // Vertices  
+  for (int i=0;i<8;++i)
+  {
+    pp = transform( m_corners[i] );
+    f << "v " << GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+		pp[X] ) << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+		pp[Y] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+		pp[Z] ) << " " << endl;	
+  }
+  
+  // Faces
+  f << "f " << firstpoint_number + 4 << " "
+  	<< firstpoint_number + 5 << " "
+	<< firstpoint_number + 6 << " "
+  	<< firstpoint_number + 7 << endl;
+  f << "f " << firstpoint_number + 5 << " "
+  	<< firstpoint_number + 1 << " "
+	<< firstpoint_number + 2 << " "
+  	<< firstpoint_number + 6 << endl;	
+  f << "f " << firstpoint_number + 1 << " "
+  	<< firstpoint_number << " "
+	<< firstpoint_number + 3 << " "
+  	<< firstpoint_number + 2 << endl;	
+  f << "f " << firstpoint_number << " "
+  	<< firstpoint_number + 4 << " "
+	<< firstpoint_number + 7 << " "
+  	<< firstpoint_number + 3 << endl;
+  f << "f " << firstpoint_number + 4 << " "
+  	<< firstpoint_number << " "
+	<< firstpoint_number + 1 << " "
+  	<< firstpoint_number + 5 << endl;	
+  f << "f " << firstpoint_number + 3 << " "
+  	<< firstpoint_number + 7 << " "
+	<< firstpoint_number + 6 << " "
+  	<< firstpoint_number + 2 << endl;
+	
+  firstpoint_number += 8;			
 }
 
 
@@ -613,8 +665,8 @@ Point3 Box::IntersectionPointSPHERE( Point3 const& SphereCenter,
 	if ( normDistance < SphereRadius )
         {
           overlap = normDistance - SphereRadius;
-          contactPoint.setValue( SphereCenter[X], - m_extent[Y] - 0.5 * overlap,
-	  	SphereCenter[Z] );
+          contactPoint.setValue( SphereCenter[X], - m_extent[Y] 
+	  	- 0.5 * overlap, SphereCenter[Z] );
         }
       }
     }
@@ -646,8 +698,8 @@ Point3 Box::IntersectionPointSPHERE( Point3 const& SphereCenter,
       {
         if ( warningSphereCenterInBox )
 	{
-	  cout << "Warning: sphere center in box in Box::IntersectionPointSPHERE"
-		<< endl;
+	  cout << "Warning: sphere center in box in "
+	  	"Box::IntersectionPointSPHERE" << endl;
 	  GrainsExec::m_exception_Contact = true;
           throw ContactError();
 	}
@@ -975,17 +1027,60 @@ bool Box::isIn( Point3 const& pt ) const
 
 
 // ----------------------------------------------------------------------------
-// Returns the bounding cylinder to box
-BCylinder Box::bcylinder() const
+// Returns the bounding volume to box
+BVolume* Box::computeBVolume( unsigned int type ) const
 {
-  double a[2];
-  int axis = ( a[X] = fabs( m_extent[X] ) ) < ( a[Y] = fabs( m_extent[Y] ) )
-    ? Y : X;
-  int i = a[axis] < fabs( m_extent[Z] ) ? Z : axis;
-  Vector3 e( 0., 0., 0. );
-  e[i] = 1.;
-  double h = 2. * m_extent[i];
-  double r = sqrt( Norm2(m_extent) - m_extent[i]*m_extent[i]);
+  BVolume* bvol = NULL;
+  if ( type == 1 ) // OBB
+    bvol = new OBB( m_extent, Matrix() );
+  else if ( type == 2 ) // OBC
+  {
+    double xy = fabs( m_extent[X] - m_extent[Y] );
+    double xz = fabs( m_extent[X] - m_extent[Z] );
+    double yz = fabs( m_extent[Y] - m_extent[Z] );
+    // pick from xy and xz, store to xy
+    int zAxis = xy < xz ? Z : Y;
+    xy = xy < xz ? xy : xz;
+    // pick from xy and yz
+    zAxis = xy < yz ? zAxis : X;
 
-  return( BCylinder( r, h, e ) );
+    Vector3 e( 0., 0., 0. );
+    e[ zAxis ] = 1.;
+    double h = 2. * m_extent[zAxis];
+    double r = sqrt( m_extent[X] * m_extent[X] + 
+                     m_extent[Y] * m_extent[Y] +
+                     m_extent[Z] * m_extent[Z] -
+                     m_extent[zAxis] * m_extent[zAxis] );
+
+    bvol = new OBC( r, h, e );
+  }
+
+  return( bvol );
 }
+
+
+
+// ----------------------------------------------------------------------------
+// Performs advanced comparison of the two boxes and returns whether 
+// they match
+bool Box::equalType_level2( Convex const* other ) const
+{
+  // We know that other points to a Box, we dynamically cast it to actual type
+  Box const* other_ = dynamic_cast<Box const*>(other); 
+
+  size_t dim = ( GrainsBuilderFactory::getContext() == DIM_2 ? 2: 3 ), j;
+  bool same = true;  
+  double lmin = min( computeCircumscribedRadius(),
+  	other_->computeCircumscribedRadius() ); 
+  
+  if ( dim == 2 )
+    for (j=0;j<4 && same;++j)
+      same = ( (*m_corners2D_XY)[j].DistanceTo( (*other_->m_corners2D_XY)[j] ) 
+      	< LOWEPS * lmin );
+  else
+    for (j=0;j<8 && same;++j)
+      same = ( m_corners[j].DistanceTo( (other_->m_corners)[j] ) 
+      	< LOWEPS * lmin );
+  
+  return ( same );
+} 

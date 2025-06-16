@@ -63,29 +63,27 @@ class Particle : public Component
     //@{
     /** @brief Constructor with autonumbering as input parameter
     @param autonumbering whether to increment the component indexing */
-    Particle( bool const& autonumbering = true );
+    Particle( bool const& autonumbering );
 
     /** @brief Constructor with an XML node as an input parameter. This
-    constructor is expected to be used for reference particles
+    constructor is expected to be used for reference particles. Autonumbering
+    is set to false
     @param root XML node
-    @param autonumbering whether to increment the component indexing
     @param pc particle class */
-    Particle( DOMNode* root, bool const& autonumbering = true,
-  	int const& pc = 0 );
+    Particle( DOMNode* root, int const& pc );
 	
     /** @brief Constructor with input parameters. This
-    constructor is expected to be used for reference particles
+    constructor is expected to be used for reference particles. Autonumbering
+    is set to false
     @param georbwc pointer to a rigid body with crust object
     @param density particle density
     @param mat particle material
-    @param autonumbering whether to increment the component indexing
     @param pc particle class */
     Particle( RigidBodyWithCrust* georbwc, double const& density,
-    	string const& mat,
-    	bool const& autonumbering = true,
-  	int const& pc = 0 );	
+    	string const& mat, int const& pc );	
 
-    /** @brief Constructor with input parameters
+    /** @brief Constructor with input parameters. Autonumbering
+    is set to false and numbering is set with the parameter id_
     @param id_ ID number
     @param ParticleRef reference particle
     @param vx x translational velocity component
@@ -110,27 +108,33 @@ class Particle : public Component
 	const double m[12],
 	ParticleActivity const& activ,
 	int const& tag_,
-	int const& coordination_number_ = 0 );
+	int const& coordination_number_ );
 
     /** @brief Constructor with input parameters. This constructor is expected
-    to be used for periodic clone particle
+    to be used for periodic clone particle. Autonumbering
+    is set to false and numbering is set with the parameter id_
     @param id_ ID number
     @param ParticleRef reference particle
     @param vtrans translational velocity
     @param vrot angular velocity
     @param qrot rotation quaternion
     @param config particle transformation
-    @param activ particle activity */
+    @param activ particle activity 
+    @param contactMap contact map */
     Particle( int const& id_, Particle const* ParticleRef,
 	Vector3 const& vtrans,
 	Quaternion const& qrot,
 	Vector3 const& vrot,
 	Transform const& config,
-	ParticleActivity const& activ );
+	ParticleActivity const& activ,
+	map< std::tuple<int,int,int>,
+     	std::tuple<bool, Vector3, Vector3, Vector3> > const* contactMap );
 
-    /** @brief Copy constructor (the torsor is initialized to 0)
-    @param other copied Particle object */
-    Particle( Particle const& other );
+    /** @brief Copy constructor (the torsor is initialized to 0). Autonumbering
+    is set to true
+    @param other copied Particle object
+    @param autonumbering whether to increment the component indexing */
+    Particle( Particle const& other, bool const& autonumbering );
 
     /** @brief Destructor */
     virtual ~Particle();
@@ -163,6 +167,13 @@ class Particle : public Component
     /** @brief Sets the viscosity of the surrounding fluid
     @param mu fluid viscosity */
     static void setFluidViscosity( double mu );
+
+    /** @brief Returns the maximum ID number of a particle */
+    static int getMaxIDnumber();
+    
+    /** @brief Resets the maximum ID number of a particle for autonumbering
+    @param maxID_ maximum ID number */
+    static void setMaxIDnumber( int const& maxID_ );    
     //@}
 
 
@@ -177,10 +188,24 @@ class Particle : public Component
     /** @brief Sets the angular velocity
     @param vrot angular velocity */
     virtual void setAngularVelocity( Vector3 const& vrot );
+    
+    /** @brief Sets the angular velocity
+    @param omx x-angular velocity component 
+    @param omy y-angular velocity component     
+    @param omz z-angular velocity component */
+    virtual void setAngularVelocity( double const& omx, double const& omy,
+	double const& omz );    
 
     /** @brief Sets the translation velocity
     @param vtrans translation velocity */
     virtual void setTranslationalVelocity( Vector3 const& vtrans );
+    
+    /** @brief Sets the translation velocity
+    @param vx x-translation velocity component 
+    @param vy y-translation velocity component     
+    @param vz z-translation velocity component */
+    virtual void setTranslationalVelocity( double const& vx, double const& vy,
+	double const& vz );     
 
     /** @brief Sets particle activity
     @param activity particle activity */
@@ -237,14 +262,14 @@ class Particle : public Component
     @param vecteur1 y component of the quaternion
     @param vecteur2 z component of the quaternion
     @param scalaire scalar component of the quaternion */
-    void setQuaternionRotation( double const& vecteur0,
+    virtual void setQuaternionRotation( double const& vecteur0,
 	double const& vecteur1,
 	double const& vecteur2,
 	double const& scalaire );
 
     /** @brief Sets the rotation quaternion
     @param qrot rotation quaternion */
-    void setQuaternionRotation( Quaternion const& qrot );
+    virtual void setQuaternionRotation( Quaternion const& qrot );
 
     /** @brief Sets the particle geometric type
     @param pc particle class */
@@ -276,19 +301,40 @@ class Particle : public Component
     @param transform_ transformation */
     virtual void setTransform( Transform const& transform_ );
 
-    /** @brief Sets the pointer to the particle's kinematics
+    /** @brief Sets the pointer to the particle kinematics
     @param pkine transformation */
     void setKinematics( ParticleKinematics* pkine );
+    
+    /** @brief Sets time integration scheme using the macro variable
+    GrainsExec::m_TIScheme */
+    void setTimeIntegrationScheme();
+
+    /** @brief Sets the center of mass coordinate in a given direction 
+    at the previous time to the current value (generally called at the 
+    start of a time step) */      
+    void setPositionDir_nm1( Direction dir ); 
+    
+    /** @brief Sets momentum equation coupling factor */
+    void setCouplingFactor();         
     //@}
 
 
     /** @name Methods */
     //@{
     /** @brief Solves the Newton's law and move particle to their new position
-    @exception DisplacementError displacement is larger than crust thickness
+    @exception MotionError motion is larger than crust thickness
     @param time physical time
-    @param dt time step magnitude */
-    virtual void Move( double time, double dt );
+    @param dt_particle_vel velocity time step magnitude 
+    @param dt_particle_disp motion time step magnitude */
+    virtual void Move( double time, 
+	double const& dt_particle_vel, 
+    	double const& dt_particle_disp );
+    
+    /** @brief Advances velocity over dt_particle_vel
+    @param time physical time 
+    @param dt_particle_vel velocity time step magnitude */
+    void advanceVelocity( double time, 
+    	double const& dt_particle_vel );      
 
     /** @brief Contact between a particle and a component. If contact exists,
     computes the contact force and torque and adds to each component
@@ -341,12 +387,6 @@ class Particle : public Component
     @param i start index to copy in the 1D array */
     void copyKinematicsNm2( double* vit, int i ) const;
 
-    /** @brief Adds a force whose point of application is different from the
-    reference point of the torsor (additional torque contribution)
-    @param f_ the added force
-    @param point point of application of the force */
-    void addForce( Point3 const& point, Vector3 const& f_ );
-
     /** @brief Updates geographic localisation in the LinkedCell. Note that
     this method uses the cell from the previous time m_cellule_nm1 */
     void updateGeoPosition();
@@ -368,28 +408,32 @@ class Particle : public Component
 
     /** @brief Creates a clone of the particle. This method calls the standard
     copy constructor and is used for new particles to be inserted in the
-    simulation. Numbering is automatic, total number of components is
-    incremented by 1 and activity is set to WAIT. The calling object is
-    expected to be a reference particle */
-    virtual Particle* createCloneCopy() const ;
+    simulation. Activity is set to WAIT. The calling object is
+    expected to be a reference particle
+    @param autonumbering whether to increment the component indexing */
+    virtual Particle* createCloneCopy( bool const& autonumbering ) const ;
 
     /** @brief Creates a clone of the particle. This method calls the
     constructor Particle( int const& id_, Particle const* ParticleRef, Vector3
     const& vtrans, Quaternion const& qrot, Vector3 const& vrot,	Transform
     const& config, ParticleActivity const& activ ) and is used for periodic
-    clone particles to be inserted in the simulation. Numbering is set with the
-    parameter id_ and total number of components left unchanged.
+    clone particles to be inserted in the simulation. Autonumbering
+    is set to false and numbering is set with the parameter id_
     @param id_ ID number
     @param ParticleRef reference particle
     @param vtrans translational velocity
     @param vrot angular velocity
     @param qrot rotation quaternion
     @param config particle transformation
-    @param activ particle activity */
+    @param activ particle activity 
+    @param contactMap contact map */
     virtual Particle* createCloneCopy( int const& id_,
     	Particle const* ParticleRef, Vector3 const& vtrans,
 	Quaternion const& qrot,	Vector3 const& vrot,
-	Transform const& config, ParticleActivity const& activ ) const ;
+	Transform const& config, ParticleActivity const& activ,
+     	map< std::tuple<int,int,int>,
+     	std::tuple<bool, Vector3, Vector3, Vector3> > const* contactMap ) 
+	const ;
 
     /** @brief Sets the boolean that tells that the rigid body's transformation
     with the scaling by the crust thickness to shrink the rigid bodies has
@@ -422,6 +466,14 @@ class Particle : public Component
     frame
     @param inertia inertia tensor in the space fixed coordinate frame */
     void computeInertiaTensorSpaceFixed( vector<double>& inertia ) const;
+    
+    /** @brief Returns whether two particles are of the same type
+    @param other the other particle */
+    virtual bool equalType( Particle const* other ) const; 
+    
+    /** @brief Returns whether to store the contact force for post-processing 
+    @param othercomp the other component invovled in the contact */
+    bool storePPForce( Component const* othercomp ) const;         
     //@}
 
 
@@ -458,9 +510,6 @@ class Particle : public Component
     /** @brief Returns particle density */
     double getDensity() const;
 
-    /** @brief Returns the radius of the sphere of same volume */
-    double getEquivalentSphereRadius() const;
-
     /** @brief Returns the velocity at a point in space based on the
     translational and angular velocity of the particle. This method assumes
     that the point belongs to the particle but this assumption is not verified.
@@ -475,9 +524,6 @@ class Particle : public Component
 
     /** @brief Returns translational velocity */
     virtual Vector3 const* getTranslationalVelocity() const;
-
-    /** @brief Returns total force exerted on the particle */
-    Vector3 const* getForce() const;
 
     /** @brief Returns the cell the particle belonged to at the previous
     discrete time */
@@ -508,6 +554,15 @@ class Particle : public Component
     /** @brief Returns a pointer to the reference component of the component:
     this in general and the CompositeParticle for an elementary particle */
     virtual Component* getMasterComponent();
+    
+    /** @brief Returns the specific composite shape name: "none" for standard 
+    particles and non-specific composite particle and class name for specific 
+    composite particles */
+    string getSpecificCompositeShapeName() const;
+    
+    /** @brief Returns the center of mass coordinate in a given direction 
+    at the previous time */    
+    double getPositionDir_nm1() const;      
     //@}
 
 
@@ -607,6 +662,18 @@ class Particle : public Component
     @param translation additional center of mass translation */
     virtual void write_polygonsPts_PARAVIEW( ostream& f,
   	Vector3 const* translation = NULL ) const ;
+	
+    /** @brief Returns the number of bytes of the particle when written in a 
+    binary format to an output stream */
+    size_t get_numberOfBytes() const ;
+    
+    /** @brief Writes the particle in an OBJ format
+    @param f output stream 
+    @param group_number elementary particle number in case of composite 
+    particle 
+    @param firstpoint_number number of the 1st point */
+    virtual void write_OBJ( ostream& f, size_t const& group_number,
+    	size_t& firstpoint_number ) const;
     //@}
 
 
@@ -632,14 +699,14 @@ class Particle : public Component
     	contribution of the particle acceleration treated explicitly (used for
 	neutrally buoyant or lighter particles than the fluid) */
     int m_tag; /**< tag of the cell the particle belongs to at the
-    	current time: 0=interior, 1=buffer zone, 2=halo zone */
+    	current time: 0=interior, 1=buffer zone, 2=clone zone */
     GeoPosition m_GeoLoc; /**< geographic position of the particle in the
     	Linked cell, i.e. geographic position of the cell the particle belongs
 	to at the current time */
     Cell* m_cellule; /**< Cell that the particle belongs to at the
     	current time */
     int m_tag_nm1; /**< tag of the cell the particle belonged to at the
-    	previous time: 0=interior, 1=buffer zone, 2=halo zone */
+    	previous time: 0=interior, 1=buffer zone, 2=clone zone */
     GeoPosition m_GeoLoc_nm1; /**< geographic position of the particle in the
     	Linked cell, i.e. geographic position of the cell the particle belonged
 	to at the previous time */
@@ -649,7 +716,11 @@ class Particle : public Component
     int m_coordination_number; /**< coordination number */
     Vector3 m_weight; /**< particle weight */
     string m_specific_composite_shape; /**< specific composite particle 
-    	shape, e.g., SpheroCylinder */  
+    	shape, e.g., TrilobeCylinder */
+    static int m_maxID; /**< Maximum ID number, particle ID numbers range
+    	from 1 to m_maxID and are therefore always positive */
+    double m_pos_dir_nm1; /**< center of mass position in a given direction 
+    	at the previous time */	  
     //@}
 
 

@@ -57,13 +57,17 @@ void GrainsPostProcessing::do_before_time_stepping( DOMElement* rootElement )
 
   // Link all components with the grid
   m_allcomponents.Link( *m_collision );
+  
+  // In case of a periodic simulation, if the linked cell changed from the 
+  // previous simulation or periodic clones were not saved in the restart file,
+  // we need to check that all periodic clones are there
+  if ( m_periodic ) checkClonesReload();  
 
   // Number of particles: inserted and in the system
-  m_allcomponents.setNumberParticlesOnAllProc( 
-  	m_allcomponents.getNumberParticles() );
-  m_npwait_nm1 = m_allcomponents.getNumberInactiveParticles();
+  m_allcomponents.computeNumberParticles( m_wrapper );
+  m_npwait_nm1 = m_allcomponents.getNumberPhysicalParticlesToInsert();
 
-  // Initialisation obstacle kinematics
+  // Initialisation of obstacle kinematics
   m_allcomponents.setKinematicsObstacleWithoutMoving( m_time, m_dt ); 
 
   cout << "Initialization completed" << endl << endl;                           
@@ -100,29 +104,24 @@ void GrainsPostProcessing::Simulation( double time_interval )
     list<Particle*> const* allpart = m_allcomponents.getActiveParticles();
     list<Particle*>::const_iterator il;      
     size_t nx, ny, nz;
-    Point3 intVolptA;	
+    Point3 intVolptA, ptA, ptB;	
     Vector3 intVolExtent;
-    double dxl, dyl, dzl, dvl; 
+    double dxl, dyl, dzl, dvl, radius, height;
+    Direction axisdir; 
         
-    if ( m_global_porosity->domain.ftype == WINDOW_BOX )
+    if ( m_global_porosity->domain.getType() == WINDOW_BOX )
     {       
-      volporodomain = ( m_global_porosity->domain.ptB[X] 
-    	- m_global_porosity->domain.ptA[X] ) *
-	( m_global_porosity->domain.ptB[Y] 
-    	- m_global_porosity->domain.ptA[Y] ) *
-	( m_global_porosity->domain.ptB[Z] 
-    	- m_global_porosity->domain.ptA[Z] );
-      dx = ( m_global_porosity->domain.ptB[X] 
-    	- m_global_porosity->domain.ptA[X] ) 
+      ptA = *(m_global_porosity->domain.getPointA());
+      ptB = *(m_global_porosity->domain.getPointB());      
+      volporodomain = ( ptB[X] - ptA[X] ) *
+	( ptB[Y] - ptA[Y] ) * ( ptB[Z] - ptA[Z] );
+      dx = ( ptB[X] - ptA[X] ) 
 	/ double(m_global_porosity->nintervals[X]);
-      dy = ( m_global_porosity->domain.ptB[Y] 
-    	- m_global_porosity->domain.ptA[Y] ) 
+      dy = ( ptB[Y] - ptA[Y] ) 
 	/ double(m_global_porosity->nintervals[Y]);
-      dz = ( m_global_porosity->domain.ptB[Z] 
-    	- m_global_porosity->domain.ptA[Z] ) 
+      dz = ( ptB[Z] - ptA[Z] ) 
 	/ double(m_global_porosity->nintervals[Z]);    
-      BBox BBdomain( m_global_porosity->domain.ptA,
-      	 m_global_porosity->domain.ptB ), BBintVol;
+      BBox BBdomain( ptA, ptB ), BBintVol;
       
       for (il=allpart->begin();il!=allpart->end();il++)
       {
@@ -179,38 +178,28 @@ void GrainsPostProcessing::Simulation( double time_interval )
 	  volparticles += (*il)->getVolume();
       }
     }
-    else if ( m_global_porosity->domain.ftype == WINDOW_CYLINDER )
+    else if ( m_global_porosity->domain.getType() == WINDOW_CYLINDER )
     {
-      volporodomain = PI * m_global_porosity->domain.radius
-      	* m_global_porosity->domain.radius * m_global_porosity->domain.height;
-      dx = ( m_global_porosity->domain.axisdir == X ?
-      	m_global_porosity->domain.height 
-		: 2. * m_global_porosity->domain.radius )
+      ptA = *(m_global_porosity->domain.getPointA());
+      radius = m_global_porosity->domain.getRadius();
+      height = m_global_porosity->domain.getHeight();
+      axisdir = m_global_porosity->domain.getAxisDirection();
+      volporodomain = PI * radius * radius * height;
+      dx = ( axisdir == X ? height : 2. * radius )
 	/ double(m_global_porosity->nintervals[X]);
-      dy = ( m_global_porosity->domain.axisdir == Y ?
-      	m_global_porosity->domain.height 
-		: 2. * m_global_porosity->domain.radius )
+      dy = ( axisdir == Y ? height : 2. * radius )
 	/ double(m_global_porosity->nintervals[Y]);
-      dz = ( m_global_porosity->domain.axisdir == Z ?
-      	m_global_porosity->domain.height 
-		: 2. * m_global_porosity->domain.radius )
+      dz = ( axisdir == Z ? height : 2. * radius )
 	/ double(m_global_porosity->nintervals[Z]); 
       Point3 center;
       double circumscribed_radius = 0.;
       size_t intersect = 0;
       BBox BBdomain, BBintVol;
-      Point3 BBCenter = m_global_porosity->domain.ptA;
-      BBCenter[m_global_porosity->domain.axisdir] += 
-      	0.5 * m_global_porosity->domain.height;
-      Vector3 BBextent( m_global_porosity->domain.axisdir == X ?
-      	0.5 * m_global_porosity->domain.height 
-		: m_global_porosity->domain.radius,
-	m_global_porosity->domain.axisdir == Y ?
-      	0.5 * m_global_porosity->domain.height 
-		: m_global_porosity->domain.radius,
-	m_global_porosity->domain.axisdir == Z ?
-      	0.5 * m_global_porosity->domain.height 
-		: m_global_porosity->domain.radius );
+      Point3 BBCenter = ptA;
+      BBCenter[axisdir] += 0.5 * height;
+      Vector3 BBextent( axisdir == X ? 0.5 * height : radius,
+	axisdir == Y ? 0.5 * height : radius, 
+	axisdir == Z ? 0.5 * height : radius );
       BBdomain.setCenter( BBCenter );
       BBdomain.setExtent( BBextent );					
 	            
@@ -219,11 +208,7 @@ void GrainsPostProcessing::Simulation( double time_interval )
         center = *((*il)->getPosition());
 	circumscribed_radius = (*il)->getCircumscribedRadius();
 	intersect = GrainsExec::AACylinderSphereIntersection( center,
-    		circumscribed_radius,
-		m_global_porosity->domain.ptA,
-		m_global_porosity->domain.radius,
-		m_global_porosity->domain.height,
-		m_global_porosity->domain.axisdir );
+    		circumscribed_radius, ptA, radius, height, axisdir );
 
         // If the circumscribed sphere of the particle is fully contained
 	// in the porosity domain, we simply add the volume
@@ -259,10 +244,7 @@ void GrainsPostProcessing::Simulation( double time_interval )
 		
 		// If the cell center belongs to the cylindrical porosity domain
 		if ( GrainsExec::isPointInAACylinder( elemVolCenter,
-			m_global_porosity->domain.ptA,
-			m_global_porosity->domain.radius,
-			m_global_porosity->domain.height,
-			m_global_porosity->domain.axisdir ) )		 
+			ptA, radius, height, axisdir ) )		 
 	        {
 	          // List of cells containing the cell that elemVolCenter 
 		  // belongs to and its neighboring cells
@@ -299,8 +281,9 @@ void GrainsPostProcessing::Construction( DOMElement* rootElement )
   assert( rootElement != NULL );
   DOMNode* root = ReaderXML::getNode( rootElement, "Construction" );
 
-  bool brestart = false;
+  bool b2024 = false;
   string restart;
+  size_t npart;
 
   // Domain size: origin, max coordinates and periodicity
   DOMNode* domain = ReaderXML::getNode( root, "LinkedCell" );
@@ -369,25 +352,38 @@ void GrainsPostProcessing::Construction( DOMElement* rootElement )
     DOMNode* reload = ReaderXML::getNode( root, "Reload" );
     if ( reload ) 
     {
-      brestart = true;
+      m_restart = true;
 
       // Restart mode is new, not read in XML file
       GrainsExec::m_ReloadType = "new" ;
       restart  = ReaderXML::getNodeAttr_String( reload, "Filename" );	
-      restart = fullResultFileName( restart );
+      restart = GrainsExec::fullResultFileName( restart, false );
       
       // Extract the reload directory from the reload file
       GrainsExec::m_ReloadDirectory = GrainsExec::extractRoot( restart ); 
 
-      // Read the reload file
+      // Read the reload file and check the restart format
       string cle;
       ifstream simulLoad( restart.c_str() );
-      simulLoad >> cle >> m_time;
+      simulLoad >> cle; 
+      if ( cle == "__Format2024__" ) 
+      { 
+        b2024 = true;
+        simulLoad >> cle >> m_time;
+      }
+      else simulLoad >> m_time;         
       ContactBuilderFactory::reload( simulLoad );
-      m_allcomponents.read( simulLoad, restart );
-      ContactBuilderFactory::set_materialsForObstaclesOnly_reload(
+      if ( !b2024 )
+      {
+        m_allcomponents.read_pre2024( simulLoad, restart, m_wrapper );
+        ContactBuilderFactory::set_materialsForObstaclesOnly_reload(
           m_allcomponents.getReferenceParticles() );
+      }
+      else
+        npart = m_allcomponents.read( simulLoad, m_insertion_position, 
+		m_rank, m_nprocs );      
       simulLoad >> cle;
+      simulLoad.close(); 
 
       // Whether to reset velocity to 0
       string reset = ReaderXML::getNodeAttr_String( reload, "Velocity" );
@@ -396,7 +392,7 @@ void GrainsPostProcessing::Construction( DOMElement* rootElement )
    
 
     // Check that construction is fine
-    if ( !brestart ) 
+    if ( !m_restart ) 
     {
       if ( m_rank == 0 )
         cout << "ERR : Error in input file in <Contruction>" << endl;
@@ -426,6 +422,11 @@ void GrainsPostProcessing::Construction( DOMElement* rootElement )
     
     // Define the linked cell grid
     defineLinkedCell( LC_coef * maxR, GrainsExec::m_shift9 ); 
+
+    // If reload with 2024 format, read the particle reload file
+    if ( b2024 )
+      m_allcomponents.read_particles( restart, npart, m_collision, m_rank, 
+      	m_nprocs, m_wrapper );
     
     // Link obstacles with the linked cell grid
     m_collision->Link( m_allcomponents.getObstacles() );     
@@ -531,7 +532,9 @@ void GrainsPostProcessing::AdditionalFeatures( DOMElement* rootElement )
 
         // Domain features
         DOMNode* nWindow = ReaderXML::getNode( nGlobalPoro, "Window" ); 
-        readWindow( nWindow, m_global_porosity->domain, GrainsExec::m_shift9 );
+	bool ok = m_global_porosity->domain.readWindow( nWindow, 
+		GrainsExec::m_shift9, m_rank );
+	if ( !ok ) grainsAbort();
 	
 	// Number of intervals in each direction for numerical integration
 	m_global_porosity->nintervals[0] = size_t(ReaderXML::getNodeAttr_Int( 

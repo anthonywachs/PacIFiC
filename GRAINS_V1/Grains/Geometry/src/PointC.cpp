@@ -1,4 +1,7 @@
+#include "OBB.hh"
+#include "OBC.hh"
 #include "PointC.hh"
+
 
 
 // ----------------------------------------------------------------------------
@@ -116,3 +119,33 @@ bool PointC::isIn( Point3 const& pt ) const
 {
   return ( false );
 }  
+
+
+
+
+// ----------------------------------------------------------------------------
+// Performs advanced comparison of the two points and returns whether 
+// they match
+bool PointC::equalType_level2( Convex const* other ) const
+{
+  return ( true );
+} 
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the bounding volume to point
+BVolume* PointC::computeBVolume( unsigned int type ) const
+{
+  BVolume* bvol = NULL;
+  if ( type == 1 ) // OBB
+    bvol = new OBB( Vector3( 0., 0., 0. ), Matrix() );
+  else if ( type == 2 ) // OBC
+  {
+    bvol = new OBC( 0., 
+                    0.,
+                    Vector3( 0., 0., 1. ) );
+  }
+  return( bvol );
+}

@@ -1,6 +1,7 @@
 #include "GrainsExec.hh"
 #include "Polyhedron.hh"
 #include "AllComponents.hh"
+#include "GrainsExec.hh"
 #include <fstream>
 #include <new> 
 #include <sstream>
@@ -86,7 +87,7 @@ Polyhedron* Polyhedron::create( istream& fileIn )
   int nb_point;
   *PolyIN >> nb_point >> nb_point;
   
-  // Creation du tableau de points du polyedre  
+  // Creation of the array of vertices
   Point3* point = new Point3[nb_point];
   VertexBase* vertexbase = new VertexBase( (void *)point );
   
@@ -212,67 +213,6 @@ double Polyhedron::computeCircumscribedRadius() const
 
 
 // -------------------------------------------------------------------
-// Computes the contribution to inertia and volume of a tetrahedron
-// defined by the center of mass (assuming that the center of mass is located 
-// at (0,0,0)), the center of mass on a face and 2 consecutives vertices on 
-// this face
-void Polyhedron::computeVolumeInertiaContrib( const Point3 &A2, 
-	const Point3 &A3, const Point3 &A4 )
-{
-  // From Journal of Mathematics and Statistics 1 (1): 8-11, 2004
-  // "Explicit Exact Formulas for the 3-D Tetrahedron Inertia Tensor
-  // in Terms of its Vertex Coordinates", F. Tonon
-
-  double x1 = 0., x2 = A2[X], x3 = A3[X], x4 = A4[X],
-  	y1 = 0., y2 = A2[Y], y3 = A3[Y], y4 = A4[Y],
-	z1 = 0., z2 = A2[Z], z3 = A3[Z], z4 = A4[Z],
-	det ;
-	
-  det = fabs( ( x2 - x1 ) * ( y3 - y1 ) * ( z4 - z1 )
-  	+ ( y2 - y1 ) * ( z3 - z1 ) * (	x4 - x1 )
-	+ ( z2 - z1 ) * ( x3 - x1 ) * (	y4 - y1 )
-	- ( z2 - z1 ) * ( y3 - y1 ) * (	x4 - x1 )
-	- ( x2 - x1 ) * ( z3 - z1 ) * (	y4 - y1 )
-	- ( y2 - y1 ) * ( x3 - x1 ) * (	z4 - z1 ) );
-
-  m_VolumePoly += det / 6. ;
-  
-  m_InertiaPoly[0] += det * ( y1 * y1 + y1 * y2 + y2 * y2 
-  	+ y1 * y3 + y2 * y3 + y3 * y3
-	+ y1 * y4 + y2 * y4 + y3 * y4 + y4 * y4
-	+ z1 * z1 + z1 * z2 + z2 * z2 
-  	+ z1 * z3 + z2 * z3 + z3 * z3
-	+ z1 * z4 + z2 * z4 + z3 * z4 + z4 * z4 ) / 60. ;
-  m_InertiaPoly[1] -= det * ( 2. * x1 * z1 + x2 * z1 + x3 * z1 + x4 * z1 
-  	+ x1 * z2 + 2. * x2 * z2 + x3 * z2 + x4 * z2 
-	+ x1 * z3 + x2 * z3 + 2. * x3 * z3 + x4 * z3 
-	+ x1 * z4 + x2 * z4 + x3 * z4 + 2. * x4 * z4 ) / 120. ;
-  m_InertiaPoly[2] -= det * ( 2. * x1 * y1 + x2 * y1 + x3 * y1 + x4 * y1 
-  	+ x1 * y2 + 2. * x2 * y2 + x3 * y2 + x4 * y2 
-	+ x1 * y3 + x2 * y3 + 2. * x3 * y3 + x4 * y3 
-	+ x1 * y4 + x2 * y4 + x3 * y4 + 2. * x4 * y4 ) / 120. ;
-  m_InertiaPoly[3] += det * ( x1 * x1 + x1 * x2 + x2 * x2 
-  	+ x1 * x3 + x2 * x3 + x3 * x3
-	+ x1 * x4 + x2 * x4 + x3 * x4 + x4 * x4
-	+ z1 * z1 + z1 * z2 + z2 * z2 
-  	+ z1 * z3 + z2 * z3 + z3 * z3
-	+ z1 * z4 + z2 * z4 + z3 * z4 + z4 * z4 ) / 60. ;
-  m_InertiaPoly[4] -= det * ( 2. * y1 * z1 + y2 * z1 + y3 * z1 + y4 * z1 
-  	+ y1 * z2 + 2. * y2 * z2 + y3 * z2 + y4 * z2 
-	+ y1 * z3 + y2 * z3 + 2. * y3 * z3 + y4 * z3 
-	+ y1 * z4 + y2 * z4 + y3 * z4 + 2. * y4 * z4 ) / 120. ;
-  m_InertiaPoly[5] += det * ( x1 * x1 + x1 * x2 + x2 * x2 
-  	+ x1 * x3 + x2 * x3 + x3 * x3
-	+ x1 * x4 + x2 * x4 + x3 * x4 + x4 * x4
-	+ y1 * y1 + y1 * y2 + y2 * y2 
-  	+ y1 * y3 + y2 * y3 + y3 * y3
-	+ y1 * y4 + y2 * y4 + y3 * y4 + y4 * y4 ) / 60. ;			
-}
-
-
-
-
-// -------------------------------------------------------------------
 // Allocates the inertia tensor array and sets its component and the 
 // volume to 0
 void Polyhedron::Initialisation() 
@@ -319,7 +259,7 @@ Convex* Polyhedron::clone() const
 
 // ----------------------------------------------------------------------
 // Polyhedron support function, returns the support point P, i.e. 
-// the point on the surface of the sphere that satisfies max(P.v)
+// the point on the surface of the polyhedron that satisfies max(P.v)
 // Note: condition "d <= h" has been replaced by "d-h < eps" in relation to
 // round error issues. For now, eps = 1.e-16 but this should be re-examined   
 Point3 Polyhedron::support( Vector3 const& v ) const 
@@ -400,8 +340,9 @@ void Polyhedron::BuildPolyhedron( int nbface, IndexArray const* face )
     
     if ( face[i].size() == 3 )
     {
-      computeVolumeInertiaContrib( (*this)[face[i][0]], (*this)[face[i][1]],
-      	(*this)[face[i][2]]);
+      GrainsExec::computeVolumeInertiaContrib( (*this)[face[i][0]], 
+      	(*this)[face[i][1]], (*this)[face[i][2]], 
+	m_VolumePoly, m_InertiaPoly );
     }
     else
     {
@@ -409,8 +350,8 @@ void Polyhedron::BuildPolyhedron( int nbface, IndexArray const* face )
       for(j=0; j<face[i].size(); ++j) G_ += (*this)[face[i][j]];
       G_ /= face[i].size();
       for(j=0, k=face[i].size() - 1; j<face[i].size(); k=j++) 
-        computeVolumeInertiaContrib( G_, (*this)[face[i][k]], 
-		(*this)[face[i][j]]);
+        GrainsExec::computeVolumeInertiaContrib( G_, (*this)[face[i][k]], 
+		(*this)[face[i][j]], m_VolumePoly, m_InertiaPoly);
     }
   }
   
@@ -720,50 +661,6 @@ void Polyhedron::write_polygonsStr_PARAVIEW( list<int>& connectivity,
   {
   
   }
-//   int ncorners = numVerts();
-//   
-//   // Tetrahedron or box or prism
-//   if ( ncorners == 4 || ncorners == 8 || 
-//   	( ncorners == 6 && m_allFaces->size() == 5 ) )
-//   {
-//     int count = firstpoint_globalnumber + 1;
-//     for (int i=0;i<ncorners;++i)
-//     {
-//       connectivity.push_back(count);
-//       ++count;
-//     }  
-//     last_offset += ncorners;
-//     offsets.push_back(last_offset);
-//     if ( ncorners == 4 ) cellstype.push_back(10);
-//     else if ( ncorners == 8 ) cellstype.push_back(12);
-//     else cellstype.push_back(13);
-//   
-//     firstpoint_globalnumber += ncorners + 1;
-//   }
-//   // Icosahedron
-//   // The icosahedron is split into 20 tetrahedrons using the center of mass and
-//   // 3 vertices on each face
-//   else if ( ncorners == 12 && m_allFaces->size() == 20 )
-//   {
-//     size_t nbface = m_allFaces->size();
-//     for (size_t i=0;i<nbface;++i)
-//     {
-//       connectivity.push_back( firstpoint_globalnumber );
-//       size_t nbv = (*m_allFaces)[i].size();
-//       for (size_t j=0;j<nbv;++j) 
-//         connectivity.push_back( firstpoint_globalnumber 
-// 		+ (*m_allFaces)[i][j] + 1 );
-//       last_offset += 4;
-//       offsets.push_back(last_offset);
-//       cellstype.push_back(10);
-//     }
-//      
-//     firstpoint_globalnumber += ncorners + 1;       
-//   }
-//   else
-//   {
-//     // General: not implemented yet !!  
-//   }
 }
 
 
@@ -795,7 +692,7 @@ void Polyhedron::write_convex_STL( ostream& f, Transform const& transform )
       for (int j=0;j<4;++j)
         FC[j] = transform((*this)[(*m_allFaces)[i][j]]); 
 	
-      // On divise la face rectangulaire en 2 triangles
+      // Divide each faces into 2 triangles
       // Triangle 0
       f << "  facet normal " << outward_normal[X]
       	<< " " << outward_normal[Y]
@@ -842,8 +739,8 @@ bool Polyhedron::isIn( Point3 const& pt ) const
 {
   bool isIn = false;
 
-  // Recall that by definition, center of mass is at the origin in the reference
-  // configuration
+  // Recall that by definition, center of mass is at the origin in the 
+  // reference configuration
   Point3 G_, centerOfMass ;
   size_t i, j, k, nbface = m_allFaces->size();
   for (i=0; i<nbface && !isIn; i++)
@@ -869,4 +766,125 @@ bool Polyhedron::isIn( Point3 const& pt ) const
   }
   
   return ( isIn );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the bounding volume to polyhedron
+BVolume* Polyhedron::computeBVolume( unsigned int type ) const
+{
+  // It is typically not straightforward to find the bounding volume to a 
+  // general polyhedron. The method we use here is not by any means the optimal 
+  // (most fitted) bounding volume to the given polyhedron.
+  // Here, we simply loop over all vertices to find those with maximum abs value
+  // in each direction. Persumably, for regular polyhedron it is going to be
+  // enough.
+  BVolume* bvol = NULL;
+  Point3 pt;
+  Vector3 extent( 0., 0., 0. );
+  for ( int i = 0; i < numVerts(); i++ )
+  {
+    pt = m_base[i];
+    extent[X] = fabs( pt[X] ) > extent[X] ? fabs( pt[X] ) : extent[X];
+    extent[Y] = fabs( pt[Y] ) > extent[Y] ? fabs( pt[Y] ) : extent[Y];
+    extent[Z] = fabs( pt[Z] ) > extent[Z] ? fabs( pt[Z] ) : extent[Z];
+  }
+  if ( type == 1 ) // OBB
+  {
+    bvol = new OBB( extent, Matrix() );
+  }
+  else if ( type == 2 ) // OBC
+  {
+    double xy = fabs( extent[X] - extent[Y] );
+    double xz = fabs( extent[X] - extent[Z] );
+    double yz = fabs( extent[Y] - extent[Z] );
+    // pick from xy and xz, store to xy
+    int zAxis = xy < xz ? Z : Y;
+    xy = xy < xz ? xy : xz;
+    // pick from xy and yz
+    zAxis = xy < yz ? zAxis : X;
+
+    Vector3 e( 0., 0., 0. );
+    e[ zAxis ] = 1.;
+    double h = 2. * extent[zAxis];
+    double r = sqrt( extent[X] * extent[X] + 
+                     extent[Y] * extent[Y] +
+                     extent[Z] * extent[Z] -
+                     extent[zAxis] * extent[zAxis] );
+
+    bvol = new OBC( r, h, e );
+  }
+
+  return( bvol );
+}
+
+
+
+// ----------------------------------------------------------------------------
+// Performs advanced comparison of the two polyhedrons and returns whether 
+// they match
+bool Polyhedron::equalType_level2( Convex const* other ) const
+{
+  // We know that other points to a Polyhedron, we dynamically cast it to 
+  // actual type
+  Polyhedron const* other_ = dynamic_cast<Polyhedron const*>(other);
+  
+  double lmin = computeCircumscribedRadius();    
+
+  // Check the number of vertices
+  int ncorners = numVerts();  
+  bool same = ( ncorners == other_->numVerts() );
+  
+  // Check vertex coordinates
+  for (int i=0;i<ncorners && same;++i) 
+    same = ( (*this)[i].DistanceTo( (*other_)[i] ) < LOWEPS * lmin );     
+    
+  // Check face numbering
+  if ( same )
+  {
+    size_t nbface = m_allFaces->size();
+    for (size_t i=0;i<nbface;i++) 
+      for (size_t j=0;j<(*m_allFaces)[i].size();++j) 
+        same = ( (*m_allFaces)[i][j] == (*other_->m_allFaces)[i][j] );
+  }
+  
+  return ( same );
+} 
+
+
+
+
+// ----------------------------------------------------------------------------
+// Writes the polyhedron in an OBJ format
+void Polyhedron::write_convex_OBJ( ostream& f, Transform  const& transform,
+    	size_t& firstpoint_number ) const
+{
+  Point3 pp;
+  int ncorners = numVerts();
+  
+  // Vertices
+  for (int i=0; i<ncorners; i++) 
+  {
+    pp = transform( (*this)[i] );
+    f << "v " << GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+		pp[X] ) << " " << 
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+		pp[Y] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, FORMAT10DIGITS,
+		pp[Z] ) << " " << endl;	  
+  }  
+  
+  // Faces 
+  size_t nbface = m_allFaces->size();
+  for (size_t i=0; i<nbface; i++) 
+  {
+    f << "f";
+    for (size_t j=0;j<(*m_allFaces)[i].size();++j) 
+      f << " " << firstpoint_number + (*m_allFaces)[i][j];
+    f << endl;
+  }
+  
+  firstpoint_number += size_t(ncorners);  			  
 }

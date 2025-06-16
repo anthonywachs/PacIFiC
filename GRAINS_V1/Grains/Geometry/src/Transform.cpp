@@ -6,6 +6,9 @@
 #include <sstream>
 using namespace std;
 
+size_t Transform::m_sizeofTransform = Matrix::m_sizeofMatrix + 
+	solid::Group3::m_sizeofGroup3 + sizeof( unsigned int );
+
 
 // --------------------------------------------------------------------------
 // Default constructor. Origin is (0,0,0) and matrix is identity
@@ -239,6 +242,25 @@ void Transform::setBasis( const Matrix &basis_ )
 
 
 
+// -----------------------------------------------------------------------------
+// Sets the matrix part of the transformation with specified rotations around 
+// each principal axis
+void Transform::setBasis( double aX, double aY, double aZ )
+{
+    m_basis = Matrix( cos(aZ)*cos(aY),
+                      cos(aZ)*sin(aY)*sin(aX) - sin(aZ)*cos(aX),
+                      cos(aZ)*sin(aY)*cos(aX) + sin(aZ)*sin(aX),
+                      sin(aZ)*cos(aY),
+                      sin(aZ)*sin(aY)*sin(aX) + cos(aZ)*cos(aX),
+                      sin(aZ)*sin(aY)*cos(aX) - cos(aZ)*sin(aX),
+                      -sin(aY),
+                      cos(aY)*sin(aX),
+                      cos(aY)*cos(aX) );
+}
+
+
+
+
 // --------------------------------------------------------------------------
 // Sets the transformation with an 1D array of 12 values as inputs 
 void Transform::setValue( const double m[12] ) 
@@ -361,6 +383,7 @@ ostream& operator << ( ostream& fileOut, Transform const& t )
   fileOut << "Type = " << t.m_type << endl;
   fileOut << "*Position\n";
   fileOut << t.m_origin << endl;
+  fileOut << "*Orientation\n";
   fileOut << t.m_basis;
 
   return ( fileOut );
@@ -371,15 +394,15 @@ ostream& operator << ( ostream& fileOut, Transform const& t )
 
 // --------------------------------------------------------------------------
 // Writes the object with a high precision format given by
-// POSITIONFORMAT defined in GrainsExec.hh
+// FORMAT16DIGITS defined in GrainsExec.hh
 void Transform::writeTransform( ostream& fileOut ) const
 {
   fileOut << "*Position " << m_type << endl;
-  fileOut << GrainsExec::doubleToString(ios::scientific,POSITIONFORMAT,
+  fileOut << GrainsExec::doubleToString(ios::scientific,FORMAT16DIGITS,
   	m_origin[X]) << " " << 
-	GrainsExec::doubleToString(ios::scientific,POSITIONFORMAT,
+	GrainsExec::doubleToString(ios::scientific,FORMAT16DIGITS,
   	m_origin[Y]) << " " << 
-	GrainsExec::doubleToString(ios::scientific,POSITIONFORMAT,
+	GrainsExec::doubleToString(ios::scientific,FORMAT16DIGITS,
   	m_origin[Z]) << endl;	
   m_basis.writeMatrix( fileOut );
 }
@@ -389,14 +412,14 @@ void Transform::writeTransform( ostream& fileOut ) const
 
 // --------------------------------------------------------------------------
 // Writes the object with a high precision format given by
-// POSITIONFORMAT defined in GrainsExec.hh and the 2014 reload format
+// FORMAT16DIGITS defined in GrainsExec.hh and the 2014 reload format
 void Transform::writeTransform2014( ostream& fileOut ) const
 {
-  fileOut << GrainsExec::doubleToString(ios::scientific,POSITIONFORMAT,
+  fileOut << GrainsExec::doubleToString(ios::scientific,FORMAT16DIGITS,
   	m_origin[X]) << " " << 
-	GrainsExec::doubleToString(ios::scientific,POSITIONFORMAT,
+	GrainsExec::doubleToString(ios::scientific,FORMAT16DIGITS,
   	m_origin[Y]) << " " << 
-	GrainsExec::doubleToString(ios::scientific,POSITIONFORMAT,
+	GrainsExec::doubleToString(ios::scientific,FORMAT16DIGITS,
   	m_origin[Z]) << " ";	
   m_basis.writeMatrix2014( fileOut );
   fileOut << " " << m_type;
