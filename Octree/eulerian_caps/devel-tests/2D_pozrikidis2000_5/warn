@@ -1,0 +1,17 @@
+2D_pozrikidis2000_5.c: In function ‘movie’:
+2D_pozrikidis2000_5.c:130:18: warning: missing braces around initializer [-Wmissing-braces]
+   cells ();
+                  ^
+2D_pozrikidis2000_5.c:130:18: warning: (near initialization for ‘(anonymous).n’) [-Wmissing-braces]
+2D_pozrikidis2000_5.c:137:18: warning: missing braces around initializer [-Wmissing-braces]
+   cells ();
+                  ^
+2D_pozrikidis2000_5.c:137:18: warning: (near initialization for ‘(anonymous).n’) [-Wmissing-braces]
+2D_pozrikidis2000_5.c:144:18: warning: missing braces around initializer [-Wmissing-braces]
+   cells ();
+                  ^
+2D_pozrikidis2000_5.c:144:18: warning: (near initialization for ‘(anonymous).n’) [-Wmissing-braces]
+2D_pozrikidis2000_5.c:151:18: warning: missing braces around initializer [-Wmissing-braces]
+   cells ();
+                  ^
+2D_pozrikidis2000_5.c:151:18: warning: (near initialization for ‘(anonymous).n’) [-Wmissing-braces]

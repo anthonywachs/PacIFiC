@@ -1,0 +1,41 @@
+# Automatically generated using 'make Makefile.tests'
+# DO NOT EDIT, edit 'Makefile' instead
+ALLTESTS = \
+	0D_elongational_tilted_2.c \
+	0D_elongational_tilted.c \
+	compute_J2.c \
+	compute_J3.c \
+	compute_J.c \
+	neo-hookean-shear-1.c \
+	neo-hookean-shear-2.c \
+	neo-hookean-shear-3.c \
+	neo-hookean-shear-4.c \
+	neo-hookean-shear-5.c \
+	neo-hookean-shear-6.c \
+	neo-hookean-shear-7.c \
+	project_G_stress_only.c \
+	reversed-shear-2.c \
+	reversed-shear-3.c \
+	reversed-shear-4.c \
+	reversed-shear-5.c \
+	reversed-shear-6.c \
+	reversed-shear-7.c \
+	reversed-shear-8.c \
+	sinusoidal-shear-uyandufy-free-grad-uf.c \
+	sinusoidal-shear-uyandufy-imposed-grad-uf.c \
+	sinusoidal-shear-uy-free.c \
+	sinusoidal-shear-uy-free-grad-uf.c \
+	sinusoidal-shear-uy-imposed.c \
+	sinusoidal-shear-uy-imposed-endtimestep.c \
+	sinusoidal-shear-uy-imposed-grad-uf.c \
+	test-acceleration-2.c \
+	test-acceleration-3.c \
+
+plots: \
+
+TESTS = \
+
+SPECIAL_TESTS = \
+
+ALLPAGES = \
+

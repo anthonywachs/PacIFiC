@@ -1,0 +1,7 @@
+/home/damien/phd/pacific/Octree/basilisk/src/eulerian_caps/normal_extension.h: In function ‘initialize_normals_for_extension’:
+/home/damien/phd/pacific/Octree/basilisk/src/eulerian_caps/normal_extension.h:84:39: warning: ‘n_coord.x’ may be used uninitialized in this function [-Wmaybe-uninitialized]
+   84 |         normals.x[] = n_coord.x;
+      |                                ~      ^ 
+/home/damien/phd/pacific/Octree/basilisk/src/eulerian_caps/normal_extension.h:84:39: warning: ‘n_coord.y’ may be used uninitialized in this function [-Wmaybe-uninitialized]
+   84 |         normals.x[] = n_coord.x;
+      |                                ~      ^ 
