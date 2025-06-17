@@ -176,7 +176,7 @@ void GrainsCoupledWithFluid::Simulation( double time_interval )
       // Compute f_i+1 and a_i+1 as a function of (x_i+1,v_i+1/2)      
             	
       // Initiliaze all component transforms with crust to non computed
-      m_allcomponents.InitializeRBTransformWithCrustState( m_time, m_dt );
+      m_allcomponents.Initialize_RBWCTransformState( m_time, m_dt );
 
 
       // Compute forces from all applications

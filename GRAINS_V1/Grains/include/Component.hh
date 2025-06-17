@@ -10,6 +10,7 @@
 #include <list>
 #include <string>
 #include <map>
+#include <set>
 using namespace std;
 
 class BBox;
@@ -358,9 +359,10 @@ class Component
     @param _id id of the component to search for */
     Vector3 lookupCollision( int _id ) const;
 
-    /** @brief Increments the coordination number by nc
-    @param nc increment of the coordination number */
-    virtual void addToCoordinationNumber( int const& nc );
+    /** @brief Adds a contacting component ID to the set of contacting 
+    component IDs
+    @param id contacting component ID */
+    virtual void addContactingComponentID( int const& id );
 
     /** @brief Returns whether the component is a composite particle */
     virtual bool isCompositeParticle() const;

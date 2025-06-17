@@ -772,8 +772,10 @@ void CompositeParticle::InterAction( Component* voisin,
       		->computeForces( (*il)->p0, (*il)->p1, (*il)->ContactPoint,
 		LC, dt, nbContact ) )
       {
-        (*il)->p0->getMasterComponent()->addToCoordinationNumber( 1 );
-        (*il)->p1->getMasterComponent()->addToCoordinationNumber( 1 );
+        (*il)->p0->getMasterComponent()->addContactingComponentID( 
+		(*il)->p1->getMasterComponent()->getID() );
+        (*il)->p1->getMasterComponent()->addContactingComponentID( 
+		(*il)->p0->getMasterComponent()->getID() );
       }
       delete *il;
     }

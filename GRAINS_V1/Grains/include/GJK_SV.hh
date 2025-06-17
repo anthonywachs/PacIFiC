@@ -68,7 +68,7 @@ convex shape that represents the tips of the minimal distance segment
 frame
 @param b2w geometric tramsformation describing convex B in the world reference
 frame
-@param vVec initial search direction
+@param v initial search direction
 @param pa point representing one tip of the minimal distance segment on A
 @param pb point representing the other tip of the minimal distance segment on B
 @param nbIter number of iterations of GJK for convergence */

@@ -498,7 +498,6 @@ void Particle::InterAction( Component* voisin,
       if ( initialDirection != Vector3Null )
       {
         m_collisionHistory.updateCollision( id, initialDirection );
-        // cout << initialDirection << endl;
       }
       else
         m_collisionHistory.removeCollision( id );
@@ -538,9 +537,9 @@ void Particle::InterAction( Component* voisin,
     {
       // Note: in this method this and voisin cannot be a CompositeParticle
       // thus there is no need to call getMasterComponent() before
-      // addToCoordinationNumber( 1 )
-      this->addToCoordinationNumber( 1 );
-      voisin->addToCoordinationNumber( 1 );
+      // addContactingComponentID( xxx )
+      this->addContactingComponentID( voisin->getID() );
+      voisin->addContactingComponentID( m_id );
     }
   }
 }
@@ -1411,6 +1410,7 @@ void Particle::InitializeForce( bool const& withWeight )
   if ( withWeight )
     m_torsor.setToBodyForce( *m_geoRBWC->getCentre(), m_weight );
   else m_torsor.setToBodyForce( *m_geoRBWC->getCentre(), Vector3Null );
+  m_contacting_component_IDs.clear();
   m_coordination_number = 0 ;
 }
 
@@ -1698,10 +1698,11 @@ void Particle::copyCellTagGeoPosition_n_to_nm1()
 
 
 // ----------------------------------------------------------------------------
-// Increments the coordination number by nc
-void Particle::addToCoordinationNumber( int const& nc )
+// Adds a contacting component ID to the set of contacting component IDs
+void Particle::addContactingComponentID( int const& id )
 {
-  m_coordination_number += nc;
+  m_contacting_component_IDs.insert( id );
+  m_coordination_number = int( m_contacting_component_IDs.size() );
 }
 
 

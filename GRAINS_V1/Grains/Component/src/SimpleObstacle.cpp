@@ -263,7 +263,10 @@ void SimpleObstacle::InterAction( Component* voisin,
     if ( ContactBuilderFactory::contactForceModel(
     	m_materialName, voisin->getMaterial() )
     	->computeForces( voisin, this, closestPoint, LC, dt ) )
-      voisin->addToCoordinationNumber( 1 );
+      // Note: in this method voisin cannot be a CompositeParticle
+      // thus there is no need to call getMasterComponent() before
+      // addContactingComponentID( xxx )
+      voisin->addContactingComponentID( m_id );
   }
 }
 
