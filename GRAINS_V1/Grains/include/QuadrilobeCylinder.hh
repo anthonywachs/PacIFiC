@@ -118,37 +118,6 @@ class QuadrilobeCylinder : public CompositeParticle
 
     /**@name Methods I/O */
     //@{
-    /** @brief Returns the number of points to write the composite particle in a
-    Paraview format */
-    int numberOfPoints_PARAVIEW() const;
-
-    /** @brief Returns the number of elementary polytopes to write the
-    composite particle shape in a Paraview format */
-    int numberOfCells_PARAVIEW() const;
-
-    /** @brief Writes the points describing the composite particle in a
-    Paraview format
-    @param f output stream
-    @param translation additional center of mass translation */
-    void write_polygonsPts_PARAVIEW( ostream& f,
-  	Vector3 const* translation = NULL ) const;
-
-    /** @brief Returns a list of points describing the component in a
-    Paraview format
-    @param translation additional center of mass translation */
-    list<Point3> get_polygonsPts_PARAVIEW(
-  	Vector3 const* translation = NULL ) const;
-
-    /** @brief Writes the composite particle in a Paraview format
-    @param connectivity connectivity of Paraview polytopes
-    @param offsets connectivity offsets
-    @param cellstype Paraview polytopes type
-    @param firstpoint_globalnumber global number of the 1st point
-    @param last_offset last offset used for the previous convex shape */
-    void write_polygonsStr_PARAVIEW( list<int>& connectivity,
-    	list<int>& offsets, list<int>& cellstype, int& firstpoint_globalnumber,
-	int& last_offset ) const ;
-
     /**  @brief Outputs information to be transferred to the fluid
     @param fluid output stream */
     void writePositionInFluid( ostream& fluid );

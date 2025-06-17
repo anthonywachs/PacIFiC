@@ -402,7 +402,7 @@ int CompositeParticle::numberOfCells_PARAVIEW() const
 // ----------------------------------------------------------------------------
 // Writes the points describing the composite particle in a Paraview format
 void CompositeParticle::write_polygonsPts_PARAVIEW( ostream& f,
-	Vector3 const* translation )const
+	Vector3 const* translation ) const
 {
   for ( size_t i=0; i<m_nbElemPart; ++i )
     m_elementaryParticles[i]->write_polygonsPts_PARAVIEW( f, translation ) ;

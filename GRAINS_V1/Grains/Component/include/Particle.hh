@@ -545,7 +545,7 @@ class Particle : public Component
     GeoPosition getGeoPositionNm1() const;
 
     /** @brief Returns particle coordination number */
-    virtual int getCoordinationNumber() const;
+    int getCoordinationNumber() const;
 
     /** @brief Returns the number of corners of the rigib body shape and a code
     describing the rigid body shape */
