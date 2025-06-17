@@ -47,7 +47,7 @@ enum CloneInReload
 
     Manages all rigid components in the simulation.
 
-    @author G.FERRER - Institut Francais du Petrole - 1999 - Creation
+    @author Institut Francais du Petrole - 1999 - Creation
     @author A.WACHS - 2019 - Major cleaning & refactoring */
 // ============================================================================
 class AllComponents

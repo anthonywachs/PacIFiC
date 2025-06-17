@@ -12,11 +12,9 @@ namespace solid
   Point in a 3D space. From GJK Engine - A Fast and Robust GJK
   Implementation, Copyright (C) 1998  Gino van den Bergen. 
       
-  @author G.FERRER - Institut Francais du Petrole - 1999 - Creation 
-  @author F.PRADEL - Institut Francais du Petrole - 2000 - Modification
-  @author D.PETIT  - 2000 - Modification 
-  @author A.WACHS  - 2009 - Modification 
-  @author A.WACHS  - 2019 - Modification */
+  @author Institut Francais du Petrole - 1999 - Creation 
+  @author Institut Francais du Petrole - 2000 - Modification
+  @author A.WACHS - 2009 - Modification */
   // ==========================================================================
   class Point3 : public Group3
   {

@@ -10,7 +10,7 @@
     Convex with a 2D disc shape. From GJK Engine - A Fast and 
     Robust GJK Implementation, Copyright (C) 1998  Gino van den Bergen.
     
-    @author G.FERRER - Institut Francais du Petrole - 2003 - Creation
+    @author Institut Francais du Petrole - 2003 - Creation
     @author A.WACHS - 2019 - Major cleaning & refactoring */
 // ============================================================================
 class Disc : public Convex 

@@ -13,7 +13,7 @@ class PointContact;
 
     A combination of a convex shape, a transformation and a surface crust.
 
-    @author G. FERRER - Institut Francais du Petrole - 2002 - Creation
+    @author Institut Francais du Petrole - 2002 - Creation
     @author D. RAKOTONIRINA - IFP Energies Nouvelles - Sept. 2014
     - Modification
     @author A.WACHS - 2019 - Major cleaning & refactoring */

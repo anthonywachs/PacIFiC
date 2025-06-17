@@ -18,7 +18,7 @@ class Obstacle;
 
     Defines and controls the force imposed on an obstacle.
 
-    @author G.FERRER - Institut Francais du Petrole - 2003 - Creation 
+    @author Institut Francais du Petrole - 2003 - Creation 
     @author A.WACHS - 2019 - Major cleaning & refactoring */
 // ============================================================================
 class ObstacleImposedForce

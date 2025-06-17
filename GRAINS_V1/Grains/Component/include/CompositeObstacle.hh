@@ -16,7 +16,7 @@ using namespace std;
     obstacles. Useful to impose the same motion to the whole cluster or to
     compose motions.
 
-    @author G.FERRER - Institut Francais du Petrole - 2002 - Creation
+    @author Institut Francais du Petrole - 2002 - Creation
     @author D. RAKOTONIRINA - IFP Energies nouvelles - 2014 - Modification 
     @author A.WACHS - 2019 - Major cleaning & refactoring */
 // ============================================================================

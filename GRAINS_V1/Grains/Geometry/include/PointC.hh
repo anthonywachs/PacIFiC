@@ -8,7 +8,7 @@
 
     Convex with a point shape. 
     
-    @author D.PETIT - Institut Francais du Petrole - 2000 - Creation
+    @author Institut Francais du Petrole - 2000 - Creation
     @author A.WACHS - 2019 - Major cleaning & refactoring */
 // ============================================================================
 class PointC : public Convex 

@@ -26,7 +26,7 @@ struct PointForcePostProcessing
     Generic application to detect collisions and compute collision force 
     & torques on rigid bodies.
 
-    @author G.FERRER - Institut Francais du Petrole - 2003 - Creation 
+    @author Institut Francais du Petrole - 2003 - Creation 
     @author A.WACHS - 2021 - Major cleaning & refactoring */
 // ============================================================================
 class AppCollision : public App

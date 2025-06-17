@@ -58,7 +58,7 @@ enum GeoPosition
     Defines a cell of the linked-cell grid. The cell has a parallelepipedic
     shape by construction.
     
-    @author G.FERRER - Institut Francais du Petrole - 1999 - Creation 
+    @author Institut Francais du Petrole - 1999 - Creation 
     @author A.WACHS - 2019 - Major cleaning & refactoring */
 // ============================================================================
 class Cell

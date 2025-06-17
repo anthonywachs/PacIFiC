@@ -45,7 +45,7 @@ enum ConvexType {
     High level class describing convex shapes. From GJK Engine - A Fast and
     Robust GJK Implementation, Copyright (C) 1998  Gino van den Bergen.
 
-    @author D.PETIT - Institut Francais du Petrole - 2000 - Modification
+    @author Institut Francais du Petrole - 2000 - Modification
     @author D.RAKOTONIRINA - IFP Energies Nouvelles - 2014 - Modification
     @author A.WACHS - 2019 - Major cleaning & refactoring
     @author A.YAZDANI - 2024 - GJK Refactoring */

@@ -9,7 +9,7 @@
     Standard Grains3D application running in parallel mode with domain
     decomposition.
 
-    @author G.FERRER - Institut Francais du Petrole - 2003 - Creation 
+    @author Institut Francais du Petrole - 2003 - Creation 
     @author A.WACHS - 2021 - Major cleaning & refactoring 
     @author A.WACHS - 2024 - Reimplementation */
 // ============================================================================

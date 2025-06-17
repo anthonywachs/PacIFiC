@@ -52,8 +52,8 @@ struct VelocityInfosNm1
 
     A freely moving particle.
 
-    @author F.PRADEL - Institut Francais du Petrole - 1999 - Creation
-    @author G.FERRER - Institut Francais du Petrole - 2000 - Creation
+    @author Institut Francais du Petrole - 1999 - Creation
+    @author Institut Francais du Petrole - 2000 - Creation
     @author A.WACHS - 2019 - Major cleaning & refactoring */
 // ============================================================================
 class Particle : public Component

@@ -16,7 +16,7 @@ istream& operator >> ( istream& fileIn, Torsor& object );
     A force, a point of reference of the torque (generally the center of mass
     of the corresponding rigid body) and the associated torque
 
-    @author F.PRADEL - Institut Francais du Petrole - 1999 - Creation 
+    @author Institut Francais du Petrole - 1999 - Creation 
     @author A.WACHS - 2019 - Major cleaning & refactoring */
 // ============================================================================
 class Torsor

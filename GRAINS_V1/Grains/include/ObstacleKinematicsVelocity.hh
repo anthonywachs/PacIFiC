@@ -20,7 +20,7 @@ istream& operator >> ( istream& fileIn, ObstacleKinematicsVelocity& kine_ );
 
     Manages the obstacle kinematics with a prescribed velocity.
 
-    @author G.FERRER - Institut Francais du Petrole - 2000 - Creation 
+    @author Institut Francais du Petrole - 2000 - Creation 
     @author A.WACHS - 2019 - Major cleaning & refactoring */
 // ============================================================================
 class ObstacleKinematicsVelocity : public Kinematics

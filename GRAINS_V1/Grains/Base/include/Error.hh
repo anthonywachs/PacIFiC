@@ -13,7 +13,7 @@ class Component;
 
     To manage contact errors as exceptions.
 
-    @author G.FERRER - Institut Francais du Petrole - 2000 - Creation
+    @author Institut Francais du Petrole - 2000 - Creation
     @author A.WACHS - 2019 - Major cleaning & refactoring */
 // ============================================================================
 class ContactError

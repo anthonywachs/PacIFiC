@@ -31,7 +31,7 @@ struct ContactInfos
 
     Physical component of a granular simulation (can be particle or obstacle).
 
-    @author G.FERRER - Institut Francais du Petrole - 2000 - Creation
+    @author Institut Francais du Petrole - 2000 - Creation
     @author A.WACHS - 2019 - Major cleaning & refactoring 
     @author D.HUET - 2022 - Contact force model with memory */
 // ============================================================================

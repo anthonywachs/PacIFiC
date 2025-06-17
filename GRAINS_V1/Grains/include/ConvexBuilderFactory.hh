@@ -17,7 +17,7 @@ using namespace std;
     mother class Convex. Constructors, destructor and equal operator are 
     forbidden.
 
-    @author G.FERRER - Institut Francais du Petrole - 2003 - Creation
+    @author Institut Francais du Petrole - 2003 - Creation
     @author D. RAKOTONIRINA - IFP Energies nouvelles - Oct. 2014
     - Modification 
     @author A.WACHS - 2019 - Major cleaning & refactoring */
