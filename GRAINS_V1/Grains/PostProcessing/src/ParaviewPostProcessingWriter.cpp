@@ -15,7 +15,7 @@
 #include "Cylinder.hh"
 #include "Cone.hh"
 #include "Superquadric.hh"
-#include "SpheroCyl.hh"
+#include "SpheroCylinder.hh"
 #include "SpheroCylindricalPrism.hh"
 #include <zlib.h>
 using namespace solid;
@@ -107,7 +107,7 @@ ParaviewPostProcessingWriter::ParaviewPostProcessingWriter( DOMNode* dn,
   if ( ReaderXML::hasNodeAttr( dn, "NbPtsPerSCQuarter" ) )
   { 
     int nnn = ReaderXML::getNodeAttr_Int( dn, "NbPtsPerSCQuarter" );
-    SpheroCyl::SetvisuNodeNbPerQar( nnn );
+    SpheroCylinder::SetvisuNodeNbPerQar( nnn );
   }
   if ( ReaderXML::hasNodeAttr( dn, "NbPtsPerSCPHalf" ) )
   { 

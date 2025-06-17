@@ -1,15 +1,15 @@
 #include "GrainsExec.hh"
 #include "GrainsBuilderFactory.hh"
-#include "SpheroCyl.hh"
+#include "SpheroCylinder.hh"
 #include "BBox.hh"
 #include <sstream>
 
-int SpheroCyl::m_visuNodeNbPerQar = 8;
+int SpheroCylinder::m_visuNodeNbPerQar = 8;
 
 
 // ----------------------------------------------------------------------------
 // Constructor with edge length as input parameters
-SpheroCyl::SpheroCyl( double r, double h )
+SpheroCylinder::SpheroCylinder( double r, double h )
   : m_radius( r )
   , m_height( h )
 {}
@@ -19,7 +19,7 @@ SpheroCyl::SpheroCyl( double r, double h )
 
 // ----------------------------------------------------------------------------
 // Constructor with an input stream
-SpheroCyl::SpheroCyl( istream& fileIn )
+SpheroCylinder::SpheroCylinder( istream& fileIn )
 {
   readShape( fileIn );
 }
@@ -29,7 +29,7 @@ SpheroCyl::SpheroCyl( istream& fileIn )
 
 // ----------------------------------------------------------------------------
 // Constructor with an XML node as an input parameter
-SpheroCyl::SpheroCyl( DOMNode* root )
+SpheroCylinder::SpheroCylinder( DOMNode* root )
 {
   m_radius = ReaderXML::getNodeAttr_Double( root, "Radius" );
   m_height = ReaderXML::getNodeAttr_Double( root, "Height" );
@@ -40,7 +40,7 @@ SpheroCyl::SpheroCyl( DOMNode* root )
 
 // ----------------------------------------------------------------------------
 // Destructor
-SpheroCyl::~SpheroCyl()
+SpheroCylinder::~SpheroCylinder()
 {}
 
 
@@ -48,7 +48,7 @@ SpheroCyl::~SpheroCyl()
 
 // ----------------------------------------------------------------------
 // Returns the convex type
-ConvexType SpheroCyl::getConvexType() const
+ConvexType SpheroCylinder::getConvexType() const
 {
   return ( SPHEROCYLINDER );
 }
@@ -57,10 +57,10 @@ ConvexType SpheroCyl::getConvexType() const
 
 
 // ----------------------------------------------------------------------------
-// Returns a clone of the spherocylinder
-Convex* SpheroCyl::clone() const
+// Returns a clone of the SpheroCylinder
+Convex* SpheroCylinder::clone() const
 {
-  return ( new SpheroCyl( m_radius, m_height ) );
+  return ( new SpheroCylinder( m_radius, m_height ) );
 }
 
 
@@ -68,7 +68,7 @@ Convex* SpheroCyl::clone() const
 
 // ----------------------------------------------------------------------
 // Computes the inertia tensor and the inverse of the inertia tensor
-bool SpheroCyl::BuildInertia( double* inertia, double* inertia_1 ) const
+bool SpheroCylinder::BuildInertia( double* inertia, double* inertia_1 ) const
 {  
   inertia[1] = inertia[2] = inertia[4] = 0.;
   inertia_1[1] = inertia_1[2] = inertia_1[4] = 0.0;  
@@ -93,9 +93,9 @@ bool SpheroCyl::BuildInertia( double* inertia, double* inertia_1 ) const
 
 
 // ----------------------------------------------------------------------------
-// Returns the circumscribed radius of the reference spherocylinder,
+// Returns the circumscribed radius of the reference SpheroCylinder,
 // i.e., without applying any transformation
-double SpheroCyl::computeCircumscribedRadius() const
+double SpheroCylinder::computeCircumscribedRadius() const
 {
   return ( 0.5 * m_height + m_radius );
 }
@@ -109,7 +109,7 @@ double SpheroCyl::computeCircumscribedRadius() const
 // face of the elementary cylinder, an arbitrary point on the lateral surface 
 // of the elementary cylinder and center of top circular face of the elementary 
 // cylinder
-vector<Point3> SpheroCyl::getEnvelope() const
+vector<Point3> SpheroCylinder::getEnvelope() const
 {
   Point3 point( 0., 0., 0. );
   vector<Point3> surface( 3, point );
@@ -126,7 +126,7 @@ vector<Point3> SpheroCyl::getEnvelope() const
 // ----------------------------------------------------------------------------
 // Returns a pointer to a 2D array describing the relationship between the face
 // indices and the point indices. Returns a null pointer as a convention
-vector< vector<int> > const* SpheroCyl::getFaces() const
+vector< vector<int> > const* SpheroCylinder::getFaces() const
 {
   vector< vector<int> >* allFaces = NULL;
   return ( allFaces );
@@ -138,7 +138,7 @@ vector< vector<int> > const* SpheroCyl::getFaces() const
 // ----------------------------------------------------------------------------
 // Returns the number of vertices/corners or a code corresponding to
 // a specific convex shape. Here returns the code 3333
-int SpheroCyl::getNbCorners() const
+int SpheroCylinder::getNbCorners() const
 {
   return ( 3333 );
 }
@@ -147,8 +147,8 @@ int SpheroCyl::getNbCorners() const
 
 
 // ----------------------------------------------------------------------------
-// Returns the spherocylinder volume
-double SpheroCyl::getVolume() const
+// Returns the SpheroCylinder volume
+double SpheroCylinder::getVolume() const
 {
   return ( PI * m_radius * m_radius * 
   	( m_height + ( 4. / 3. ) * m_radius ) );
@@ -159,7 +159,7 @@ double SpheroCyl::getVolume() const
 
 // ----------------------------------------------------------------------------
 // Output operator
-void SpheroCyl::writeShape( ostream& fileOut ) const
+void SpheroCylinder::writeShape( ostream& fileOut ) const
 {
   fileOut << "*SpheroCylinder " << m_radius << " " << m_height << " *END";
 }
@@ -169,7 +169,7 @@ void SpheroCyl::writeShape( ostream& fileOut ) const
 
 // ----------------------------------------------------------------------------
 // Input operator
-void SpheroCyl::readShape( istream& fileIn )
+void SpheroCylinder::readShape( istream& fileIn )
 {
   fileIn >> m_radius >> m_height;
 }
@@ -178,9 +178,9 @@ void SpheroCyl::readShape( istream& fileIn )
 
 
 // ----------------------------------------------------------------------------
-// spherocylinder support function, returns the support point P, i.e. the
-// point on the surface of the spherocylinder that satisfies max(P.v)
-Point3 SpheroCyl::support( Vector3 const& v ) const
+// SpheroCylinder support function, returns the support point P, i.e. the
+// point on the surface of the SpheroCylinder that satisfies max(P.v)
+Point3 SpheroCylinder::support( Vector3 const& v ) const
 {
   double s = Norm( v );
   if ( s > EPSILON ) 
@@ -200,9 +200,9 @@ Point3 SpheroCyl::support( Vector3 const& v ) const
 
 
 // ----------------------------------------------------------------------------
-// Returns the number of points to write the spherocylinder in a Paraview 
+// Returns the number of points to write the SpheroCylinder in a Paraview 
 // format
-int SpheroCyl::numberOfPoints_PARAVIEW() const
+int SpheroCylinder::numberOfPoints_PARAVIEW() const
 {
   return ( 2 * ( 4 * m_visuNodeNbPerQar * m_visuNodeNbPerQar + 2 ) );
 }
@@ -211,9 +211,9 @@ int SpheroCyl::numberOfPoints_PARAVIEW() const
 
 
 // ----------------------------------------------------------------------------
-// Returns the number of elementary polytopes to write the spherocylinder
+// Returns the number of elementary polytopes to write the SpheroCylinder
 // in a Paraview format
-int SpheroCyl::numberOfCells_PARAVIEW() const
+int SpheroCylinder::numberOfCells_PARAVIEW() const
 {
   return ( 2 * ( 4 * m_visuNodeNbPerQar * m_visuNodeNbPerQar ) 
   	+ 4 * m_visuNodeNbPerQar );
@@ -224,7 +224,7 @@ int SpheroCyl::numberOfCells_PARAVIEW() const
 
 // ----------------------------------------------------------------------------
 // Writes a list of points describing the sphere in a Paraview format
-void SpheroCyl::write_polygonsPts_PARAVIEW( ostream& f,
+void SpheroCylinder::write_polygonsPts_PARAVIEW( ostream& f,
   	Transform const& transform, Vector3 const* translation ) const
 {	 	
   double angle = PI / ( 2. * m_visuNodeNbPerQar ) ;
@@ -303,9 +303,9 @@ void SpheroCyl::write_polygonsPts_PARAVIEW( ostream& f,
 
 
 // ----------------------------------------------------------------------------
-// Returns a list of points describing the spherocylinder in a Paraview 
+// Returns a list of points describing the SpheroCylinder in a Paraview 
 // format
-list<Point3> SpheroCyl::get_polygonsPts_PARAVIEW( 
+list<Point3> SpheroCylinder::get_polygonsPts_PARAVIEW( 
 	Transform const& transform,
 	Vector3 const* translation ) const
 {
@@ -388,8 +388,8 @@ list<Point3> SpheroCyl::get_polygonsPts_PARAVIEW(
 
 
 // ----------------------------------------------------------------------------
-// Writes the spherocylinder in a Paraview format
-void SpheroCyl::write_polygonsStr_PARAVIEW( list<int>& connectivity,
+// Writes the SpheroCylinder in a Paraview format
+void SpheroCylinder::write_polygonsStr_PARAVIEW( list<int>& connectivity,
     	list<int>& offsets, list<int>& cellstype, int& firstpoint_globalnumber,
 	int& last_offset ) const
 {
@@ -533,8 +533,8 @@ void SpheroCyl::write_polygonsStr_PARAVIEW( list<int>& connectivity,
 
 
 // ----------------------------------------------------------------------------
-// Returns whether a point lies inside the spherocylinder
-bool SpheroCyl::isIn( Point3 const& pt ) const
+// Returns whether a point lies inside the SpheroCylinder
+bool SpheroCylinder::isIn( Point3 const& pt ) const
 {
   bool isIn = false;
   double halfHeight = 0.5 * m_height, r2 = m_radius * m_radius;
@@ -557,8 +557,8 @@ bool SpheroCyl::isIn( Point3 const& pt ) const
 
 
 // ----------------------------------------------------------------------------
-// Returns the bounding volume to spherocylinder
-BVolume* SpheroCyl::computeBVolume( unsigned int type ) const
+// Returns the bounding volume to SpheroCylinder
+BVolume* SpheroCylinder::computeBVolume( unsigned int type ) const
 {
   BVolume* bvol = NULL;
   if ( type == 1 ) // OBB
@@ -580,14 +580,14 @@ BVolume* SpheroCyl::computeBVolume( unsigned int type ) const
 
 
 // ----------------------------------------------------------------------------
-// Performs advanced comparison of the two spherocylinders and returns 
+// Performs advanced comparison of the two SpheroCylinders and returns 
 // whether they match
-bool SpheroCyl::equalType_level2( Convex const* other ) const
+bool SpheroCylinder::equalType_level2( Convex const* other ) const
 {
-  // We know that other points to a spherocylinder, we dynamically cast it 
+  // We know that other points to a SpheroCylinder, we dynamically cast it 
   // to actual type
-  SpheroCyl const* other_ = 
-  	dynamic_cast<SpheroCyl const*>(other); 
+  SpheroCylinder const* other_ = 
+  	dynamic_cast<SpheroCylinder const*>(other); 
 
   double lmin = min( computeCircumscribedRadius(),
   	other_->computeCircumscribedRadius() ); 
@@ -603,10 +603,10 @@ bool SpheroCyl::equalType_level2( Convex const* other ) const
 
 
 // ----------------------------------------------------------------------------
-// Sets the number of point per quarter of the elementary cylinder perimeter 
-// for Paraview post-processing, i.e., controls the number of facets in the 
-// sphero-cylinder reconstruction in Paraview
-void SpheroCyl::SetvisuNodeNbPerQar( int nbpts )
+// Sets the number of point per quarter of the elementary spherocylinder 
+// perimeter for Paraview post-processing, i.e., controls the number of facets 
+// in the spherocylinder reconstruction in Paraview
+void SpheroCylinder::SetvisuNodeNbPerQar( int nbpts )
 {
   m_visuNodeNbPerQar = nbpts;
 }
@@ -615,8 +615,8 @@ void SpheroCyl::SetvisuNodeNbPerQar( int nbpts )
 
 
 // ----------------------------------------------------------------------------
-// Writes the spherocylinder in an OBJ format
-void SpheroCyl::write_convex_OBJ( ostream& f, Transform  const& transform,
+// Writes the SpheroCylinder in an OBJ format
+void SpheroCylinder::write_convex_OBJ( ostream& f, Transform  const& transform,
     	size_t& firstpoint_number ) const
 {
   double angle = PI / ( 2. * m_visuNodeNbPerQar ) ;
