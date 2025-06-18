@@ -17,7 +17,7 @@ using namespace std;
     compose motions.
 
     @author Institut Francais du Petrole - 2002 - Creation
-    @author D. RAKOTONIRINA - IFP Energies nouvelles - 2014 - Modification 
+    @author D.RAKOTONIRINA - IFP Energies nouvelles - 2014 - Modification 
     @author A.WACHS - 2019 - Major cleaning & refactoring */
 // ============================================================================
 class CompositeObstacle : public Obstacle

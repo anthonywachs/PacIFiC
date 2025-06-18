@@ -10,7 +10,7 @@
 
     A freely moving particle made of multiple glued particles.
 
-    @author D. RAKOTONIRINA - IFP Energies nouvelles - 2014 - Creation
+    @author D.RAKOTONIRINA - IFP Energies nouvelles - 2014 - Creation
     @author A.WACHS - 2021 - Major cleaning & refactoring */
 // ============================================================================
 class CompositeParticle : public Particle

@@ -18,7 +18,7 @@ using namespace std;
     forbidden.
 
     @author Institut Francais du Petrole - 2003 - Creation
-    @author D. RAKOTONIRINA - IFP Energies nouvelles - Oct. 2014
+    @author D.RAKOTONIRINA - IFP Energies nouvelles - Oct. 2014
     - Modification 
     @author A.WACHS - 2019 - Major cleaning & refactoring */
 // ============================================================================
