@@ -6,6 +6,7 @@
 #include "Cell.hh"
 #include "RigidBodyWithCrust.hh"
 #include "Box.hh"
+#include "OBB.hh"
 #include "Grains.hh"
 #include "GrainsExec.hh"
 #include <algorithm>
@@ -1373,6 +1374,8 @@ void LinkedCell::Link( Obstacle* root_obstacle )
   // i.e. cells expanded by a least the maximum circumscribed radius of the
   // largest particle in the simulation, hence guaranteeing that no collision
   // between particles and the obstacle is missed
+  // If the obstacle shape is RECTANGLE2D, we search intersection of its OBB 
+  // with the cell OBB
 
   AppCollision::Link( root_obstacle );
   
@@ -1383,23 +1386,28 @@ void LinkedCell::Link( Obstacle* root_obstacle )
   Point3 const* cg = NULL;
   Point3 obscg;
   bool add = false;
-  size_t i, j, k;
-  double angx, angy, angz;
-  Matrix mrotX, mrotY, mrotZ, mrot;
   
   for (myObs=m_allSimpleObstacles.begin();myObs!=m_allSimpleObstacles.end();
   	myObs++)
   {
     RigidBodyWithCrust* obstacleRBWC = (*myObs)->getRigidBody();
     BBox const* obstacleBBox = (*myObs)->getObstacleBox();
+    OBB obstacleOBB, cellOBB;    
     Vector3 cellBoxExtension( 0.5 * alpha * m_cellsize_X, 
     	0.5 * alpha * m_cellsize_Y,
 	0.5 * alpha * m_cellsize_Z );    
     Convex* cellBox = new Box( 2. * cellBoxExtension[X], 
     	2. * cellBoxExtension[Y],
-    	2. * cellBoxExtension[Z] );
+    	2. * cellBoxExtension[Z] );	
     RigidBodyWithCrust cellBoxRBWC( cellBox, cellPosition, false,
     	(*myObs)->getCrustThickness() );
+	
+    if ( obstacleRBWC->getConvex()->getConvexType() == RECTANGLE2D )
+    {
+      obstacleOBB = *(dynamic_cast<OBB*>(
+    	obstacleRBWC->getConvex()->computeBVolume( 1 )));
+      cellOBB = *(dynamic_cast<OBB*>(cellBox->computeBVolume( 1 )));	
+    }
 
     // Intersection of the cell with the obstacle
     for (int m=0; m<m_nb; m++)
@@ -1415,38 +1423,11 @@ void LinkedCell::Link( Obstacle* root_obstacle )
 	{	  
 	  cellBoxRBWC.setOrigin( (*cg)[X], (*cg)[Y], (*cg)[Z] );
 	  
-	  // Note: to avoid false outcome of isContact in the case of perfectly
-	  // aligned rigid bodies with the faces of the cell box, we perturb
-	  // the angular position of the cell box in the 8 quadrants of the
-	  // Cartesian space
-	  // Example: a Rectangle2D perfectly aligned with the XY, YZ or XZ
-	  // plane, in this case the support function of the cell box may return
-	  // any of the 4 points of the face that is closest to the Rectangle2D
-	  for (i=0;i<2 && !add;++i)
-	  { 
-	    angx = i == 0 ? - LOWEPS : LOWEPS;
-	    mrotX.setValue( 1., 0., 0.,
-	    	0., cos( angx ), - sin( angx ), 
-		0., sin( angx ), cos( angx ) );
-	    for (j=0;j<2 && !add;++j) 
-	    {
-	      angy = j == 0 ? - LOWEPS : LOWEPS;
-	      mrotY.setValue( cos( angy ), 0., sin( angy ), 
-    		0., 1., 0.,
-		- sin( angy ), 0., cos( angy ) );
-	      for (k=0;k<2 && !add;++k) 
-	      {
-	        angz = k == 0 ? - LOWEPS : LOWEPS;
-                mrotZ.setValue( cos( angz ), - sin( angz ), 0., 
-    			sin( angz ), cos( angz ), 0., 
-    			0., 0., 1. );
-		mrot = mrotZ * mrotY;
-		cellBoxRBWC.getTransform()->setBasis( mrot * mrotX );
-	        cellBoxRBWC.initialize_transformWithCrust_to_notComputed();
-	        add = cellBoxRBWC.isContact( *obstacleRBWC );
-	      }
-	    }
-	  }	    
+	  if ( obstacleRBWC->getConvex()->getConvexType() == RECTANGLE2D )
+	    add = isContactBVolume( cellOBB, obstacleOBB, 
+	  	*cellBoxRBWC.getTransform(), *obstacleRBWC->getTransform() );
+	  else
+	    add = cellBoxRBWC.isContact( *obstacleRBWC );
 	}
 	
 	if ( add )
@@ -1579,8 +1560,8 @@ void LinkedCell::LinkUpdate( double time, double dt, SimpleObstacle *myObs )
   // This method is highly sub-optimal for the following two reasons:
   // 1) the whole linked cell grid is searched
   // 2) we use the AABBox of the obstacle such that the geometric intersection
-  // test is faster than relying on GJK, leading to unnecessary cells whenever
-  // the obstacle is not "reasonably" aligned with the coordinate axis
+  // test is faster than relying on GJK or OBB, leading to unnecessary cells 
+  // whenever the obstacle is not "reasonably" aligned with the coordinate axis
 
   if ( myObs->performLinkUpdate() )
   {

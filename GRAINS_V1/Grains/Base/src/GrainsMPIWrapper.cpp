@@ -1661,7 +1661,7 @@ void GrainsMPIWrapper::UpdateClones(double time,
       pClone->setTranslationalVelocity( recvbuf_DOUBLE[j+3],
 	  	recvbuf_DOUBLE[j+4],
 		recvbuf_DOUBLE[j+5] );
-      pClone->setAngularVelocity(recvbuf_DOUBLE[j+10],
+      pClone->setAngularVelocity( recvbuf_DOUBLE[j+10],
 	  	recvbuf_DOUBLE[j+11],
 		recvbuf_DOUBLE[j+12] );
     }

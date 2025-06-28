@@ -39,6 +39,22 @@ OBB::~OBB()
 
 
 
+// ----------------------------------------------------------------------------
+// Equal operator to another OBB
+OBB& OBB::operator = ( OBB const& obb )
+{
+  if ( &obb != this )
+  {
+    m_extent = obb.m_extent;
+    m_initOrientation = obb.m_initOrientation;
+  }
+
+  return ( *this );
+}
+
+
+
+
 // --------------------------------------------------------------------
 // Returns the bounding volume type
 BVolumeType OBB::getBVolumeType() const

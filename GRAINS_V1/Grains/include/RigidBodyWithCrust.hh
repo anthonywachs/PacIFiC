@@ -1,5 +1,5 @@
-#ifndef _FORMEVDW_HH_
-#define _FORMEVDW_HH_
+#ifndef _RIGIDBODYWITHCRUST_HH_
+#define _RIGIDBODYWITHCRUST_HH_
 
 #include "RigidBody.hh"
 #include "ReaderXML.hh"
@@ -14,8 +14,7 @@ class PointContact;
     A combination of a convex shape, a transformation and a surface crust.
 
     @author Institut Francais du Petrole - 2002 - Creation
-    @author D.RAKOTONIRINA - IFP Energies Nouvelles - Sept. 2014
-    - Modification
+    @author D.RAKOTONIRINA - IFP Energies Nouvelles - 2014 - Modification
     @author A.WACHS - 2019 - Major cleaning & refactoring */
 // ============================================================================
 class RigidBodyWithCrust : public RigidBody

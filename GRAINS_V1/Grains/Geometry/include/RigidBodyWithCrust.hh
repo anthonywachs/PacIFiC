@@ -1,5 +1,5 @@
-#ifndef _FORMEVDW_HH_
-#define _FORMEVDW_HH_
+#ifndef _RIGIDBODYWITHCRUST_HH_
+#define _RIGIDBODYWITHCRUST_HH_
 
 #include "RigidBody.hh"
 #include "ReaderXML.hh"

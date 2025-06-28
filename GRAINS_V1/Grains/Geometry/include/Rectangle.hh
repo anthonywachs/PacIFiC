@@ -5,6 +5,17 @@
 #include "ReaderXML.hh"
 
 class Transform;
+
+
+/** @brief Insertion window type */
+enum RectangleVisuExpansion
+{
+  RVE_CENTERED, /**< Centered */
+  RVE_ZPLUS, /**< Expansion in the z+ direction */
+  RVE_ZMINUS /**< Expansion in the z- direction */
+};
+
+
 /** @brief The class Rectangle.
 
     Convex with a rectangular shape.
@@ -18,8 +29,11 @@ class Rectangle : public Convex
     //@{
     /** @brief Constructor with edge length as input parameters
     @param LX edge length in x
-    @param LY edge length in y */
-    Rectangle( double LX = 0., double LY = 0. );
+    @param LY edge length in y 
+    @param pw width in Paraview 
+    @param pwt width rendering in Paraview */
+    Rectangle( double LX, double LY, double pw = 2. * LOWEPS, 
+    	RectangleVisuExpansion pwt = RVE_CENTERED );
 
     /** @brief Constructor with an input stream
     @param fileIn input stream */
@@ -136,9 +150,12 @@ class Rectangle : public Convex
 
     /** @name Parameters*/
     //@{
-    double m_LX; /**< legnth of the X edge */
-    double m_LY; /**< legnth of the Y edge */
+    double m_LX; /**< length of the X edge */
+    double m_LY; /**< length of the Y edge */
     vector<Point3> m_corners; /**< vector of the 4 corners/vertices */
+    double m_ParaviewWidth; /**< width in Paraview */
+    RectangleVisuExpansion m_ParaviewWidth_type; /**< width rendering in 
+    	Paraview */
     //@}
 
 

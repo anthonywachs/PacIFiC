@@ -10,9 +10,12 @@
 
 // ----------------------------------------------------------------------------
 // Constructor with the dimensions of the wall
-Rectangle::Rectangle( double LX, double LY )
+Rectangle::Rectangle( double LX, double LY, double pw, 
+	RectangleVisuExpansion pwt )
   : m_LX( LX )
   , m_LY( LY )
+  , m_ParaviewWidth( pw )
+  , m_ParaviewWidth_type( pwt )
 {
   setCorners();
 }
@@ -35,6 +38,16 @@ Rectangle::Rectangle( DOMNode* root )
 {
   m_LX =  ReaderXML::getNodeAttr_Double( root, "LX" );
   m_LY =  ReaderXML::getNodeAttr_Double( root, "LY" );
+  if ( ReaderXML::hasNodeAttr( root, "ParaviewWidth" ) )
+    m_ParaviewWidth = ReaderXML::getNodeAttr_Double( root, "ParaviewWidth" );
+  else m_ParaviewWidth = 2 * LOWEPS;
+  m_ParaviewWidth_type = RVE_CENTERED;
+  if ( ReaderXML::hasNodeAttr( root, "ParaviewExpand" ) )
+  {
+    string sexp = ReaderXML::getNodeAttr_String( root, "ParaviewExpand" );
+    if ( sexp == "Z+" ) m_ParaviewWidth_type = RVE_ZPLUS;
+    else if ( sexp == "Z-" ) m_ParaviewWidth_type = RVE_ZMINUS;
+  }
   setCorners();
 }
 
@@ -128,8 +141,8 @@ Point3 Rectangle::support( Vector3 const& v ) const
   double s = Norm( v );
   if ( s > EPSILON )
   {
-    return ( Point3( v[X] < 0. ? -m_LX/2. : m_LX/2.,
-                     v[Y] < 0. ? -m_LY/2. : m_LY/2.,
+    return ( Point3( v[X] < 0. ? -m_LX / 2. : m_LX / 2.,
+                     v[Y] < 0. ? -m_LY / 2. : m_LY / 2.,
                      0. ) );
   }
   else
@@ -178,7 +191,9 @@ double Rectangle::getVolume()const
 // Output operator
 void Rectangle::writeShape( ostream& fileOut ) const
 {
-  fileOut << "*Rectangle " << m_LX << " " << m_LY << " *END";
+  fileOut << "*Rectangle " << m_LX << " " << m_LY << " " <<	
+  	m_ParaviewWidth << " " << static_cast<int>(m_ParaviewWidth_type) 
+	<< " *END";
 }
 
 
@@ -188,7 +203,14 @@ void Rectangle::writeShape( ostream& fileOut ) const
 // Input operator
 void Rectangle::readShape( istream& fileIn )
 {
-  fileIn >> m_LX >> m_LY;
+  int nn;
+  fileIn >> m_LX >> m_LY >> m_ParaviewWidth >> nn;
+  switch( nn )
+  {
+    case 0: m_ParaviewWidth_type = RVE_CENTERED; break;
+    case 1: m_ParaviewWidth_type = RVE_ZPLUS; break;    
+    case 2: m_ParaviewWidth_type = RVE_ZMINUS; break;    
+  }
 }
 
 
@@ -235,7 +257,12 @@ void Rectangle::write_polygonsPts_PARAVIEW( ostream& f,
   for ( int i = 0; i < 4; ++i )
   {
     pp = m_corners[i];
-    pp[Z] = - LOWEPS;
+    switch( m_ParaviewWidth_type )
+    {
+      case RVE_CENTERED: pp[Z] = - 0.5 * m_ParaviewWidth; break;
+      case RVE_ZPLUS: pp[Z] = 0.; break;
+      case RVE_ZMINUS: pp[Z] = - m_ParaviewWidth; break;      
+    }
     pp = transform( pp );
     if ( translation ) pp += *translation;
     f << pp[X] << " " << pp[Y] << " " << 
@@ -245,7 +272,12 @@ void Rectangle::write_polygonsPts_PARAVIEW( ostream& f,
   for ( int i = 0; i < 4; ++i )
   {
     pp = m_corners[i];
-    pp[Z] = LOWEPS;  
+    switch( m_ParaviewWidth_type )
+    {
+      case RVE_CENTERED: pp[Z] = 0.5 * m_ParaviewWidth; break;
+      case RVE_ZPLUS: pp[Z] = m_ParaviewWidth; break;
+      case RVE_ZMINUS: pp[Z] = 0.; break;      
+    }
     pp = transform( pp );
     if ( translation ) pp += *translation;
     f << pp[X] << " " << pp[Y] << " " << 
@@ -267,7 +299,12 @@ list<Point3> Rectangle::get_polygonsPts_PARAVIEW( Transform const& transform,
   for ( int i = 0; i < 4; ++i )
   {
     pp = m_corners[i];
-    pp[Z] = - LOWEPS;  
+    switch( m_ParaviewWidth_type )
+    {
+      case RVE_CENTERED: pp[Z] = - 0.5 * m_ParaviewWidth; break;
+      case RVE_ZPLUS: pp[Z] = 0.; break;
+      case RVE_ZMINUS: pp[Z] = - m_ParaviewWidth; break;      
+    }
     pp = transform( pp );
     if ( translation ) pp += *translation;
     ParaviewPoints.push_back( pp );
@@ -275,7 +312,12 @@ list<Point3> Rectangle::get_polygonsPts_PARAVIEW( Transform const& transform,
   for ( int i = 0; i < 4; ++i )
   {
     pp = m_corners[i];
-    pp[Z] = LOWEPS;  
+    switch( m_ParaviewWidth_type )
+    {
+      case RVE_CENTERED: pp[Z] = 0.5 * m_ParaviewWidth; break;
+      case RVE_ZPLUS: pp[Z] = m_ParaviewWidth; break;
+      case RVE_ZMINUS: pp[Z] = 0.; break;      
+    }
     pp = transform( pp );
     if ( translation ) pp += *translation;
     ParaviewPoints.push_back( pp );
@@ -361,7 +403,7 @@ BVolume* Rectangle::computeBVolume( unsigned int type ) const
 {
   BVolume* bvol = NULL;
   if ( type == 1 ) // OBB
-    bvol = new OBB( Vector3( m_LX, m_LY, 0. ), Matrix() );
+    bvol = new OBB( Vector3( m_LX, m_LY, EPSILON ), Matrix() );
   else if ( type == 2 ) // OBC
   {
     bvol = new OBC( sqrt( m_LX * m_LX + m_LY * m_LY ) / 2., 

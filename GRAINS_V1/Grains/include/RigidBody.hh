@@ -25,7 +25,7 @@ class Torsor;
 class RigidBody
 {
   public:
-    /**@name Constructeurs */
+    /**@name Constructors */
     //@{
     /** @brief Default constructor */
     RigidBody();

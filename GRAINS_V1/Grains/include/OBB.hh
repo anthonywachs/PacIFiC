@@ -34,6 +34,7 @@ class OBB : public BVolume
     ~OBB();
     //@}
 
+
     /**@name Methods */
     //@{
     /** @brief Returns the type of the bounding volume */
@@ -60,6 +61,14 @@ class OBB : public BVolume
     @param fileOut output stream */
     void writeShape( ostream& fileOut ) const;
     //@}
+    
+    
+    /**@name Operators */
+    //@{
+    /** @brief Equal operator to another OBB object
+    @param obb the other OBB object */
+    OBB& operator = ( OBB const& obb );     
+    //@}    
 
 
   private:

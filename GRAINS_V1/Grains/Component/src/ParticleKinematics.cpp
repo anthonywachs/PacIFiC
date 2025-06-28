@@ -200,7 +200,9 @@ void ParticleKinematics::setTranslationalVelocity( double const& vx,
 void ParticleKinematics::setAngularVelocity( Vector3 const& omega )
 {
   m_angularVelocity = omega;
-  m_angularVelocity_bf = m_angularVelocity;   
+  Quaternion pConjugue = m_QuaternionRotation.Conjugate();
+  m_angularVelocity_bf = pConjugue.multToVector3( 
+    	( m_angularVelocity , m_QuaternionRotation ) );    
 }
 
 
@@ -214,7 +216,9 @@ void ParticleKinematics::setAngularVelocity( double const& omx,
   m_angularVelocity[X] = omx;
   m_angularVelocity[Y] = omy;  
   m_angularVelocity[Z] = omz;
-  m_angularVelocity_bf = m_angularVelocity; 
+  Quaternion pConjugue = m_QuaternionRotation.Conjugate();
+  m_angularVelocity_bf = pConjugue.multToVector3( 
+    	( m_angularVelocity , m_QuaternionRotation ) );
 }
 
 
