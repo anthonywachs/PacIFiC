@@ -1,0 +1,3 @@
+[submodule "Octree/basilisk"]
+	path = Octree/basilisk
+	url = git@gitlab.math.ubc.ca:colive/pacific-basilisk
