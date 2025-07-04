@@ -24,8 +24,8 @@
 # endif
 
 # include "DLMFD_Output_vtu_foreach.h"
-# include "vtkXMLHyperTreeGrid.h"
-
+//# include "vtkXMLHyperTreeGrid.h"
+# include "vtkHDFHyperTreeGrid.h"
 
 //----------------------------------------------------------------------------
 void output_pvd( FILE* fp, char const* times_series )
@@ -378,56 +378,62 @@ void save_data_vtk( scalar* list, vector* vlist, RigidBody const* allrb,
     strcat( filename_htg, RESULT_FLUID_ROOTFILENAME );
     sprintf( suffix, "_T%d.htg", cycle_number );
     strcat( filename_htg, suffix );
-    vtkXMLHyperTreeGrid *vtk_xml_hypertreegrid = NULL; 
 
-#   if _MPI
-      MPI_File fp;
-      MPI_File_open( MPI_COMM_WORLD, filename_htg,
-                MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &fp );
-      vtk_xml_hypertreegrid =
-      	vtk_xml_hypertreegrid_init( 2, PARAVIEW_DATATYPE_DOUBLE ? 9: 8, 1, 
-		true, list, vlist, time );
-      vtk_xml_hypertreegrid_to_file( vtk_xml_hypertreegrid, fp );
-      vtk_xml_hypertreegrid_free( vtk_xml_hypertreegrid );
-      MPI_File_close( &fp );
-#   else
-      FILE *fp = fopen( filename_htg, "w");
-      if ( PARAVIEW_BINFILE )
-        vtk_xml_hypertreegrid = vtk_xml_hypertreegrid_init( 2, 
-		PARAVIEW_DATATYPE_DOUBLE ? 9: 8, 1, true, list, vlist, time );
-      else 
-        vtk_xml_hypertreegrid = vtk_xml_hypertreegrid_init( 2, 
-		PARAVIEW_DATATYPE_DOUBLE ? 9: 8, 0, false, list, vlist, time );
-      vtk_xml_hypertreegrid_to_file( vtk_xml_hypertreegrid, fp );
-      fclose(fp);
-      vtk_xml_hypertreegrid_free( vtk_xml_hypertreegrid );
-#   endif
+    vtkHDFHyperTreeGrid vtk_hdf = vtk_HDF_hypertreegrid_init(list, vlist, filename_htg);
+    vtk_HDF_hypertreegrid_close(&vtk_hdf);
+
+//    vtkXMLHyperTreeGrid *vtk_xml_hypertreegrid = NULL; 
+
+
+
+// #   if _MPI
+//       MPI_File fp;
+//       MPI_File_open( MPI_COMM_WORLD, filename_htg,
+//                 MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &fp );
+//       vtk_xml_hypertreegrid =
+//       	vtk_xml_hypertreegrid_init( 2, PARAVIEW_DATATYPE_DOUBLE ? 9: 8, 1, 
+// 		true, list, vlist, time );
+//       vtk_xml_hypertreegrid_to_file( vtk_xml_hypertreegrid, fp );
+//       vtk_xml_hypertreegrid_free( vtk_xml_hypertreegrid );
+//       MPI_File_close( &fp );
+// #   else
+//       FILE *fp = fopen( filename_htg, "w");
+//       if ( PARAVIEW_BINFILE )
+//         vtk_xml_hypertreegrid = vtk_xml_hypertreegrid_init( 2, PARAVIEW_DATATYPE_DOUBLE ? 9: 8, 1, true, list, vlist, time );
+//       else 
+//         vtk_xml_hypertreegrid = vtk_xml_hypertreegrid_init( 2, PARAVIEW_DATATYPE_DOUBLE ? 9: 8, 0, false, list, vlist, time );
+//       vtk_xml_hypertreegrid_to_file( vtk_xml_hypertreegrid, fp );
+//       fclose(fp);
+//       vtk_xml_hypertreegrid_free( vtk_xml_hypertreegrid );
+// #   endif
          
     // Write the PVD file  
-    if ( pid() == 0 ) 
-    {  
-      sprintf( filename_pvd, "%s", RESULT_DIR );
-      strcat( filename_pvd, "/" );  
-      strcat( filename_pvd, RESULT_FLUID_ROOTFILENAME );
-      strcat( filename_pvd, "_htg.pvd" ); 
+    // if ( pid() == 0 ) 
+    // {  
+    //   sprintf( filename_pvd, "%s", RESULT_DIR );
+    //   strcat( filename_pvd, "/" );  
+    //   strcat( filename_pvd, RESULT_FLUID_ROOTFILENAME );
+    //   strcat( filename_pvd, "_htg.pvd" ); 
 
-      fpvtk = fopen( filename_pvd, "w" );
+    //   fpvtk = fopen( filename_pvd, "w" );
 
-      char time_line[200] = "";
-      strcpy( time_line, "<DataSet timestep=" );
-      sprintf( suffix, "\"%.4e\"", time );
-      strcat( time_line, suffix );
-      strcat( time_line, " group=\"\" part=\"0\" file=\"" );
-      strcpy( filename_htg, RESULT_FLUID_ROOTFILENAME );
-      sprintf( suffix, "_T%d.htg", cycle_number );     
-      strcat( filename_htg, suffix );        
-      strcat( time_line, filename_htg );        
-      strcat( time_line, "\"/>\n" );  
-      strcat( htg_field_times_series, time_line );    
-      output_pvd( fpvtk, htg_field_times_series );
+    //   char time_line[200] = "";
+    //   strcpy( time_line, "<DataSet timestep=" );
+    //   sprintf( suffix, "\"%.4e\"", time );
+    //   strcat( time_line, suffix );
+    //   strcat( time_line, " group=\"\" part=\"0\" file=\"" );
+    //   strcpy( filename_htg, RESULT_FLUID_ROOTFILENAME );
+    //   sprintf( suffix, "_T%d.htg", cycle_number );     
+    //   strcat( filename_htg, suffix );        
+    //   strcat( time_line, filename_htg );        
+    //   strcat( time_line, "\"/>\n" );  
+    //   strcat( htg_field_times_series, time_line );    
+    //   output_pvd( fpvtk, htg_field_times_series );
   
-      fclose( fpvtk );
-    }
+    //   fclose( fpvtk );
+    // }
+
+
 # endif
     
   
