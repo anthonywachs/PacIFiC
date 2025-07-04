@@ -459,7 +459,7 @@ void Grains::Simulation( double time_interval )
 void Grains::computeParticlesForceAndTorque()
 {
   // Initiliaze all component transforms with crust to non computed
-  m_allcomponents.InitializeRBTransformWithCrustState( m_time, m_dt );
+  m_allcomponents.Initialize_RBWCTransformState( m_time, m_dt );
 
   // Initialize contact maps (for contact model with memory)
   // TODO: add if-statement that bypasses this step when contact model has

@@ -215,7 +215,9 @@ class TrilobeCylinder : public CompositeParticle
     double m_height; /**< Height */       
     static int m_visuNodeNbPerHalf; /**< number of points over 
     	the circular perimeter of each half cylinder (half of a cricle ) 
-	for Paraview post-processing */	
+	for Paraview post-processing */
+    static bool m_minParaview; /**< minimize the number of elementary
+    	polyhedrons needed to visualize the shape in Paraview */	
     //@}
 
     /**@name Constructors */

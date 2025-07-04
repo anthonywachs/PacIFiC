@@ -192,7 +192,6 @@ void RawDataPostProcessingWriter::one_output_MPI( double const& time,
     m_angular_velocity_x << stime;
     m_angular_velocity_y << stime;
     m_angular_velocity_z << stime;
-    m_angular_velocity_z << stime;
   }
 
   // Write in files: inactive particles are assigned 0 values and values are

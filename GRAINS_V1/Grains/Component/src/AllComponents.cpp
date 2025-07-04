@@ -324,8 +324,7 @@ void AllComponents::InitializeForces( double time, double dt,
 
 // ----------------------------------------------------------------------------
 // Initializes the transformation with crust of all components to not computed
-void AllComponents::InitializeRBTransformWithCrustState( double time,
-	double dt )
+void AllComponents::Initialize_RBWCTransformState( double time, double dt )
 {
   list<Particle*>::iterator particle;
 

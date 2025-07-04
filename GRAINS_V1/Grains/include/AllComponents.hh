@@ -47,7 +47,7 @@ enum CloneInReload
 
     Manages all rigid components in the simulation.
 
-    @author G.FERRER - Institut Francais du Petrole - 1999 - Creation
+    @author Institut Francais du Petrole - 1999 - Creation
     @author A.WACHS - 2019 - Major cleaning & refactoring */
 // ============================================================================
 class AllComponents
@@ -92,11 +92,12 @@ class AllComponents
     @param withWeight with or without particle weight */
     void InitializeForces( double time, double dt, bool const& withWeight );
 
-    /** @brief Initializes the transformation with crust of all components to not
-    computed
+    /** @brief Initializes the transformation with crust of all components to 
+    not computed
     @param time physical time
     @param dt time step magnitude */
-    void InitializeRBTransformWithCrustState( double time, double dt );
+    void Initialize_RBWCTransformState( double time, 
+    	double dt );
 
     /** @brief Computes all particles weight
     @param time physical time

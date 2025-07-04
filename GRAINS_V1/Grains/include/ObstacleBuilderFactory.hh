@@ -12,7 +12,7 @@ class Obstacle;
 
     Creates the appropriate obstacle depending on options.
 
-    @author G.FERRER - Institut Francais du Petrole - 2003 - Creation 
+    @author Institut Francais du Petrole - 2003 - Creation 
     @author A.WACHS - 2019 - Major cleaning & refactoring */
 // ============================================================================
 class ObstacleBuilderFactory

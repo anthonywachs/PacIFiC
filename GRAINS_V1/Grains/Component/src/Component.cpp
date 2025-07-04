@@ -558,8 +558,8 @@ Vector3 Component::lookupCollision( int _id ) const
 
 
 // ----------------------------------------------------------------------------
-// Increments the coordination number by nc
-void Component::addToCoordinationNumber( int const& nc )
+// Adds a contacting component ID to the set of contacting component IDs
+void Component::addContactingComponentID( int const& id )
 {}
 
 

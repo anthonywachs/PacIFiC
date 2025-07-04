@@ -13,7 +13,7 @@ using namespace std;
     Convex with a polygonal/polyedral shape. From GJK Engine - A Fast and 
     Robust GJK Implementation, Copyright (C) 1998  Gino van den Bergen.
     
-    @author D.PETIT - Institut Francais du Petrole - 2000 - Creation 
+    @author Institut Francais du Petrole - 2000 - Creation 
     @author A.WACHS - 2019 - Major cleaning & refactoring */
 // ============================================================================
 class Polytope : public Convex 

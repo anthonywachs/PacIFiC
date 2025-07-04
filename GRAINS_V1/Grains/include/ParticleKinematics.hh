@@ -23,7 +23,7 @@ ostream& operator << ( ostream& fileOut,
 
     Manages the particle kinematics.
 
-    @author G.FERRER - Institut Francais du Petrole - 2000 - Creation 
+    @author Institut Francais du Petrole - 2000 - Creation 
     @author A.WACHS - 2019 - Major cleaning & refactoring */
 // ============================================================================
 class ParticleKinematics : public Kinematics

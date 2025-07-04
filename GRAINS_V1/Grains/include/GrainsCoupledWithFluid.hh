@@ -14,7 +14,7 @@ using namespace std;
     Grains3D application coupled to a fluid flow to describe the dynamics
     of immersed rigid bodies.
 
-    @author G.FERRER - Institut Francais du Petrole - 2003 - Creation 
+    @author Institut Francais du Petrole - 2003 - Creation 
     @author A.WACHS - 2021 - Major cleaning & refactoring */
 // ============================================================================
 class GrainsCoupledWithFluid : virtual public Grains

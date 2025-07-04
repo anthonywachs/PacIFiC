@@ -10,7 +10,7 @@
 #include "Superquadric.hh"
 #include "Rectangle.hh"
 #include "TrapezoidalPrism.hh"
-#include "SpheroCyl.hh"
+#include "SpheroCylinder.hh"
 #include "SpheroCylindricalPrism.hh"
 #include "TruncatedCone.hh"
 
@@ -38,7 +38,7 @@ Convex* ConvexBuilderFactory::create( DOMNode* root )
   else if ( type == "TrapezoidalPrism" ) 
     convex = new TrapezoidalPrism( element );  
   else if ( type == "SpheroCylinder" || type == "SpheroCyl" ) 
-    convex = new SpheroCyl( element ); 
+    convex = new SpheroCylinder( element ); 
   else if ( type == "SpheroCylindricalPrism" ) 
     convex = new SpheroCylindricalPrism( element );
   else if ( type == "TruncatedCone" ) 
@@ -71,7 +71,7 @@ Convex* ConvexBuilderFactory::create( string& type, istream& fileIn )
   else if ( type == "*TrapezoidalPrism" ) 
     convex = new TrapezoidalPrism( fileIn ); 
   else if ( type == "*SpheroCylinder" || type == "*SpheroCyl" ) 
-    convex = new SpheroCyl( fileIn );
+    convex = new SpheroCylinder( fileIn );
   else if ( type == "*SpheroCylindricalPrism" ) 
     convex = new SpheroCylindricalPrism( fileIn ); 
   else if ( type == "*TruncatedCone" ) 

@@ -19,7 +19,7 @@ enum ShapeType {
     implemented in Grains3D. From GJK Engine - A Fast and Robust GJK
     Implementation, Copyright (C) 1998  Gino van den Bergen.
 
-    @author F.PRADEL - Institut Francais du Petrole - 2000 - Modification 
+    @author Institut Francais du Petrole - 2000 - Modification 
     @author A.WACHS - 2019 - Major cleaning & refactoring */
 // ============================================================================
 class Shape 

@@ -14,7 +14,7 @@ class Convex;
     Creates the appropriate particle kinematics depending on the space 
     dimension and the rigid body shape.
 
-    @author G.FERRER - Institut Francais du Petrole - 2003 - Creation 
+    @author Institut Francais du Petrole - 2003 - Creation 
     @author A.WACHS - 2019 - Major cleaning & refactoring */
 // ============================================================================
 class KinematicsBuilderFactory

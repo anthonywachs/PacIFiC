@@ -19,7 +19,7 @@ class PeriodicObstacle;
 
     A simple obstacle is an obstacle composed of a single convex rigid body.
 
-    @author G.FERRER - Institut Francais du Petrole - 2002 - Creation
+    @author Institut Francais du Petrole - 2002 - Creation
     @author A.WACHS - 2019 - Major cleaning & refactoring */
 // ============================================================================
 class SimpleObstacle : public Obstacle

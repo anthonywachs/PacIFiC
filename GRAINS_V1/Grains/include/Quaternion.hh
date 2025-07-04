@@ -20,7 +20,7 @@ istream& operator >> (istream& fileIn, Quaternion& q );
     A quaternion in a 3D space, i.e., a scalar w plus a Vector3 vector vqt
     as [ w, vqt ].
 
-    @author F.PRADEL - Institut Francais du Petrole - 2000 - Modification
+    @author Institut Francais du Petrole - 2000 - Modification
     @author A.WACHS  - 2019 - Modification */
 // ============================================================================
 class Quaternion

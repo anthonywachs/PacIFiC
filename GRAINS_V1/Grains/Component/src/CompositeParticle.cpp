@@ -402,7 +402,7 @@ int CompositeParticle::numberOfCells_PARAVIEW() const
 // ----------------------------------------------------------------------------
 // Writes the points describing the composite particle in a Paraview format
 void CompositeParticle::write_polygonsPts_PARAVIEW( ostream& f,
-	Vector3 const* translation )const
+	Vector3 const* translation ) const
 {
   for ( size_t i=0; i<m_nbElemPart; ++i )
     m_elementaryParticles[i]->write_polygonsPts_PARAVIEW( f, translation ) ;
@@ -772,8 +772,10 @@ void CompositeParticle::InterAction( Component* voisin,
       		->computeForces( (*il)->p0, (*il)->p1, (*il)->ContactPoint,
 		LC, dt, nbContact ) )
       {
-        (*il)->p0->getMasterComponent()->addToCoordinationNumber( 1 );
-        (*il)->p1->getMasterComponent()->addToCoordinationNumber( 1 );
+        (*il)->p0->getMasterComponent()->addContactingComponentID( 
+		(*il)->p1->getMasterComponent()->getID() );
+        (*il)->p1->getMasterComponent()->addContactingComponentID( 
+		(*il)->p0->getMasterComponent()->getID() );
       }
       delete *il;
     }

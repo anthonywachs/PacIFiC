@@ -1,140 +1,113 @@
 #ifndef _SPHEROCYLINDER_HH_
 #define _SPHEROCYLINDER_HH_
 
-#include "CompositeParticle.hh"
+#include "Convex.hh"
+#include "ReaderXML.hh"
+#include "Vector3.hh"
+#include "Transform.hh"
+#include "Error.hh"
+using namespace solid;
+
+class Transform;
 
 
 /** @brief The class SpheroCylinder.
 
-    A freely moving sphero-cylinder.
+    Convex with a SpheroCylinder shape. 
 
-    @author A.WACHS - 2023 - Creation */
+    @author A.WACHS - 2024 - Creation */
 // ============================================================================
-class SpheroCylinder : public CompositeParticle
+class SpheroCylinder : public Convex
 {
   public:
-    /**@name Constructors & Destructor */
+    /** @name Constructors */
     //@{
-    /** @brief Constructor with autonumbering as input parameter
-    @param autonumbering whether to increment the component indexing */
-    SpheroCylinder( bool const& autonumbering = true );
+    /** @brief Constructor with radius and height as input parameters
+    @param r radius of the elementary cylinder and the two spherical caps
+    @param h height of the elementary cylinder */
+    SpheroCylinder( double r, double h );
 
-    /** @brief Constructor with an XML node as an input parameter. This
-    constructor is expected to be used for reference composite particles
-    @param root XML node
-    @param autonumbering whether to increment the component indexing
-    @param pc particle class */
-    SpheroCylinder( DOMNode* root, bool const& autonumbering = true,
-  	int const& pc = 0 );
+    /** @brief Constructor with an input stream
+    @param fileIn input stream */
+    SpheroCylinder( istream& fileIn );
 
-    /** @brief Constructor with input parameters
-    @param id_ ID number
-    @param ParticleRef reference particle
-    @param vx x translational velocity component
-    @param vy y translational velocity component
-    @param vz z translational velocity component
-    @param rx x angular velocity component
-    @param ry y angular velocity component
-    @param rz z angular velocity component
-    @param qrotationx x rotation quaternion component
-    @param qrotationy y rotation quaternion component
-    @param qrotationz z rotation quaternion component
-    @param qrotations scalar rotation quaternion component
-    @param m particle position & configuration as a 1D array
-    @param activ particle activity
-    @param tag_ tag of the cell the particle belongs to
-    @param coordination_number_ particle coordination number
-    @param updatePosition whether we update position or not */
-    SpheroCylinder( int const& id_, Particle const* ParticleRef,
-	double const& vx, double const& vy, double const& vz,
-	double const& qrotationx, double const& qrotationy,
-	double const& qrotationz, double const& qrotations,
-	double const& rx, double const& ry, double const& rz,
-	const double m[12],
-	ParticleActivity const& activ,
-	int const& tag_,
-	int const& coordination_number_ = 0,
- 	bool const& updatePosition = false );
-
-    /** @brief Constructor with input parameters. This constructor is expected
-    to be used for periodic clone particle
-    @param id_ ID number
-    @param ParticleRef reference particle
-    @param vtrans translational velocity
-    @param vrot angular velocity
-    @param qrot rotation quaternion
-    @param config particle transformation
-    @param activ particle activity */
-    SpheroCylinder( int const& id_, Particle const* ParticleRef,
-	Vector3 const& vtrans,
-	Quaternion const& qrot,
-	Vector3 const& vrot,
-	Transform const& config,
-	ParticleActivity const& activ );
-
-    /** @brief Copy constructor (the torsor is initialized to 0)
-    @param other copied SpheroCylinder object */
-    SpheroCylinder( SpheroCylinder const& other );
+    /** @brief Constructor with an XML node as an input parameter
+    @param root XML node */
+    SpheroCylinder( DOMNode* root );
 
     /** @brief Destructor */
-    virtual ~SpheroCylinder();
+    ~SpheroCylinder();
     //@}
 
 
-    /**@name Methods */
+    /** @name Methods */
     //@{
-    /** @brief Creates a clone of the composite particle. This method calls
-    the standard copy constructor and is used for new composite particles to be
-    inserted in the simulation. Numbering is automatic, total number of
-    components is incremented by 1 and activity is set to WAIT. The calling
-    object is expected to be a reference composite particle */
-    Particle* createCloneCopy() const ;
+    /** @brief Computes the inertia tensor and the inverse of the inertia tensor
+    @param inertia inertia tensor
+    @param inertia_1 inverse of the inertia tensor */
+    bool BuildInertia( double* inertia, double* inertia_1 ) const;
 
-    /** @brief Creates a clone of the composite particle. This method calls the
-    constructor SpheroCylinder( int const& id_, Particle const* ParticleRef,
-    Vector3 const& vtrans, Quaternion const& qrot, Vector3 const& vrot,
-    Transform const& config, ParticleActivity const& activ ) and is used for
-    periodic clone composite particles to be inserted in the simulation.
-    Numbering is set with the parameter id_ and total number of components left
-    unchanged.
-    @param id_ ID number
-    @param ParticleRef reference particle
-    @param vtrans translational velocity
-    @param vrot angular velocity
-    @param qrot rotation quaternion
-    @param config particle transformation
-    @param activ particle activity */
-    Particle* createCloneCopy( int const& id_,
-    	Particle const* ParticleRef, Vector3 const& vtrans,
-	Quaternion const& qrot,	Vector3 const& vrot,
-	Transform const& config, ParticleActivity const& activ ) const ;
-    //@}
+    /** @brief Returns a clone of the SpheroCylinder */
+    Convex* clone() const;
 
+    /** @brief Returns the convex type */
+    ConvexType getConvexType() const;
 
-    /**@name Methods I/O */
-    //@{
-    /** @brief Returns the number of points to write the composite particle in a
+    /** @brief Returns a vector of points describing the surface of the 
+    SpheroCylinder */
+    vector<Point3> getEnvelope() const;
+
+    /** @brief Returns a pointer to a 2D array describing the relationship
+    between the face indices and the point indices. Returns a null pointer as a
+    convention */
+    vector<vector<int> > const* getFaces() const;
+
+    /** @brief Returns the number of vertices/corners or a code corresponding to
+    a specific convex shape. Here returns the code 3333 */
+    int getNbCorners() const;
+
+    /** @brief Returns the SpheroCylinder volume */
+    double getVolume() const;
+
+    /** @brief Output operator
+    @param fileOut output stream */
+    void writeShape( ostream &fileOut ) const;
+
+    /** @brief Input operator
+    @param fileIn input stream */
+    void readShape( istream &fileIn );
+
+    /** @brief SpheroCylinder support function, returns the support point P,
+    i.e. the point on the surface of the SpheroCylinder that satisfies 
+    max(P.v)
+    @param v direction vector */
+    Point3 support( Vector3 const& v ) const;
+
+    /** @brief Returns the number of points to write the SpheroCylinder in a
     Paraview format */
     int numberOfPoints_PARAVIEW() const;
 
-    /** @brief Returns the number of elementary polytopes to write the
-    composite particle shape in a Paraview format */
+    /** @brief Returns the number of elementary polytopes to write the 
+    SpheroCylinder in a Paraview format */
     int numberOfCells_PARAVIEW() const;
 
-    /** @brief Writes the points describing the composite particle in a
+    /** @brief Writes a list of points describing the SpheroCylinder in a
     Paraview format
     @param f output stream
+    @param transform geometric transformation
     @param translation additional center of mass translation */
     void write_polygonsPts_PARAVIEW( ostream& f,
+  	Transform const& transform,
   	Vector3 const* translation = NULL ) const;
 
-    /** @brief Returns a list of points describing the component in a
+    /** @brief Returns a list of points describing the SpheroCylinder in a
     Paraview format
+    @param transform geometric transformation
     @param translation additional center of mass translation */
-    list<Point3> get_polygonsPts_PARAVIEW(
+    list<Point3> get_polygonsPts_PARAVIEW( Transform const& transform,
   	Vector3 const* translation = NULL ) const;
 
-    /** @brief Writes the composite particle in a Paraview format
+    /** @brief Writes the SpheroCylinder in a Paraview format
     @param connectivity connectivity of Paraview polytopes
     @param offsets connectivity offsets
     @param cellstype Paraview polytopes type
@@ -142,40 +115,53 @@ class SpheroCylinder : public CompositeParticle
     @param last_offset last offset used for the previous convex shape */
     void write_polygonsStr_PARAVIEW( list<int>& connectivity,
     	list<int>& offsets, list<int>& cellstype, int& firstpoint_globalnumber,
-	int& last_offset ) const ;
+	int& last_offset ) const;
 
-    /**  @brief Outputs information to be transferred to the fluid
-    @param fluid output stream */
-    void writePositionInFluid( ostream& fluid );
-    //@}
+    /** @ brief Returns whether a point lies inside the SpheroCylinder
+    @param pt point */
+    bool isIn( Point3 const& pt ) const;
+    
+    /** @brief Writes the SpheroCylinder in an OBJ format
+    @param f output stream
+    @param transform geometric transformation 
+    @param firstpoint_number number of the 1st point */
+    void write_convex_OBJ( ostream& f, Transform const& transform,
+    	size_t& firstpoint_number ) const;    
 
-
-    /**@name Accessors */
-    //@{
-    /** @brief Returns the number of corners of the rigib body shape and a code
-    describing the rigid body shape */
-    int getNbCorners() const;
+    /** @ Returns the bounding volume to SpheroCylinder */
+    BVolume* computeBVolume( unsigned int type ) const;
+    
+    /** @brief Performs advanced comparison of the SpheroCylinders and 
+    returns whether they match
+    @param other the other SpheroCylinder */
+    bool equalType_level2( Convex const* other ) const;
+    
+    /** @brief Sets the number of points per quarter of the elementary 
+    spherocylinder perimeter for Paraview post-processing, i.e., controls the 
+    number of facets in the spherocylinder reconstruction in Paraview
+    @param nbpts number of point per quarter of the elementary cylinder 
+    perimeter */
+    static void SetvisuNodeNbPerQar( int nbpts );        
     //@}
 
 
   protected:
-
-
-  private:
-    /** @name Parameters */
+    /**@name Methods */
     //@{
-    double m_height; /**< Height of the elementary cylinder */
-    double m_radius; /**< Radius of the elementary cylinder and the two
-    	spherical caps */
-    static int m_visuNodeNbPerQar; /**< number of points over a quarter of 
-    	the circular perimeter of the sphero-cylinder for Paraview 
-	post-processing */	
+    /** @brief Returns the circumscribed radius of the reference spherocylinder,
+    i.e., without applying any transformation */
+    double computeCircumscribedRadius() const;
     //@}
 
-    /**@name Constructors */
+
+    /** @name Parameters */
     //@{
-    /** @brief Default constructor */
-    SpheroCylinder();
+    double m_radius; /**< Radius of the elementary cylinder and the two
+    	spherical caps */
+    double m_height; /**< Height of the elementary cylinder */
+    static int m_visuNodeNbPerQar; /**< number of points over a quarter of 
+    	the circular perimeter of the spherocylinder for Paraview 
+	post-processing */	
     //@}
 };
 

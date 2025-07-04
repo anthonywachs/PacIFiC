@@ -13,6 +13,7 @@
 #include <algorithm>
 
 int TrilobeCylinder::m_visuNodeNbPerHalf = 16;
+bool TrilobeCylinder::m_minParaview = false;
 
 
 // ----------------------------------------------------------------------------
@@ -68,12 +69,20 @@ TrilobeCylinder::TrilobeCylinder( DOMNode* root, int const& pc )
   m_geoRBWC->setCrustThickness( crust_thickness ); 
 
   // Material
-  DOMNode* material_ = ReaderXML::getNode( root, "Material" );
-  if ( material_ )
+  DOMNode* nmaterial = ReaderXML::getNode( root, "Material" );
+  if ( nmaterial )
   {
-    m_materialName = ReaderXML::getNodeValue_String( material_ );
+    m_materialName = ReaderXML::getNodeValue_String( nmaterial );
     ContactBuilderFactory::defineMaterial( m_materialName, false );
   }
+  
+  // Paraview
+  DOMNode* npar = ReaderXML::getNode( root, "Paraview" );
+  if ( npar )
+  {
+    string spar = ReaderXML::getNodeAttr_String( npar, "Minimize" );
+    if ( spar == "True" ) m_minParaview = true;
+  }  
 
   // Angular position of the composite particle
   m_geoRBWC->getTransform()->load( root );
@@ -272,7 +281,10 @@ Particle* TrilobeCylinder::createCloneCopy( int const& id_,
 // Paraview format
 int TrilobeCylinder::numberOfPoints_PARAVIEW() const
 {
- return ( int(m_nbElemPart) * ( 2 * m_visuNodeNbPerHalf + 8 ) );  
+  if ( m_minParaview )
+    return ( int(m_nbElemPart) * ( 2 * m_visuNodeNbPerHalf + 8 ) ); 
+  else
+    return ( CompositeParticle::numberOfPoints_PARAVIEW() ); 
 }
 
 
@@ -283,7 +295,10 @@ int TrilobeCylinder::numberOfPoints_PARAVIEW() const
 // composite particle shape in a Paraview format
 int TrilobeCylinder::numberOfCells_PARAVIEW() const
 {  
-  return ( int(m_nbElemPart) * ( m_visuNodeNbPerHalf + 1 ) );   
+  if ( m_minParaview )
+    return ( int(m_nbElemPart) * ( m_visuNodeNbPerHalf + 1 ) );
+  else
+    return ( CompositeParticle::numberOfCells_PARAVIEW() );       
 }
 
 
@@ -294,77 +309,82 @@ int TrilobeCylinder::numberOfCells_PARAVIEW() const
 void TrilobeCylinder::write_polygonsPts_PARAVIEW( ostream& f,
 	Vector3 const* translation )const
 { 
-  Point3 pp, p;
-  double dtheta = PI / m_visuNodeNbPerHalf, tstartright = - 0.5 * PI;
+  if ( m_minParaview )
+  {  
+    Point3 pp, p;
+    double dtheta = PI / m_visuNodeNbPerHalf, tstartright = - 0.5 * PI;
 
-  for (size_t m=0;m<m_nbElemPart;++m)
-  {
-    Transform const* transform = m_elementaryParticles[m]->getRigidBody()
+    for (size_t m=0;m<m_nbElemPart;++m)
+    {
+      Transform const* transform = m_elementaryParticles[m]->getRigidBody()
   	->getTransform();
  
-    // Half cylinder
-    // Lower disk rim
-    p[Y] = - 0.5 * m_height;
-    for (int i=0;i<m_visuNodeNbPerHalf+1;++i)
-    {
-      p[X] = m_radius * cos ( tstartright + i * dtheta ) + 0.5 * m_armLength;
-      p[Z] = m_radius * sin ( tstartright + i * dtheta );
+      // Half cylinder
+      // Lower disk rim
+      p[Y] = - 0.5 * m_height;
+      for (int i=0;i<m_visuNodeNbPerHalf+1;++i)
+      {
+        p[X] = m_radius * cos ( tstartright + i * dtheta ) + 0.5 * m_armLength;
+        p[Z] = m_radius * sin ( tstartright + i * dtheta );
+        pp = (*transform)( p );
+        if ( translation ) pp += *translation;
+        f << pp[X] << " " << pp[Y] << " " << pp[Z] << endl;
+      }
+
+      // Upper disk rim
+      p[Y] = 0.5 * m_height;
+      for (int i=0;i<m_visuNodeNbPerHalf+1;++i)
+      {
+        p[X] = m_radius * cos ( tstartright + i * dtheta ) + 0.5 * m_armLength;
+        p[Z] = m_radius * sin ( tstartright + i * dtheta );
+        pp = (*transform)( p );
+        if ( translation ) pp += *translation;
+        f << pp[X] << " " << pp[Y] << " " << pp[Z] << endl;
+      }
+
+      // Lower disk center
+      p[X] = 0.5 * m_armLength;
+      p[Y] = - 0.5 * m_height;
+      p[Z] = 0.;
       pp = (*transform)( p );
       if ( translation ) pp += *translation;
       f << pp[X] << " " << pp[Y] << " " << pp[Z] << endl;
-    }
 
-    // Upper disk rim
-    p[Y] = 0.5 * m_height;
-    for (int i=0;i<m_visuNodeNbPerHalf+1;++i)
-    {
-      p[X] = m_radius * cos ( tstartright + i * dtheta ) + 0.5 * m_armLength;
-      p[Z] = m_radius * sin ( tstartright + i * dtheta );
+      // Upper disk center
+      p[Y] = 0.5 * m_height;
       pp = (*transform)( p );
       if ( translation ) pp += *translation;
       f << pp[X] << " " << pp[Y] << " " << pp[Z] << endl;
-    }
-
-    // Lower disk center
-    p[X] = 0.5 * m_armLength;
-    p[Y] = - 0.5 * m_height;
-    p[Z] = 0.;
-    pp = (*transform)( p );
-    if ( translation ) pp += *translation;
-    f << pp[X] << " " << pp[Y] << " " << pp[Z] << endl;
-
-    // Upper disk center
-    p[Y] = 0.5 * m_height;
-    pp = (*transform)( p );
-    if ( translation ) pp += *translation;
-    f << pp[X] << " " << pp[Y] << " " << pp[Z] << endl;
     
-    // Lower corners
-    p[X] = - 0.5 * m_armLength;
-    p[Y] = - 0.5 * m_height;
-    p[Z] = - m_radius;
-    pp = (*transform)( p );
-    if ( translation ) pp += *translation;
-    f << pp[X] << " " << pp[Y] << " " << pp[Z] << endl;
+      // Lower corners
+      p[X] = - 0.5 * m_armLength;
+      p[Y] = - 0.5 * m_height;
+      p[Z] = - m_radius;
+      pp = (*transform)( p );
+      if ( translation ) pp += *translation;
+      f << pp[X] << " " << pp[Y] << " " << pp[Z] << endl;
     
-    p[Z] = m_radius;
-    pp = (*transform)( p );
-    if ( translation ) pp += *translation;
-    f << pp[X] << " " << pp[Y] << " " << pp[Z] << endl;
+      p[Z] = m_radius;
+      pp = (*transform)( p );
+      if ( translation ) pp += *translation;
+      f << pp[X] << " " << pp[Y] << " " << pp[Z] << endl;
     
-    // Upper corners
-    p[X] = - 0.5 * m_armLength;
-    p[Y] = 0.5 * m_height;
-    p[Z] = - m_radius;
-    pp = (*transform)( p );
-    if ( translation ) pp += *translation;
-    f << pp[X] << " " << pp[Y] << " " << pp[Z] << endl;
+      // Upper corners
+      p[X] = - 0.5 * m_armLength;
+      p[Y] = 0.5 * m_height;
+      p[Z] = - m_radius;
+      pp = (*transform)( p );
+      if ( translation ) pp += *translation;
+      f << pp[X] << " " << pp[Y] << " " << pp[Z] << endl;
     
-    p[Z] = m_radius;
-    pp = (*transform)( p );
-    if ( translation ) pp += *translation;
-    f << pp[X] << " " << pp[Y] << " " << pp[Z] << endl;                   
-  }          
+      p[Z] = m_radius;
+      pp = (*transform)( p );
+      if ( translation ) pp += *translation;
+      f << pp[X] << " " << pp[Y] << " " << pp[Z] << endl;                   
+    } 
+  }
+  else
+    CompositeParticle::write_polygonsPts_PARAVIEW( f, translation );         
 }
 
 
@@ -376,79 +396,86 @@ list<Point3> TrilobeCylinder::get_polygonsPts_PARAVIEW(
 	Vector3 const* translation ) const
 {
   list<Point3> ParaviewPoints;
-  Point3 pp, p;
-  double dtheta = PI / m_visuNodeNbPerHalf, tstartright = - 0.5 * PI;
+  
+  if ( m_minParaview )
+  { 
+    Point3 pp, p;
+    double dtheta = PI / m_visuNodeNbPerHalf, tstartright = - 0.5 * PI;
 
-  for (size_t m=0;m<m_nbElemPart;++m)
-  {
-    Transform const* transform = m_elementaryParticles[m]->getRigidBody()
+    for (size_t m=0;m<m_nbElemPart;++m)
+    {
+      Transform const* transform = m_elementaryParticles[m]->getRigidBody()
   	->getTransform();
  
-    // Half cylinder
-    // Lower disk rim
-    p[Y] = - 0.5 * m_height;
-    for (int i=0;i<m_visuNodeNbPerHalf+1;++i)
-    {
-      p[X] = m_radius * cos ( tstartright + i * dtheta ) + 0.5 * m_armLength;
-      p[Z] = m_radius * sin ( tstartright + i * dtheta );
+      // Half cylinder
+      // Lower disk rim
+      p[Y] = - 0.5 * m_height;
+      for (int i=0;i<m_visuNodeNbPerHalf+1;++i)
+      {
+        p[X] = m_radius * cos ( tstartright + i * dtheta ) + 0.5 * m_armLength;
+        p[Z] = m_radius * sin ( tstartright + i * dtheta );
+        pp = (*transform)( p );
+        if ( translation ) pp += *translation;
+        ParaviewPoints.push_back( pp );
+      }
+
+      // Upper disk rim
+      p[Y] = 0.5 * m_height;
+      for (int i=0;i<m_visuNodeNbPerHalf+1;++i)
+      {
+        p[X] = m_radius * cos ( tstartright + i * dtheta ) + 0.5 * m_armLength;
+        p[Z] = m_radius * sin ( tstartright + i * dtheta );
+        pp = (*transform)( p );
+        if ( translation ) pp += *translation;
+        ParaviewPoints.push_back( pp );
+      }
+
+      // Lower disk center
+      p[X] = 0.5 * m_armLength;
+      p[Y] = - 0.5 * m_height;
+      p[Z] = 0.;
+      pp = (*transform)( p );
+      if ( translation ) pp += *translation;
+      ParaviewPoints.push_back( pp );
+
+      // Upper disk center
+      p[Y] = 0.5 * m_height;
+      pp = (*transform)( p );
+      if ( translation ) pp += *translation;
+      ParaviewPoints.push_back( pp );
+    
+      // Lower corners
+      p[X] = - 0.5 * m_armLength;
+      p[Y] = - 0.5 * m_height;
+      p[Z] = - m_radius;
+      pp = (*transform)( p );
+      if ( translation ) pp += *translation;
+      ParaviewPoints.push_back( pp );
+    
+      p[Z] = m_radius;
+      pp = (*transform)( p );
+      if ( translation ) pp += *translation;
+      ParaviewPoints.push_back( pp );
+    
+      // Upper corners
+      p[X] = - 0.5 * m_armLength;
+      p[Y] = 0.5 * m_height;
+      p[Z] = - m_radius;
+      pp = (*transform)( p );
+      if ( translation ) pp += *translation;
+      ParaviewPoints.push_back( pp );
+    
+      p[Z] = m_radius;
       pp = (*transform)( p );
       if ( translation ) pp += *translation;
       ParaviewPoints.push_back( pp );
     }
-
-    // Upper disk rim
-    p[Y] = 0.5 * m_height;
-    for (int i=0;i<m_visuNodeNbPerHalf+1;++i)
-    {
-      p[X] = m_radius * cos ( tstartright + i * dtheta ) + 0.5 * m_armLength;
-      p[Z] = m_radius * sin ( tstartright + i * dtheta );
-      pp = (*transform)( p );
-      if ( translation ) pp += *translation;
-      ParaviewPoints.push_back( pp );
-    }
-
-    // Lower disk center
-    p[X] = 0.5 * m_armLength;
-    p[Y] = - 0.5 * m_height;
-    p[Z] = 0.;
-    pp = (*transform)( p );
-    if ( translation ) pp += *translation;
-    ParaviewPoints.push_back( pp );
-
-    // Upper disk center
-    p[Y] = 0.5 * m_height;
-    pp = (*transform)( p );
-    if ( translation ) pp += *translation;
-    ParaviewPoints.push_back( pp );
-    
-    // Lower corners
-    p[X] = - 0.5 * m_armLength;
-    p[Y] = - 0.5 * m_height;
-    p[Z] = - m_radius;
-    pp = (*transform)( p );
-    if ( translation ) pp += *translation;
-    ParaviewPoints.push_back( pp );
-    
-    p[Z] = m_radius;
-    pp = (*transform)( p );
-    if ( translation ) pp += *translation;
-    ParaviewPoints.push_back( pp );
-    
-    // Upper corners
-    p[X] = - 0.5 * m_armLength;
-    p[Y] = 0.5 * m_height;
-    p[Z] = - m_radius;
-    pp = (*transform)( p );
-    if ( translation ) pp += *translation;
-    ParaviewPoints.push_back( pp );
-    
-    p[Z] = m_radius;
-    pp = (*transform)( p );
-    if ( translation ) pp += *translation;
-    ParaviewPoints.push_back( pp );
   }
+  else
+    ParaviewPoints = CompositeParticle::get_polygonsPts_PARAVIEW( translation );
   
-  return ( ParaviewPoints );  
+  return ( ParaviewPoints );
+    
 }
 
 
@@ -460,46 +487,52 @@ void TrilobeCylinder::write_polygonsStr_PARAVIEW( list<int>& connectivity,
     	list<int>& offsets, list<int>& cellstype, int& firstpoint_globalnumber,
 	int& last_offset ) const
 {
-  for (size_t m=0;m<m_nbElemPart;++m)
-  {  
-    // Half cylinder 
-    for (int i=0;i<m_visuNodeNbPerHalf;++i)
-    {
-      connectivity.push_back( firstpoint_globalnumber + i );
-      connectivity.push_back( firstpoint_globalnumber + i + 1 );
-      connectivity.push_back( firstpoint_globalnumber 
+  if ( m_minParaview )
+  { 
+    for (size_t m=0;m<m_nbElemPart;++m)
+    {  
+      // Half cylinder 
+      for (int i=0;i<m_visuNodeNbPerHalf;++i)
+      {
+        connectivity.push_back( firstpoint_globalnumber + i );
+        connectivity.push_back( firstpoint_globalnumber + i + 1 );
+        connectivity.push_back( firstpoint_globalnumber 
       	+ 2 * ( m_visuNodeNbPerHalf + 1 ) );
-      connectivity.push_back( firstpoint_globalnumber + i 
+        connectivity.push_back( firstpoint_globalnumber + i 
       	+ m_visuNodeNbPerHalf + 1 );
-      connectivity.push_back( firstpoint_globalnumber + i 
+        connectivity.push_back( firstpoint_globalnumber + i 
       	+ m_visuNodeNbPerHalf + 2 );
-      connectivity.push_back( firstpoint_globalnumber + 
+        connectivity.push_back( firstpoint_globalnumber + 
       	2 * ( m_visuNodeNbPerHalf + 1 ) + 1 );
-      last_offset += 6;
-      offsets.push_back( last_offset );
-      cellstype.push_back( 13 );
-    }
+        last_offset += 6;
+        offsets.push_back( last_offset );
+        cellstype.push_back( 13 );
+      }
   
-    // Box
-    connectivity.push_back( firstpoint_globalnumber );
-    connectivity.push_back( firstpoint_globalnumber + m_visuNodeNbPerHalf );
-    connectivity.push_back( firstpoint_globalnumber + 
+      // Box
+      connectivity.push_back( firstpoint_globalnumber );
+      connectivity.push_back( firstpoint_globalnumber + m_visuNodeNbPerHalf );
+      connectivity.push_back( firstpoint_globalnumber + 
   	2 * m_visuNodeNbPerHalf + 1 );
-    connectivity.push_back( firstpoint_globalnumber + m_visuNodeNbPerHalf + 1 );
-    connectivity.push_back( firstpoint_globalnumber + 2 * m_visuNodeNbPerHalf + 
+      connectivity.push_back( firstpoint_globalnumber + m_visuNodeNbPerHalf + 1 );
+      connectivity.push_back( firstpoint_globalnumber + 2 * m_visuNodeNbPerHalf + 
   	4 );
-    connectivity.push_back( firstpoint_globalnumber + 2 * m_visuNodeNbPerHalf + 
+      connectivity.push_back( firstpoint_globalnumber + 2 * m_visuNodeNbPerHalf + 
   	5 );
-    connectivity.push_back( firstpoint_globalnumber + 2 * m_visuNodeNbPerHalf + 
+      connectivity.push_back( firstpoint_globalnumber + 2 * m_visuNodeNbPerHalf + 
   	7 );	
-    connectivity.push_back( firstpoint_globalnumber + 2 * m_visuNodeNbPerHalf + 
+      connectivity.push_back( firstpoint_globalnumber + 2 * m_visuNodeNbPerHalf + 
   	6 );	
-    last_offset += 8;
-    offsets.push_back( last_offset );
-    cellstype.push_back( 12 );
+      last_offset += 8;
+      offsets.push_back( last_offset );
+      cellstype.push_back( 12 );
   
-    firstpoint_globalnumber += 2 * m_visuNodeNbPerHalf + 8;
-  } 
+      firstpoint_globalnumber += 2 * m_visuNodeNbPerHalf + 8;
+    }
+  }
+  else
+    CompositeParticle::write_polygonsStr_PARAVIEW( connectivity,
+    	offsets, cellstype, firstpoint_globalnumber, last_offset ); 
 }
 
 

@@ -9,7 +9,7 @@
     Convex with a conical shape. From GJK Engine - A Fast and 
     Robust GJK Implementation, Copyright (C) 1998  Gino van den Bergen.
     
-    @author D.PETIT - Institut Francais du Petrole - 2000 - Creation 
+    @author Institut Francais du Petrole - 2000 - Creation 
     @author A.WACHS - 2019 - Major cleaning & refactoring */
 // ============================================================================
 class Cone : public Convex {

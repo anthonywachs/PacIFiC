@@ -12,7 +12,7 @@ istream& operator >> ( istream& fileIn, ParticleKinematics2D& kine_ );
     
     Specific methods for the kinematics of 2D particles.
 
-    @author F.PRADEL - Institut Francais du Petrole - 2000 - Creation 
+    @author Institut Francais du Petrole - 2000 - Creation 
     @author A.WACHS - 2019 - Major cleaning & refactoring */
 // ============================================================================
 class ParticleKinematics2D : public ParticleKinematics

@@ -19,7 +19,7 @@ using namespace std;
     & torques on rigid bodies. Broad phase detection is based on a linked-cell
     grid.
 
-    @author G.FERRER - Institut Francais du Petrole - 2003 - Creation
+    @author Institut Francais du Petrole - 2003 - Creation
     @author A.WACHS - 2021 - Major cleaning & refactoring */
 // ============================================================================
 class LinkedCell : public AppCollision

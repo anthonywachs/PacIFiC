@@ -188,6 +188,6 @@ ostream& operator << ( ostream& Out, PointContact const& pc )
   Out << "Min dist ptB = " << pc.m_contactB << endl; 
   Out << "Overlap vector = " << pc.m_overlapvector << endl; 
   Out << "Overlap distance = " << pc.m_overlapdistance << endl;
-  Out << "GJK iterations = " << pc.m_nbIterGJK << endl; 
+  Out << "GJK iterations = " << pc.m_nbIterGJK; 
   return ( Out );          
 }

@@ -15,7 +15,7 @@ class Obstacle;
 
     Manages the obstacle kinematics with an imposed force.
 
-    @author G.FERRER - Aout.2003 - Institut Francais du Petrole - Creation 
+    @author Institut Francais du Petrole - 2003 - Creation 
     @author A.WACHS - 2019 - Major cleaning & refactoring */
 // ============================================================================
 class ObstacleKinematicsForce : public Kinematics

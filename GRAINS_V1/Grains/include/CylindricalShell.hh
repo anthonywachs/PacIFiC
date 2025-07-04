@@ -54,7 +54,9 @@ class CylindricalShell : public CompositeObstacle
     double m_height; /**< height */
     double m_innerRadius; /**< inner radius */
     double m_shellWidth; /**< shell radial width */
-    size_t m_nbBoxes; /**< number of boxes in the angular direction */   
+    size_t m_nbBoxes; /**< number of boxes in the angular direction */ 
+    bool m_box; /**< if true, elementary obstacles are Box, otherwise 
+    	Rectangle */   
     //@}
 
 

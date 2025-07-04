@@ -4,6 +4,7 @@
 #include "ContactBuilderFactory.hh"
 #include "ObstacleBuilderFactory.hh"
 #include "Box.hh"
+#include "Rectangle.hh"
 
 
 // ----------------------------------------------------------------------------
@@ -26,7 +27,13 @@ CylindricalShell::CylindricalShell( DOMNode* root ) :
   m_shellWidth = ReaderXML::getNodeAttr_Double( nGeom, "Width" );
   m_nbBoxes = size_t(ReaderXML::getNodeAttr_Int( nGeom, "N" ));
   double crust_thickness = ReaderXML::getNodeAttr_Double( nGeom, 
-  	"CrustThickness" ); 
+  	"CrustThickness" );
+  m_box = false;
+  if ( ReaderXML::hasNodeAttr( nGeom, "ElementaryObstacle" ) )
+  {
+    string selem = ReaderXML::getNodeAttr_String( nGeom, "ElementaryObstacle" );
+    if ( selem == "Box" ) m_box = true;
+  }   
 
   // Center of mass and angular position of the cylindrical shell
   m_geoRBWC->getTransform()->load( root );
@@ -45,20 +52,31 @@ CylindricalShell::CylindricalShell( DOMNode* root ) :
   if ( status )
     transferToFluid = ReaderXML::getNodeAttr_Int( status, "ToFluid" );
 
-  // Create elememtary box obstacles  
-  double extRad = m_innerRadius + m_shellWidth / 2.;
+  // Create elementary box obstacles 
+  double extRad = m_innerRadius; 
+  if ( m_box ) extRad += + m_shellWidth / 2.;
   double delta = 2. * PI / double(m_nbBoxes), angle;
   double ly = 2. * ( m_innerRadius + m_shellWidth ) *
-	( sin( delta ) - ( 1. - cos( delta ) ) / tan( delta ) );
+	( sin( delta ) - ( 1. - cos( delta ) ) / tan( delta ) );	
   string name;
-  Matrix mrot;
+  Matrix mrot, mm( 0., 0., -1., 0., 1., 0., 1., 0., 0. );
   Vector3 zerotranslation;  
   for (size_t i=0;i<m_nbBoxes;++i)
   {
     name = m_name + GrainsExec::intToString( int(i) );
-    Box* box = new Box( m_shellWidth, ly, m_height );
-    RigidBodyWithCrust* geoRBWC_box = new RigidBodyWithCrust( box, Transform(),
+    RigidBodyWithCrust* geoRBWC_box = NULL;
+    if ( m_box )
+    { 
+      Box* box = new Box( m_shellWidth, ly, m_height );
+      geoRBWC_box = new RigidBodyWithCrust( box, Transform(),
   	false, crust_thickness ); 
+    }
+    else
+    {
+      Rectangle* box = new Rectangle( m_height, ly, m_shellWidth, RVE_ZMINUS );
+      geoRBWC_box = new RigidBodyWithCrust( box, Transform(),
+  	false, crust_thickness );       
+    }
     Obstacle* sbox = new SimpleObstacle( name, geoRBWC_box, 
 	m_materialName, transferToFluid, true );
     angle = ( 0.5 + double(i) ) * delta;
@@ -67,6 +85,7 @@ CylindricalShell::CylindricalShell( DOMNode* root ) :
     mrot.setValue( cos( angle ), - sin( angle ), 0., 
     	sin( angle ), cos( angle ), 0., 
     	0., 0., 1.);
+    if ( !m_box ) mrot *= mm;	
     sbox->getRigidBody()->getTransform()->setBasis( mrot );
     sbox->getRigidBody()->composeLeftByTransform( *m_geoRBWC->getTransform() );
     sbox->Translate( zerotranslation );

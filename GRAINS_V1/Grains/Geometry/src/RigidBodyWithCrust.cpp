@@ -1095,7 +1095,7 @@ PointContact ClosestPointCYLINDERS( RigidBodyWithCrust const& rbA,
 bool isContactBVolume( RigidBodyWithCrust const& rbA, 
 	RigidBodyWithCrust const& rbB )
 {
-  return ( isContact( rbA.getBVolume(), rbB.getBVolume(),*rbA.getTransform(),
+  return ( isContact( rbA.getBVolume(), rbB.getBVolume(), *rbA.getTransform(),
 	*rbB.getTransform() ) );
 }
 

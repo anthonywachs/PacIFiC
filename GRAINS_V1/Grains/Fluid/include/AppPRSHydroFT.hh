@@ -13,7 +13,7 @@ using namespace std;
     Used to add hydrodynamic forces and torques exerted on rigid bodies and 
     computed by a Particle-Resolved external solver.
 
-    @author G.FERRER - Institut Francais du Petrole - 2003 - Creation 
+    @author Institut Francais du Petrole - 2003 - Creation 
     @author A.WACHS - 2023 - Creation */
 // ============================================================================
 class AppPRSHydroFT : public App

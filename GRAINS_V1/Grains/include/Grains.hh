@@ -59,7 +59,7 @@ enum RandomGeneratorSeed
 
     Standard Grains3D application.
 
-    @author G.FERRER - Institut Francais du Petrole - 2003 - Creation 
+    @author Institut Francais du Petrole - 2003 - Creation 
     @author A.WACHS - 2021 - Major cleaning & refactoring */
 // ============================================================================
 class Grains : public ComputingTime, public SolverComputingTime

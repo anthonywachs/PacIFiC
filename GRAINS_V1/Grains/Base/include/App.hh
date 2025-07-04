@@ -13,7 +13,7 @@ using namespace std;
 
     Used to compute forces and torques exerted on rigid bodies.
 
-    @author G.FERRER - Institut Francais du Petrole - 2003 - Creation 
+    @author Institut Francais du Petrole - 2003 - Creation 
     @author A.WACHS - 2021 - Major cleaning & refactoring */
 // ============================================================================
 class App

@@ -52,8 +52,8 @@ struct VelocityInfosNm1
 
     A freely moving particle.
 
-    @author F.PRADEL - Institut Francais du Petrole - 1999 - Creation
-    @author G.FERRER - Institut Francais du Petrole - 2000 - Creation
+    @author Institut Francais du Petrole - 1999 - Creation
+    @author Institut Francais du Petrole - 2000 - Creation
     @author A.WACHS - 2019 - Major cleaning & refactoring */
 // ============================================================================
 class Particle : public Component
@@ -445,9 +445,10 @@ class Particle : public Component
     time */
     void copyCellTagGeoPosition_n_to_nm1();
 
-    /** @brief Increments the coordination number by nc
-    @param nc increment of the coordination number */
-    virtual void addToCoordinationNumber( int const& nc );
+    /** @brief Adds a contacting component ID to the set of contacting 
+    component IDs
+    @param id contacting component ID */
+    virtual void addContactingComponentID( int const& id );
 
     /** @brief Returns whether the particle is an elementary particle */
     virtual bool isElementaryParticle() const;
@@ -473,7 +474,7 @@ class Particle : public Component
     
     /** @brief Returns whether to store the contact force for post-processing 
     @param othercomp the other component invovled in the contact */
-    bool storePPForce( Component const* othercomp ) const;         
+    bool storePPForce( Component const* othercomp ) const;       
     //@}
 
 
@@ -545,7 +546,7 @@ class Particle : public Component
     GeoPosition getGeoPositionNm1() const;
 
     /** @brief Returns particle coordination number */
-    virtual int getCoordinationNumber() const;
+    int getCoordinationNumber() const;
 
     /** @brief Returns the number of corners of the rigib body shape and a code
     describing the rigid body shape */
@@ -713,7 +714,9 @@ class Particle : public Component
     Cell* m_cellule_nm1; /**< Cell that the particle belonged to at the
     	previous time */
     int m_GeomType; /**< particle geometric type */
-    int m_coordination_number; /**< coordination number */
+    set<int> m_contacting_component_IDs; /**< set of contacting component IDs */
+    int m_coordination_number; /**< coordination number (= size of the set
+    	of contacting component IDs) */
     Vector3 m_weight; /**< particle weight */
     string m_specific_composite_shape; /**< specific composite particle 
     	shape, e.g., TrilobeCylinder */

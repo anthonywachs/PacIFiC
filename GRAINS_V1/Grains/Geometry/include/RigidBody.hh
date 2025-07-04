@@ -18,16 +18,14 @@ class Torsor;
 
     A combination of a convex shape and a transformation.
 
-    @author F.PRADEL - Institut Francais du Petrole - 1999 - Creation
-    @author G.FERRER - Institut Francais du Petrole - 2000 - Polymorphisme
-    @author D.PETIT  - Institut Francais du Petrole - 2000 - Modification
-    @author D.PETIT - Institut Francais du Petrole - 2000 - Creation
+    @author Institut Francais du Petrole - 1999 - Creation
+    @author Institut Francais du Petrole - 2000 - Modification
     @author A.WACHS - 2019 - Major cleaning & refactoring */
 // ============================================================================
 class RigidBody
 {
   public:
-    /**@name Constructeurs */
+    /**@name Constructors */
     //@{
     /** @brief Default constructor */
     RigidBody();

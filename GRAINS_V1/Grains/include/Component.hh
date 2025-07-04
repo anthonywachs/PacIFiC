@@ -10,6 +10,7 @@
 #include <list>
 #include <string>
 #include <map>
+#include <set>
 using namespace std;
 
 class BBox;
@@ -30,7 +31,7 @@ struct ContactInfos
 
     Physical component of a granular simulation (can be particle or obstacle).
 
-    @author G.FERRER - Institut Francais du Petrole - 2000 - Creation
+    @author Institut Francais du Petrole - 2000 - Creation
     @author A.WACHS - 2019 - Major cleaning & refactoring 
     @author D.HUET - 2022 - Contact force model with memory */
 // ============================================================================
@@ -358,9 +359,10 @@ class Component
     @param _id id of the component to search for */
     Vector3 lookupCollision( int _id ) const;
 
-    /** @brief Increments the coordination number by nc
-    @param nc increment of the coordination number */
-    virtual void addToCoordinationNumber( int const& nc );
+    /** @brief Adds a contacting component ID to the set of contacting 
+    component IDs
+    @param id contacting component ID */
+    virtual void addContactingComponentID( int const& id );
 
     /** @brief Returns whether the component is a composite particle */
     virtual bool isCompositeParticle() const;
