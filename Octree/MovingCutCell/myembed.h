@@ -171,10 +171,10 @@ struct Cleanup {
 };
 
 trace
-int fractions_cleanup (struct Cleanup p)
+int fractions_cleanup (scalar c, face vector s,
+           double smin = 0., double cmin = 0., bool opposite = false)
+
 {
-  scalar c = p.c;
-  face vector s = p.s;
   
   /**
   Since both surface and volume fractions are altered, iterations are
@@ -182,16 +182,30 @@ int fractions_cleanup (struct Cleanup p)
   through the topology of the domain: for examples, long, unresolved
   "filaments" may need many iterations to be fully removed. */
   
-  int changed = 1, schanged = 0;
+  int changed = 1, schanged = 0, i = 0;
   for (int i = 0; i < 100 && changed; i++) {
 
     /**
     Face fractions of empty cells must be zero. */
    
     foreach_face()
-      if (s.x[] && ((!c[] || !c[-1]) || s.x[] < p.smin))
+      if (s.x[] && ((!c[] || !c[-1]) || s.x[] < smin))
 	s.x[] = 0.;
-    boundary ((scalar *) {s});
+
+    /**
+    Face fractions of full cells must be one. However, changing the
+    face fractions accordingly is more tricky. There are two possible
+    cases:
+	
+    * either only a corner is cut, and in this case we set all
+      face fractions to 1;
+	
+    * or one face is solid, and in this case we set all the other
+    faces fractions to 1. */
+
+    foreach_face()
+      if (s.x[] > 0 && (c[-1] == 1 || c[] == 1))
+	s.x[] = 1.;
 
     changed = 0;
     foreach(reduction(+:changed))
@@ -212,7 +226,7 @@ int fractions_cleanup (struct Cleanup p)
 	  
 	  If *c* is smaller than *cmin*, we also remove the cell. */
 
-	  if ((p.opposite && s.x[] == 0. && s.x[1] == 0.) || c[] < p.cmin)
+	  if ((opposite && s.x[] == 0. && s.x[1] == 0.) || c[] < cmin)
 	    c[] = 0., changed++;
 	}
 
@@ -227,37 +241,18 @@ int fractions_cleanup (struct Cleanup p)
 
 	/**
 	We finally make sure that if the volume fraction is very close
-	to 1, it is actually 1.
+	to 1, it is actually 1. */
 
-	Changing the face fractions accordingly is more tricky. There
-	are two possible cases:
-	
-	* either only a corner is cut, and in this case we set all
-	face fractions to 1;
-	
-	* or one face is solid, and in this case we set all the other
-	faces fractions to 1. */
-
-	if (fabs (1. - c[]) < 1.e-14) {
+	if (fabs (1. - c[]) < 1.e-14)
 	  c[] = 1., changed++;
-	  int nfs = 0.;
-	  foreach_dimension()
-	    for (int i = 0; i <= 1; i++) {
-	      if (s.x[i] > 0)
-		s.x[i] = 1.;
-	      else 
-		nfs += 1;
-	    }
-	  assert (nfs <= 1);
-	}
       }
-    boundary ({c});
 
     schanged += changed;
   }
-  restriction ({c, s});
   
-  assert (!changed); // not converged yet...
+  if (changed)
+    fprintf (stderr, "#WARNING: fractions_cleanup() did not converge after "
+	     "%d iterations\n", i);
   return schanged;
 }
 
@@ -270,34 +265,41 @@ conditions related to the embedded boundaries. */
 bid embed;
 
 /**
-For ease of use, we redefine the Neumann and Dirichlet boundary macros
-so that they can be used either for standard domain boundaries or for
-embedded boundaries. The distinction between the two cases is based on
-whether the `dirichlet` parameter is passed to the boundary function
-(using the `data` parameter). Note that when using boundary conditions
-for embedded boundaries, the coordinates x,y,z no longer describe the
-center of the cell but instead the barycenter $\mathbf{b}$ of the
-discrete rigid boundary $\delta \Gamma_{\Delta}$ in the cut-cell (see
-function *embed_area_center()*). */
+For ease of use, we replace the Neumann and Dirichlet functions with
+macros so that they can be used either for standard domain boundaries
+or for embedded boundaries. The distinction between the two cases is
+based on whether the `dirichlet` parameter is passed to the boundary
+function (using the `data` parameter). */
 
-@undef neumann
-@def neumann(expr)   (data ? embed_area_center (point, &x, &y, &z),
-		      *((bool *)data) = false, (expr) :
-		      Delta*(expr) + val(_s,0,0,0))
-@
-@undef neumann_homogeneous
-@def neumann_homogeneous() (data ? *((bool *)data) = false, (0) :
-			    val(_s,0,0,0))
-@
-@undef dirichlet
-@def dirichlet(expr) (data ? embed_area_center (point, &x, &y, &z),
-		      *((bool *)data) = true, (expr) :
-		      2.*(expr) - val(_s,0,0,0))
-@
-@undef dirichlet_homogeneous
-@def dirichlet_homogeneous() (data ? *((bool *)data) = true, (0) :
-			      - val(_s,0,0,0))
-@
+macro2
+double dirichlet (double expr, Point point = point,
+		  scalar s = _s, bool * data = data)
+{
+  return data ? embed_area_center (point, &x, &y, &z),
+    *((bool *)data) = true, expr : 2.*expr - s[];
+}
+
+macro2
+double dirichlet_homogeneous (double expr, Point point = point,
+			      scalar s = _s, bool * data = data)
+{
+  return data ? *((bool *)data) = true, 0 : - s[];
+}
+
+macro2
+double neumann (double expr, Point point = point,
+		scalar s = _s, bool * data = data)
+{
+  return data ? embed_area_center (point, &x, &y, &z),
+    *((bool *)data) = false, expr : Delta*expr + s[];
+}
+
+macro2
+double neumann_homogeneous (double expr, Point point = point,
+			    scalar s = _s, bool * data = data)
+{
+  return data ? *((bool *)data) = false, 0 : s[];
+}
 
 /**
 ## Operator overloading
@@ -932,7 +934,6 @@ double neumann_scalar (Point point, scalar s, scalar cs,
   double d[2], v[2] = {nodata,nodata};
   embed_evaluate (point, s, cs, n, b, &d[0], &v[0], &d[1], &v[1]);
 
-
   /**
   This is a degenerate case, we use the gradient boundary condition
   and the cell-center value to define the value of the scalar at the
@@ -1344,10 +1345,8 @@ These two vectors are computed by the *embed_force()* function.
 trace
 void embed_force (scalar p, vector u, face vector mu, coord * Fp, coord * Fmu)
 {
-  // fixme: this could be simplified considerably if reduction worked on vectors
-  double Fp_x = 0., Fp_y = 0., Fp_z = 0., Fmu_x = 0., Fmu_y = 0., Fmu_z = 0.;
-  foreach (reduction(+:Fp_x) reduction(+:Fp_y) reduction(+:Fp_z)
-	   reduction(+:Fmu_x) reduction(+:Fmu_y) reduction(+:Fmu_z)) {
+  coord Fps = {0}, Fmus = {0};
+  foreach (reduction(+:Fps) reduction(+:Fmus), nowarning)
     if (cs[] > 0. && cs[] < 1.) {
 
       /**
@@ -1362,7 +1361,7 @@ void embed_force (scalar p, vector u, face vector mu, coord * Fp, coord * Fmu)
 
       double Fn = area*embed_interpolate (point, p, b);
       foreach_dimension()
-	Fp_x += Fn*n.x;
+	Fps.x += Fn*n.x;
           
       /**
       To compute the viscous force, we first need to retrieve the
@@ -1467,21 +1466,18 @@ void embed_force (scalar p, vector u, face vector mu, coord * Fp, coord * Fmu)
 	coord dudn = embed_gradient (point, u, b, n);
 #if dimension == 2
 	foreach_dimension()
-	  Fmu_x -= area*mua*(dudn.x*(sq (n.x) + 1.) +
-			     dudn.y*n.x*n.y);
+	  Fmus.x -= area*mua*(dudn.x*(sq (n.x) + 1.) +
+			      dudn.y*n.x*n.y);
 #else // dimension == 3
 	foreach_dimension()
-	  Fmu_x -= area*mua*(dudn.x*(sq (n.x) + 1.) +
-			     dudn.y*n.x*n.y +
-			     dudn.z*n.x*n.z);
+	  Fmus.x -= area*mua*(dudn.x*(sq (n.x) + 1.) +
+			      dudn.y*n.x*n.y +
+			      dudn.z*n.x*n.z);
 #endif // dimension
       }
     }
-  }
-  foreach_dimension() {
-    Fp->x = Fp_x;
-    Fmu->x = Fmu_x;
-  }
+  
+  *Fp = Fps; *Fmu = Fmus;
 }
 
 /**
@@ -1490,10 +1486,8 @@ embedded boundaries, using the user defined color scalar *color*. */
 
 void embed_color_force (scalar p, vector u, face vector mu, scalar color, coord * Fp, coord * Fmu)
 {
-  // fixme: this could be simplified considerably if reduction worked on vectors
-  double Fp_x = 0., Fp_y = 0., Fp_z = 0., Fmu_x = 0., Fmu_y = 0., Fmu_z = 0.;
-  foreach (reduction(+:Fp_x) reduction(+:Fp_y) reduction(+:Fp_z)
-	   reduction(+:Fmu_x) reduction(+:Fmu_y) reduction(+:Fmu_z)) {
+  coord Fps = {0}, Fmus = {0};
+  foreach (reduction(+:Fps) reduction(+:Fmus))
     if (cs[] > 0. && cs[] < 1. && color[] > 0. && color[] < 1.) {
 
       coord n, b;
@@ -1502,7 +1496,7 @@ void embed_color_force (scalar p, vector u, face vector mu, scalar color, coord 
 
       double Fn = area*embed_interpolate (point, p, b);
       foreach_dimension()
-	Fp_x += Fn*n.x;
+	Fps.x += Fn*n.x;
           
       if (constant(mu.x) != 0.) {
 	double mua = 0., fa = 0.;
@@ -1515,21 +1509,18 @@ void embed_color_force (scalar p, vector u, face vector mu, scalar color, coord 
 	coord dudn = embed_gradient (point, u, b, n);
 #if dimension == 2
 	foreach_dimension()
-	  Fmu_x -= area*mua*(dudn.x*(sq (n.x) + 1.) +
-			     dudn.y*n.x*n.y);
+	  Fmus.x -= area*mua*(dudn.x*(sq (n.x) + 1.) +
+			      dudn.y*n.x*n.y);
 #else // dimension == 3
 	foreach_dimension()
-	  Fmu_x -= area*mua*(dudn.x*(sq (n.x) + 1.) +
-			     dudn.y*n.x*n.y +
-			     dudn.z*n.x*n.z);
+	  Fmus.x -= area*mua*(dudn.x*(sq (n.x) + 1.) +
+			      dudn.y*n.x*n.y +
+			      dudn.z*n.x*n.z);
 #endif // dimension
       }
     }
-  }
-  foreach_dimension() {
-    Fp->x  = Fp_x;
-    Fmu->x = Fmu_x;
-  }
+
+  *Fp = Fps; *Fmu = Fmus;  
 }
 
 /**
@@ -1561,9 +1552,8 @@ ressembles the function *embed_force()*.
 trace
 void embed_torque (scalar p, vector u, face vector mu, coord c, coord * Tp, coord * Tmu)
 {
-  double Tp_x = 0., Tp_y = 0., Tp_z = 0., Tmu_x = 0., Tmu_y = 0., Tmu_z = 0.;
-  foreach (reduction(+:Tp_x) reduction(+:Tp_y) reduction(+:Tp_z)
-	   reduction(+:Tmu_x) reduction(+:Tmu_y) reduction(+:Tmu_z))
+  coord Tps = {0}, Tmus = {0};
+  foreach (reduction(+:Tps) reduction(+:Tmus))
     if (cs[] > 0. && cs[] < 1.) {
       
       coord n, b;
@@ -1575,7 +1565,6 @@ void embed_torque (scalar p, vector u, face vector mu, coord c, coord * Tp, coor
       *embed_force()*, we also compute the relative coordinates
       $\mathbf{x} - \mathbf{x}_{\Gamma}$. */
 
-
       // The coordinate x,y,z are not permuted with foreach_dimension()
       coord r = {x,y,z};
       // In case of a periodic domain, we shift the position of the center
@@ -1591,10 +1580,11 @@ void embed_torque (scalar p, vector u, face vector mu, coord c, coord * Tp, coor
       
       double Fn = area*embed_interpolate (point, p, b);
 #if dimension == 2
-      Tp_z += Fn*(r.x*n.y - r.y*n.x);
+      Tps.x += Fn*(r.x*n.y - r.y*n.x);
+      Tps.y = Tps.x;
 #else // dimension == 3      
       foreach_dimension()
-	Tp_x += Fn*(r.y*n.z - r.z*n.y);
+	Tps.x += Fn*(r.y*n.z - r.z*n.y);
 #endif // dimension
       
       if (constant(mu.x) != 0.) {
@@ -1606,39 +1596,29 @@ void embed_torque (scalar p, vector u, face vector mu, coord c, coord * Tp, coor
 	mua /= (fa + SEPS);
 
 	coord dudn = embed_gradient (point, u, b, n);
+	coord Fmus = {0};
 #if dimension == 2
-	double Fmu_x = 0., Fmu_y = 0.;	
 	foreach_dimension()
-	  Fmu_x = -area*mua*(dudn.x*(sq (n.x) + 1.) +
-			     dudn.y*n.x*n.y);
+	  Fmus.x = -area*mua*(dudn.x*(sq (n.x) + 1.) +
+			      dudn.y*n.x*n.y);
 #else // dimension == 3
-	double Fmu_x = 0., Fmu_y = 0., Fmu_z = 0.;	
 	foreach_dimension()
-	  Fmu_x = -area*mua*(dudn.x*(sq (n.x) + 1.) +
-			     dudn.y*n.x*n.y +
-			     dudn.z*n.x*n.z);
+	  Fmus.x = -area*mua*(dudn.x*(sq (n.x) + 1.) +
+			      dudn.y*n.x*n.y +
+			      dudn.z*n.x*n.z);
 #endif // dimension
 
 #if dimension == 2
-	Tmu_z += r.x*Fmu_y - r.y*Fmu_x;
+	Tmus.x += r.x*Fmus.y - r.y*Fmus.x;
+	Tmus.y = Tmus.x;
 #else // dimension == 3
 	foreach_dimension()
-	  Tmu_x += r.y*Fmu_z - r.z*Fmu_y;
+	  Tmus.x += r.y*Fmus.z - r.z*Fmus.y;
 #endif // dimension
       }
     }
-#if dimension == 2
-  double T_p = Tp_z, T_mu = Tmu_z;
-  foreach_dimension() {
-    Tp->x = T_p;
-    Tmu->x = T_mu;
-  }
-#else // dimension == 3
-  foreach_dimension() {
-    Tp->x = Tp_x;
-    Tmu->x = Tmu_x;
-  }
-#endif
+  
+  *Tp = Tps; *Tmu = Tmus;
 }
 
 /**
@@ -1647,14 +1627,18 @@ embedded boundaries, using the user defined color scalar *color*. */
 
 void embed_color_torque (scalar p, vector u, face vector mu, scalar color, coord c, coord * Tp, coord * Tmu)
 {
-  double Tp_x = 0., Tp_y = 0., Tp_z = 0., Tmu_x = 0., Tmu_y = 0., Tmu_z = 0.;
-  foreach (reduction(+:Tp_x) reduction(+:Tp_y) reduction(+:Tp_z)
-	   reduction(+:Tmu_x) reduction(+:Tmu_y) reduction(+:Tmu_z))
+  coord Tps = {0}, Tmus = {0};
+  foreach (reduction(+:Tps) reduction(+:Tmus))
     if (cs[] > 0. && cs[] < 1. && color[] > 0. && color[] < 1.) {
       
       coord n, b;
       double area = embed_geometry (point, &b, &n);
       area *= pow (Delta, dimension - 1);
+
+      /**
+      In addition to the quantities computed in the function
+      *embed_force()*, we also compute the relative coordinates
+      $\mathbf{x} - \mathbf{x}_{\Gamma}$. */
 
       // The coordinate x,y,z are not permuted with foreach_dimension()
       coord r = {x,y,z};
@@ -1671,10 +1655,11 @@ void embed_color_torque (scalar p, vector u, face vector mu, scalar color, coord
       
       double Fn = area*embed_interpolate (point, p, b);
 #if dimension == 2
-      Tp_z += Fn*(r.x*n.y - r.y*n.x);
+      Tps.x += Fn*(r.x*n.y - r.y*n.x);
+      Tps.y = Tps.x;
 #else // dimension == 3      
       foreach_dimension()
-	Tp_x += Fn*(r.y*n.z - r.z*n.y);
+	Tps.x += Fn*(r.y*n.z - r.z*n.y);
 #endif // dimension
       
       if (constant(mu.x) != 0.) {
@@ -1686,39 +1671,29 @@ void embed_color_torque (scalar p, vector u, face vector mu, scalar color, coord
 	mua /= (fa + SEPS);
 
 	coord dudn = embed_gradient (point, u, b, n);
+	coord Fmus = {0};
 #if dimension == 2
-	double Fmu_x = 0., Fmu_y = 0.;	
 	foreach_dimension()
-	  Fmu_x = -area*mua*(dudn.x*(sq (n.x) + 1.) +
-			     dudn.y*n.x*n.y);
+	  Fmus.x = -area*mua*(dudn.x*(sq (n.x) + 1.) +
+			      dudn.y*n.x*n.y);
 #else // dimension == 3
-	double Fmu_x = 0., Fmu_y = 0., Fmu_z = 0.;	
 	foreach_dimension()
-	  Fmu_x = -area*mua*(dudn.x*(sq (n.x) + 1.) +
-			     dudn.y*n.x*n.y +
-			     dudn.z*n.x*n.z);
+	  Fmus.x = -area*mua*(dudn.x*(sq (n.x) + 1.) +
+			      dudn.y*n.x*n.y +
+			      dudn.z*n.x*n.z);
 #endif // dimension
 
 #if dimension == 2
-	Tmu_z += r.x*Fmu_y - r.y*Fmu_x;
+	Tmus.x += r.x*Fmus.y - r.y*Fmus.x;
+	Tmus.y = Tmus.x;
 #else // dimension == 3
 	foreach_dimension()
-	  Tmu_x += r.y*Fmu_z - r.z*Fmu_y;
+	  Tmus.x += r.y*Fmus.z - r.z*Fmus.y;
 #endif // dimension
       }
     }
-#if dimension == 2
-  double T_p = Tp_z, T_mu = Tmu_z;
-  foreach_dimension() {
-    Tp->x = T_p;
-    Tmu->x = T_mu;
-  }
-#else // dimension == 3
-  foreach_dimension() {
-    Tp->x = Tp_x;
-    Tmu->x = Tmu_x;
-  }
-#endif
+  
+  *Tp = Tps; *Tmu = Tmus;
 }
 
 /**
@@ -1765,8 +1740,9 @@ embedded boundary. */
 static inline double bilinear_embed (Point point, scalar s)
 {
   if (!coarse(cs)) {
-    assert (coarse(s) == 0.);
-    return coarse(s); // 0
+    /* assert (coarse(s) == 0.); */
+    /* return coarse(s); // 0 */
+    return 0;
   }
   if (!coarse(cs,child.x) ||
       (!emerged && !coarse(csm1,child.x)))
@@ -1973,7 +1949,7 @@ void update_tracer (scalar f, face vector uf, face vector flux, double dt)
   The modified default *bilinear_embed* refinement/prolongation is
   sufficient for *divfc* and *divfc_corr* on trees. */
     
-  foreach() {
+  foreach (nowarning) {
     
     /**
     If the cell is empty, the divergence is zero. */
@@ -2078,7 +2054,6 @@ void update_tracer (scalar f, face vector uf, face vector flux, double dt)
       divfc_cor[] /= (Delta*cs[]);
     }
   }
-  boundary ({divfc, divfc_cor});
 
   /**
   Following [Sverdrup et al., 2019](#sverdrup2019), we compute in each
@@ -2153,7 +2128,7 @@ void update_tracer (scalar f, face vector uf, face vector flux, double dt)
   The modified default *bilinear_embed* refinement/prolongation is
   sufficient on trees for *e*. */
   
-  foreach() {
+  foreach (nowarning) {
 
     if (cs[] <= 0.)
       e[] = 0.;
@@ -2223,7 +2198,6 @@ void update_tracer (scalar f, face vector uf, face vector flux, double dt)
       e[] = dt*cs[]*(1. - kc)*((divfc[] + divfc_cor[]) - divfnc)/(scs + SEPS);
     }
   }
-  boundary ({e});
 
   /**
   In a second phase, the excess *e* in each cell is added to the
@@ -2275,7 +2249,6 @@ event metric (i = 0)
   default `refine` method calls the prolongation method for each
   component. */
 #endif
-  boundary    ({cs, csm1, fs});
   restriction ({cs, csm1, fs});
 
   // fixme: embedded boundaries cannot be combined with (another) metric yet
@@ -2289,6 +2262,14 @@ event metric (i = 0)
   at restart. */
   
   csm1.nodump = true;
+}
+
+/**
+We add the embedded boundary to the default display. */
+
+event defaults (i = 0 ) {
+  display ("draw_vof (c = 'cs', s = 'fs', filled = -1, "
+	   "fc = {0.5,0.5,0.5}, order = 2);");
 }
 
 /**
@@ -2312,8 +2293,7 @@ event metric (i = 0)
   title={A Cartesian grid embedded boundary method for the heat equation 
   and Poisson’s equation in three dimensions},
   author={Schwartz, Peter and Barad, Michael and Colella, Phillip and Ligocki, 
-  Terry},
-  journal={Journal of Computational Physics},
+  Terry}, journal={Journal of Computational Physics},
   volume={211},
   number={2},
   pages={531--550},
@@ -2345,7 +2325,7 @@ event metric (i = 0)
 }
 
 @article{miller2012,
-  title={An embedded boundary method for the Navier–Stokes equations on a time-dependent domain},
+  title={An embedded boundary method for the Navier–Stokes equationon a time-dependent domain},
   author={Miller, G. and Trebotich, D.},
   journal={Communications in Applied Mathematics and Computational Science},
   volume={7},

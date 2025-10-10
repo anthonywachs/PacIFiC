@@ -246,14 +246,14 @@ typedef struct {
   coord au, aw; // Acceleration
 } particle;
 
-struct p_Dump {
+typedef struct {
   char * file; // File name
   particle * list; // List of particles
   FILE * fp; // File pointer
   bool unbuffered;
-};
+} p_Dump;
 
-void p_dump (struct p_Dump p)
+void p_dump (p_Dump p)
 {
   FILE * fp = p.fp;
   char def[] = "p_dump", * file = p.file ? p.file : p.fp ? NULL : def;
@@ -287,7 +287,7 @@ void p_dump (struct p_Dump p)
   }
 }
 
-bool p_restore (struct p_Dump p)
+bool p_restore (p_Dump p)
 {
   FILE * fp = p.fp;
   char * file = p.file;
@@ -353,7 +353,7 @@ event init (i = 0)
     We first restore the particle properties. */
     
     particle pp_restore;
-    bool p_restart = p_restore ("p_restart", &pp_restore);
+    bool p_restart = p_restore ((p_Dump){"p_restart", &pp_restore});
     assert (p_restart == true);
 
     /**
@@ -422,7 +422,7 @@ therefore use the position and boundary conditions at time $t^n$. */
 
 event stability (i++)
 {
-  foreach(reduction(min:dtmax)) {
+  foreach(reduction(min:dtmax), nowarning) {
     if (cs[] > 0. && cs[] < 1.) {
 
       // Barycenter and normal of the embedded fragment
@@ -531,7 +531,7 @@ event advection_term (i++)
   conditions). */
 
   for (scalar s in {u, g})
-    foreach() {
+    foreach (nowarning) {
       if (csm1[] <= 0. && cs[] > 0.) {
 
   	// Normal emerged cell

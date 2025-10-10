@@ -144,7 +144,6 @@ event defaults (i = 0)
     face vector alphav = alpha;
     foreach_face()
       alphav.x[] = fm.x[];
-    boundary ((scalar *) {alpha});
   }
 
   /**
@@ -187,11 +186,9 @@ double dtmax;
 
 event init (i = 0)
 {
-  boundary ((scalar *) {u});
   trash ({uf});
   foreach_face()
     uf.x[] = fm.x[]*face_value (u.x, 0);
-  boundary ((scalar *) {uf});
 
   /**
   We update fluid properties. */
@@ -240,9 +237,7 @@ The fluid properties such as specific volume (fields $\alpha$ and
 $\alpha_c$) or dynamic viscosity (face field $\mu_f$) -- at time
 $t+\Delta t/2$ -- can be defined by overloading this event. */
 
-event properties (i++,last) {
-  boundary ({alpha, mu, rho});
-}
+event properties (i++,last);
 
 /**
 ### Predicted face velocity field
@@ -282,7 +277,6 @@ void prediction()
 #endif
 	  du.x[] = (u.x[1] - u.x[-1])/(2.*Delta);
     }
-  boundary ((scalar *) {du});
 
   trash ({uf});
   foreach_face() {
@@ -303,7 +297,6 @@ void prediction()
     #endif
     uf.x[] *= fm.x[];
   }
-  boundary ((scalar *) {uf});
 
   delete ((scalar *){du});
 }
@@ -337,7 +330,6 @@ static void correction (double dt)
   foreach()
     foreach_dimension()
       u.x[] += dt*g.x[];
-  boundary ((scalar *) {u});  
 }
 
 /**
@@ -388,7 +380,6 @@ event acceleration (i++,last)
   trash ({uf});
   foreach_face()
     uf.x[] = fm.x[]*(face_value (u.x, 0) + dt*a.x[]);
-  boundary ((scalar *) {uf, a});
 }
 
 /**
@@ -408,7 +399,6 @@ void centered_gradient (scalar p, vector g)
   foreach_face()
     gf.x[] = fm.x[]*a.x[] - alpha.x[]*(p[] - p[-1])/Delta; // fixme: More stable? More consistent?
     /* gf.x[] = fm.x[]*a.x[] - alpha.x[]*face_gradient_x(p, 0); */
-  boundary_flux ({gf});
   
   /**
   We average these face values to obtain the centered, combined
@@ -418,7 +408,6 @@ void centered_gradient (scalar p, vector g)
   foreach()
     foreach_dimension()
       g.x[] = (gf.x[] + gf.x[1])/(fm.x[] + fm.x[1] + SEPS);
-  boundary ((scalar *) {g});
 }
 
 /**
@@ -454,11 +443,9 @@ fluxes need to be checked for inconsistencies. */
 event adapt (i++,last) {
 #if EMBED
   fractions_cleanup (cs, fs);
-  boundary (all); // Since boundary conditions can depend on volume and face fractions
   foreach_face()
     if (uf.x[] && !fs.x[])
       uf.x[] = 0.;
-  boundary ((scalar *) {uf});
 #endif // EMBED
   event ("properties");
 }
