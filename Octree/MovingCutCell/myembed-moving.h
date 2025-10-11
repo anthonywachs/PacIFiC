@@ -246,62 +246,74 @@ typedef struct {
   coord au, aw; // Acceleration
 } particle;
 
-typedef struct {
+struct p_Dump {
   char * file; // File name
   particle * list; // List of particles
   FILE * fp; // File pointer
   bool unbuffered;
-} p_Dump;
+};
 
-void p_dump (p_Dump p)
+void p_dump(char *file, particle *list, bool unbuffered = 1)
 {
-  FILE * fp = p.fp;
-  char def[] = "p_dump", * file = p.file ? p.file : p.fp ? NULL : def;
+  FILE *fp = NULL;
+  struct p_Dump p = { file, list, NULL, unbuffered };
 
-  char * name = NULL;
-  if (file) {
-    name = (char *) malloc (strlen(file) + 2);
-    strcpy (name, file);
-    if (!p.unbuffered)
-      strcat (name, "~");
-    if ((fp = fopen (name, "w")) == NULL) {
-      perror (name);
-      exit (1);
+  char def[] = "p_dump";
+  char *fname = p.file ? p.file : def;
+
+  char *name = NULL;
+  if (fname) {
+    name = malloc(strlen(fname) + 2);
+    if (!name) {
+      perror("malloc");
+      exit(1);
     }
-  }
-  assert (fp);
 
-  // Get particle data (only 1 particle for now)
-  int p_n = 1;
-  particle * p_list = p.list;
-
-  // Dump particle data
-  fwrite(p_list, sizeof(*p_list), p_n, fp);
-  
-  /* free (p_list); */
-  if (file) {
-    fclose (fp);
+    strcpy(name, fname);
     if (!p.unbuffered)
-      rename (name, file);
-    free (name);
+      strcat(name, "~");
+
+    if ((fp = fopen(name, "wb")) == NULL) {
+      perror(name);
+      exit(1);
+    }
+  } else {
+    // if fname == NULL but p.fp exists, use it
+    fp = p.fp;
+  }
+
+  assert(fp);
+
+  int p_n = 1;
+  particle *p_list = p.list;
+
+  fwrite(p_list, sizeof(*p_list), p_n, fp);
+
+  if (fname) {
+    fclose(fp);
+    if (!p.unbuffered)
+      rename(name, fname);
+    free(name);
   }
 }
 
-bool p_restore (p_Dump p)
+bool p_restore (char *file, particle *list, bool unbuffered = 1)
 {
-  FILE * fp = p.fp;
-  char * file = p.file;
-  if (file && (fp = fopen (file, "r")) == NULL)
+  FILE *fp = NULL;
+  struct p_Dump p = { file, list, fp, unbuffered };
+
+  char *fname = p.file;
+  if (fname && (fp = fopen(fname, "r")) == NULL)
     return 0;
-  assert (fp);
+  assert(fp);
 
   // Read particle data (only 1 particle for now)
   int p_n = 1;
-  particle * p_list = p.list;
+  particle *p_list = p.list;
 
-  if (fread (p_list, sizeof(*p_list), (p_n), fp) < 1) {
-    fprintf (ferr, "#p_restore(): error reading particle data\n");
-    exit (1);
+  if (fread(p_list, sizeof(*p_list), p_n, fp) < 1) {
+    fprintf(stderr, "#p_restore(): error reading particle data\n");
+    exit(1);
   }
 
   foreach_dimension() {
@@ -311,13 +323,14 @@ bool p_restore (p_Dump p)
     p_au.x = p_list->au.x;
     p_aw.x = p_list->aw.x;
   }
-  
-  /* free (p_list); */
-  if (file)
-    fclose (fp);
-  
+
+  /* free(p_list); */
+  if (fname)
+    fclose(fp);
+
   return true;
 }
+
 
 /**
 ## Initialization */
@@ -353,7 +366,7 @@ event init (i = 0)
     We first restore the particle properties. */
     
     particle pp_restore;
-    bool p_restart = p_restore ((p_Dump){"p_restart", &pp_restore});
+    bool p_restart = p_restore ("p_restart", &pp_restore);
     assert (p_restart == true);
 
     /**
