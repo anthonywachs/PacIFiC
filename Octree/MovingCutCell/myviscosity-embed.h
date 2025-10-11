@@ -1,27 +1,55 @@
-#include "mypoisson.h"
+/**
+# Viscous solver with embedded boundaries
+
+We consider the Stokes equations
+$$
+\rho \mathbf{u}_t = \rho \mathbf{g} +
+\nabla \cdot [\mu ( \nabla \mathbf{u} + \nabla^T \mathbf{u})]
+$$
+with $\mathbf{g}$ the acceleration and $T$ the transpose.
+
+In the case of incompressible flow and uniform viscosity, the viscous term
+can be further simplified. Since
+$$
+\nabla \cdot (\mu  \nabla \mathbf{u}) =
+(\nabla \mu) \cdot \nabla \mathbf{u} + \mu \nabla (\nabla \cdot  \mathbf{u}) = 0
+$$
+the viscous term reduces to
+$$
+\nabla \cdot [\mu ( \nabla \mathbf{u} + \nabla^T \mathbf{u})] =
+\nabla \cdot (\mu \nabla^T \mathbf{u}) = \nabla^2 (\mu \mathbf{u})
+$$
+and the equations for each velocity component are decoupled. For each
+component $v_i$, the following discrete implicit equation is solved
+using the multigrid solver
+$$
+\frac{\Delta t} \nabla (\mu \nabla v_i^{n+1}) - (\rho + \lambda_i) v_i^{n+1}
++ \underbrace{(\rho v_i^{n} + g_i\, Delta t)}_{r_i} = 0
+$$
+$\lambda_i$ is a possible extra term due to the metric. */
+
+/**
+### Note
+This is a copy of [viscosity-embed](/src/viscosity-embed.h), where the only element that has been changed is the call to the mypoisson.h solver instead of poisson.h
+This so to account non-zero fluid velocity on embedded boundary.
+*/
+
+#include "mypoisson.h" // instead of the call to poisson.h
 
 struct Viscosity {
-  vector u;
   face vector mu;
   scalar rho;
   double dt;
-  int nrelax;
-  scalar * res;
   double (* embed_flux) (Point, scalar, vector, double *);
 };
 
 #if AXI
-// fixme: RHO here not correct
-# define lambda ((coord){1., 1. + dt/RHO*(mu.x[] + mu.x[1] + \
-					  mu.y[] + mu.y[0,1])/2./sq(y)})
+# define lambda ((coord){0, dt*(mu.x[] + mu.x[1]			\
+				+ mu.y[] + mu.y[0,1])*sq(cs[])		\
+	/(fm.x[] + fm.x[1] + fm.y[] + fm.y[0,1] + SEPS)/(cm[] + SEPS)})
+
 #else // not AXI
-# if dimension == 1
-#   define lambda ((coord){1.})
-# elif dimension == 2
-#   define lambda ((coord){1.,1.})
-# elif dimension == 3
-#   define lambda ((coord){1.,1.,1.})
-#endif
+# define lambda ((coord){0.,0.,0.})
 #endif
 
 // Note how the relaxation function uses "naive" gradients i.e. not
@@ -36,7 +64,7 @@ static void relax_diffusion (scalar * a, scalar * b, int l, void * data)
   vector u = vector(a[0]), r = vector(b[0]);
 
   double (* embed_flux) (Point, scalar, vector, double *) = p->embed_flux;
-  foreach_level_or_leaf (l) {
+  foreach_level_or_leaf (l, nowarning) {
     double avgmu = 0.;
     foreach_dimension()
       avgmu += mu.x[] + mu.x[1];
@@ -49,7 +77,7 @@ static void relax_diffusion (scalar * a, scalar * b, int l, void * data)
       foreach_dimension()
 	a += mu.x[1]*s[1] + mu.x[]*s[-1];
       u.x[] = (dt*a + (r.x[] - dt*c)*sq(Delta))/
-	(sq(Delta)*(rho[]*lambda.x + dt*d) + avgmu);
+	(sq(Delta)*(rho[] + lambda.x + dt*d) + avgmu);
     }
   }
   
@@ -82,12 +110,11 @@ static double residual_diffusion (scalar * a, scalar * b, scalar * resl,
     face vector g[];
     foreach_face()
       g.x[] = mu.x[]*face_gradient_x (s, 0);
-    boundary_flux ({g});
-    foreach (reduction(max:maxres)) {
+    foreach (reduction(max:maxres), nowarning) {
       double a = 0.;
       foreach_dimension()
 	a += g.x[] - g.x[1];
-      res.x[] = r.x[] - rho[]*lambda.x*u.x[] - dt*a/Delta;
+      res.x[] = r.x[] - (rho[] + lambda.x)*u.x[] - dt*a/Delta;
       if (embed_flux) {
 	double c, d = embed_flux (point, u.x, mu, &c);
 	res.x[] -= dt*(c + d*u.x[]);
@@ -96,16 +123,15 @@ static double residual_diffusion (scalar * a, scalar * b, scalar * resl,
 	maxres = fabs (res.x[]);
     }
   }
-  boundary (resl);
 #else
   /* "naive" discretisation (only 1st order on trees) */
-  foreach (reduction(max:maxres))
+  foreach (reduction(max:maxres), nowarning)
     foreach_dimension() {
       scalar s = u.x;
       double a = 0.;
       foreach_dimension()
 	a += mu.x[0]*face_gradient_x (s, 0) - mu.x[1]*face_gradient_x (s, 1);
-      res.x[] = r.x[] - rho[]*lambda.x*u.x[] - dt*a/Delta;
+      res.x[] = r.x[] - (rho[] + lambda.x)*u.x[] - dt*a/Delta;
       if (embed_flux) {
 	double c, d = embed_flux (point, u.x, mu, &c);
 	res.x[] -= dt*(c + d*u.x[]);
@@ -122,21 +148,20 @@ static double residual_diffusion (scalar * a, scalar * b, scalar * resl,
 double TOLERANCE_MU = 0.; // default to TOLERANCE
 
 trace
-mgstats viscosity (struct Viscosity p)
+mgstats viscosity (vector u, face vector mu, scalar rho, double dt,
+		   int nrelax = 4, scalar * res = NULL)
 {
-  vector u = p.u, r[];
-  scalar rho = p.rho;
+  vector r[];
   foreach()
     foreach_dimension()
       r.x[] = rho[]*u.x[];
 
-  face vector mu = p.mu;
   restriction ({mu, rho});
-
+  struct Viscosity p = { mu, rho, dt };
   p.embed_flux = u.x.boundary[embed] != antisymmetry ? embed_flux : NULL;
   return mg_solve ((scalar *){u}, (scalar *){r},
-		   residual_diffusion, relax_diffusion, &p, p.nrelax, p.res,
+		   residual_diffusion, relax_diffusion, &p, nrelax, res,
 		   minlevel = 1, // fixme: because of root level
                                   // BGHOSTS = 2 bug on trees
-		   tolerance = TOLERANCE_MU);
+		   tolerance = TOLERANCE_MU ? TOLERANCE_MU : TOLERANCE);
 }
