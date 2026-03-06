@@ -29,7 +29,7 @@ graph TD;
 
 ## Install
 
-### Packages
+For those who wish to *just use* our software, the easiest and most hassle-free method by far is to use our linux packages. For those who wish to contribute to PacIFiC, instructions on locally building the suite yourself follow in [building](#building)
 
 ### Fedora
 
@@ -55,9 +55,6 @@ sudo apt-add-repository ppa:colive/pacific
 sudo apt update
 sudo apt install pacific-basilisk pacific-tools libpacific-mpi-dev
 ```
-### Apptainer
-
-Sample container definitions may be found under `apptainer`. These images are ideal for situations where your HPC cluster may not offer some of the dependencies but do offer an apptainer module.
 
 ## Building 
 
@@ -85,27 +82,51 @@ sudo apt-get install -y build-essential make cmake git libopenmpi-dev libxerces-
 
 ### Building with CMake
 
-The PacIFiC project requires the CMake meta-build tool and a build tool. We will use ninja here. 
+The PacIFiC project requires the CMake meta-build tool and one actual build tool. 
 
-First, create a build directory where you would like to build the system. Here, we will create a build folder in the PacIFiC root folder: To do so, configure and generate the build system by running
-
-```bash
-cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
-```
-
-To build all targets in the project, simply run
+First, configure and generate the build system by running
 
 ```bash
-cmake --build build-release --parallel
+cmake --preset Default
 ```
-### Installing From Source 
 
-If you wish to install to your system, run
+To build all targets in the project
 
 ```bash
-sudo cmake --build build --target install
+cmake --build --preset Default
 ```
 
+To build just one target in the project (for example, Grains) run 
+
+```bash
+cmake --build --preset Default --target Grains_main
+```
+
+Once the `--build` step is run, the resulting executable `grains` may be found in `build/release/src/Grains3D/Main` which itself links against the shared libraries such as `libGrains.so` that also live in the build tree. 
+
+You may run the executable using the absolute or relative path e.g. by typing 
+
+```bash
+./build/release/src/Grains3D/Main/grains
+```
+
+from the project root. But typing `grains` alone *does not work* since the build folder is not part of the `$PATH` variable that your system uses to find binaries. If you are someone who is developing grains (and frequently rebuilding) you may find it useful to not type this everytime. In this case, a file is generated that may be sourced as 
+
+```bash
+source ./build/release/pacific-env.sh
+```
+which temporarily adds the build folder to `$PATH`. Once your shell is closed (or you type `exit`) then `grains` will no longer run without typing the full path.
+
+If you are not frequently rebuilding and wish to install the entire project to a system directory, where `grains` will be found in `$PATH` every type, then you may install your build to a system directory with
+
+```bash
+sudo cmake --install build/release 
+```
+which by default chooses `/usr` as the installation prefix. Since `/usr/bin` is found in path, you may once again use it from anywhere.
+
+### Building with Make
+
+TODO
 ## Examples
 
 Some examples may be found in `examples`: These can be relocated, and by default, use `FetchContent` to include copies of PacIFiC into their own build tree automatically. They therefore do not require installation of PacIFiC, although they still assume the project dependencies are installed.

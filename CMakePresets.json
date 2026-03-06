@@ -8,18 +8,30 @@
   "configurePresets": [
     {
       "name": "Default",
-      "displayName": "Default (Release)",
+      "displayName": "Default",
       "description": "Release build with system default generator.",
       "generator": "Unix Makefiles",
       "binaryDir": "${sourceDir}/build/release",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/release",
         "BUILD_THIRD_PARTY_HDF5": "OFF",
         "BUILD_THIRD_PARTY_XERCESC": "OFF",
         "BUILD_THIRD_PARTY_ZLIB": "OFF"
       }
     },
+    {
+      "name": "Release",
+      "displayName": "Release",
+      "description": "Release build",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_THIRD_PARTY_HDF5": "OFF",
+        "BUILD_THIRD_PARTY_XERCESC": "OFF",
+        "BUILD_THIRD_PARTY_ZLIB": "OFF"
+      }
+    },    
     {
       "name": "Debug",
       "displayName": "Debug",
@@ -27,8 +39,7 @@
       "inherits": "Default",
       "binaryDir": "${sourceDir}/build/debug",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/debug"
+        "CMAKE_BUILD_TYPE": "Debug"
       }
     },
     {
@@ -38,16 +49,14 @@
       "inherits": "Default",
       "binaryDir": "${sourceDir}/build/rel-with-warnings",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "RelWithWarnings",
-        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/rel_with_warnings"
+        "CMAKE_BUILD_TYPE": "RelWithWarnings"
       }
-    },
-    {
+    },{
       "name": "SockeyeRelease",
       "displayName": "HPC Release for Sockeye",
       "description": "Release build for Sockeye with specific compiler and flags.",
       "generator": "Unix Makefiles",
-      "binaryDir": "${sourceDir}/build/sockeye_release",
+      "binaryDir": "${sourceDir}/build/",
       "environment": {
         "CC" : "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-11.4.1/gcc-9.4.0-xraorchustmpt5xtpv3f7z2mw4wdkpef/bin/gcc",
         "CXX" : "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-11.4.1/gcc-9.4.0-xraorchustmpt5xtpv3f7z2mw4wdkpef/bin/g++",
@@ -62,7 +71,7 @@
       },
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/sockeye_release",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/",
         "USE_SUBMODULES": "ON",
         "OCTREE_BASILISK_PROVIDER": "VENDORED",
         "BUILD_THIRD_PARTY_HDF5": "OFF",
@@ -109,19 +118,25 @@
       "name": "Default",
       "configurePreset": "Default",
       "description": "Build the release configuration",
-      "jobs": 16
+      "jobs": 4
+    },
+    {
+      "name": "Release",
+      "configurePreset": "Release",
+      "description": "Build the release configuration",
+      "jobs": 4
     },
     {
       "name": "Debug",
       "configurePreset": "Debug",
       "description": "Build the debug configuration",
-      "jobs": 16
+      "jobs": 4
     },
     {
       "name": "RelWithWarnings",
       "configurePreset": "RelWithWarnings",
       "description": "Build the RelWithWarnings configuration",
-      "jobs": 16
+      "jobs": 4
     },
     {
       "name": "SockeyeRelease",
@@ -135,6 +150,7 @@
       "description": "Build on my workstation",
       "jobs": 4
     }
+
   ],
   "testPresets": [
     {

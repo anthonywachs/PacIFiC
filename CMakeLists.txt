@@ -182,3 +182,45 @@ add_subdirectory(src)
 # ================================================================================
 
 add_subdirectory(docs)
+
+# ================================================================================
+#
+# Environment File
+#
+# ================================================================================
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+include(PacificEnv)
+
+pacific_generate_dev_env_script(
+  OUTPUT  "${CMAKE_BINARY_DIR}/pacific-env.sh"
+  TARGETS Grains_main
+  # EXTRA_LIB_DIRS "${CMAKE_BINARY_DIR}/src/Grains3D/Grains"
+)
+
+message(STATUS "Environment Script: ${CMAKE_BINARY_DIR}/pacific-env.sh")
+
+# ================================================================================
+#
+# Docs
+#
+# ================================================================================
+
+add_subdirectory(docs)
+
+# ================================================================================
+#
+# Environment File
+#
+# ================================================================================
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+include(PacificEnv)
+
+pacific_generate_dev_env_script(
+  OUTPUT  "${CMAKE_BINARY_DIR}/pacific-env.sh"
+  TARGETS Grains_main
+  # EXTRA_LIB_DIRS "${CMAKE_BINARY_DIR}/src/Grains3D/Grains"
+)
+
+message(STATUS "Environment Script: ${CMAKE_BINARY_DIR}/pacific-env.sh")
