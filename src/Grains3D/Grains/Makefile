@@ -1,167 +1,210 @@
+# Compilation & linking flags
 CXX = $(PACIFIC_MPICXX)
 CC = $(PACIFIC_MPICC)
 CPPFLAGS += $(PACIFIC_XERCESC_CFLAGS) $(PACIFIC_ZLIB_CFLAGS)
 LDLIBS   += $(PACIFIC_XERCESC_LFLAGS) $(PACIFIC_ZLIB_LFLAGS)
 
+# Target directories
 OBJDIR := $(LIBGRAINS_OBJDIR)
 LIBDIR := $(LIBGRAINS_LIBDIR)
 SHAREDIR := $(LIBGRAINS_SHAREDIR)
+INCDIR := $(LIBGRAINS_INCDIR)
+
+LIBSO := libGrains.so
+LIBSO_WP := $(LIBDIR)/$(LIBSO)
 
 ifeq ($(strip $(SHAREDIR)),)
 SHAREDIR := $(LIBDIR)/../share
 endif
 
-INCDIRS := \
-  $(LIBGRAINS_SRCDIR)/Base/include \
-  $(LIBGRAINS_SRCDIR)/Component/include \
-  $(LIBGRAINS_SRCDIR)/Fluid/include \
-  $(LIBGRAINS_SRCDIR)/Geometry/include \
-  $(LIBGRAINS_SRCDIR)/PostProcessing/include \
-  $(LIBGRAINS_SRCDIR)/TimeIntegration/include \
-  $(LIBGRAINS_SRCDIR)/Utility/include \
-  $(LIBGRAINS_SRCDIR)/XML3/include \
-  $(LIBGRAINS_SRCDIR)/InterfaceCBasilisk/include
+ALLINC = 
 
-SRCS := \
-  Base/src/AppBrownian.cpp  \
-  Base/src/AppCollision.cpp  \
-  Base/src/App.cpp  \
-  Base/src/Cell.cpp  \
-  Base/src/computingtime.cpp  \
-  Base/src/Error.cpp  \
-  Base/src/GrainsBuilderFactory.cpp  \
-  Base/src/Grains.cpp  \
-  Base/src/GrainsCRBFeatures.cpp  \
-  Base/src/GrainsExec.cpp  \
-  Base/src/GrainsMPI.cpp  \
-  Base/src/GrainsMPIWrapper.cpp  \
-  Base/src/GrainsParameters.cpp  \
-  Base/src/GrainsPostProcessing.cpp  \
-  Base/src/GrainsTestDev.cpp  \
-  Base/src/LinkedCell.cpp  \
-  Base/src/MPINeighbors.cpp  \
-  Base/src/solvercomputingtime.cpp  \
-  Component/src/BoxShell.cpp \
-  Component/src/AllComponents.cpp  \
-  Component/src/CompositeObstacle.cpp  \
-  Component/src/CylindricalShell.cpp  \
-  Component/src/HookeMemoryContactForceModel.cpp  \
-  Component/src/ObstacleImposedForce.cpp  \
-  Component/src/Particle.cpp  \
-  Component/src/ParticleKinematicsSphere.cpp  \
-  Component/src/STLObstacle.cpp  \
-  Component/src/Window.cpp  \
-  Component/src/AllInsertionWindows.cpp  \
-  Component/src/CompositeParticle.cpp  \
-  Component/src/HertzContactForceModel.cpp  \
-  Component/src/KinematicsBuilderFactory.cpp  \
-  Component/src/ObstacleImposedVelocity.cpp  \
-  Component/src/ParticleKinematics2D.cpp  \
-  Component/src/QuadrilobeCylinder.cpp  \
-  Component/src/Torsor.cpp  \
-  Component/src/CollisionHistory.cpp  \
-  Component/src/ContactBuilderFactory.cpp  \
-  Component/src/HertzMemoryContactForceModel.cpp  \
-  Component/src/ObstacleBuilderFactory.cpp  \
-  Component/src/ObstacleKinematicsForce.cpp  \
-  Component/src/ParticleKinematics3D.cpp  \
-  Component/src/RoughWall.cpp  \
-  Component/src/TrilobeCylinder.cpp  \
-  Component/src/Component.cpp  \
-  Component/src/ContactForceModel.cpp  \
-  Component/src/HookeContactForceModel.cpp  \
-  Component/src/Obstacle.cpp  \
-  Component/src/ObstacleKinematicsVelocity.cpp  \
-  Component/src/ParticleKinematics.cpp  \
-  Component/src/SimpleObstacle.cpp  \
-  Component/src/TruncatedConicalShell.cpp  \
-  Fluid/src/AppPRSHydroFT.cpp  \
-  Fluid/src/GrainsCoupledWithFluid.cpp  \
-  Geometry/src/BBox.cpp  \
-  Geometry/src/Box.cpp  \
-  Geometry/src/BVolume.cpp  \
-  Geometry/src/Cone.cpp  \
-  Geometry/src/ConvexBuilderFactory.cpp  \
-  Geometry/src/Convex.cpp  \
-  Geometry/src/Cylinder.cpp  \
-  Geometry/src/Disc.cpp  \
-  Geometry/src/GJK_SV2.cpp  \
-  Geometry/src/GJK_SV.cpp  \
-  Geometry/src/Group3.cpp  \
-  Geometry/src/IndexArray.cpp  \
-  Geometry/src/Matrix.cpp  \
-  Geometry/src/OBB.cpp  \
-  Geometry/src/OBC.cpp  \
-  Geometry/src/Point3.cpp  \
-  Geometry/src/PointC.cpp  \
-  Geometry/src/PointContact.cpp  \
-  Geometry/src/Polygon.cpp  \
-  Geometry/src/Polyhedron.cpp  \
-  Geometry/src/Polytope.cpp  \
-  Geometry/src/Quaternion.cpp  \
-  Geometry/src/Rectangle.cpp  \
-  Geometry/src/RigidBody.cpp  \
-  Geometry/src/RigidBodyWithCrust.cpp  \
-  Geometry/src/Segment.cpp  \
-  Geometry/src/Shape.cpp  \
-  Geometry/src/Sphere.cpp  \
-  Geometry/src/SpheroCylinder.cpp  \
-  Geometry/src/SpheroCylindricalPrism.cpp  \
-  Geometry/src/STLTriangle.cpp  \
-  Geometry/src/STLVertex.cpp  \
-  Geometry/src/Superquadric.cpp  \
-  Geometry/src/Transform.cpp  \
-  Geometry/src/TrapezoidalPrism.cpp  \
-  Geometry/src/TruncatedCone.cpp  \
-  Geometry/src/Vector3.cpp  \
-  Geometry/src/VertexBase.cpp  \
-  PostProcessing/src/ParaviewPostProcessingWriter.cpp  \
-  PostProcessing/src/ParaviewPostProcessingWriter_MPIIO.cpp  \
-  PostProcessing/src/ParaviewPostProcessingWriter_Serial.cpp  \
-  PostProcessing/src/PostProcessingWriterBuilderFactory.cpp  \
-  PostProcessing/src/PostProcessingWriter.cpp  \
-  PostProcessing/src/RawDataPostProcessingWriter.cpp  \
-  TimeIntegration/src/FirstOrderExplicit.cpp  \
-  TimeIntegration/src/SecondOrderAdamsBashforth.cpp  \
-  TimeIntegration/src/SecondOrderExplicit.cpp  \
-  TimeIntegration/src/SecondOrderLeapFrog.cpp  \
-  TimeIntegration/src/TimeIntegratorBuilderFactory.cpp  \
-  TimeIntegration/src/TimeIntegrator.cpp  \
-  Utility/src/Data.cpp  \
-  Utility/src/Exec.cpp  \
-  XML3/src/ReaderXML.cpp  \
-  XML3/src/WriterXML.cpp  \
-  InterfaceCBasilisk/src/InterfaceGrains3DBasilisk.cpp
+# Source and include directories
+SRCDIRBASE := Base/src
+INCDIRBASE := Base/include
+INCDIRS += $(INCDIRBASE)
+ALLINC += $(wildcard $(INCDIRBASE)/*.hh)
+
+SRCDIRCOMPO := Component/src
+INCDIRCOMPO := Component/include
+INCDIRS += $(INCDIRCOMPO)
+ALLINC += $(wildcard $(INCDIRCOMPO)/*.hh)
+
+SRCDIRFLUID := Fluid/src
+INCDIRFLUID := Fluid/include
+INCDIRS += $(INCDIRFLUID)
+ALLINC += $(wildcard $(INCDIRFLUID)/*.hh)
+
+SRCDIRGEOM := Geometry/src
+INCDIRGEOM := Geometry/include
+INCDIRS += $(INCDIRGEOM)
+ALLINC += $(wildcard $(INCDIRGEOM)/*.hh)
+
+SRCDIRPP := PostProcessing/src
+INCDIRPP := PostProcessing/include
+INCDIRS += $(INCDIRPP)
+ALLINC += $(wildcard $(INCDIRPP)/*.hh)
+
+SRCDIRTIME := TimeIntegration/src
+INCDIRTIME := TimeIntegration/include
+INCDIRS += $(INCDIRTIME)
+ALLINC += $(wildcard $(INCDIRTIME)/*.hh)
+
+SRCDIRUTIL := Utility/src
+INCDIRUTIL := Utility/include
+INCDIRS += $(INCDIRUTIL)
+ALLINC += $(wildcard $(INCDIRUTIL)/*.hh)
+
+SRCDIRXML := XML3/src
+INCDIRXML := XML3/include
+INCDIRS += $(INCDIRXML)
+ALLINC += $(wildcard $(INCDIRXML)/*.hh)
+
+SRCDIRBAS := InterfaceCBasilisk/src
+INCDIRBAS := InterfaceCBasilisk/include
+INCDIRS += $(INCDIRBAS)
+ALLINC += $(wildcard $(INCDIRBAS)/*.h)
+
+
+# Source files per package
+# _WP_ means "with path"
+SRCFILES_WP_BASE := $(wildcard $(SRCDIRBASE)/*.cpp)
+SRCFILESBASE := $(subst $(SRCDIRBASE)/,,$(SRCFILES_WP_BASE))
+
+SRCFILES_WP_COMPO := $(wildcard $(SRCDIRCOMPO)/*.cpp)
+SRCFILESCOMPO := $(subst $(SRCDIRCOMPO)/,,$(SRCFILES_WP_COMPO))
+
+SRCFILES_WP_FLUID := $(wildcard $(SRCDIRFLUID)/*.cpp)
+SRCFILESFLUID := $(subst $(SRCDIRFLUID)/,,$(SRCFILES_WP_FLUID))
+
+SRCFILES_WP_GEOM := $(wildcard $(SRCDIRGEOM)/*.cpp)
+SRCFILESGEOM := $(subst $(SRCDIRGEOM)/,,$(SRCFILES_WP_GEOM))
+
+SRCFILES_WP_PP := $(wildcard $(SRCDIRPP)/*.cpp)
+SRCFILESPP := $(subst $(SRCDIRPP)/,,$(SRCFILES_WP_PP))
+
+SRCFILES_WP_TIME := $(wildcard $(SRCDIRTIME)/*.cpp)
+SRCFILESTIME := $(subst $(SRCDIRTIME)/,,$(SRCFILES_WP_TIME))
+
+SRCFILES_WP_UTIL := $(wildcard $(SRCDIRUTIL)/*.cpp)
+SRCFILESUTIL := $(subst $(SRCDIRUTIL)/,,$(SRCFILES_WP_UTIL))
+
+SRCFILES_WP_XML := $(wildcard $(SRCDIRXML)/*.cpp)
+SRCFILESXML := $(subst $(SRCDIRXML)/,,$(SRCFILES_WP_XML))
+
+SRCFILES_WP_BAS := $(wildcard $(SRCDIRBAS)/*.cpp)
+SRCFILESBAS := $(subst $(SRCDIRBAS)/,,$(SRCFILES_WP_BAS))
+
+
+# Substitutions for objects
+# Here we use the base file names combined to VPATH
+OBJS_BASE := $(SRCFILESBASE:%.cpp=$(OBJDIR)/%.o)
+OBJS_COMPO := $(SRCFILESCOMPO:%.cpp=$(OBJDIR)/%.o)
+OBJS_FLUID := $(SRCFILESFLUID:%.cpp=$(OBJDIR)/%.o)
+OBJS_GEOM := $(SRCFILESGEOM:%.cpp=$(OBJDIR)/%.o)
+OBJS_PP := $(SRCFILESPP:%.cpp=$(OBJDIR)/%.o)
+OBJS_TIME := $(SRCFILESTIME:%.cpp=$(OBJDIR)/%.o)
+OBJS_XML := $(SRCFILESXML:%.cpp=$(OBJDIR)/%.o)
+OBJS_UTIL := $(SRCFILESUTIL:%.cpp=$(OBJDIR)/%.o)
+OBJS_BAS := $(SRCFILESBAS:%.cpp=$(OBJDIR)/%.o)
+
+
+# Defining VPATH for automatic search of source files in the 
+# different source directories 
+# This enables to have a single rule/target for all source files in 
+# various directories and all objects in a single directory
+VPATH := $(SRCDIRBASE):$(SRCDIRCOMPO):$(SRCDIRFLUID):$(SRCDIRGEOM):$(SRCDIRPP):$(SRCDIRTIME):$(SRCDIRXML):$(SRCDIRUTIL):$(SRCDIRBAS)
+
 
 CPPFLAGS += $(addprefix -I,$(INCDIRS))
 
-OBJS := $(patsubst %.cpp,$(OBJDIR)/%.o,$(SRCS))
-DEPS := $(OBJS:.o=.d)
+CXXFLAGS += -O3 -g -MMD -MP -fPIC
 
-CXXFLAGS += -MMD -MP
 
-# Compile rule
-$(OBJDIR)/%.o: %.cpp
+#------------------------------------------------------------------------------
+# Production rules
+.SILENT:
+
+all    : MESS OBJ dtd tools LINK CPINC
+
+OBJ    : GEOM MGEOM XML MXML COMPO MCOMPO BASE MBASE FLUID MFLUID BAS MBAS TIME MTIME PP MPP UTIL MUTIL
+	@echo -e 'Compilation is complete\n'
+
+LINK    : $(LIBSO_WP)
+
+$(LIBSO_WP) : $(LIBDIR)
+	sleep 5 # this is to avoid obj files randomly not being on the disk
+		# yet when linking starts in parallel make
+	$(CXX) -shared -Wl,-soname,$(LIBSO) -o $(LIBSO_WP) $(OBJS_BASE) $(OBJS_COMPO) $(OBJS_FLUID) $(OBJS_GEOM) $(OBJS_PP) $(OBJS_TIME) $(OBJS_XML) $(OBJS_UTIL) $(OBJS_BAS) $(LDFLAGS) $(LDLIBS)
+	@echo -e '--------------------------------\n''Library libGrains.so generated !\n''--------------------------------'	
+
+BASE   : $(OBJS_BASE)
+
+COMPO  : $(OBJS_COMPO)
+
+FLUID  : $(OBJS_FLUID)
+
+GEOM   : $(OBJS_GEOM)
+
+PP     : $(OBJS_PP)
+
+TIME   : $(OBJS_TIME)
+	
+XML    : $(OBJS_XML)
+
+UTIL   : $(OBJS_UTIL)
+
+BAS    : $(OBJS_BAS)
+
+MBASE   : 
+	@echo -e '*** Package Base compiled\n'
+
+MCOMPO  : 
+	@echo -e '*** Package Component compiled\n'
+
+MFLUID  : 
+	@echo -e '*** Package Fluid compiled\n'
+
+MGEOM   :
+	@echo -e '*** Package Geometry compiled\n'
+
+MPP     : 
+	@echo -e '*** Package PostProcessing compiled\n'
+
+MTIME   : 
+	@echo -e '*** Package TimeIntegration compiled\n'
+	
+MXML    : 
+	@echo -e '*** Package XML compiled\n'
+	
+MUTIL   : 
+	@echo -e '*** Package Util compiled\n'
+	
+MBAS    : 
+	@echo -e '*** Package Basilisk compiled\n'	
+		
+MESS   :
+	@echo -e '************************************************************\n''Grains3D compiled with' $(CXX) $(CPPFLAGS) $(CXXFLAGS)'\n************************************************************'	
+
+$(OBJDIR)/%.o : %.cpp
 	@mkdir -p $(dir $@)
+	@echo 'Compiling '$<
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
-
-LIBSO := $(LIBDIR)/libGrains.so
 
 $(LIBDIR):
 	@mkdir -p $@
-
-CXXFLAGS += -fPIC
-$(LIBSO): $(OBJS) | $(LIBDIR)
-	$(CXX) -shared -o $@ $(OBJS) $(LDFLAGS) $(LDLIBS)
-
-.PHONY: all clean
-
-all: $(LIBSO) dtd tools
+	
+$(INCDIR):
+	@mkdir -p $@
+	
+CPINC  : $(INCDIR)
+	cp $(ALLINC) $(INCDIR)/	
 
 clean:
 	rm -rf $(OBJDIR)/* \
-	rm -f $(LIBSO) \
-  rm -rf $(SHAREDIR)/*
+	rm -f $(LIBSO_WP) \
+	rm -rf $(SHAREDIR)/* \
+	rm -rf $(INCDIR)/*	
 
 dtd:
 	@mkdir -p $(SHAREDIR)/Dtd

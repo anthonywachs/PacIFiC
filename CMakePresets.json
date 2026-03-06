@@ -74,7 +74,35 @@
         "MPI_HOME": "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/openmpi-4.1.1-7c42tpwdhfycqa3vdhit4mspyk6a32nn",
         "ZLIB_ROOT": "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/zlib-ng-2.0.7-joh4ncvu4opnvgu5yk4dwsmaxq2attjo"
       }
-    }
+    },
+    {
+      "name": "MyRelease",
+      "displayName": "Release on my workstation",
+      "description": "Release build for my workstation with specific compiler and flags.",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/release",
+      "environment": {   
+	"CC" : "/home/wachs/local/openmpi-4.0.3/bin/mpicc",
+        "CXX" : "/home/wachs/local/openmpi-4.0.3/bin/mpic++",        
+	"MPICC" : "/home/wachs/local/openmpi-4.0.3/bin/mpicc",
+        "MPICXX" : "/home/wachs/local/openmpi-4.0.3/bin/mpic++",
+        "OPENMPI_ROOT" : "/home/wachs/local/openmpi-4.0.3",
+        "HDF5_ROOT" : "/home/wachs/local/hdf5-1.14.6",
+        "PATH": "/home/wachs/local/openmpi-4.0.3/bin:/home/wachs/local/hdf5-1.14.6/bin:/usr/bin",
+        "LD_LIBRARY_PATH": "/home/wachs/local/hdf5-1.14.6/lib:/home/wachs/local/openmpi-4.0.3/lib:/usr/bin"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/release",
+        "USE_SUBMODULES": "OFF",
+        "OCTREE_BASILISK_PROVIDER": "GIT",
+	"CMAKE_MAKE_PROGRAM": "/usr/bin/gmake",
+	"CMAKE_C_COMPILER": "/home/wachs/local/openmpi-4.0.3/bin/mpicc",
+        "CMAKE_CXX_COMPILER": "/home/wachs/local/openmpi-4.0.3/bin/mpic++",
+        "CMAKE_PREFIX_PATH" : "/home/wachs/local/openmpi-4.0.3/bin/.:/home/wachs/local/hdf5-1.14.6/bin/.:/usr/bin/.",
+        "MPI_HOME": "/home/wachs/local/openmpi-4.0.3"
+      }
+    }    
   ],
   "buildPresets": [
     {
@@ -100,6 +128,12 @@
       "configurePreset": "SockeyeRelease",
       "description": "Build on Sockeye",
       "jobs": 8
+    },
+    {
+      "name": "MyRelease",
+      "configurePreset": "MyRelease",
+      "description": "Build on my workstation",
+      "jobs": 4
     }
   ],
   "testPresets": [

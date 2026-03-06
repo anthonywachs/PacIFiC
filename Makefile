@@ -55,7 +55,7 @@ grains: builddir $(SRC_THIRDPARTY_DEPS)
 mac: builddir $(SRC_THIRDPARTY_DEPS)
 	$(PACIFIC_SRC_MAKE) mac
 
-fluid: builddir $(SRC_THIRDPARTY_DEPS)
+fluid: q $(SRC_THIRDPARTY_DEPS)
 	$(PACIFIC_SRC_MAKE) fluid
 
 docs:
