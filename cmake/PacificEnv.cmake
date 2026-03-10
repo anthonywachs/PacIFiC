@@ -86,11 +86,11 @@ echo \"[PacIFiC] PATH (and optional loader path) enabled for this shell.\"
     )
   endif()
 
-  # Make it executable for convenience (sourcing works either way)
-  add_custom_target(pacific-dev-env ALL
-    COMMAND "${CMAKE_COMMAND}" -E chmod +x "${PENV_OUTPUT}"
-    BYPRODUCTS "${PENV_OUTPUT}"
-    COMMENT "Making pacific-env.sh executable"
-    VERBATIM
-  )
+  # # Make it executable for convenience (sourcing works either way)
+  # add_custom_target(pacific-dev-env ALL
+  #   COMMAND "${CMAKE_COMMAND}" -E chmod +x "${PENV_OUTPUT}"
+  #   BYPRODUCTS "${PENV_OUTPUT}"
+  #   COMMENT "Making pacific-env.sh executable"
+  #   VERBATIM
+  # )
 endfunction()
