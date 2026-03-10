@@ -1,5 +1,5 @@
 add_executable(Grains_shapefile
-  src/shapefile.cpp
+  src/PP_shapefile.cpp
 )
 
 

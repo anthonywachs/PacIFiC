@@ -1,5 +1,5 @@
 add_executable(Grains_position
-  src/position.cpp
+  src/PP_position.cpp
 )
 
-set_target_properties(Grains_position PROPERTIES OUTPUT_NAME Grains_position)
+set_target_properties(Grains_position PROPERTIES OUTPUT_NAME position)

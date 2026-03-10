@@ -30,11 +30,12 @@ int main(int argc, char *argv[])
     cout << "  (4) Regular tetrahedron" << endl;
     cout << "  (5) Regular octahedron" << endl;
     cout << "  (6) Regular dodecahedron" << endl;        
-    cout << "  (7) Regular icosahedron" << endl;    
+    cout << "  (7) Regular icosahedron" << endl;
+    cout << "  (8) Hexagonal prism" << endl;        
     cout << "Choice : ";
     cin >> choice;
   
-    if ( choice < 0 || choice > 7 )
+    if ( choice < 0 || choice > 8 )
       cout << "Wrong choice, select again" << endl;
     else
       good_choice = true;
@@ -426,7 +427,65 @@ int main(int argc, char *argv[])
                   
       fileOUT.close();        
       
-      break;                                
+      break; 
+      
+    case 8:
+      good_choice = false; 
+      while(!good_choice)
+      { 
+        cout << "Hexagon edge length = ";
+        cin >> edge;
+  
+        if ( edge < 0. )
+          cout << "Wrong choice, edge length > 0, enter again" << endl;
+        else
+          good_choice = true;
+      } 
+
+      good_choice = false; 
+      while(!good_choice)
+      { 
+        cout << "Hexagon height = ";
+        cin >> height;
+  
+        if ( height < 0. )
+          cout << "Wrong choice, height > 0, enter again" << endl;
+        else
+          good_choice = true;
+      }
+
+      cout << "Hexagonal prism" << endl;
+      cout << "   hexagon edge length = " << edge  << endl;
+      cout << "   height = " << height  << endl;      
+      
+      filename="hexaprism.insert";
+      
+      fileOUT.open(filename.c_str(),ios::out);
+      fileOUT.setf(std::ios::scientific,std::ios::floatfield);
+      fileOUT.precision(8);
+      
+      fileOUT << "3" << endl << "12" << endl;
+      for (i=0;i<6;++i)
+        fileOUT << edge * cos( double(i) * pi / 3. ) << " " << 
+		 edge * sin( double(i) * pi / 3. ) << " " << 
+		 - height / 2. << endl;
+      for (i=0;i<6;++i)
+        fileOUT << edge * cos( double(i) * pi / 3. ) << " " << 
+		 edge * sin( double(i) * pi / 3. ) << " " << 
+		 height / 2. << endl;		         
+      fileOUT << endl << "8" << endl; 
+      fileOUT << "6 0 1 7" << endl;
+      fileOUT << "7 1 2 8" << endl;      
+      fileOUT << "8 2 3 9" << endl;      
+      fileOUT << "9 3 4 10" << endl;
+      fileOUT << "10 4 5 11" << endl;
+      fileOUT << "11 5 0 6" << endl;
+      fileOUT << "0 5 4 3 2 1" << endl;      
+      fileOUT << "6 7 8 9 10 11" << endl;                                  
+                  
+      fileOUT.close();        
+      
+      break;                                      
 
   }  
         

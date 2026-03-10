@@ -460,6 +460,8 @@ int Polyhedron::numberOfCells_PARAVIEW() const
   else if ( ncorners == 20 && m_allFaces->size() == 12 ) ncells = 36; 
   // Trancoctahedron 
   else if ( ncorners == 24 && m_allFaces->size() == 14 ) ncells = 44; 
+  // Hexagonal prism
+  else if ( ncorners == 12 && m_allFaces->size() == 8 ) ncells = 4; 
   // General: not implemented yet !!
   else
   {
@@ -656,6 +658,32 @@ void Polyhedron::write_polygonsStr_PARAVIEW( list<int>& connectivity,
     
     firstpoint_globalnumber += ncorners + 1;  
   }
+  // Hexagonal prism
+  // The hexagonal prism is split into 5 prisms (we do not use the center of
+  // mass)  
+  else if ( ncorners == 12 && m_allFaces->size() == 8 )
+  {
+    for (size_t i=0;i<4;++i)
+    {
+      connectivity.push_back( firstpoint_globalnumber
+                + (*m_allFaces)[6][0] + 1 );
+      connectivity.push_back( firstpoint_globalnumber
+                + (*m_allFaces)[6][i+2] + 1 );
+      connectivity.push_back( firstpoint_globalnumber
+                + (*m_allFaces)[6][i+1] + 1 );
+      connectivity.push_back( firstpoint_globalnumber
+                + (*m_allFaces)[7][0] + 1 );
+      connectivity.push_back( firstpoint_globalnumber
+                + (*m_allFaces)[7][4-i] + 1 );
+      connectivity.push_back( firstpoint_globalnumber
+                + (*m_allFaces)[7][5-i] + 1 );		
+      last_offset += 6;
+      offsets.push_back(last_offset);
+      cellstype.push_back(13);
+    }
+    
+    firstpoint_globalnumber += ncorners + 1;  
+  }  
   // General: not implemented yet !!
   else
   {

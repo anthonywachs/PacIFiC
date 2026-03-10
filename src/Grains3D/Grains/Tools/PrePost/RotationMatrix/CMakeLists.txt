@@ -1,5 +1,5 @@
 add_executable(Grains_rotationmatrix
-  src/rotationmatrix.cpp
+  src/PP_rotationmatrix.cpp
 )
 
 set_target_properties(Grains_rotationmatrix PROPERTIES OUTPUT_NAME rotationmatrix)
