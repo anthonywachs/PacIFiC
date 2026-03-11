@@ -41,11 +41,17 @@
           default = pkgs.mkShell {
             inputsFrom = [ pkgs.pacific ];
             packages = with pkgs; [
+              petsc
+              hypre
               gdb
               doxygen
               python313Packages.mkdocs
               apptainer
             ];
+            shellHook = ''
+              export PETSC_DIR="${pkgs.petsc}"
+              export HYPRE_DIR="${pkgs.hypre}"
+            '';
           };
         });
 

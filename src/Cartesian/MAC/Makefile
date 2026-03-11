@@ -1,219 +1,159 @@
 CXX = $(PACIFIC_MPICXX)
 CC = $(PACIFIC_MPICC)
-CPPFLAGS += $(PACIFIC_ZLIB_CFLAGS)
-LDLIBS   += $(PACIFIC_ZLIB_LFLAGS)
+CPPFLAGS += $(PACIFIC_ZLIB_CFLAGS) $(PACIFIC_PETSC_CFLAGS)
+LDLIBS   += $(PACIFIC_ZLIB_LFLAGS) $(PACIFIC_PETSC_LFLAGS)
 
 OBJDIR := $(MAC_OBJDIR)
 LIBDIR := $(MAC_LIBDIR)
+INCDIR := $(MAC_INCDIR)
 
-INCDIRS := \
-  $(MAC_SRCDIR_ABS)/ArrayVector/include \
-  $(MAC_SRCDIR_ABS)/Base/include \
-  $(MAC_SRCDIR_ABS)/FiniteVolume/include \
-  $(MAC_SRCDIR_ABS)/LinearAlgebra/include
+LIBSO := libMAC.so
+LIBSO_WP := $(LIBDIR)/$(LIBSO)
 
-SRCS := \
-  ArrayVector/src/boolArray2D.cc \
-  ArrayVector/src/boolArray3D.cc \
-  ArrayVector/src/boolVector.cc \
-  ArrayVector/src/doubleArray2D.cc \
-  ArrayVector/src/doubleArray3D.cc \
-  ArrayVector/src/doubleArray4D.cc \
-  ArrayVector/src/doubleArray5D.cc \
-  ArrayVector/src/doubleArray6D.cc \
-  ArrayVector/src/doubleArray7D.cc \
-  ArrayVector/src/doubleVector.cc \
-  ArrayVector/src/intArray2D.cc \
-  ArrayVector/src/intArray3D.cc \
-  ArrayVector/src/intVector.cc \
-  ArrayVector/src/longLongIntArray3D.cc \
-  ArrayVector/src/longLongIntVector.cc \
-  ArrayVector/src/size_t_array2D.cc \
-  ArrayVector/src/size_t_array3D.cc \
-  ArrayVector/src/size_t_vector.cc \
-  ArrayVector/src/stringArray2D.cc \
-  ArrayVector/src/stringVector.cc \
-  Base/src/erf.cc \
-  Base/src/MAC_Application.cc \
-  Base/src/MAC_ApplicationRestorer.cc \
-  Base/src/MAC_ArithmeticExp.cc \
-  Base/src/MAC_ArrayExp.cc \
-  Base/src/MAC_assertions.cc \
-  Base/src/MAC_BalancedBinaryTree.cc \
-  Base/src/MAC_BalancedBinaryTreeIterator.cc \
-  Base/src/MAC_BalancedBinaryTreeNode.cc \
-  Base/src/MAC_BinStored.cc \
-  Base/src/MAC_BoolArray2D.cc \
-  Base/src/MAC_Bool.cc \
-  Base/src/MAC_BooleanExp.cc \
-  Base/src/MAC_BoolVector.cc \
-  Base/src/MAC.cc \
-  Base/src/MAC_Collection.cc \
-  Base/src/MAC_Communicator.cc \
-  Base/src/MAC_CommunicatorExp.cc \
-  Base/src/MAC_ComparisonExp.cc \
-  Base/src/MAC_ConditionalExp.cc \
-  Base/src/MAC_ConstantExp.cc \
-  Base/src/MAC_Container.cc \
-  Base/src/MAC_Context.cc \
-  Base/src/MAC_ContextPair.cc \
-  Base/src/MAC_ContextSimple.cc \
-  Base/src/MAC_ConvertTypeExp.cc \
-  Base/src/MAC_CutPointsExp.cc \
-  Base/src/MAC_Data.cc \
-  Base/src/MAC_DataWithContext.cc \
-  Base/src/MAC_DataWithContextExp.cc \
-  Base/src/MAC_DerivativeExp.cc \
-  Base/src/MAC_DistributedPartition.cc \
-  Base/src/MAC_DoubleArray2D.cc \
-  Base/src/MAC_DoubleArray3D.cc \
-  Base/src/MAC_Double.cc \
-  Base/src/MAC_DoubleComparator.cc \
-  Base/src/MAC_DoubleComparatorExact.cc \
-  Base/src/MAC_DoubleComparatorFloat.cc \
-  Base/src/MAC_DoubleVector.cc \
-  Base/src/MAC_Error.cc \
-  Base/src/MAC_Exec.cc \
-  Base/src/MAC_Expression.cc \
-  Base/src/MAC_ExternalAPI.cc \
-  Base/src/MAC_ExtractionExp.cc \
-  Base/src/MAC_FileToModule.cc \
-  Base/src/MAC_GroupExp.cc \
-  Base/src/MAC_HashTableSet.cc \
-  Base/src/MAC_HashTableSetIterator.cc \
-  Base/src/MAC_IndexSet.cc \
-  Base/src/MAC_IntArray2D.cc \
-  Base/src/MAC_IntArray3D.cc \
-  Base/src/MAC_Int.cc \
-  Base/src/MAC_InterpolExp.cc \
-  Base/src/MAC_IntVector.cc \
-  Base/src/MAC_Iterator.cc \
-  Base/src/MAC_KeyItemPair.cc \
-  Base/src/MAC_KeywordDataIterator.cc \
-  Base/src/MAC_KeywordDataPair.cc \
-  Base/src/MAC_Lex.cc \
-  Base/src/MAC_Lexical.cc \
-  Base/src/MAC_List.cc \
-  Base/src/MAC_ListIdentity.cc \
-  Base/src/MAC_ListItem.cc \
-  Base/src/MAC_ListIterator.cc \
-  Base/src/MAC_Map.cc \
-  Base/src/MAC_MapIterator.cc \
-  Base/src/MAC_MathFunctionExp.cc \
-  Base/src/MAC_MembershipExp.cc \
-  Base/src/MAC_MemoryTracer.cc \
-  Base/src/MAC_Module.cc \
-  Base/src/MAC_ModuleComparator.cc \
-  Base/src/MAC_ModuleExplorer.cc \
-  Base/src/MAC_ModuleIterator.cc \
-  Base/src/MAC_ModulePattern.cc \
-  Base/src/MAC_NumberedDoubleVectors.cc \
-  Base/src/MAC_Object.cc \
-  Base/src/MAC_ObjectReader.cc \
-  Base/src/MAC_ObjectRegister.cc \
-  Base/src/MAC_ObjectTest.cc \
-  Base/src/MAC_ObjectWriter.cc \
-  Base/src/MAC_Randomizer.cc \
-  Base/src/MAC_RelationalExp.cc \
-  Base/src/MAC_Root.cc \
-  Base/src/MAC_Sequence.cc \
-  Base/src/MAC_SequentialCommunicator.cc \
-  Base/src/MAC_Set.cc \
-  Base/src/MAC_SigalExp.cc \
-  Base/src/MAC_SortExp.cc \
-  Base/src/MAC_StringArray2D.cc \
-  Base/src/MAC_String.cc \
-  Base/src/MAC_StringExp.cc \
-  Base/src/MAC_StringVector.cc \
-  Base/src/MAC_System.cc \
-  Base/src/MAC_SystemExp.cc \
-  Base/src/MAC_Timer.cc \
-  Base/src/MAC_TransferExp.cc \
-  Base/src/MAC_UnaryArithmeticExp.cc \
-  Base/src/MAC_Variable.cc \
-  Base/src/MAC_VariableExp.cc \
-  Base/src/MAC_Vector.cc \
-  Base/src/MAC_VectorExp.cc \
-  Base/src/MAC_VectorIterator.cc \
-  Base/src/MAC_Yacc.cc \
-  Base/src/main.cc \
-  FiniteVolume/src/FV_BoundaryCondition.cc \
-  FiniteVolume/src/FV.cc \
-  FiniteVolume/src/FV_DiscreteField.cc \
-  FiniteVolume/src/FV_DiscreteField_Centered.cc \
-  FiniteVolume/src/FV_DiscreteField_Centered_SpatialSchemes.cc \
-  FiniteVolume/src/FV_DiscreteField_SpatialSchemes.cc \
-  FiniteVolume/src/FV_DiscreteField_Staggered.cc \
-  FiniteVolume/src/FV_DiscreteField_Staggered_SpatialSchemes.cc \
-  FiniteVolume/src/FV_DiscreteField_Tensor.cc \
-  FiniteVolume/src/FV_DiscreteField_Vertex.cc \
-  FiniteVolume/src/FV_DiscreteField_Vorticity.cc \
-  FiniteVolume/src/FV_DomainAndFields.cc \
-  FiniteVolume/src/FV_DomainBuilder.cc \
-  FiniteVolume/src/FV_MatlabPostProcessingWriter.cc \
-  FiniteVolume/src/FV_Mesh.cc \
-  FiniteVolume/src/FV_MorePostProcessing.cc \
-  FiniteVolume/src/FV_OneStepIteration.cc \
-  FiniteVolume/src/FV_ParaviewPostProcessingWriter.cc \
-  FiniteVolume/src/FV_PostProcessingWriter.cc \
-  FiniteVolume/src/FV_SplitSystem.cc \
-  FiniteVolume/src/FV_StepByStepProgression.cc \
-  FiniteVolume/src/FV_StreamFunction.cc \
-  FiniteVolume/src/FV_SystemNumbering.cc \
-  FiniteVolume/src/FV_TimeIteratorAdapter.cc \
-  FiniteVolume/src/FV_TimeIterator.cc \
-  FiniteVolume/src/FV_Vorticity.cc \
-  FiniteVolume/src/geomVector.cc \
-  LinearAlgebra/src/LA_BlockSeqMatrix.cc \
-  LinearAlgebra/src/LA_BlockSeqMatrixIterator.cc \
-  LinearAlgebra/src/LA.cc \
-  LinearAlgebra/src/LA_CRSmatrix.cc \
-  LinearAlgebra/src/LA_CRSmatrixIterator.cc \
-  LinearAlgebra/src/LA_DistImplementation.cc \
-  LinearAlgebra/src/LA_DistMatrix.cc \
-  LinearAlgebra/src/LA_DistScatter.cc \
-  LinearAlgebra/src/LA_DistVector.cc \
-  LinearAlgebra/src/LA_Implementation.cc \
-  LinearAlgebra/src/LA_Matrix.cc \
-  LinearAlgebra/src/LA_MatrixIterator.cc \
-  LinearAlgebra/src/LA_PairOfMatrixIterator.cc \
-  LinearAlgebra/src/LA_PelMatrix.cc \
-  LinearAlgebra/src/LA_PelMatrixIterator.cc \
-  LinearAlgebra/src/LA_Scatter.cc \
-  LinearAlgebra/src/LA_SeqImplementation.cc \
-  LinearAlgebra/src/LA_SeqMatrix.cc \
-  LinearAlgebra/src/LA_SeqScatter.cc \
-  LinearAlgebra/src/LA_SeqVector.cc \
-  LinearAlgebra/src/LA_ShiftedIndexMatrixIterator.cc \
-  LinearAlgebra/src/LA_Solver.cc \
-  LinearAlgebra/src/LA_StorableVectors.cc \
-  LinearAlgebra/src/LA_Vector.cc
+ALLINC = 
 
-CPPFLAGS += $(addprefix -I,$(INCDIRS))
+# Source and include directories
+SRCDIRARRV := ArrayVector/src
+INCDIRARRV := ArrayVector/include
+INCDIRS += $(INCDIRARRV)
+ALLINC += $(wildcard $(INCDIRARRV)/*.hh)
+ALLINC += $(wildcard $(INCDIRARRV)/*.icc)
 
-OBJS := $(patsubst %.cc,$(OBJDIR)/%.o,$(SRCS))
+SRCDIRBASE := Base/src
+INCDIRBASE := Base/include
+INCDIRS += $(INCDIRBASE)
+ALLINC += $(wildcard $(INCDIRBASE)/*.hh)
+ALLINC += $(wildcard $(INCDIRBASE)/*.icc)
+
+SRCDIRMPI := ExternalAPI/MPI/src
+INCDIRMPI := ExternalAPI/MPI/include
+INCDIRS += $(INCDIRMPI)
+ALLINC += $(wildcard $(INCDIRMPI)/*.hh)
+ALLINC += $(wildcard $(INCDIRMPI)/*.icc)
+
+SRCDIRPETSC := ExternalAPI/PETSc_3.24.3/src
+INCDIRPETSC := ExternalAPI/PETSc_3.24.3/include
+INCDIRS += $(INCDIRPETSC)
+ALLINC += $(wildcard $(INCDIRPETSC)/*.hh)
+ALLINC += $(wildcard $(INCDIRPETSC)/*.icc)
+
+SRCDIRFV := FiniteVolume/src
+INCDIRFV := FiniteVolume/include
+INCDIRS += $(INCDIRFV)
+ALLINC += $(wildcard $(INCDIRFV)/*.hh)
+ALLINC += $(wildcard $(INCDIRFV)/*.icc)
+
+SRCDIRLA := LinearAlgebra/src
+INCDIRLA := LinearAlgebra/include
+INCDIRS += $(INCDIRLA)
+ALLINC += $(wildcard $(INCDIRLA)/*.hh)
+ALLINC += $(wildcard $(INCDIRLA)/*.icc)
+
+# Source files per package
+# _WP_ means "with path"
+SRCFILES_WP_ARRV := $(wildcard $(SRCDIRARRV)/*.cc)
+SRCFILESARRV := $(subst $(SRCDIRARRV)/,,$(SRCFILES_WP_ARRV))
+
+SRCFILES_WP_BASE := $(wildcard $(SRCDIRBASE)/*.cc)
+SRCFILESBASE := $(subst $(SRCDIRBASE)/,,$(SRCFILES_WP_BASE))
+
+SRCFILES_WP_MPI := $(wildcard $(SRCDIRMPI)/*.cc)
+SRCFILESMPI := $(subst $(SRCDIRMPI)/,,$(SRCFILES_WP_MPI))
+
+SRCFILES_WP_PETSC := $(wildcard $(SRCDIRPETSC)/*.cc)
+SRCFILESPETSC := $(subst $(SRCDIRPETSC)/,,$(SRCFILES_WP_PETSC))
+
+SRCFILES_WP_FV := $(wildcard $(SRCDIRFV)/*.cc)
+SRCFILESFV := $(subst $(SRCDIRFV)/,,$(SRCFILES_WP_FV))
+
+SRCFILES_WP_LA := $(wildcard $(SRCDIRLA)/*.cc)
+SRCFILESLA := $(subst $(SRCDIRLA)/,,$(SRCFILES_WP_LA))
+
+# Substitutions for objects
+# Here we use the base file names combined to VPATH
+OBJS_ARRV := $(SRCFILESARRV:%.cc=$(OBJDIR)/%.o)
+OBJS_BASE := $(SRCFILESBASE:%.cc=$(OBJDIR)/%.o)
+OBJS_MPI := $(SRCFILESMPI:%.cc=$(OBJDIR)/%.o)
+OBJS_PETSC := $(SRCFILESPETSC:%.cc=$(OBJDIR)/%.o)
+OBJS_FV := $(SRCFILESFV:%.cc=$(OBJDIR)/%.o)
+OBJS_LA := $(SRCFILESLA:%.cc=$(OBJDIR)/%.o)
+OBJS := $(OBJS_ARRV) $(OBJS_BASE) $(OBJS_MPI) $(OBJS_PETSC) $(OBJS_FV) $(OBJS_LA)
 DEPS := $(OBJS:.o=.d)
 
-CXXFLAGS += -MMD -MP
+VPATH := $(SRCDIRARRV):$(SRCDIRBASE):$(SRCDIRMPI):$(SRCDIRPETSC):$(SRCDIRFV):$(SRCDIRLA)
 
-# Compile rule
-$(OBJDIR)/%.o: %.cc
+CPPFLAGS += $(addprefix -I,$(INCDIRS))
+CPPFLAGS += -DMPIRUN=\"$(PACIFIC_MPIEXEC)\"
+CPPFLAGS += -DLEVEL=0
+CXXFLAGS += -O3 -g -MMD -MP -fPIC
+
+#------------------------------------------------------------------------------
+# Production rules
+.SILENT:
+
+all    : MESS $(LIBSO_WP) CPINC
+
+OBJ    : ARRV MARRV BASE MBASE MPI MMPI PETSC MPETSC FV MFV LA MLA
+	@echo -e 'Compilation is complete\n'
+
+LINK : $(LIBSO_WP)
+
+$(LIBSO_WP) : $(OBJS) | $(LIBDIR)
+	$(CXX) -shared -Wl,-soname,$(LIBSO) -o $(LIBSO_WP) $(OBJS) $(LDFLAGS) $(LDLIBS)
+	@echo -e '--------------------------------\n''Library libMAC.so generated !\n''--------------------------------'	
+
+ARRV : $(OBJS_ARRV)
+
+BASE  : $(OBJS_BASE)
+
+MPI  : $(OBJS_MPI)
+
+PETSC   : $(OBJS_PETSC)
+
+FV     : $(OBJS_FV)
+
+LA   : $(OBJS_LA)
+	
+MARRV     : 
+	@echo -e '*** Package ArrayVector compiled\n'
+
+MBASE   : 
+	@echo -e '*** Package Base compiled\n'
+
+MMPI    : 
+	@echo -e '*** Package ExternalAPI/MPI compiled\n'
+	
+MPETSC    : 
+	@echo -e '*** Package ExternalAPI/PETSc compiled\n'
+	
+MFV   : 
+	@echo -e '*** Package FiniteVolume compiled\n'
+	
+MLA    : 
+	@echo -e '*** Package LinearAlgebra compiled\n'	
+		
+MESS   :
+	@echo -e '************************************************************\n''MAC compiled with' $(CXX) $(CPPFLAGS) $(CXXFLAGS)'\n************************************************************'	
+
+$(OBJDIR)/%.o : %.cc
 	@mkdir -p $(dir $@)
+	@echo 'Compiling '$<
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
-
-LIBSO := $(LIBDIR)/libMAC.so
 
 $(LIBDIR):
 	@mkdir -p $@
+	
+$(INCDIR):
+	@mkdir -p $@
+	
+CPINC  : $(INCDIR)
+	cp $(ALLINC) $(INCDIR)/	
 
-CXXFLAGS += -fPIC
-$(LIBSO): $(OBJS) | $(LIBDIR)
-	$(CXX) -shared -o $@ $(OBJS) $(LDFLAGS) $(LDLIBS)
-
-.PHONY: all clean
-
-all: $(LIBSO)
+-include $(DEPS)
 
 clean:
-	rm -rf $(OBJDIR)
-	rm -f $(LIBSO)
+	rm -rf $(OBJDIR)/*.o \
+	rm -f $(LIBSO_WP) \
+	rm -rf $(INCDIR)/*.hh \
+	rm -rf $(INCDIR)/*.icc
+ 

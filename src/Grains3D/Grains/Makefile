@@ -107,6 +107,8 @@ OBJS_TIME := $(SRCFILESTIME:%.cpp=$(OBJDIR)/%.o)
 OBJS_XML := $(SRCFILESXML:%.cpp=$(OBJDIR)/%.o)
 OBJS_UTIL := $(SRCFILESUTIL:%.cpp=$(OBJDIR)/%.o)
 OBJS_BAS := $(SRCFILESBAS:%.cpp=$(OBJDIR)/%.o)
+OBJS := $(OBJS_BASE) $(OBJS_COMPO) $(OBJS_FLUID) $(OBJS_GEOM) $(OBJS_PP) $(OBJS_TIME) $(OBJS_XML) $(OBJS_UTIL) $(OBJS_BAS)
+DEPS := $(OBJS:.o=.d)
 
 
 # Defining VPATH for automatic search of source files in the 
@@ -125,17 +127,15 @@ CXXFLAGS += -O3 -g -MMD -MP -fPIC
 # Production rules
 .SILENT:
 
-all    : MESS OBJ dtd tools LINK CPINC
+all    : MESS $(LIBSO_WP) dtd tools CPINC
 
 OBJ    : GEOM MGEOM XML MXML COMPO MCOMPO BASE MBASE FLUID MFLUID BAS MBAS TIME MTIME PP MPP UTIL MUTIL
 	@echo -e 'Compilation is complete\n'
 
 LINK    : $(LIBSO_WP)
 
-$(LIBSO_WP) : $(LIBDIR)
-	sleep 5 # this is to avoid obj files randomly not being on the disk
-		# yet when linking starts in parallel make
-	$(CXX) -shared -Wl,-soname,$(LIBSO) -o $(LIBSO_WP) $(OBJS_BASE) $(OBJS_COMPO) $(OBJS_FLUID) $(OBJS_GEOM) $(OBJS_PP) $(OBJS_TIME) $(OBJS_XML) $(OBJS_UTIL) $(OBJS_BAS) $(LDFLAGS) $(LDLIBS)
+$(LIBSO_WP) : $(OBJS) | $(LIBDIR)
+	$(CXX) -shared -Wl,-soname,$(LIBSO) -o $(LIBSO_WP) $(OBJS) $(LDFLAGS) $(LDLIBS)
 	@echo -e '--------------------------------\n''Library libGrains.so generated !\n''--------------------------------'	
 
 BASE   : $(OBJS_BASE)
@@ -197,8 +197,10 @@ $(LIBDIR):
 $(INCDIR):
 	@mkdir -p $@
 	
-CPINC  : $(INCDIR)
+CPINC  : | $(INCDIR)
 	cp $(ALLINC) $(INCDIR)/	
+
+-include $(DEPS)
 
 clean:
 	rm -rf $(OBJDIR)/* \

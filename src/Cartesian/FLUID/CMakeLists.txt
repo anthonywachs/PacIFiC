@@ -15,120 +15,87 @@ project(FLUID
 #
 
 set(FLUID_SOURCES "")
+set(FLUID_INCLUDE_DIRS "")
 
 #
 # FluidSolidInterface
 #
 
-list(APPEND FLUID_SOURCES
-  FluidSolidInterface/src/FS_2Dcylinder.cc
-  FluidSolidInterface/src/FS_3Dbox.cc
-  FluidSolidInterface/src/FS_3Dcylinder.cc
-  FluidSolidInterface/src/FS_AllRigidBodies.cc
-  FluidSolidInterface/src/FS_GeneralPolyhedron.cc
-  FluidSolidInterface/src/FS_Grains3DPlugIn.cc
-  FluidSolidInterface/src/FS_RigidBody_BuilderFactory.cc
-  FluidSolidInterface/src/FS_RigidBody.cc
-  FluidSolidInterface/src/FS_SolidPlugIn_BuilderFactory.cc
-  FluidSolidInterface/src/FS_SolidPlugIn.cc
-  FluidSolidInterface/src/FS_Sphere.cc
+list(APPEND FLUID_INCLUDE_DIRS $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/FluidSolidInterface/include>)
+file(GLOB FLUID_FSI_SOURCES CONFIGURE_DEPENDS
+  "${CMAKE_CURRENT_SOURCE_DIR}/FluidSolidInterface/src/*.cc"
 )
+list(SORT FLUID_FSI_SOURCES)
+list(APPEND FLUID_SOURCES ${FLUID_FSI_SOURCES})
 
 #
 # Misc
 #
 
-list(APPEND FLUID_SOURCES
-  Misc/src/PAC_computingtime.cc  
-  Misc/src/PAC_solvercomputingtime.cc
-  Misc/src/PAC_Misc.cc
+list(APPEND FLUID_INCLUDE_DIRS $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Misc/include>)
+file(GLOB FLUID_MISC_SOURCES CONFIGURE_DEPENDS
+  "${CMAKE_CURRENT_SOURCE_DIR}/Misc/src/*.cc"
 )
+list(SORT FLUID_MISC_SOURCES)
+list(APPEND FLUID_SOURCES ${FLUID_MISC_SOURCES})
 
 #
 # PostProcessing
 #
 
-list(APPEND FLUID_SOURCES
-  PostProcessing/src/PostProcessing.cc
+list(APPEND FLUID_INCLUDE_DIRS $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/PostProcessing/include>)
+file(GLOB FLUID_POSTPROCESSING_SOURCES CONFIGURE_DEPENDS
+  "${CMAKE_CURRENT_SOURCE_DIR}/PostProcessing/src/*.cc"
 )
+list(SORT FLUID_POSTPROCESSING_SOURCES)
+list(APPEND FLUID_SOURCES ${FLUID_POSTPROCESSING_SOURCES})
 
 #
-# Solvers
+# Solvers/DirectionSplitting
 #
 
-# list(APPEND FLUID_SOURCES
-#   Solvers/DirectionSplitting/src/DS_2Dcylinder.cc
-#   Solvers/DirectionSplitting/src/DS_AllRigidBodies.cc
-#   Solvers/DirectionSplitting/src/DS_HeatTransfer.cc
-#   Solvers/DirectionSplitting/src/DS_NavierStokesSystem.cc
-#   Solvers/DirectionSplitting/src/DS_RigidBody.cc
-#   Solvers/DirectionSplitting/src/DS_3Dbox.cc
-#   Solvers/DirectionSplitting/src/DS_DirectionSplitting.cc
-#   Solvers/DirectionSplitting/src/DS_HeatTransferSystem.cc
-#   Solvers/DirectionSplitting/src/DS_PID.cc
-#   Solvers/DirectionSplitting/src/DS_Sphere.cc
-#   Solvers/DirectionSplitting/src/DS_3Dcylinder.cc
-#   Solvers/DirectionSplitting/src/DS_GeneralPolyhedron.cc
-#   Solvers/DirectionSplitting/src/DS_NavierStokes.cc
-#   Solvers/DirectionSplitting/src/DS_RigidBody_BuilderFactory.cc
-#   Solvers/DirectionSplitting/src/DS_STL.cc
-# )
-
-list(APPEND FLUID_SOURCES
-  Solvers/DLMFD/src/DLMFD_3Dbox.cc
-  Solvers/DLMFD/src/DLMFD_BoundaryMultiplierPoint.cc
-  Solvers/DLMFD/src/DLMFD_InteriorMultiplierPoint.cc
-  Solvers/DLMFD/src/DLMFD_RigidBody_BuilderFactory.cc
-  Solvers/DLMFD/src/DLMFD_3Dcylinder.cc
-  Solvers/DLMFD/src/DLMFD_FictitiousDomain.cc
-  Solvers/DLMFD/src/DLMFD_ParticlePoint.cc
-  Solvers/DLMFD/src/DLMFD_RigidBody.cc
-  Solvers/DLMFD/src/DLMFD_AllGeomBoundaries.cc
-  Solvers/DLMFD/src/DLMFD_GeneralPolyhedron.cc
-  Solvers/DLMFD/src/DLMFD_ProjectionNavierStokes.cc
-  Solvers/DLMFD/src/DLMFD_Sphere.cc
-  Solvers/DLMFD/src/DLMFD_AllRigidBodies.cc
-  Solvers/DLMFD/src/DLMFD_GeomBoundary.cc
-  Solvers/DLMFD/src/DLMFD_ProjectionNavierStokesSystem.cc
-  Solvers/DLMFD/src/DLMFD_XYZBoxPlan.cc
+list(APPEND FLUID_INCLUDE_DIRS $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Solvers/DirectionSplitting/include>)
+file(GLOB FLUID_DS_SOURCES CONFIGURE_DEPENDS
+  "${CMAKE_CURRENT_SOURCE_DIR}/Solvers/DirectionSplitting/src/*.cc"
 )
-
-list(APPEND FLUID_SOURCES
-  Solvers/Viscoplastic_HeatTransfer/src/VPH_HeatTransfer.cc
-  Solvers/Viscoplastic_HeatTransfer/src/VPH_HeatTransferSystem.cc
-  Solvers/Viscoplastic_HeatTransfer/src/VPH_Viscoplastic.cc
-  Solvers/Viscoplastic_HeatTransfer/src/VPH_Viscoplastic_Misc.cc
-  Solvers/Viscoplastic_HeatTransfer/src/VPH_ViscoplasticSystem.cc
-)
-
+list(SORT FLUID_DS_SOURCES)
+list(APPEND FLUID_SOURCES ${FLUID_DS_SOURCES})
 
 #
-# Build FLUID shared object
+# Solvers/DLMFD
 #
 
-add_library(FLUID SHARED ${FLUID_SOURCES} )
-add_library(PacIFiC::FLUID ALIAS FLUID)
-
-set_target_properties(FLUID
-  PROPERTIES
-  VERSION ${PROJECT_VERSION}
-  SOVERSION ${PROJECT_VERSION_MAJOR}
+list(APPEND FLUID_INCLUDE_DIRS $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Solvers/DLMFD/include>)
+file(GLOB FLUID_DLMFD_SOURCES CONFIGURE_DEPENDS
+  "${CMAKE_CURRENT_SOURCE_DIR}/Solvers/DLMFD/src/*.cc"
 )
+list(SORT FLUID_DLMFD_SOURCES)
+list(APPEND FLUID_SOURCES ${FLUID_DLMFD_SOURCES})
 
-target_include_directories(FLUID
+#
+# Solvers/Viscoplastic_HeatTransfer
+#
+
+list(APPEND FLUID_INCLUDE_DIRS $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Solvers/Viscoplastic_HeatTransfer/include>)
+file(GLOB FLUID_VPH_SOURCES CONFIGURE_DEPENDS
+  "${CMAKE_CURRENT_SOURCE_DIR}/Solvers/Viscoplastic_HeatTransfer/src/*.cc"
+)
+list(SORT FLUID_VPH_SOURCES)
+list(APPEND FLUID_SOURCES ${FLUID_VPH_SOURCES})
+
+#
+# Build FLUID binary
+#
+ 
+add_executable(fluid ${FLUID_SOURCES})
+ 
+
+target_include_directories(fluid
   PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/FluidSolidInterface/include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Misc/include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/PostProcessing/include>
-    # $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Solvers/DirectionSplitting/include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Solvers/DLMFD/include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Solvers/Viscoplastic_HeatTransfer/include>
-
-    # Install tree include dir (must NOT be in the source tree)
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/FLUID>
+    ${FLUID_INCLUDE_DIRS}
 )
 
-target_link_libraries(FLUID 
+target_link_libraries(fluid 
   PUBLIC
     PacIFiC::MAC
     PacIFiC::Grains
@@ -142,64 +109,47 @@ target_link_libraries(FLUID
 # ================================================================================
 
 include(GNUInstallDirs)
-include(CMakePackageConfigHelpers)
+# include(CMakePackageConfigHelpers)
 
 # ---- 1. Install the shared library ------------------------------------------------
-install(TARGETS FLUID
-  EXPORT FLUIDTargets
-  LIBRARY DESTINATION ${PACIFIC_MPI_INSTALL_LIBDIR}      
+install(TARGETS fluid
+  # EXPORT FLUIDTargets
+  RUNTIME DESTINATION ${PACIFIC_MPI_INSTALL_BINDIR}
   COMPONENT FLUID_Runtime
-  RUNTIME DESTINATION ${PACIFIC_MPI_INSTALL_BINDIR}      
-  COMPONENT FLUID_Runtime
-  INCLUDES DESTINATION ${PACIFIC_MPI_INSTALL_INCLUDEDIR} 
-)
-
-# ---- 2. Install all public headers -------------------------------------------------
-# If your project has multiple include roots, add them all.
-install(DIRECTORY
-  ${CMAKE_CURRENT_SOURCE_DIR}/FluidSolidInterface/include/
-  ${CMAKE_CURRENT_SOURCE_DIR}/Misc/include/
-  ${CMAKE_CURRENT_SOURCE_DIR}/PostProcessing/include/
-  ${CMAKE_CURRENT_SOURCE_DIR}/Solvers/DirectionSplitting/include/
-  ${CMAKE_CURRENT_SOURCE_DIR}/Solvers/DLMFD/include/
-  ${CMAKE_CURRENT_SOURCE_DIR}/Solvers/Viscoplastic_HeatTransfer/include/
-  DESTINATION ${PACIFIC_MPI_INSTALL_INCLUDEDIR}/FLUID
-  COMPONENT FLUID_Devel
-  FILES_MATCHING PATTERN "*.h*"      # match .h, .hh, .hpp
 )
 
 # ---- 4. Generate CMake package configuration --------------------------------------
-set(FLUID_INSTALL_CMAKEDIR ${PACIFIC_MPI_INSTALL_LIBDIR}/cmake/FLUID)
+# set(FLUID_INSTALL_CMAKEDIR ${PACIFIC_MPI_INSTALL_LIBDIR}/cmake/FLUID)
 
-configure_package_config_file(
-  ${CMAKE_CURRENT_SOURCE_DIR}/cmake/FLUIDConfig.cmake.in
-  ${CMAKE_CURRENT_BINARY_DIR}/FLUIDConfig.cmake
-  INSTALL_DESTINATION ${FLUID_INSTALL_CMAKEDIR}
-)
+# configure_package_config_file(
+#   ${CMAKE_CURRENT_SOURCE_DIR}/cmake/FLUIDConfig.cmake.in
+#   ${CMAKE_CURRENT_BINARY_DIR}/FLUIDConfig.cmake
+#   INSTALL_DESTINATION ${FLUID_INSTALL_CMAKEDIR}
+# )
 
-write_basic_package_version_file(
-  ${CMAKE_CURRENT_BINARY_DIR}/FLUIDConfigVersion.cmake
-  VERSION ${PROJECT_VERSION}
-  COMPATIBILITY SameMajorVersion
-)
+# write_basic_package_version_file(
+#   ${CMAKE_CURRENT_BINARY_DIR}/FLUIDConfigVersion.cmake
+#   VERSION ${PROJECT_VERSION}
+#   COMPATIBILITY SameMajorVersion
+# )
 
 # ---- 5. Install the package + targets ---------------------------------------------
-install(EXPORT FLUIDTargets
-  FILE FLUIDTargets.cmake
-  NAMESPACE PacIFiC::
-  DESTINATION ${FLUID_INSTALL_CMAKEDIR}
-  COMPONENT FLUID_Devel
-)
+# install(EXPORT FLUIDTargets
+#   FILE FLUIDTargets.cmake
+#   NAMESPACE PacIFiC::
+#   DESTINATION ${FLUID_INSTALL_CMAKEDIR}
+#   COMPONENT FLUID_Devel
+# )
 
-install(FILES
-  ${CMAKE_CURRENT_BINARY_DIR}/FLUIDConfig.cmake
-  ${CMAKE_CURRENT_BINARY_DIR}/FLUIDConfigVersion.cmake
-  DESTINATION ${FLUID_INSTALL_CMAKEDIR}
-  COMPONENT FLUID_Devel
-)
+# install(FILES
+#   ${CMAKE_CURRENT_BINARY_DIR}/FLUIDConfig.cmake
+#   ${CMAKE_CURRENT_BINARY_DIR}/FLUIDConfigVersion.cmake
+#   DESTINATION ${FLUID_INSTALL_CMAKEDIR}
+#   COMPONENT FLUID_Devel
+# )
 
 # ---- 6. Export from the build tree for development -------------------------------
-export(EXPORT FLUIDTargets
-  FILE ${CMAKE_CURRENT_BINARY_DIR}/FLUIDTargets.cmake
-  NAMESPACE PacIFiC::
-)
+# export(EXPORT FLUIDTargets
+#   FILE ${CMAKE_CURRENT_BINARY_DIR}/FLUIDTargets.cmake
+#   NAMESPACE PacIFiC::
+# )

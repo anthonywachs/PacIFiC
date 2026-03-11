@@ -9,6 +9,8 @@
   openmpi,
   hdf5-mpi,
   zlib,
+  petsc,
+  hypre,
   xercesc,
   makeWrapper,
 }:
@@ -39,6 +41,8 @@ stdenv.mkDerivation {
     zlib
     (hdf5-mpi.override { mpi = openmpi; })
     openmpi
+    petsc
+    hypre
   ];
 
   propagatedBuildInputs = [

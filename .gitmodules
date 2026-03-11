@@ -10,3 +10,6 @@
 [submodule "third_party/basilisk/basilisk_submodule"]
 	path = third_party/basilisk/basilisk_submodule
 	url = https://github.com/tortotubus/pacific-basilisk.git
+[submodule "third_party/petsc/petsc_submodule"]
+	path = third_party/petsc/petsc_submodule
+	url = https://gitlab.com/petsc/petsc.git

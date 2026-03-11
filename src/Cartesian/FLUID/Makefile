@@ -1,108 +1,147 @@
-# Dependencies
-CPPFLAGS += $(PACIFIC_XERCESC_CFLAGS) $(PACIFIC_ZLIB_CFLAGS)
-LDLIBS   += $(PACIFIC_XERCESC_LFLAGS) $(PACIFIC_ZLIB_LFLAGS)
-
-MAC_INCDIRS := \
-  $(MAC_SRCDIR_ABS)/ArrayVector/include \
-  $(MAC_SRCDIR_ABS)/Base/include \
-  $(MAC_SRCDIR_ABS)/FiniteVolume/include \
-  $(MAC_SRCDIR_ABS)/LinearAlgebra/include
-
-CPPFLAGS += $(addprefix -I,$(MAC_INCDIRS))
-LDLIBS += "-L$(MAC_LIBDIR) -lMAC"
-
-GRAINS_INCDIRS := \
-  $(GRAINS_SRCDIR_ABS)/Grains/Base/include \
-  $(GRAINS_SRCDIR_ABS)/Grains/Component/include \
-  $(GRAINS_SRCDIR_ABS)/Grains/Fluid/include \
-  $(GRAINS_SRCDIR_ABS)/Grains/Geometry/include \
-  $(GRAINS_SRCDIR_ABS)/Grains/PostProcessing/include \
-  $(GRAINS_SRCDIR_ABS)/Grains/TimeIntegration/include \
-  $(GRAINS_SRCDIR_ABS)/Grains/Utility/include \
-  $(GRAINS_SRCDIR_ABS)/Grains/XML3/include \
-  $(GRAINS_SRCDIR_ABS)/Grains/InterfaceCBasilisk/include
-
-CPPFLAGS += $(addprefix -I,$(GRAINS_INCDIRS))
-LDLIBS += "-L$(GRAINS_LIBDIR) -lGrains"
-
-# Complilers
 CXX = $(PACIFIC_MPICXX)
 CC = $(PACIFIC_MPICC)
+CPPFLAGS += $(PACIFIC_XERCESC_CFLAGS) $(PACIFIC_ZLIB_CFLAGS)
+LDLIBS += $(PACIFIC_XERCESC_LFLAGS) $(PACIFIC_ZLIB_LFLAGS)
 
-# Build directories
 OBJDIR := $(FLUID_OBJDIR)
-LIBDIR := $(FLUID_LIBDIR)
+BINDIR := $(FLUID_BINDIR)
+TARGET := fluid
+TARGET_WP := $(BINDIR)/$(TARGET)
 
-INCDIRS := \
-  $(FLUID_SRCDIR_ABS)/FluidSolidInterface/include \
-  $(FLUID_SRCDIR_ABS)/Misc/include \
-  $(FLUID_SRCDIR_ABS)/PostProcessing/include \
-  $(FLUID_SRCDIR_ABS)/Solvers/DLMFD/include \
-  $(FLUID_SRCDIR_ABS)/Solvers/Viscoplastic_HeatTransfer/include 
+ALLINC =
 
-SRCS := \
-  FluidSolidInterface/src/FS_2Dcylinder.cc \
-  FluidSolidInterface/src/FS_3Dbox.cc \
-  FluidSolidInterface/src/FS_3Dcylinder.cc \
-  FluidSolidInterface/src/FS_AllRigidBodies.cc \
-  FluidSolidInterface/src/FS_GeneralPolyhedron.cc \
-  FluidSolidInterface/src/FS_Grains3DPlugIn.cc \
-  FluidSolidInterface/src/FS_RigidBody_BuilderFactory.cc \
-  FluidSolidInterface/src/FS_RigidBody.cc \
-  FluidSolidInterface/src/FS_SolidPlugIn_BuilderFactory.cc \
-  FluidSolidInterface/src/FS_SolidPlugIn.cc \
-  FluidSolidInterface/src/FS_Sphere.cc \
-  Misc/src/PAC_computingtime.cc \
-  Misc/src/PAC_solvercomputingtime.cc \
-  Misc/src/PAC_Misc.cc \
-  PostProcessing/src/PostProcessing.cc \
-  Solvers/DLMFD/src/DLMFD_3Dbox.cc \
-  Solvers/DLMFD/src/DLMFD_BoundaryMultiplierPoint.cc \
-  Solvers/DLMFD/src/DLMFD_InteriorMultiplierPoint.cc \
-  Solvers/DLMFD/src/DLMFD_RigidBody_BuilderFactory.cc \
-  Solvers/DLMFD/src/DLMFD_3Dcylinder.cc \
-  Solvers/DLMFD/src/DLMFD_FictitiousDomain.cc \
-  Solvers/DLMFD/src/DLMFD_ParticlePoint.cc \
-  Solvers/DLMFD/src/DLMFD_RigidBody.cc \
-  Solvers/DLMFD/src/DLMFD_AllGeomBoundaries.cc \
-  Solvers/DLMFD/src/DLMFD_GeneralPolyhedron.cc \
-  Solvers/DLMFD/src/DLMFD_ProjectionNavierStokes.cc \
-  Solvers/DLMFD/src/DLMFD_Sphere.cc \
-  Solvers/DLMFD/src/DLMFD_AllRigidBodies.cc \
-  Solvers/DLMFD/src/DLMFD_GeomBoundary.cc \
-  Solvers/DLMFD/src/DLMFD_ProjectionNavierStokesSystem.cc \
-  Solvers/DLMFD/src/DLMFD_XYZBoxPlan.cc \
-  Solvers/Viscoplastic_HeatTransfer/src/VPH_HeatTransfer.cc \
-  Solvers/Viscoplastic_HeatTransfer/src/VPH_HeatTransferSystem.cc \
-  Solvers/Viscoplastic_HeatTransfer/src/VPH_Viscoplastic.cc \
-  Solvers/Viscoplastic_HeatTransfer/src/VPH_Viscoplastic_Misc.cc \
-  Solvers/Viscoplastic_HeatTransfer/src/VPH_ViscoplasticSystem.cc \
+# External dependencies
+MAC_INCDIRS := \
+  $(MAC_INCDIR)
+CPPFLAGS += $(addprefix -I,$(MAC_INCDIRS))
+LDLIBS += -L$(MAC_LIBDIR) -lMAC
+LDFLAGS += -L$(MAC_LIBDIR) -Wl,-rpath,$(MAC_LIBDIR)
 
-CPPFLAGS += $(addprefix -I,$(INCDIRS))
+GRAINS_INCDIRS := \
+  $(GRAINS_INCDIR)
+CPPFLAGS += $(addprefix -I,$(GRAINS_INCDIRS))
+LDLIBS += -L$(GRAINS_LIBDIR) -lGrains
+LDFLAGS += -L$(GRAINS_LIBDIR) -Wl,-rpath,$(GRAINS_LIBDIR)
 
-OBJS := $(patsubst %.cc,$(OBJDIR)/%.o,$(SRCS))
+# Source and include directories
+SRCDIRFSI := FluidSolidInterface/src
+INCDIRFSI := FluidSolidInterface/include
+INCDIRS += $(INCDIRFSI)
+ALLINC += $(wildcard $(INCDIRFSI)/*.hh)
+
+SRCDIRMISC := Misc/src
+INCDIRMISC := Misc/include
+INCDIRS += $(INCDIRMISC)
+ALLINC += $(wildcard $(INCDIRMISC)/*.hh)
+
+SRCDIRPP := PostProcessing/src
+INCDIRPP := PostProcessing/include
+INCDIRS += $(INCDIRPP)
+ALLINC += $(wildcard $(INCDIRPP)/*.hh)
+
+SRCDIRDS := Solvers/DirectionSplitting/src
+INCDIRDS := Solvers/DirectionSplitting/include
+INCDIRS += $(INCDIRDS)
+ALLINC += $(wildcard $(INCDIRDS)/*.hh)
+
+SRCDIRDLMFD := Solvers/DLMFD/src
+INCDIRDLMFD := Solvers/DLMFD/include
+INCDIRS += $(INCDIRDLMFD)
+ALLINC += $(wildcard $(INCDIRDLMFD)/*.hh)
+
+SRCDIRVPH := Solvers/Viscoplastic_HeatTransfer/src
+INCDIRVPH := Solvers/Viscoplastic_HeatTransfer/include
+INCDIRS += $(INCDIRVPH)
+ALLINC += $(wildcard $(INCDIRVPH)/*.hh)
+
+# Source files per package
+SRCFILES_WP_FSI := $(wildcard $(SRCDIRFSI)/*.cc)
+SRCFILESFSI := $(subst $(SRCDIRFSI)/,,$(SRCFILES_WP_FSI))
+
+SRCFILES_WP_MISC := $(wildcard $(SRCDIRMISC)/*.cc)
+SRCFILESMISC := $(subst $(SRCDIRMISC)/,,$(SRCFILES_WP_MISC))
+
+SRCFILES_WP_PP := $(wildcard $(SRCDIRPP)/*.cc)
+SRCFILESPP := $(subst $(SRCDIRPP)/,,$(SRCFILES_WP_PP))
+
+SRCFILES_WP_DS := $(wildcard $(SRCDIRDS)/*.cc)
+SRCFILESDS := $(subst $(SRCDIRDS)/,,$(SRCFILES_WP_DS))
+
+SRCFILES_WP_DLMFD := $(wildcard $(SRCDIRDLMFD)/*.cc)
+SRCFILESDLMFD := $(subst $(SRCDIRDLMFD)/,,$(SRCFILES_WP_DLMFD))
+
+SRCFILES_WP_VPH := $(wildcard $(SRCDIRVPH)/*.cc)
+SRCFILESVPH := $(subst $(SRCDIRVPH)/,,$(SRCFILES_WP_VPH))
+
+# Objects
+OBJS_FSI := $(SRCFILESFSI:%.cc=$(OBJDIR)/%.o)
+OBJS_MISC := $(SRCFILESMISC:%.cc=$(OBJDIR)/%.o)
+OBJS_PP := $(SRCFILESPP:%.cc=$(OBJDIR)/%.o)
+OBJS_DS := $(SRCFILESDS:%.cc=$(OBJDIR)/%.o)
+OBJS_DLMFD := $(SRCFILESDLMFD:%.cc=$(OBJDIR)/%.o)
+OBJS_VPH := $(SRCFILESVPH:%.cc=$(OBJDIR)/%.o)
+OBJS := $(OBJS_FSI) $(OBJS_MISC) $(OBJS_PP) $(OBJS_DS) $(OBJS_DLMFD) $(OBJS_VPH)
 DEPS := $(OBJS:.o=.d)
 
-CXXFLAGS += -MMD -MP
+VPATH := $(SRCDIRFSI):$(SRCDIRMISC):$(SRCDIRPP):$(SRCDIRDS):$(SRCDIRDLMFD):$(SRCDIRVPH)
 
-# Compile rule
+CPPFLAGS += $(addprefix -I,$(INCDIRS))
+CXXFLAGS += -O3 -g -MMD -MP
+
+.SILENT:
+
+all: MESS $(TARGET_WP)
+
+OBJ: FSI MFSI MISC MMISC PP MPP DS MDS DLMFD MDLMFD VPH MVPH
+	@echo -e 'Compilation is complete\n'
+
+$(TARGET_WP): $(OBJS) | $(BINDIR)
+	$(CXX) -o $(TARGET_WP) $(OBJS) $(LDFLAGS) $(LDLIBS)
+	@echo -e '-------------------------------\n''Executable fluid generated !\n''-------------------------------'
+
+FSI: $(OBJS_FSI)
+
+MISC: $(OBJS_MISC)
+
+PP: $(OBJS_PP)
+
+DS: $(OBJS_DS)
+
+DLMFD: $(OBJS_DLMFD)
+
+VPH: $(OBJS_VPH)
+
+MFSI:
+	@echo -e '*** Package FluidSolidInterface compiled\n'
+
+MMISC:
+	@echo -e '*** Package Misc compiled\n'
+
+MPP:
+	@echo -e '*** Package PostProcessing compiled\n'
+
+MDS:
+	@echo -e '*** Package Solvers/DirectionSplitting compiled\n'
+
+MDLMFD:
+	@echo -e '*** Package Solvers/DLMFD compiled\n'
+
+MVPH:
+	@echo -e '*** Package Solvers/Viscoplastic_HeatTransfer compiled\n'
+
+MESS:
+	@echo -e '************************************************************\n''FLUID compiled with' $(CXX) $(CPPFLAGS) $(CXXFLAGS)'\n************************************************************'
+
 $(OBJDIR)/%.o: %.cc
 	@mkdir -p $(dir $@)
+	@echo 'Compiling '$<
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
-LIBSO := $(LIBDIR)/libFLUID.so
-
-$(LIBDIR):
+$(BINDIR):
 	@mkdir -p $@
-
-CXXFLAGS += -fPIC
-$(LIBSO): $(OBJS) | $(LIBDIR)
-	$(CXX) -shared -o $@ $(OBJS) $(LDFLAGS) $(LDLIBS)
-
-.PHONY: all clean
-
-all: $(LIBSO)
 
 clean:
 	rm -rf $(OBJDIR)
-	rm -f $(LIBSO)
+	rm -f $(TARGET_WP)
+
+-include $(DEPS)

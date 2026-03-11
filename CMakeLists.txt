@@ -181,7 +181,11 @@ add_subdirectory(src)
 #
 # ================================================================================
 
-add_subdirectory(docs)
+option(PACIFIC_DOCS "Enable docs" OFF)
+
+if(PACIFIC_DOCS)
+  add_subdirectory(docs)
+endif()
 
 # ================================================================================
 #
