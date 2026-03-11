@@ -21,168 +21,99 @@ configure_file(
 # Collect Grains sources
 #
 
-set(GRAINS_HEADERS "")
-set(GRAINS_INCLUDE_DIRS
-  "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-)
+set(GRAINS_INCLUDE_DIRS "")
 set(GRAINS_SOURCES "")
 
+# Base
 list(APPEND GRAINS_INCLUDE_DIRS "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Base/include>")
-
+file(GLOB GRAINS_BASE_SOURCES CONFIGURE_DEPENDS
+  "${CMAKE_CURRENT_SOURCE_DIR}/Base/src/*.cpp"
+)
+list(SORT GRAINS_BASE_SOURCES)
 list(APPEND GRAINS_SOURCES
-  Base/src/App.cpp
-  Base/src/AppBrownian.cpp
-  Base/src/AppCollision.cpp
-  Base/src/Cell.cpp
-  Base/src/computingtime.cpp
-  Base/src/Error.cpp
-  Base/src/Grains.cpp
-  Base/src/GrainsBuilderFactory.cpp
-  Base/src/GrainsCRBFeatures.cpp
-  Base/src/GrainsExec.cpp
-  Base/src/GrainsMPI.cpp
-  Base/src/GrainsMPIWrapper.cpp
-  Base/src/GrainsParameters.cpp
-  Base/src/GrainsPostProcessing.cpp
-  Base/src/GrainsTestDev.cpp
-  Base/src/LinkedCell.cpp
-  Base/src/MPINeighbors.cpp
-  Base/src/solvercomputingtime.cpp
+  ${GRAINS_BASE_SOURCES}
 )
 
+# Component
 list(APPEND GRAINS_INCLUDE_DIRS "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Component/include>")
-
+file(GLOB GRAINS_COMPONENT_SOURCES CONFIGURE_DEPENDS
+  "${CMAKE_CURRENT_SOURCE_DIR}/Component/src/*.cpp"
+)
+list(SORT GRAINS_COMPONENT_SOURCES)
 list(APPEND GRAINS_SOURCES
-  Component/src/AllComponents.cpp
-  Component/src/CompositeObstacle.cpp
-  Component/src/CylindricalShell.cpp
-  Component/src/BoxShell.cpp
-  Component/src/HookeMemoryContactForceModel.cpp
-  Component/src/ObstacleImposedForce.cpp
-  Component/src/Particle.cpp
-  Component/src/ParticleKinematicsSphere.cpp
-  Component/src/STLObstacle.cpp
-  Component/src/AllInsertionWindows.cpp
-  Component/src/CompositeParticle.cpp
-  Component/src/HertzContactForceModel.cpp
-  Component/src/KinematicsBuilderFactory.cpp
-  Component/src/ObstacleImposedVelocity.cpp
-  Component/src/ParticleKinematics2D.cpp
-  Component/src/QuadrilobeCylinder.cpp
-  Component/src/CollisionHistory.cpp
-  Component/src/ContactBuilderFactory.cpp
-  Component/src/HertzMemoryContactForceModel.cpp
-  Component/src/ObstacleBuilderFactory.cpp
-  Component/src/ObstacleKinematicsForce.cpp
-  Component/src/ParticleKinematics3D.cpp
-  Component/src/RoughWall.cpp             
-  Component/src/Component.cpp
-  Component/src/ContactForceModel.cpp
-  Component/src/HookeContactForceModel.cpp
-  Component/src/Obstacle.cpp
-  Component/src/ObstacleKinematicsVelocity.cpp
-  Component/src/ParticleKinematics.cpp
-  Component/src/SimpleObstacle.cpp
-  Component/src/Torsor.cpp
-  Component/src/TrilobeCylinder.cpp
-  Component/src/TruncatedConicalShell.cpp
-  Component/src/Window.cpp
+  ${GRAINS_COMPONENT_SOURCES}
 )
 
-list(APPEND GRAINS_INCLUDE_DIRS "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Geometry/include>")
-
-
-list(APPEND GRAINS_SOURCES
-  Fluid/src/AppPRSHydroFT.cpp
-  Fluid/src/GrainsCoupledWithFluid.cpp
-)
-
+# Fluid
 list(APPEND GRAINS_INCLUDE_DIRS "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Fluid/include>")
-
-
+file(GLOB GRAINS_FLUID_SOURCES CONFIGURE_DEPENDS
+  "${CMAKE_CURRENT_SOURCE_DIR}/Fluid/src/*.cpp"
+)
+list(SORT GRAINS_FLUID_SOURCES)
 list(APPEND GRAINS_SOURCES
-  Geometry/src/BBox.cpp
-  Geometry/src/Box.cpp
-  Geometry/src/BVolume.cpp
-  Geometry/src/Cone.cpp
-  Geometry/src/ConvexBuilderFactory.cpp
-  Geometry/src/Convex.cpp
-  Geometry/src/Cylinder.cpp
-  Geometry/src/Disc.cpp
-  Geometry/src/GJK_SV2.cpp
-  Geometry/src/GJK_SV.cpp
-  Geometry/src/Group3.cpp
-  Geometry/src/IndexArray.cpp
-  Geometry/src/Matrix.cpp
-  Geometry/src/OBB.cpp
-  Geometry/src/OBC.cpp
-  Geometry/src/Point3.cpp
-  Geometry/src/PointC.cpp
-  Geometry/src/PointContact.cpp
-  Geometry/src/Polygon.cpp
-  Geometry/src/Polyhedron.cpp
-  Geometry/src/Polytope.cpp
-  Geometry/src/Quaternion.cpp
-  Geometry/src/Rectangle.cpp
-  Geometry/src/RigidBody.cpp
-  Geometry/src/RigidBodyWithCrust.cpp
-  Geometry/src/Segment.cpp
-  Geometry/src/Shape.cpp
-  Geometry/src/Sphere.cpp
-  Geometry/src/SpheroCylinder.cpp
-  Geometry/src/SpheroCylindricalPrism.cpp
-  Geometry/src/STLTriangle.cpp
-  Geometry/src/STLVertex.cpp
-  Geometry/src/Superquadric.cpp
-  Geometry/src/Transform.cpp
-  Geometry/src/TrapezoidalPrism.cpp
-  Geometry/src/TruncatedCone.cpp
-  Geometry/src/Vector3.cpp
-  Geometry/src/VertexBase.cpp
+  ${GRAINS_FLUID_SOURCES}
 )
 
-list(APPEND GRAINS_INCLUDE_DIRS "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/PostProcessing/include>")
-
+# Geometry
+list(APPEND GRAINS_INCLUDE_DIRS "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Geometry/include>")
+file(GLOB GRAINS_GEOMETRY_SOURCES CONFIGURE_DEPENDS
+  "${CMAKE_CURRENT_SOURCE_DIR}/Geometry/src/*.cpp"
+)
+list(SORT GRAINS_GEOMETRY_SOURCES)
 list(APPEND GRAINS_SOURCES
-  PostProcessing/src/ParaviewPostProcessingWriter.cpp
-  PostProcessing/src/ParaviewPostProcessingWriter_MPIIO.cpp
-  PostProcessing/src/ParaviewPostProcessingWriter_Serial.cpp
-  PostProcessing/src/PostProcessingWriterBuilderFactory.cpp
-  PostProcessing/src/PostProcessingWriter.cpp
-  PostProcessing/src/RawDataPostProcessingWriter.cpp
+  ${GRAINS_GEOMETRY_SOURCES}
 )
 
-list(APPEND GRAINS_INCLUDE_DIRS "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/TimeIntegration/include>")
-
-list(APPEND GRAINS_SOURCES 
-  TimeIntegration/src/FirstOrderExplicit.cpp
-  TimeIntegration/src/SecondOrderAdamsBashforth.cpp
-  TimeIntegration/src/SecondOrderExplicit.cpp
-  TimeIntegration/src/SecondOrderLeapFrog.cpp
-  TimeIntegration/src/TimeIntegratorBuilderFactory.cpp
-  TimeIntegration/src/TimeIntegrator.cpp
-)
-
-list(APPEND GRAINS_INCLUDE_DIRS "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Utility/include>")
-list(APPEND GRAINS_INCLUDE_DIRS "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/Utility/include>")
-
-list(APPEND GRAINS_SOURCES
-  Utility/src/Data.cpp
-  Utility/src/Exec.cpp
-)
-
-list(APPEND GRAINS_INCLUDE_DIRS "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/XML3/include>")
-
-list(APPEND GRAINS_SOURCES
-  XML3/src/ReaderXML.cpp
-  XML3/src/WriterXML.cpp
-)
-
+# InterfaceCBasilisk
 list(APPEND GRAINS_INCLUDE_DIRS "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/InterfaceCBasilisk/include>")
-
-list(APPEND GRAINS_SOURCES
-  InterfaceCBasilisk/src/InterfaceGrains3DBasilisk.cpp
+file(GLOB GRAINS_INTERFACECBASILISK_SOURCES CONFIGURE_DEPENDS
+  "${CMAKE_CURRENT_SOURCE_DIR}/InterfaceCBasilisk/src/*.cpp"
 )
+list(SORT GRAINS_INTERFACECBASILISK_SOURCES)
+list(APPEND GRAINS_SOURCES
+  ${GRAINS_INTERFACECBASILISK_SOURCES}
+)
+
+# PostProcessing
+list(APPEND GRAINS_INCLUDE_DIRS "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/PostProcessing/include>")
+file(GLOB GRAINS_POSTPROCESSING_SOURCES CONFIGURE_DEPENDS
+  "${CMAKE_CURRENT_SOURCE_DIR}/PostProcessing/src/*.cpp"
+)
+list(SORT GRAINS_POSTPROCESSING_SOURCES)
+list(APPEND GRAINS_SOURCES
+  ${GRAINS_POSTPROCESSING_SOURCES}
+)
+
+# TimeIntegration
+list(APPEND GRAINS_INCLUDE_DIRS "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/TimeIntegration/include>")
+file(GLOB GRAINS_TIMEINTEGRATION_SOURCES CONFIGURE_DEPENDS
+  "${CMAKE_CURRENT_SOURCE_DIR}/TimeIntegration/src/*.cpp"
+)
+list(SORT GRAINS_TIMEINTEGRATION_SOURCES)
+list(APPEND GRAINS_SOURCES
+  ${GRAINS_TIMEINTEGRATION_SOURCES}
+)
+
+# Utility
+list(APPEND GRAINS_INCLUDE_DIRS "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Utility/include>")
+file(GLOB GRAINS_UTILITY_SOURCES CONFIGURE_DEPENDS
+  "${CMAKE_CURRENT_SOURCE_DIR}/Utility/src/*.cpp"
+)
+list(SORT GRAINS_UTILITY_SOURCES)
+list(APPEND GRAINS_SOURCES
+  ${GRAINS_UTILITY_SOURCES}
+)
+
+# XML3
+list(APPEND GRAINS_INCLUDE_DIRS "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/XML3/include>")
+file(GLOB GRAINS_XML3_SOURCES CONFIGURE_DEPENDS
+  "${CMAKE_CURRENT_SOURCE_DIR}/XML3/src/*.cpp"
+)
+list(SORT GRAINS_XML3_SOURCES)
+list(APPEND GRAINS_SOURCES
+  ${GRAINS_XML3_SOURCES}
+)
+
 
 
 #

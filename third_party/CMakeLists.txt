@@ -18,3 +18,6 @@ if (BUILD_THIRD_PARTY_XERCESC)
     add_subdirectory(xercesc)
 endif()
 
+option(BUILD_THIRD_PARTY_PETSC "Build PETSc" OFF)
+if(BUILD_THIRD_PARTY_PETSC)
+endif()

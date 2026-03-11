@@ -38,12 +38,12 @@ PREPOST_MAKE = $(MAKE) -C $(PREPOST_SRCDIR) \
   
   
 libgrains:
-	$(LIBGRAINS_MAKE) -j4 all
+	$(LIBGRAINS_MAKE) all
 
 grains: libgrains
 	$(MAIN_MAKE) all
 	
-prepost:
+prepost: libgrains
 	$(PREPOST_MAKE) all	
 
 clean: 

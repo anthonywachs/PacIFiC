@@ -18,6 +18,8 @@ fi
 
 export PACIFIC_MPI_DISTRIB="OpenMPI"
 
+export PACIFIC_MPIEXEC=$(which mpiexec)
+
 export PACIFIC_MPICC=$(which mpicc)
 export PACIFIC_MPICC_CFLAGS=$(pkg-config --cflags ompi-c)
 export PACIFIC_MPICC_LFLAGS=$(pkg-config --libs ompi-c)
@@ -27,6 +29,7 @@ export PACIFIC_MPICXX=$(which mpicxx)
 export PACIFIC_MPICXX_CFLAGS=$(pkg-config --cflags ompi-cxx)
 export PACIFIC_MPICXX_LFLAGS=$(pkg-config --libs ompi-cxx)
 export PACIFIC_MPICXX_VER=$(pkg-config --modversion ompi-cxx)
+
 
 #
 # Pacific Directories
@@ -49,6 +52,13 @@ export PACIFIC_THIRDPARTY_INSTALLDIR_ABS="${PACIFIC_INSTALLDIR_ABS}"
 
 # Export Grains binary path
 export PATH="$PATH:$PACIFIC_BUILDDIR_ABS/Grains/bin"
+export PATH="$PATH:$PACIFIC_BUILDDIR_ABS/FLUID/bin"
+
+#
+# MAC
+#
+
+export MAC_LEVEL=0
 
 #
 # XERCESC
@@ -101,7 +111,7 @@ export PACIFIC_ZLIB_VER=$(pkg-config --modversion zlib)
 else 
 export PACIFIC_ZLIB_CFLAGS="-I${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}/include"
 export PACIFIC_ZLIB_LFLAGS="-L${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}/lib64 -lz-ng"
-export PACIFIC_ZLIB_PREFIX=$(pkg-config --variable=prefix zlib)
+export PACIFIC_ZLIB_PREFIX="${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}"
 export PACIFIC_ZLIB_VER="2.2.4"
 fi
 
@@ -109,7 +119,7 @@ fi
 # BASILISK
 #
 
-export PACIFIC_BASILISK_USE_THIRDPARTY=0
+export PACIFIC_BASILISK_USE_THIRDPARTY=1
 
 if [ $PACIFIC_BASILISK_USE_THIRDPARTY = 0 ]
 then
@@ -119,6 +129,25 @@ export PACIFIC_BASILISK_QCC="${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}/bin/qcc"
 
 # Export Basilisk binary path
 export PATH="${PATH}:${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}/bin"
+fi
+
+#
+# PETSc
+#
+
+export PACIFIC_PETSC_USE_THIRDPARTY=0
+
+if [ $PACIFIC_PETSC_USE_THIRDPARTY = 0 ]
+then
+export PACIFIC_PETSC_CFLAGS=$(pkg-config --cflags petsc)
+export PACIFIC_PETSC_LFLAGS=$(pkg-config --libs petsc)
+export PACIFIC_PETSC_PREFIX=$(pkg-config --variable=prefix petsc)
+export PACIFIC_PETSC_VER=$(pkg-config --modversion petsc)
+else
+export PACIFIC_PETSC_CFLAGS="-I${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}/include"
+export PACIFIC_PETSC_LFLAGS="-L${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}/lib -lpetsc"
+export PACIFIC_PETSC_PREFIX="${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}"
+export PACIFIC_PETSC_VER="3.24.3"
 fi
 
 
@@ -185,6 +214,10 @@ echo -e "${C_CYAN}${C_BOLD}CXX${C_RESET}"
 echo -e "${C_CYAN}PACIFIC_CXX    ${C_RESET} = ${PACIFIC_CXX}"
 echo -e "${C_CYAN}PACIFIC_CXX_VER${C_RESET} = ${PACIFIC_CXX_VER}"
 echo -e ""
+echo -e "${C_CYAN}${C_BOLD}MPI${C_RESET}"
+echo -e "${C_CYAN}PACIFIC_MPI_DISTRIB${C_RESET} = ${PACIFIC_MPI_DISTRIB}"
+echo -e "${C_CYAN}PACIFIC_MPIEXEC${C_RESET}    = ${PACIFIC_MPIEXEC}"
+echo -e ""
 echo -e "${C_CYAN}${C_BOLD}MPICC${C_RESET}"
 echo -e "${C_CYAN}PACIFIC_MPICC       ${C_RESET} = ${PACIFIC_MPICC}"
 echo -e "${C_CYAN}PACIFIC_MPICC_CFLAGS${C_RESET} = ${PACIFIC_MPICC_CFLAGS}"
@@ -217,6 +250,13 @@ echo -e "${C_GREEN}PACIFIC_ZLIB_CFLAGS${C_RESET} = ${PACIFIC_ZLIB_CFLAGS}"
 echo -e "${C_GREEN}PACIFIC_ZLIB_LFLAGS${C_RESET} = ${PACIFIC_ZLIB_LFLAGS}"
 echo -e "${C_GREEN}PACIFIC_ZLIB_PREFIX${C_RESET} = ${PACIFIC_ZLIB_PREFIX}"
 echo -e "${C_GREEN}PACIFIC_ZLIB_VER   ${C_RESET} = ${PACIFIC_ZLIB_VER}"
+echo -e ""
+echo -e "${C_GREEN}${C_BOLD}PETSC${C_RESET}"
+echo -e "${C_GREEN}PACIFIC_PETSC_USE_THIRDPARTY${C_RESET} = ${PACIFIC_PETSC_USE_THIRDPARTY}"
+echo -e "${C_GREEN}PACIFIC_PETSC_CFLAGS${C_RESET} = ${PACIFIC_PETSC_CFLAGS}"
+echo -e "${C_GREEN}PACIFIC_PETSC_LFLAGS${C_RESET} = ${PACIFIC_PETSC_LFLAGS}"
+echo -e "${C_GREEN}PACIFIC_PETSC_PREFIX${C_RESET} = ${PACIFIC_PETSC_PREFIX}"
+echo -e "${C_GREEN}PACIFIC_PETSC_VER   ${C_RESET} = ${PACIFIC_PETSC_VER}"
 echo -e ""
 echo -e "${C_GREEN}${C_BOLD}Basilisk${C_RESET}"
 echo -e "${C_GREEN}PACIFIC_BASILISK_USE_THIRDPARTY${C_RESET} = ${PACIFIC_BASILISK_USE_THIRDPARTY}"

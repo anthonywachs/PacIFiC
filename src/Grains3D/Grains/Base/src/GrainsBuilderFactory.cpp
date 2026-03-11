@@ -107,7 +107,7 @@ string GrainsBuilderFactory::init( string const& filename, int const& rank,
     int dimension = 0;
   
     // header2 += GrainsExec::m_GRAINS_HOME + "/Main/dtd/" ;
-    header2 += get_dtd_dir().string();
+    header2 += get_dtd_dir().string() + "/";
    
     ifstream fileIN( filename.c_str(), ios::in );
     ofstream fileOUT( ( filename + ".tmp" ).c_str(), ios::out );   
