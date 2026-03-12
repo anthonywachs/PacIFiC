@@ -198,7 +198,7 @@ include(PacificEnv)
 
 pacific_generate_dev_env_script(
   OUTPUT  "${CMAKE_BINARY_DIR}/pacific-env.sh"
-  TARGETS Grains_main
+  TARGETS Grains_main fluid qcc
   # EXTRA_LIB_DIRS "${CMAKE_BINARY_DIR}/src/Grains3D/Grains"
 )
 
