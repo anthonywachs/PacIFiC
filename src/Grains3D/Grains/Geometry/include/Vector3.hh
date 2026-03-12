@@ -24,24 +24,24 @@ namespace solid
       //@{
       /** @brief Default constructor
       @param def value of all 3 components */
-      Vector3( double def = 0. );
+      inline Vector3( double def = 0. ) : Group3( def ) {}
 
       /** @brief Constructor with 3 components as inputs
       @param x 1st component
       @param y 2nd component
       @param z 3rd component*/
-      Vector3( double x, double y, double z );
+      inline Vector3( double x, double y, double z ) : Group3( x, y, z ) {}
 
       /** @brief Copy constructor
       @param g copied Group3 object */
-      Vector3( Vector3 const& g );
+      inline Vector3( Vector3 const& g ) : Group3( g ) {}
 
       /** @brief Copy constructor
       @param g copied Group3 object */
-      Vector3( Group3 const& g );
+      inline Vector3( Group3 const& g ) : Group3( g ) {}
 
       /** @brief Destructor */
-      ~Vector3();
+      inline ~Vector3() {}
       //@}
 
 
@@ -51,10 +51,10 @@ namespace solid
       int closestAxis() const;
 
       /** @brief Unitary nomalization operator */
-      void normalize();
+      inline void normalize() { *this /= Norm( *this ); }
 
       /** @brief Returns a vector corresponding to the normalized vector */
-      Vector3 normalized() const;
+      inline Vector3 normalized() const { return ( *this / Norm( *this ) ); }
 
       /** @brief Rotation by an unitary quaternion
       @param q unitary quaternion corresponding to the rotation */
@@ -66,11 +66,21 @@ namespace solid
       //@{
       /** @brief Equal operator to another Vector3 object
       @param g2 the other Vector3 object */
-      Vector3& operator = ( Vector3 const& g2 );    
+      inline Vector3& operator = ( Vector3 const& g2 )
+      {
+        if ( &g2 != this )
+        { m_comp[X] = g2.m_comp[X]; m_comp[Y] = g2.m_comp[Y]; m_comp[Z] = g2.m_comp[Z]; }
+        return (*this);
+      }
 
       /** @brief Cross product this x rhv
       @param rhv 2nd Vector3 object */
-      Vector3 operator ^ ( Vector3 const& rhv ) const;
+      inline Vector3 operator ^ ( Vector3 const& rhv ) const
+      {
+        return ( Vector3( m_comp[1] * rhv.m_comp[2] - m_comp[2] * rhv.m_comp[1],
+          - m_comp[0] * rhv.m_comp[2] + m_comp[2] * rhv.m_comp[0],
+            m_comp[0] * rhv.m_comp[1] - m_comp[1] * rhv.m_comp[0] ) );
+      }
       //@}
 
 
@@ -96,12 +106,19 @@ namespace solid
     //@}
   };
 
-  /**@name Group3 : External methods */
-  //@{
-  /** @brief Returns the norm of the vector
-  @param v the Vector3 object */
-  double Norm( Vector3 const& v );
-  //@}
+  /** @brief Returns the norm of the vector */
+  inline double Norm( Vector3 const& v )
+  { return ( sqrt( v.m_comp[X] * v.m_comp[X]
+    + v.m_comp[Y] * v.m_comp[Y] + v.m_comp[Z] * v.m_comp[Z] ) ); }
+
+  /** @brief Returns the norm square of the vector */
+  inline double Norm2( Vector3 const& v )
+  { return ( v.m_comp[X] * v.m_comp[X] + v.m_comp[Y] * v.m_comp[Y]
+    + v.m_comp[Z] * v.m_comp[Z] ); }
+
+  /** @brief Returns whether the vector norm is less than EPSILON2 */
+  inline bool approxZero( Vector3 const& v )
+  { return ( Norm2( v ) < EPSILON2 ); }
 
   static Vector3 Vector3Null; /**< Vector3 (0.,0.,0.)  */
 } // namespace solid

@@ -55,7 +55,7 @@ void HookeContactForceModel::performForcesCalculus( Component* p0_,
 
   // Relative velocity at contact point
   Vector3 tmpV = p0_->getVelocityAtPoint( geometricPointOfContact ) 
-  	- p1_->getVelocityAtPoint( geometricPointOfContact );	
+  	- p1_->getVelocityAtPoint( geometricPointOfContact );
   Vector3 v_n = normal * ( tmpV * normal );
   Vector3 v_t = tmpV - v_n;
   
@@ -147,7 +147,7 @@ bool HookeContactForceModel::computeForces( Component* p0_,
   // Component p0_
   ref_p0_->addForce( geometricPointOfContact, coef * ( delFN + delFT ), 
   	tag_p1_ );
-  if ( m_kr ) ref_p0_->addTorque( delM * coef, tag_p1_ );     
+  if ( m_kr ) ref_p0_->addTorque( delM * coef, tag_p1_ );
     
   // Component p1_
   ref_p1_->addForce( geometricPointOfContact, coef * ( - delFN - delFT ),

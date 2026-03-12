@@ -9,6 +9,8 @@
 #include "Particle.hh"
 #include "BBox.hh"
 #include "GJK_SV.hh"
+#include "SuperquadricContact.hh"
+#include "Superquadric.hh"
 
 #include <fstream>
 #include <sstream>
@@ -222,26 +224,22 @@ PointContact RigidBodyWithCrust::ClosestPoint( RigidBodyWithCrust &neighbor )
         switch( convexB->getConvexType() )
         {
           case SPHERE:
-	    return ( ClosestPointSPHERESPHERE( *this, neighbor ) );
-	  
-	  case BOX:
-	    return ( ClosestPointSPHEREBOX( *this, neighbor ) );
-          
-	  default:
+            return ( ClosestPointSPHERESPHERE( *this, neighbor ) );
+          case BOX:
+            return ( ClosestPointSPHEREBOX( *this, neighbor ) );
+          default:
             break;
         }
         break;
 
       case DISC2D:
-        switch( convexB->getConvexType() )	
+        switch( convexB->getConvexType() )
         {
           case DISC2D:
             return ( ClosestPointSPHERESPHERE( *this, neighbor ) );
-          
-	  case BOX:
+          case BOX:
             return ( ClosestPointSPHEREBOX( *this, neighbor ) );
-          
-	  default:
+          default:
             break;
         }
         break;
@@ -251,25 +249,24 @@ PointContact RigidBodyWithCrust::ClosestPoint( RigidBodyWithCrust &neighbor )
         {
           case SPHERE:
             return ( ClosestPointSPHEREBOX( *this, neighbor ) );
-          
-	  case DISC2D:
+          case DISC2D:
             return ( ClosestPointSPHEREBOX( *this, neighbor ) );
-          
-	  default:
+          default:
             break;
         }
         break;
 	
-      // case CYLINDER:
-      //   switch( convexB->getConvexType() )	
-      //   {
-      //     case CYLINDER:
-      //       return( ClosestPointCYLINDERS( *this, neighbor ) );
-      //     default:
-      //       break;
-      //   }
-      //   break;
-
+      case SUPERQUADRIC:
+        switch( convexB->getConvexType() )	
+        {
+          case SUPERQUADRIC:
+            // Use superquadric collision detection if enabled
+            if ( GrainsExec::m_colDetSuperquadric )
+              return ( ClosestPointSUPERQUADRIC( *this, neighbor, nullptr ) );
+          default:
+            break;
+        }
+        break;
       default:
         break;
     }
@@ -345,7 +342,7 @@ PointContact RigidBodyWithCrust::ClosestPoint( RigidBodyWithCrust &neighbor )
       // If actual overlap distance < 0 => contact
       // otherwise no contact
       distance -= m_crustThickness + neighbor.m_crustThickness;
-
+      
       return ( PointContact( contact, overlap_vector, distance, nbIterGJK ) );
     }
     else
@@ -381,25 +378,21 @@ PointContact RigidBodyWithCrust::ClosestPoint( RigidBodyWithCrust &neighbor,
         switch( convexB->getConvexType() )
         {
           case SPHERE:
-	    return ( ClosestPointSPHERESPHERE( *this, neighbor ) );
-
-	  case BOX:
+            return ( ClosestPointSPHERESPHERE( *this, neighbor ) );
+          case BOX:
             return ( ClosestPointSPHEREBOX( *this, neighbor ) );
-          
-	  default:
+          default:
             break;
         }
         break;
 
       case DISC2D:
-        switch( convexB->getConvexType() )	
+        switch( convexB->getConvexType() )
         {
           case DISC2D:
             return ( ClosestPointSPHERESPHERE( *this, neighbor ) );
-
           case BOX:
             return ( ClosestPointSPHEREBOX( *this, neighbor ) );
-
           default:
             break;
         }
@@ -410,25 +403,24 @@ PointContact RigidBodyWithCrust::ClosestPoint( RigidBodyWithCrust &neighbor,
         {
           case SPHERE:
             return ( ClosestPointSPHEREBOX( *this, neighbor ) );
-
           case DISC2D:
             return ( ClosestPointSPHEREBOX( *this, neighbor ) );
-
           default:
             break;
         }
         break;
 	
-      // case CYLINDER:
-      //   switch( convexB->getConvexType() )	
-      //   {
-      //     case CYLINDER:
-      //       return( ClosestPointCYLINDERS( *this, neighbor ) );
-      //     default:
-      //       break;
-      //   }
-      //   break;
-
+      case SUPERQUADRIC:
+        switch( convexB->getConvexType() )	
+        {
+          case SUPERQUADRIC:
+            // Use superquadric collision detection if enabled
+            if ( GrainsExec::m_colDetSuperquadric )
+              return ( ClosestPointSUPERQUADRIC( *this, neighbor, &initialDirection ) );
+          default:
+            break;
+        }
+        break;
       default:
         break;
     }
@@ -1232,4 +1224,99 @@ PointContact ClosestPointRECTANGLE( RigidBodyWithCrust const& rbA,
     return ( PointNoContact );
   }
   catch ( ContactError const& ) { throw; }
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the features of the contact when the 2 rigid bodies are superquadrics, 
+// from Podlozhnyuk et al. (2017)
+PointContact ClosestPointSUPERQUADRIC( RigidBodyWithCrust const& rbA,
+	RigidBodyWithCrust const& rbB, Vector3* initialPt )
+{
+  try 
+  {
+    // Get bounding radii
+    double radiusA = rbA.getCircumscribedRadius();
+    double radiusB = rbB.getCircumscribedRadius();
+
+    Transform const* a2w = rbA.getTransform();
+    Transform const* b2w = rbB.getTransform();
+
+    // Bounding Volume Check
+    ++GrainsExec::m_nb_GJK_narrow_collision_detections;
+    Vector3 gcagcb = *rbA.getTransform()->getOrigin() - 
+                     *rbB.getTransform()->getOrigin();
+    bool BVCheck = ( Norm(gcagcb) < radiusA + radiusB );
+    if ( GrainsExec::m_colDetBoundingVolume && BVCheck )
+      BVCheck = isContactBVolume( rbA, rbB );
+
+    if ( !BVCheck )
+    {
+      // Reset warm-start point so stale data from a previous contact episode
+      // does not seed the Newton solver when particles next come together.
+      // Mirrors GJK's "initialDirection = Vector3Null" behaviour.
+      if ( initialPt != nullptr )
+        initialPt->setValue( 0., 0., 0. );
+      return ( PointNoContact );
+    }
+    
+    // Cast convex to Superquadric
+    Superquadric const* sqA = dynamic_cast<Superquadric const*>(rbA.getConvex());
+    Superquadric const* sqB = dynamic_cast<Superquadric const*>(rbB.getConvex());
+
+    // Prepare previous contact point for warm-starting
+    double prevPt[3];
+    double* prevPtPtr = nullptr;
+    if ( initialPt != nullptr )
+    {
+        prevPt[0] = (*initialPt)[X];
+        prevPt[1] = (*initialPt)[Y];
+        prevPt[2] = (*initialPt)[Z];
+        prevPtPtr = prevPt;
+    }
+
+    // Detect contact using the superquadric method
+    PointContact pc = detectSuperquadricContact(sqA, *a2w, radiusA, sqB, *b2w, radiusB, prevPtPtr);
+    
+    // Update initialPt with the converged contact point
+    if ( initialPt != nullptr )
+      initialPt->setValue( prevPt[0], prevPt[1], prevPt[2] );
+
+    // The SQ method computes the actual geometric overlap between the real
+    // surfaces, which is the same quantity GJK returns after its crust
+    // adjustment (distance - crustSum). No further crust correction needed.
+    double overlap = pc.getOverlapDistance();
+    double max_overlap = 10 * ( rbA.getCrustThickness() 
+                              + rbB.getCrustThickness() );
+    if ( overlap < 0.0 )
+    {
+      if ( -overlap >= max_overlap )
+      {
+        cout << "ERR RigidBodyWithCrust::ClosestPointSUPERQUADRIC on Processor "
+             << (GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank() : 0 ) 
+             << ": " << -overlap << " & " << max_overlap << endl;
+        // Clamp to max_overlap
+        Vector3 ov = pc.getOverlapVector();
+        double ovNorm = Norm( ov );
+        if ( ovNorm > EPSILON )
+        {
+          Vector3 ovDir = ov / ovNorm;
+          pc.setOverlapVector( max_overlap * ovDir );
+        }
+        pc.setOverlapDistance( -max_overlap );
+      }
+      return pc;
+    }
+    else
+      return PointNoContact;
+  }
+  catch ( ContactError const& ) 
+  { 
+    cout << "ERR ClosestPointSUPERQUADRIC on Processor "
+         << (GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank() : 0 ) 
+         << endl;
+    throw; 
+  }
 }

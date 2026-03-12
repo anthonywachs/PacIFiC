@@ -23,24 +23,24 @@ namespace solid
       //@{
       /** @brief Default constructor 
       @param def value of all 3 components */
-      Point3( double def = 0. );
+      inline Point3( double def = 0. ) : Group3( def ) {}
 
       /** @brief Constructor with 3 components as inputs 
       @param x 1st component
       @param y 2nd component
       @param z 3rd component*/
-      Point3( double x, double y, double z );
+      inline Point3( double x, double y, double z ) : Group3( x, y, z ) {}
 
       /** @brief Copy constructor
       @param g copied Point3 object */
-      Point3( Point3 const& g );
+      inline Point3( Point3 const& g ) : Group3( g ) {}
       
       /** @brief Copy constructor
       @param g copied Group3 object */      
-      Point3( Group3 const& g );      
+      inline Point3( Group3 const& g ) : Group3( g ) {}
 
       /** @brief Destructor */
-      ~Point3();
+      inline ~Point3() {}
       //@}
 
 
@@ -62,19 +62,37 @@ namespace solid
 
       /** @brief Distance between 2 points of type Point3
       @param point 2nd point */    
-      double DistanceTo( Point3 const& point ) const;
+      inline double DistanceTo( Point3 const& point ) const
+      {
+        double a = m_comp[0] - point[0];
+        double b = m_comp[1] - point[1];
+        double c = m_comp[2] - point[2];
+        return ( sqrt( a*a + b*b + c*c ) );
+      }
     
       /** @brief Distance between the point of type Point3 and a point defined 
       by a 3-component array
       @param pp 2nd point defined by a 3-component array */
-      double DistanceTo( double const* pp ) const;
+      inline double DistanceTo( double const* pp ) const
+      {
+        double a = m_comp[0] - pp[0];
+        double b = m_comp[1] - pp[1];
+        double c = m_comp[2] - pp[2];
+        return ( sqrt( a*a + b*b + c*c ) );
+      }
     
       /** @brief Distance between the point of type Point3 and a point defined 
       by 3 scalars
       @param x Position en X
       @param y Position en Y
       @param z Position en Z */
-      double DistanceTo( double x, double y, double z ) const;
+      inline double DistanceTo( double x, double y, double z ) const
+      {
+        double a = m_comp[0] - x;
+        double b = m_comp[1] - y;
+        double c = m_comp[2] - z;
+        return ( sqrt( a*a + b*b + c*c ) );
+      }
       //@}
 
 
@@ -82,7 +100,12 @@ namespace solid
       //@{      
       /** @brief Equal operator to another Group3 object
       @param g2 the other Group3 object */
-      Point3& operator = ( Point3 const& g2 );  
+      inline Point3& operator = ( Point3 const& g2 )
+      {
+        if ( &g2 != this )
+        { m_comp[X] = g2.m_comp[X]; m_comp[Y] = g2.m_comp[Y]; m_comp[Z] = g2.m_comp[Z]; }
+        return ( *this );
+      }
       //@}      
   };
   
