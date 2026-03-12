@@ -213,6 +213,14 @@ and the other rigid body is a box, i.e., a SPHERE-BOX contact
 PointContact ClosestPointSPHEREBOX( RigidBodyWithCrust const& rbA,
 	RigidBodyWithCrust const& rbB );
 
+/** @brief Returns the features of the contact when the 2 rigid bodies are
+superquadrics, using the homotopy continuation method from Podlozhnyuk et al. (2017)
+@param rbA 1st rigid body
+@param rbB 2nd rigid body
+@param initialPt intial point */
+PointContact ClosestPointSUPERQUADRIC( RigidBodyWithCrust const& rbA,
+	RigidBodyWithCrust const& rbB, Vector3* initialPt = nullptr );
+
 /** @brief Returns whether there is geometric contact with another rigid body
 in the sense of ClosestPoint when the 2 rigid bodies are spheres, i.e., a
 SPHERE-SPHERE contact

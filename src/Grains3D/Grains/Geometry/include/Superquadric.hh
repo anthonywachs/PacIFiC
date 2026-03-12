@@ -42,6 +42,21 @@ class Superquadric : public Convex
 
     /** @name Methods */
     //@{
+    /** @brief Returns the scale parameter along the x-axis */
+    double getA() const { return m_a; }
+    
+    /** @brief Returns the scale parameter along the y-axis */
+    double getB() const { return m_b; }
+    
+    /** @brief Returns the scale parameter along the z-axis */
+    double getC() const { return m_c; }
+    
+    /** @brief Returns the first exponent */
+    double getN1() const { return m_n1; }
+    
+    /** @brief Returns the second exponent */
+    double getN2() const { return m_n2; }
+
     /** @brief Computes the inertia tensor and the inverse of the inertia tensor
     @param inertia inertia tensor
     @param inertia_1 inverse of the inertia tensor */
@@ -142,7 +157,7 @@ class Superquadric : public Convex
     Paraview post-processing, i.e., controls the number of facets in the 
     superquadric reconstruction in Paraview
     @param nbpts number of point per quarter of the equator line */
-    static void SetvisuNodeNbPerQar( int nbpts );         
+    static void SetvisuNodeNbPerQar( int nbpts );
     //@}
 
 

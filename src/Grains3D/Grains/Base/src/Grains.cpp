@@ -665,6 +665,11 @@ void Grains::Construction( DOMElement* rootElement )
           if ( nCollisionAlg == "GJK" ) GrainsExec::m_colDetGJK_SV = false;
           else if ( nCollisionAlg == "GJK_SV" ) 
 	    GrainsExec::m_colDetGJK_SV = true;
+      else if ( nCollisionAlg == "SQ" )
+          {
+            GrainsExec::m_colDetGJK_SV = false;
+            GrainsExec::m_colDetSuperquadric = true;
+          }
           else
           {
             if ( m_rank == 0 )

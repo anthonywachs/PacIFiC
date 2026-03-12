@@ -48,6 +48,7 @@ string GrainsExec::m_inputFile;
 int GrainsExec::m_return_syscmd = 0;
 bool GrainsExec::m_colDetGJK_SV = false;
 bool GrainsExec::m_colDetWithHistory = false;
+bool GrainsExec::m_colDetSuperquadric = false;
 double GrainsExec::m_colDetTolerance = EPSILON;
 bool GrainsExec::m_colDetAcceleration = false;
 unsigned int GrainsExec::m_colDetBoundingVolume = 0;
