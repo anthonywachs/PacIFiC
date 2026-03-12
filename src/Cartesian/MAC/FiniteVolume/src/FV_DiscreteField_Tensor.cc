@@ -3523,9 +3523,15 @@ FV_DiscreteField_Tensor:: interpolateOneCompOnAnotherComp(
 bool FV_DiscreteField_Tensor::DOF_offset( int &i, int &j, int &k,
         size_t_vector center, size_t_vector stencil,
 	vector<double> &offset, size_t component ) const 
-	 
+		 
 //----------------------------------------------------------------------	 
 {
-cout << "!!!WARNING!!! DOF_offset SOULD NOT BE \n"
-	"CALLED IN FV_DiscreteField_Tensor " << endl;
-}	 
+   MAC_LABEL( "FV_DiscreteField_Tensor:: DOF_offset" ) ;
+
+   ostringstream mesg ;
+   mesg << "Field " << FNAME << " is of the tensor type; "
+        << "method \"DOF_offset\" is not implemented for "
+        << "FV_DiscreteField_Tensor." << endl ;
+   MAC_Error::object()->raise_plain( mesg.str() ) ;
+}
+

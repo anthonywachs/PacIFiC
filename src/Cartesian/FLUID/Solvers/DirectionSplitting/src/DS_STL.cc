@@ -2,6 +2,7 @@
 #include <FV_DiscreteField.hh>
 #include <FV_Mesh.hh>
 #include <MAC.hh>
+#include <MAC_Error.hh>
 using std::endl;
 
 
@@ -601,8 +602,8 @@ std::tuple<double,double,double> DS_STL:: get_mass_and_density_and_moi() const
 {
   MAC_LABEL( "DS_STL:: get_mass_and_density()" ) ;
 
-  // return ( m_geometric_rigid_body->get_mass_and_density() );
-
+  MAC_Error::object()->raise_plain(
+     "DS_STL::get_mass_and_density_and_moi() is not implemented." ) ;
 }
 
 

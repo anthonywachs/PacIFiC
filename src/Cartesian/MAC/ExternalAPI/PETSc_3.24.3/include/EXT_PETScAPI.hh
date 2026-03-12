@@ -16,7 +16,7 @@ class MAC_ModuleExplorer ;
 // Not very clear why ... the error we get is the following, at the linking
 // stage of the code that use libmac0.so :
 // libmac0.so: undefined reference to `petscstack'
-// collect2: ld a retourné 1 code d'état d'exécution
+// collect2: ld a retournï¿½ 1 code d'ï¿½tat d'exï¿½cution
 // The problem is documented on the web by googling "undefined reference to
 // `petscstack'" 
 // !!! END IMPORTANT !!!
@@ -34,6 +34,32 @@ class MAC_ModuleExplorer ;
 #include "petscpc.h"
 #include "petscversion.h"
 //}
+
+static inline PetscErrorCode
+EXT_PETScKSPMonitorTrueResidualCompat( KSP ksp,
+                                       PetscInt n,
+                                       PetscReal rnorm,
+                                       void* ctx )
+{
+#if PETSC_VERSION_GE(3,15,0)
+   return KSPMonitorTrueResidual( ksp, n, rnorm,
+                                  (PetscViewerAndFormat*) ctx ) ;
+#else
+   return KSPMonitorTrueResidualNorm( ksp, n, rnorm,
+                                      (PetscViewerAndFormat*) ctx ) ;
+#endif
+}
+
+static inline PetscErrorCode
+EXT_PETScPCFactorSetMatSolverTypeCompat( PC pc, MatSolverType stype )
+{
+#if PETSC_VERSION_GE(3,9,0)
+   return PCFactorSetMatSolverType( pc, stype ) ;
+#else
+   return PCFactorSetMatSolverPackage( pc, stype ) ;
+#endif
+}
+
 
 /*
 PETSc applications, performing their specific initialization

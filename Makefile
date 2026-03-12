@@ -120,37 +120,27 @@ submodule-clean: submodule-basilisk-clean submodule-hdf5-clean submodule-zlib-cl
 submodule-basilisk: 
 	@$(GIT) submodule update --init --checkout third_party/basilisk/basilisk_submodule
 submodule-basilisk-clean:
-	@$(GIT) submodule deinit -f -- third_party/basilisk/basilisk_submodule && \
-	rm -rf ${PACIFIC_ROOT_ABS}/.git/modules/third_party/basilisk/ \
-	${PACIFIC_ROOT_ABS}/third_party/basilisk/basilisk_submodule
+	@$(GIT) submodule deinit -f -- third_party/basilisk/basilisk_submodule 
 
 submodule-hdf5: 
 	@$(GIT) submodule update --init third_party/hdf5/hdf5_submodule
 submodule-hdf5-clean:
-	@$(GIT) submodule deinit -f -- third_party/hdf5/hdf5_submodule && \
-	rm -rf ${PACIFIC_ROOT_ABS}/.git/modules/third_party/hdf5/ \
-	${PACIFIC_ROOT_ABS}/third_party/hdf5/hdf5_submodule
+	@$(GIT) submodule deinit -f -- third_party/hdf5/hdf5_submodule 
 
 submodule-zlib: 
 	@$(GIT) submodule update --init third_party/zlib/zlib_submodule
 submodule-zlib-clean:
-	@$(GIT) submodule deinit -f -- third_party/zlib/zlib_submodule && \
-	rm -rf ${PACIFIC_ROOT_ABS}/.git/modules/third_party/zlib/ \
-	${PACIFIC_ROOT_ABS}/third_party/zlib/zlib_submodule
+	@$(GIT) submodule deinit -f -- third_party/zlib/zlib_submodule 
 
 submodule-xercesc: 
 	@$(GIT) submodule update --init third_party/xercesc/xercesc_submodule
 submodule-xercesc-clean:
-	@$(GIT) submodule deinit -f -- third_party/xercesc/xercesc_submodule && \
-	rm -rf ${PACIFIC_ROOT_ABS}/.git/modules/third_party/xercesc/ \
-	${PACIFIC_ROOT_ABS}/third_party/xercesc/xercesc_submodule
+	@$(GIT) submodule deinit -f -- third_party/xercesc/xercesc_submodule 
 
 submodule-petsc: 
 	@$(GIT) submodule update --init third_party/petsc/petsc_submodule
 submodule-petsc-clean:
-	@$(GIT) submodule deinit -f -- third_party/petsc/petsc_submodule && \
-	rm -rf ${PACIFIC_ROOT_ABS}/.git/modules/third_party/petsc/ \
-	${PACIFIC_ROOT_ABS}/third_party/petsc/petsc_submodule
+	@$(GIT) submodule deinit -f -- third_party/petsc/petsc_submodule 
 
 
 # thirdparty

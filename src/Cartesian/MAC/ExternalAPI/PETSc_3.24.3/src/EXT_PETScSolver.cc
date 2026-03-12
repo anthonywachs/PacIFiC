@@ -561,7 +561,7 @@ EXT_PETScSolver:: build_ksp( KSP &ksp, MAC_ModuleExplorer const* A_EXP )
 //for a more extensive monitoring
       PETSc_do( KSPMonitorSet( ksp, 
       (PetscErrorCode (*)(KSP,PetscInt,PetscReal,void*))
-      	KSPMonitorTrueResidualNorm, vf, 
+      	EXT_PETScKSPMonitorTrueResidualCompat, vf, 
 	(PetscErrorCode (*)(void**))PetscViewerAndFormatDestroy ) ) ;
 //
    }   
@@ -744,7 +744,7 @@ EXT_PETScSolver:: build_pc( KSP & ksp, MAC_ModuleExplorer const* A_EXP )
       else if ( type == "mumps" )
       {
         PETSc_do( PCSetType( pc, "lu" ) ) ;
-	PETSc_do( PCFactorSetMatSolverPackage( pc, MATSOLVERMUMPS ) );
+	PETSc_do( EXT_PETScPCFactorSetMatSolverTypeCompat( pc, MATSOLVERMUMPS ) );
       }
       else
       {
