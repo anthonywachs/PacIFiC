@@ -8,7 +8,14 @@ LIBDIR := $(MAC_LIBDIR)
 INCDIR := $(MAC_INCDIR)
 
 LIBSO := libMAC.so
-LIBSO_WP := $(LIBDIR)/$(LIBSO)
+LIBSO_WP = $(LIBDIR)/$(LIBSO)
+
+LIBSO0 := libMAC0.so
+LIBSO0_WP := $(LIBDIR)/$(LIBSO0)
+
+LIBSO2 := libMAC2.so
+LIBSO2_WP := $(LIBDIR)/$(LIBSO2)
+
 
 ALLINC = 
 
@@ -71,48 +78,76 @@ SRCFILESLA := $(subst $(SRCDIRLA)/,,$(SRCFILES_WP_LA))
 
 # Substitutions for objects
 # Here we use the base file names combined to VPATH
-OBJS_ARRV := $(SRCFILESARRV:%.cc=$(OBJDIR)/%.o)
-OBJS_BASE := $(SRCFILESBASE:%.cc=$(OBJDIR)/%.o)
-OBJS_MPI := $(SRCFILESMPI:%.cc=$(OBJDIR)/%.o)
-OBJS_PETSC := $(SRCFILESPETSC:%.cc=$(OBJDIR)/%.o)
-OBJS_FV := $(SRCFILESFV:%.cc=$(OBJDIR)/%.o)
-OBJS_LA := $(SRCFILESLA:%.cc=$(OBJDIR)/%.o)
-OBJS := $(OBJS_ARRV) $(OBJS_BASE) $(OBJS_MPI) $(OBJS_PETSC) $(OBJS_FV) $(OBJS_LA)
-DEPS := $(OBJS:.o=.d)
+OBJS_ARRV_0 := $(SRCFILESARRV:%.cc=$(OBJDIR)/%.0.o)
+OBJS_BASE_0 := $(SRCFILESBASE:%.cc=$(OBJDIR)/%.0.o)
+OBJS_MPI_0 := $(SRCFILESMPI:%.cc=$(OBJDIR)/%.0.o)
+OBJS_PETSC_0 := $(SRCFILESPETSC:%.cc=$(OBJDIR)/%.0.o)
+OBJS_FV_0 := $(SRCFILESFV:%.cc=$(OBJDIR)/%.0.o)
+OBJS_LA_0 := $(SRCFILESLA:%.cc=$(OBJDIR)/%.0.o)
+OBJS_0 := $(OBJS_ARRV_0) $(OBJS_BASE_0) $(OBJS_MPI_0) $(OBJS_PETSC_0) $(OBJS_FV_0) $(OBJS_LA_0)
+
+OBJS_ARRV_2 := $(SRCFILESARRV:%.cc=$(OBJDIR)/%.2.o)
+OBJS_BASE_2 := $(SRCFILESBASE:%.cc=$(OBJDIR)/%.2.o)
+OBJS_MPI_2 := $(SRCFILESMPI:%.cc=$(OBJDIR)/%.2.o)
+OBJS_PETSC_2 := $(SRCFILESPETSC:%.cc=$(OBJDIR)/%.2.o)
+OBJS_FV_2 := $(SRCFILESFV:%.cc=$(OBJDIR)/%.2.o)
+OBJS_LA_2 := $(SRCFILESLA:%.cc=$(OBJDIR)/%.2.o)
+OBJS_2 := $(OBJS_ARRV_2) $(OBJS_BASE_2) $(OBJS_MPI_2) $(OBJS_PETSC_2) $(OBJS_FV_2) $(OBJS_LA_2)
+
+DEPS := $(OBJS_0:.o=.d) $(OBJS_2:.o=.d)
 
 VPATH := $(SRCDIRARRV):$(SRCDIRBASE):$(SRCDIRMPI):$(SRCDIRPETSC):$(SRCDIRFV):$(SRCDIRLA)
 
 CPPFLAGS += $(addprefix -I,$(INCDIRS))
 CPPFLAGS += -DMPIRUN=\"$(PACIFIC_MPIEXEC)\"
-CPPFLAGS += -DLEVEL=0
 CXXFLAGS += -O3 -g -MMD -MP -fPIC
+
+CPPFLAGS_LEVEL0 = -DLEVEL=0
+CPPFLAGS_LEVEL2 = -DLEVEL=2
 
 #------------------------------------------------------------------------------
 # Production rules
 .SILENT:
+.PHONY: FORCE
 
 all    : MESS $(LIBSO_WP) CPINC
 
 OBJ    : ARRV MARRV BASE MBASE MPI MMPI PETSC MPETSC FV MFV LA MLA
 	@echo -e 'Compilation is complete\n'
 
-LINK : $(LIBSO_WP)
+LINK : $(LIBSO0_WP) $(LIBSO2_WP)
 
-$(LIBSO_WP) : $(OBJS) | $(LIBDIR)
-	$(CXX) -shared -Wl,-soname,$(LIBSO) -o $(LIBSO_WP) $(OBJS) $(LDFLAGS) $(LDLIBS)
-	@echo -e '--------------------------------\n''Library libMAC.so generated !\n''--------------------------------'	
+$(LIBSO0_WP) : $(OBJS_0) | $(LIBDIR)
+	$(CXX) -shared -Wl,-soname,$(LIBSO0) -o $(LIBSO0_WP) $(OBJS_0) $(LDFLAGS) $(LDLIBS)
+	@echo -e '--------------------------------\n''Library libMAC0.so generated !\n''--------------------------------'	
 
-ARRV : $(OBJS_ARRV)
+$(LIBSO2_WP) : $(OBJS_2) | $(LIBDIR)
+	$(CXX) -shared -Wl,-soname,$(LIBSO2) -o $(LIBSO2_WP) $(OBJS_2) $(LDFLAGS) $(LDLIBS)
+	@echo -e '--------------------------------\n''Library libMAC2.so generated !\n''--------------------------------'	
 
-BASE  : $(OBJS_BASE)
 
-MPI  : $(OBJS_MPI)
+ifeq ($(MAC_LEVEL),0)
+$(LIBSO_WP) : $(LIBSO0_WP) FORCE | $(LIBDIR)
+	@cd $(LIBDIR) && ln -sf $(LIBSO0) $(LIBSO)
+else ifeq ($(MAC_LEVEL),2)
+$(LIBSO_WP) : $(LIBSO2_WP) FORCE | $(LIBDIR)
+	@cd $(LIBDIR) && ln -sf $(LIBSO2) $(LIBSO)
+else
+$(LIBSO_WP) : $(LIBSO0_WP) FORCE | $(LIBDIR)
+	@cd $(LIBDIR) && ln -sf $(LIBSO0) $(LIBSO)
+endif
 
-PETSC   : $(OBJS_PETSC)
+ARRV : $(OBJS_ARRV_0) $(OBJS_ARRV_2)
 
-FV     : $(OBJS_FV)
+BASE  : $(OBJS_BASE_0) $(OBJS_BASE_2)
 
-LA   : $(OBJS_LA)
+MPI  : $(OBJS_MPI_0) $(OBJS_MPI_2)
+
+PETSC   : $(OBJS_PETSC_0) $(OBJS_PETSC_2)
+
+FV     : $(OBJS_FV_0) $(OBJS_FV_2)
+
+LA   : $(OBJS_LA_0) $(OBJS_LA_2)
 	
 MARRV     : 
 	@echo -e '*** Package ArrayVector compiled\n'
@@ -133,12 +168,17 @@ MLA    :
 	@echo -e '*** Package LinearAlgebra compiled\n'	
 		
 MESS   :
-	@echo -e '************************************************************\n''MAC compiled with' $(CXX) $(CPPFLAGS) $(CXXFLAGS)'\n************************************************************'	
+	@echo -e '************************************************************\n''MAC compiled with' $(CXX) $(CPPFLAGS) $(CXXFLAGS)'\n''LEVEL=0 ->' $(LIBSO0) '\n''LEVEL=2 ->' $(LIBSO2) '\n************************************************************'	
 
-$(OBJDIR)/%.o : %.cc
+$(OBJDIR)/%.0.o : %.cc
 	@mkdir -p $(dir $@)
 	@echo 'Compiling '$<
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
+	$(CXX) $(CPPFLAGS) $(CPPFLAGS_LEVEL0) $(CXXFLAGS) -c $< -o $@
+
+$(OBJDIR)/%.2.o : %.cc
+	@mkdir -p $(dir $@)
+	@echo 'Compiling '$<
+	$(CXX) $(CPPFLAGS) $(CPPFLAGS_LEVEL2) $(CXXFLAGS) -c $< -o $@
 
 $(LIBDIR):
 	@mkdir -p $@
@@ -152,8 +192,9 @@ CPINC  : $(INCDIR)
 -include $(DEPS)
 
 clean:
-	rm -rf $(OBJDIR)/*.o \
-	rm -f $(LIBSO_WP) \
-	rm -rf $(INCDIR)/*.hh \
+	rm -rf $(OBJDIR)/*.0.o $(OBJDIR)/*.0.d
+	rm -rf $(OBJDIR)/*.2.o $(OBJDIR)/*.2.d
+	rm -f $(LIBSO0_WP) $(LIBSO2_WP)
+	rm -rf $(INCDIR)/*.hh
 	rm -rf $(INCDIR)/*.icc
  
