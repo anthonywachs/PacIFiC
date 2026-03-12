@@ -735,7 +735,14 @@ FV_MatlabPostProcessingWriter:: clearResultFiles( void )
      char* path = getenv("MAC_HOME");
      string exe(path);
      exe = exe+"/tools/ShellScripts/FVMatlab_clear_exec "+RES_DIRECTORY;
-     system(exe.c_str());
+     int sys_res = system( exe.c_str() ) ;
+     if( sys_res != 0 )
+     {
+        ostringstream mesg ;
+        mesg << "Unable to clear MATLAB result files in directory "
+             << RES_DIRECTORY << "." << endl ;
+        MAC_Error::object()->raise_plain( mesg.str() ) ;
+     }
    }
 }
 

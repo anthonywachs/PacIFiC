@@ -4,6 +4,10 @@
 #include "GrainsBuilderFactory.hh"
 #include "GrainsCoupledWithFluid.hh"
 #include "ReaderXML.hh"
+#include <MAC_Error.hh>
+#include <sstream>
+
+using std::ostringstream ;
 
 
 //---------------------------------------------------------------------------
@@ -60,7 +64,14 @@ FS_Grains3DPlugIn::FS_Grains3DPlugIn( string const& insertion_file_,
     if ( m_my_rank == m_is_master ) 
     { 
       string cmd = "/bin/rm " + simulation_file_exe;
-      system( cmd.c_str() );
+      int sys_res = system( cmd.c_str() ) ;
+      if( sys_res != 0 )
+      {
+         ostringstream mesg ;
+         mesg << "Unable to remove temporary file "
+              << simulation_file_exe << "." << endl ;
+         MAC_Error::object()->raise_plain( mesg.str() ) ;
+      }
     }
   }
     
@@ -249,5 +260,3 @@ void FS_Grains3DPlugIn:: UpdateParticlesVelocities(const vector<vector<double> >
     m_Grains3D->updateParticlesVelocity( velocities, b_update_velocity_nm1 );	
   
 } 
-
-

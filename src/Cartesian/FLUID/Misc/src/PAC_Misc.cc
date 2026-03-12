@@ -4,6 +4,9 @@
 #include <MAC.hh>
 #include <MAC_Error.hh>
 #include <cstdlib>
+#include <sstream>
+
+using std::ostringstream ;
 
 
 //---------------------------------------------------------------------------
@@ -92,7 +95,15 @@ PAC_Misc:: clearAllFiles( string const& resultsDirectory,
      string exe(path);
      exe = exe+"/ExeUtils/Pacific_clear_exec "+resultsDirectory+" "
      	+savingsDirectory;
-     system(exe.c_str()); 
+     int sys_res = system( exe.c_str() ) ;
+     if( sys_res != 0 )
+     {
+        ostringstream mesg ;
+        mesg << "Unable to clear files in directories "
+             << resultsDirectory << " and " << savingsDirectory << "."
+             << endl ;
+        MAC_Error::object()->raise_plain( mesg.str() ) ;
+     }
    }   
 
 }

@@ -73,11 +73,11 @@ In addition, the following toolchain is required or reccomended
 
 On RPM-based distributions (e.g. RedHat, Fedora) these can be obtained using 
 ```bash
-sudo dnf install -y gcc g++ make cmake git openmpi-devel xerces-c-devel zlib-ng-devel hdf5-openmpi-devel
+sudo dnf install -y gcc g++ make cmake git pkgconfig openmpi-devel xerces-c-devel zlib-ng-devel hdf5-openmpi-devel petsc-openmpi-devel
 ```
 On apt-based distributions (e.g. Ubuntu, Debian), use
 ```bash
-sudo apt-get install -y build-essential make cmake git libopenmpi-dev libxerces-c-dev zlib1g-dev libhdf5-openmpi-dev
+sudo apt-get install -y build-essential make cmake git pkg-config libopenmpi-dev libxerces-c-dev zlib1g-dev libhdf5-openmpi-dev petsc-dev
 ```
 
 ### Building with CMake
@@ -126,7 +126,31 @@ which by default chooses `/usr` as the installation prefix. Since `/usr/bin` is 
 
 ### Building with Make
 
-TODO
+To build the project with make, first source the configuration file with 
+
+```bash
+source env/config.env.sh
+```
+
+Next, build the project 
+
+```bash
+make all
+```
+
+Individial targets (e.g. `grains` or `fluid`) may be built with 
+```bash
+make grains
+```
+
+Once they are built, the resulting binaries may be found in `build/PacIFiC-{$PACIFIC_ARCH}`. So long as you have run `source` in your current shell session, they will be added and findable via your `$PATH` variable and thus you should now be able to simply type e.g.
+```bash
+grains --help
+```
+
+At the moment there is no `install` step for the make build system: In order to use the software you must always first run `source`.
+
+
 ## Examples
 
 Some examples may be found in `examples`: These can be relocated, and by default, use `FetchContent` to include copies of PacIFiC into their own build tree automatically. They therefore do not require installation of PacIFiC, although they still assume the project dependencies are installed.

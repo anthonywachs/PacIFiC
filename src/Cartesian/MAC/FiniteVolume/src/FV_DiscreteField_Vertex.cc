@@ -1170,9 +1170,15 @@ FV_DiscreteField_Vertex:: translate_field_mesh( const size_t& trans_dir,
 bool FV_DiscreteField_Vertex::DOF_offset( int &i, int &j, int &k,
         size_t_vector center, size_t_vector stencil,
 	vector<double> &offset, size_t component ) const 
-	 
+		 
 //----------------------------------------------------------------------	 
 {
-cout << "!!!WARNING!!! DOF_offset SHOULD NOT BE \n"
-	"CALLED IN FV_DiscreteField_Vertex " << endl;
-}	 
+   MAC_LABEL( "FV_DiscreteField_Vertex:: DOF_offset" ) ;
+
+   ostringstream mesg ;
+   mesg << "Field " << FNAME << " is of the vertex type; "
+        << "method \"DOF_offset\" is not implemented for "
+        << "FV_DiscreteField_Vertex." << endl ;
+   MAC_Error::object()->raise_plain( mesg.str() ) ;
+}
+

@@ -21,9 +21,9 @@ class MAC_Error
 
       static MAC_Error* object( void ) ;
 
-      void raise_plain( std::string message ) ;
+      [[noreturn]] void raise_plain( std::string message ) ;
 
-      void raise_internal( std::string message ) ;
+      [[noreturn]] void raise_internal( std::string message ) ;
 
       void raise_read_syntax_error( std::string const& file,
                                     int line,
@@ -124,7 +124,7 @@ class MAC_Error
    //-- Abnormal termination
       
       // Exits on error and return exit_status to shell.
-      static void exit( size_t status = 1 ) ;
+      [[noreturn]] static void exit( size_t status = 1 ) ;
       
    protected: //-------------------------------------------------------------
 
@@ -143,7 +143,7 @@ class MAC_Error
       void end( void ) ;
       std::string const& hline( void ) const ;
       
-      static void exit_with_internal_error( void ) ;
+      [[noreturn]] static void exit_with_internal_error( void ) ;
       
       //---------------------------------------------------------------------
       //   ATTRIBUTES
