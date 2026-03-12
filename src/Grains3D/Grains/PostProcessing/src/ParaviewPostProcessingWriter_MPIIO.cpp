@@ -10,6 +10,7 @@
 #include "Segment.hh"
 #include "Cell.hh"
 #include "Vector3.hh"
+#include <cstdio>
 #include <zlib.h>
 using namespace solid;
 
@@ -27,6 +28,7 @@ void ParaviewPostProcessingWriter::
 	bool const& forceForAllTag,
 	bool const& processwrites )
 {
+  (void) processwrites;
   GrainsMPIWrapper* wrapper = GrainsExec::getComm();
   MPI_Comm MPI_COMM_activeProc = wrapper->get_active_procs_comm();
   MPI_File file;
@@ -34,9 +36,9 @@ void ParaviewPostProcessingWriter::
   MPI_Datatype num_as_string;
   int nbpts = 0, nbcells = 0, nparts = 0, i, rank, j, nc, coordNum;
   list<Particle*>::const_iterator particle;
-  char fmt[8] = "%12.5e ";
-  char endfmt[8] = "%12.5e\n";
-  const int charspernum = 13;
+  // char fmt[9] = "%+13.5e ";
+  // char endfmt[9] = "%+13.5e\n";
+  const int charspernum = 14;
   size_t counter = 0;
   Vector3 const* PPTranslation = 
   	GrainsExec::m_translationParaviewPostProcessing ;
@@ -96,9 +98,9 @@ void ParaviewPostProcessingWriter::
       ppp = (*particle)->get_polygonsPts_PARAVIEW( PPTranslation );
       for (ilpp=ppp.begin();ilpp!=ppp.end();ilpp++,counter++)
       {
-        sprintf( &pts_coord[3*counter*charspernum], fmt, (*ilpp)[X] );
-	sprintf( &pts_coord[(3*counter+1)*charspernum], fmt, (*ilpp)[Y] );
-	sprintf( &pts_coord[(3*counter+2)*charspernum], endfmt, (*ilpp)[Z] );
+        snprintf( &pts_coord[3*counter*charspernum], charspernum + 1, "%+13.5e ", (*ilpp)[X] );
+	snprintf( &pts_coord[(3*counter+1)*charspernum], charspernum + 1, "%+13.5e ", (*ilpp)[Y] );
+	snprintf( &pts_coord[(3*counter+2)*charspernum], charspernum + 1, "%+13.5e\n", (*ilpp)[Z] );
       }
     }    
 
@@ -265,7 +267,7 @@ void ParaviewPostProcessingWriter::
       nu = Norm( *(*particle)->getTranslationalVelocity() );
       for (j=0;j<nc;++j)
       {
-        sprintf( &normU[counter*charspernum], fmt, nu );
+        snprintf( &normU[counter*charspernum], charspernum + 1, "%+13.5e ", nu );
         ++counter;	
       }
     }
@@ -304,7 +306,7 @@ void ParaviewPostProcessingWriter::
       nom = Norm( *(*particle)->getAngularVelocity() );
       for (j=0;j<nc;++j)
       {
-        sprintf( &normOm[counter*charspernum], fmt, nom );
+        snprintf( &normOm[counter*charspernum], charspernum + 1, "%+13.5e ", nom );
         ++counter;	
       }
     }
@@ -394,6 +396,7 @@ void ParaviewPostProcessingWriter::
 	bool const& forceForAllTag,
 	bool const& processwrites )
 {
+  (void) processwrites;
   GrainsMPIWrapper* wrapper = GrainsExec::getComm();
   MPI_Comm MPI_COMM_activeProc = wrapper->get_active_procs_comm();
   MPI_File file;
@@ -625,6 +628,7 @@ void ParaviewPostProcessingWriter::
 	bool const& forceForAllTag,
 	bool const& processwrites )
 {
+  (void) processwrites;
   GrainsMPIWrapper* wrapper = GrainsExec::getComm();
   MPI_Comm MPI_COMM_activeProc = wrapper->get_active_procs_comm();
   MPI_File file;
@@ -632,9 +636,9 @@ void ParaviewPostProcessingWriter::
   MPI_Datatype num_as_string;
   int nbpts = 0, i, coordNum;
   list<Particle*>::const_iterator particle;
-  char fmt[8] = "%12.5e ";
-  char endfmt[8] = "%12.5e\n";
-  const int charspernum = 13;
+  // char fmt[9] = "%+13.5e ";
+  // char endfmt[9] = "%+13.5e\n";
+  const int charspernum = 14;
   size_t counter = 0;
   Vector3 const* PPTranslation = 
   	GrainsExec::m_translationParaviewPostProcessing ;
@@ -686,9 +690,9 @@ void ParaviewPostProcessingWriter::
     {
       gc = *(*particle)->getPosition();
       if ( PPTranslation ) gc += *PPTranslation ;
-      sprintf( &coord[3*counter*charspernum], fmt, gc[X] );
-      sprintf( &coord[(3*counter+1)*charspernum], fmt, gc[Y] );
-      sprintf( &coord[(3*counter+2)*charspernum], endfmt, gc[Z] );
+      snprintf( &coord[3*counter*charspernum], charspernum + 1, "%+13.5e ", gc[X] );
+      snprintf( &coord[(3*counter+1)*charspernum], charspernum + 1, "%+13.5e ", gc[Y] );
+      snprintf( &coord[(3*counter+2)*charspernum], charspernum + 1, "%+13.5e\n", gc[Z] );
       ++counter;
     }    
 
@@ -735,10 +739,10 @@ void ParaviewPostProcessingWriter::
 	( (*particle)->getTag() != 2 || forceForAllTag ) )
     {
       qrot = *(*particle)->getQuaternionRotation();
-      sprintf( &coord[4*counter*charspernum], fmt, qrot[W] );      
-      sprintf( &coord[(4*counter+1)*charspernum], fmt, qrot[X] );
-      sprintf( &coord[(4*counter+2)*charspernum], fmt, qrot[Y] );
-      sprintf( &coord[(4*counter+3)*charspernum], endfmt, qrot[Z] );
+      snprintf( &coord[4*counter*charspernum], charspernum + 1, "%+13.5e ", qrot[W] );      
+      snprintf( &coord[(4*counter+1)*charspernum], charspernum + 1, "%+13.5e ", qrot[X] );
+      snprintf( &coord[(4*counter+2)*charspernum], charspernum + 1, "%+13.5e ", qrot[Y] );
+      snprintf( &coord[(4*counter+3)*charspernum], charspernum + 1, "%+13.5e\n", qrot[Z] );
       ++counter;
     }    
 
@@ -771,7 +775,7 @@ void ParaviewPostProcessingWriter::
        ( (*particle)->getTag() != 2 || forceForAllTag ) )
     {
       nu = Norm( *(*particle)->getTranslationalVelocity() );
-      sprintf( &scalar[counter*charspernum], fmt, nu );
+      snprintf( &scalar[counter*charspernum], charspernum + 1, "%+13.5e ", nu );
       ++counter;	
     }
 
@@ -801,7 +805,7 @@ void ParaviewPostProcessingWriter::
        ( (*particle)->getTag() != 2 || forceForAllTag ) )
     {
       nom = Norm( *(*particle)->getAngularVelocity() );
-      sprintf( &scalar[counter*charspernum], fmt, nom );
+      snprintf( &scalar[counter*charspernum], charspernum + 1, "%+13.5e ", nom );
       ++counter;	
     }
 
@@ -885,6 +889,7 @@ void ParaviewPostProcessingWriter::
 	bool const& forceForAllTag,
 	bool const& processwrites )
 {
+  (void) processwrites;
   GrainsMPIWrapper* wrapper = GrainsExec::getComm();
   MPI_Comm MPI_COMM_activeProc = wrapper->get_active_procs_comm();
   MPI_File file;
@@ -1087,6 +1092,7 @@ void ParaviewPostProcessingWriter::
 	bool const& forceForAllTag,
 	bool const& processwrites )
 {
+  (void) processwrites;
   GrainsMPIWrapper* wrapper = GrainsExec::getComm();
   MPI_Comm MPI_COMM_activeProc = wrapper->get_active_procs_comm();
   MPI_File file;
@@ -1094,9 +1100,9 @@ void ParaviewPostProcessingWriter::
   MPI_Datatype num_as_string;
   int nbpts = 0, i;
   list<Particle*>::const_iterator particle;
-  char fmt[8] = "%12.5e ";
-  char endfmt[8] = "%12.5e\n";
-  const int charspernum = 13;
+  // char fmt[9] = "%+13.5e ";
+  // char endfmt[9] = "%+13.5e\n";
+  const int charspernum = 14;
   size_t counter = 0;
   Vector3 const* PPTranslation = 
   	GrainsExec::m_translationParaviewPostProcessing ;
@@ -1146,9 +1152,9 @@ void ParaviewPostProcessingWriter::
     {
       gc = *(*particle)->getPosition();
       if ( PPTranslation ) gc += *PPTranslation ;
-      sprintf( &coord[3*counter*charspernum], fmt, gc[X] );
-      sprintf( &coord[(3*counter+1)*charspernum], fmt, gc[Y] );
-      sprintf( &coord[(3*counter+2)*charspernum], endfmt, gc[Z] );
+      snprintf( &coord[3*counter*charspernum], charspernum + 1, "%+13.5e ", gc[X] );
+      snprintf( &coord[(3*counter+1)*charspernum], charspernum + 1, "%+13.5e ", gc[Y] );
+      snprintf( &coord[(3*counter+2)*charspernum], charspernum + 1, "%+13.5e\n", gc[Z] );
       ++counter;
     }    
 
@@ -1192,9 +1198,9 @@ void ParaviewPostProcessingWriter::
 	( (*particle)->getTag() != 2 || forceForAllTag ) )
     {
       vec = (*particle)->getTranslationalVelocity();
-      sprintf( &coord[3*counter*charspernum], fmt, (*vec)[X] );
-      sprintf( &coord[(3*counter+1)*charspernum], fmt, (*vec)[Y] );
-      sprintf( &coord[(3*counter+2)*charspernum], endfmt, (*vec)[Z] );
+      snprintf( &coord[3*counter*charspernum], charspernum + 1, "%+13.5e ", (*vec)[X] );
+      snprintf( &coord[(3*counter+1)*charspernum], charspernum + 1, "%+13.5e ", (*vec)[Y] );
+      snprintf( &coord[(3*counter+2)*charspernum], charspernum + 1, "%+13.5e\n", (*vec)[Z] );
       ++counter;
     }    
 
@@ -1225,9 +1231,9 @@ void ParaviewPostProcessingWriter::
 	( (*particle)->getTag() != 2 || forceForAllTag ) )
     {
       vec = (*particle)->getAngularVelocity();
-      sprintf( &coord[3*counter*charspernum], fmt, (*vec)[X] );
-      sprintf( &coord[(3*counter+1)*charspernum], fmt, (*vec)[Y] );
-      sprintf( &coord[(3*counter+2)*charspernum], endfmt, (*vec)[Z] );
+      snprintf( &coord[3*counter*charspernum], charspernum + 1, "%+13.5e ", (*vec)[X] );
+      snprintf( &coord[(3*counter+1)*charspernum], charspernum + 1, "%+13.5e ", (*vec)[Y] );
+      snprintf( &coord[(3*counter+2)*charspernum], charspernum + 1, "%+13.5e\n", (*vec)[Z] );
       ++counter;
     }    
 
@@ -1275,6 +1281,7 @@ void ParaviewPostProcessingWriter::
 	bool const& forceForAllTag,
 	bool const& processwrites )
 {
+  (void) processwrites;
   GrainsMPIWrapper* wrapper = GrainsExec::getComm();
   MPI_Comm MPI_COMM_activeProc = wrapper->get_active_procs_comm();
   MPI_File file;
@@ -1444,15 +1451,18 @@ void ParaviewPostProcessingWriter::
   	LinkedCell const* LC, string const& partFilename, double const& time,
 	bool const& processwrites )
 {
+  (void) particles;
+  (void) time;
+  (void) processwrites;
   GrainsMPIWrapper* wrapper = GrainsExec::getComm();
   MPI_Comm MPI_COMM_activeProc = wrapper->get_active_procs_comm();
   MPI_File file;
   MPI_Status status;
   MPI_Datatype num_as_string;
   int nbpts = 0, i;
-  char fmt[8] = "%12.5e ";
-  char endfmt[8] = "%12.5e\n";
-  const int charspernum = 13;
+  // char fmt[9] = "%+13.5e ";
+  // char endfmt[9] = "%+13.5e\n";
+  const int charspernum = 14;
   size_t counter = 0;
   Vector3 const* PPTranslation = 
   	GrainsExec::m_translationParaviewPostProcessing ;
@@ -1498,9 +1508,9 @@ void ParaviewPostProcessingWriter::
   {
     pt = (*pallContacts)[i].geometricPointOfContact;
     if ( PPTranslation ) pt += *PPTranslation ;
-    sprintf( &coord[3*counter*charspernum], fmt, pt[X] );
-    sprintf( &coord[(3*counter+1)*charspernum], fmt, pt[Y] );
-    sprintf( &coord[(3*counter+2)*charspernum], endfmt, pt[Z] );
+    snprintf( &coord[3*counter*charspernum], charspernum + 1, "%+13.5e ", pt[X] );
+    snprintf( &coord[(3*counter+1)*charspernum], charspernum + 1, "%+13.5e ", pt[Y] );
+    snprintf( &coord[(3*counter+2)*charspernum], charspernum + 1, "%+13.5e\n", pt[Z] );
     ++counter;
   }         
 
@@ -1541,11 +1551,11 @@ void ParaviewPostProcessingWriter::
   counter = 0;
   for (i=0;i<nbpts;++i)
   {
-    sprintf( &coord[3*counter*charspernum], fmt, 
+    snprintf( &coord[3*counter*charspernum], charspernum + 1, "%+13.5e ", 
     	(*pallContacts)[i].contactForceComp0[X] );
-    sprintf( &coord[(3*counter+1)*charspernum], fmt, 
+    snprintf( &coord[(3*counter+1)*charspernum], charspernum + 1, "%+13.5e ", 
     	(*pallContacts)[i].contactForceComp0[Y] );
-    sprintf( &coord[(3*counter+2)*charspernum], endfmt, 
+    snprintf( &coord[(3*counter+2)*charspernum], charspernum + 1, "%+13.5e\n", 
     	(*pallContacts)[i].contactForceComp0[Z] );
     ++counter;
   }  
@@ -1594,6 +1604,9 @@ void ParaviewPostProcessingWriter::
   	LinkedCell const* LC, string const& partFilename, double const& time,
 	bool const& processwrites )
 {
+  (void) particles;
+  (void) time;
+  (void) processwrites;
   GrainsMPIWrapper* wrapper = GrainsExec::getComm();
   MPI_Comm MPI_COMM_activeProc = wrapper->get_active_procs_comm();
   MPI_File file;
@@ -1735,14 +1748,17 @@ void ParaviewPostProcessingWriter::
   	LinkedCell const* LC, string const& filename, double const& time,
 	bool const& processwrites )
 {
+  (void) particles;
+  (void) time;
+  (void) processwrites;
   GrainsMPIWrapper* wrapper = GrainsExec::getComm();
   MPI_Comm MPI_COMM_activeProc = wrapper->get_active_procs_comm();
   MPI_File file;
   MPI_Status status;
   MPI_Datatype num_as_string;
-  char fmt[8] = "%12.5e ";
-  char endfmt[8] = "%12.5e\n";
-  const int charspernum = 13;
+  // char fmt[9] = "%+13.5e ";
+  // char endfmt[9] = "%+13.5e\n";
+  const int charspernum = 14;
   size_t counter = 0;
   Vector3 const* PPTranslation = 
   	GrainsExec::m_translationParaviewPostProcessing ;
@@ -1794,16 +1810,16 @@ void ParaviewPostProcessingWriter::
     // Point 0
     pt0 = (*pallContacts)[i].PPptComp0;
     if ( PPTranslation ) pt0 += *PPTranslation ;
-    sprintf( &pts_coord[6*counter*charspernum], fmt, pt0[X] );
-    sprintf( &pts_coord[(6*counter+1)*charspernum], fmt, pt0[Y] );
-    sprintf( &pts_coord[(6*counter+2)*charspernum], endfmt, pt0[Z] );     
+    snprintf( &pts_coord[6*counter*charspernum], charspernum + 1, "%+13.5e ", pt0[X] );
+    snprintf( &pts_coord[(6*counter+1)*charspernum], charspernum + 1, "%+13.5e ", pt0[Y] );
+    snprintf( &pts_coord[(6*counter+2)*charspernum], charspernum + 1, "%+13.5e\n", pt0[Z] );     
 
     // Point 1
     pt1 = (*pallContacts)[i].PPptComp1;
     if ( PPTranslation ) pt1 += *PPTranslation ; 
-    sprintf( &pts_coord[(6*counter+3)*charspernum], fmt, pt1[X] );
-    sprintf( &pts_coord[(6*counter+4)*charspernum], fmt, pt1[Y] );
-    sprintf( &pts_coord[(6*counter+5)*charspernum], endfmt, pt1[Z] );
+    snprintf( &pts_coord[(6*counter+3)*charspernum], charspernum + 1, "%+13.5e ", pt1[X] );
+    snprintf( &pts_coord[(6*counter+4)*charspernum], charspernum + 1, "%+13.5e ", pt1[Y] );
+    snprintf( &pts_coord[(6*counter+5)*charspernum], charspernum + 1, "%+13.5e\n", pt1[Z] );
   }
 
   vector<int> mpifile_offsets( m_nprocs, 0 );
@@ -1837,8 +1853,8 @@ void ParaviewPostProcessingWriter::
   for (i=0;i<nPPF;++i)
   {
     norm = Norm( (*pallContacts)[i].contactForceComp0 );
-    sprintf( &normF[counter*charspernum], fmt, norm );
-    sprintf( &normF[(counter+1)*charspernum], fmt, norm );    
+    snprintf( &normF[counter*charspernum], charspernum + 1, "%+13.5e ", norm );
+    snprintf( &normF[(counter+1)*charspernum], charspernum + 1, "%+13.5e ", norm );    
     counter += 2;    
   }
 
@@ -1958,6 +1974,9 @@ void ParaviewPostProcessingWriter::
   	LinkedCell const* LC, string const& filename, double const& time,
 	bool const& processwrites )
 {
+  (void) particles;
+  (void) time;
+  (void) processwrites;
   GrainsMPIWrapper* wrapper = GrainsExec::getComm();
   MPI_Comm MPI_COMM_activeProc = wrapper->get_active_procs_comm();
   MPI_File file;

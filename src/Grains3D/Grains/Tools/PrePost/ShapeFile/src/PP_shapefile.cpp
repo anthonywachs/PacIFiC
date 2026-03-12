@@ -17,7 +17,7 @@ int main(int argc, char *argv[])
   double x, y, z ;
   double edge, sphere_radius, half_edge, length, width, height, 
   	coord, vol ;  
-  double dtheta, theta, theta0, rc, rd, surface, zzz ; 
+  double dtheta, theta, theta0, rc, rd, surface = 0., zzz ; 
   double rcirc, h, l ;
   double gold = 0.5 * ( 1. + sqrt(5.) ), sqrt2o2 = sqrt( 2. ) / 2. ;
      

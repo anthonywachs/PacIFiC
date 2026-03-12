@@ -16,7 +16,7 @@ int main(int argc, char *argv[])
 {
   string tline;
   unsigned int nx = 0, ny = 1, nz = 1, nxmax, nymax, nzmax = 1,
-  	n, ncalc, nmax, i, j, k, ipart, buf ;
+  	n = 0, ncalc, nmax, i, j, k, ipart, buf ;
   double lx, ly, lz = 1., radius, ry, rz, hx, hy, hz, posx, posy, posz,
   	origx, origy, origz, deltax, deltay, deltaz, 
 	magnitude = 1.1, particle_measure = 0., equivol_radius = 0. ;
