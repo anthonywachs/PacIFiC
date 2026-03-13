@@ -6,7 +6,7 @@ CXXFLAGS += -O3 -g -MMD -MP
 CPPFLAGS = -I$(LIBGRAINS_INCDIR)
 
 LDFLAGS += -L$(LIBGRAINS_LIBDIR) -Wl,-rpath,$(LIBGRAINS_LIBDIR)
-LDLIBS += -lGrains
+LDLIBS += -lGrains3D
 
 TARGET := $(MAIN_BINDIR)/rotationmatrix
 SRC := src/PP_rotationmatrix.cpp

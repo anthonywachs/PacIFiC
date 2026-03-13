@@ -10,7 +10,7 @@ LIBDIR := $(LIBGRAINS_LIBDIR)
 SHAREDIR := $(LIBGRAINS_SHAREDIR)
 INCDIR := $(LIBGRAINS_INCDIR)
 
-LIBSO := libGrains.so
+LIBSO := libGrains3D.so
 LIBSO_WP := $(LIBDIR)/$(LIBSO)
 
 ifeq ($(strip $(SHAREDIR)),)

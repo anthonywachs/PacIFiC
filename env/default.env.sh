@@ -52,7 +52,7 @@ export PACIFIC_THIRDPARTY_BUILDDIR_ABS="${PACIFIC_BUILDDIR_ABS}/third_party/buil
 export PACIFIC_THIRDPARTY_INSTALLDIR_ABS="${PACIFIC_BUILDDIR_ABS}/third_party"
 
 # Export Grains binary path
-export PATH="$PATH:$PACIFIC_BUILDDIR_ABS/Grains/bin"
+export PATH="$PATH:$PACIFIC_BUILDDIR_ABS/Grains3D/bin"
 export PATH="$PATH:$PACIFIC_BUILDDIR_ABS/FLUID/bin"
 
 #

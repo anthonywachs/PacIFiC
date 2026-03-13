@@ -14,9 +14,9 @@ std::filesystem::path get_dtd_dir() {
   std::filesystem::path libdir = get_library_dir();
   std::vector<std::filesystem::path> candidates = {
       libdir / "./Dtd",                  // in-tree build
-      libdir / "../share/Grains/Dtd",    // install prefix
-      libdir / "../../../share/Grains/Dtd", // mpi-install prefix
-      libdir / "../../usr/share/Grains/Dtd" // debian multi-arch 
+      libdir / "../share/Grains3D/Dtd",    // install prefix
+      libdir / "../../../share/Grains3D/Dtd", // mpi-install prefix
+      libdir / "../../usr/share/Grains3D/Dtd" // debian multi-arch 
   };
 
   for (auto &p : candidates) {
@@ -32,9 +32,9 @@ std::filesystem::path get_tools_dir() {
   std::filesystem::path libdir = get_library_dir();
   std::vector<std::filesystem::path> candidates = {
       libdir / "./Tools",                  // in-tree build
-      libdir / "../share/Grains/Tools",    // install prefix
-      libdir / "../../../share/Grains/Tools", // mpi-install prefix (/usr/lib64/openmpi/lib/ + ../../../share/Grains/Tools)
-      libdir / "../../usr/share/Grains/Tools" // debian multi-arch 
+      libdir / "../share/Grains3D/Tools",    // install prefix
+      libdir / "../../../share/Grains3D/Tools", // mpi-install prefix (/usr/lib64/openmpi/lib/ + ../../../share/Grains/Tools)
+      libdir / "../../usr/share/Grains3D/Tools" // debian multi-arch 
   };
 
   for (auto &p : candidates) {
