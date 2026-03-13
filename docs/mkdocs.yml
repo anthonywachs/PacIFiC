@@ -23,7 +23,7 @@ nav:
   - Features: 'features.md'
   - Examples: 'examples/index.md'
   - Documentation:
-    - Grains: 'doxygen/grains/'
+    - Grains: 'doxygen/grains3d/'
     - FLUID: 'doxygen/fluid/'
     - MAC: 'doxygen/mac/'
   - Gallery: 'gallery.md'

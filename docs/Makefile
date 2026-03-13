@@ -4,7 +4,7 @@
 
 # Configuration
 DOXYGEN       ?= doxygen
-DOXYFILE      ?= DoxyGrains
+DOXYFILE      ?= DoxyGrains3D
 MKDOCS        ?= mkdocs
 SITE_DIR      ?= site
 DOXY_OUTPUT   ?= docs/doxygen
@@ -25,7 +25,7 @@ doxygen:
 	@echo ">>> Generating Doxygen documentation..."
 	$(DOXYGEN) DoxyFLUID
 	$(DOXYGEN) DoxyMAC
-	$(DOXYGEN) DoxyGrains
+	$(DOXYGEN) DoxyGrains3D
 
 build: clean doxygen 
 	mkdocs build

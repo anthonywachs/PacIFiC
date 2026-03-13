@@ -1,3 +1,3 @@
-add_executable(Grains_main src/main.cpp)
-target_link_libraries(Grains_main PRIVATE Grains)
-set_target_properties(Grains_main PROPERTIES OUTPUT_NAME grains)
+add_executable(Grains3D_main src/main.cpp)
+target_link_libraries(Grains3D_main PRIVATE Grains3D)
+set_target_properties(Grains3D_main PROPERTIES OUTPUT_NAME grains3d)

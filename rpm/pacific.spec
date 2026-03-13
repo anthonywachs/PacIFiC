@@ -94,9 +94,9 @@ export CC=mpicc CXX=mpicxx FC=mpifort
 
 %install
 %{_openmpi_load} 
-DESTDIR=%{buildroot} cmake --install %{__cmake_builddir} --component Grains_Runtime
-DESTDIR=%{buildroot} cmake --install %{__cmake_builddir} --component Grains_Devel
-DESTDIR=%{buildroot} cmake --install %{__cmake_builddir} --component Grains_Data
+DESTDIR=%{buildroot} cmake --install %{__cmake_builddir} --component Grains3D_Runtime
+DESTDIR=%{buildroot} cmake --install %{__cmake_builddir} --component Grains3D_Devel
+DESTDIR=%{buildroot} cmake --install %{__cmake_builddir} --component Grains3D_Data
 DESTDIR=%{buildroot} cmake --install %{__cmake_builddir} --component MAC_Runtime
 DESTDIR=%{buildroot} cmake --install %{__cmake_builddir} --component MAC_Devel
 DESTDIR=%{buildroot} cmake --install %{__cmake_builddir} --component FLUID_Runtime
@@ -111,16 +111,16 @@ DESTDIR=%{buildroot} cmake --install %{__cmake_builddir} --component Octree_Deve
 %doc README.md
 %{_includedir}/Octree/*
 %{_libdir}/cmake/Octree/*
-%{_datadir}/Grains
+%{_datadir}/Grains3D
 
 %files openmpi
 %{_libdir}/openmpi/bin/*
 %{_libdir}/openmpi/lib/*.so*
-%{_libdir}/openmpi/lib/cmake/Grains 
+%{_libdir}/openmpi/lib/cmake/Grains3D 
 %{_libdir}/openmpi/lib/cmake/MAC
 
 %files openmpi-devel
-%{_includedir}/openmpi-x86_64/Grains
+%{_includedir}/openmpi-x86_64/Grains3D
 %{_includedir}/openmpi-x86_64/MAC
 
 %changelog

@@ -98,7 +98,7 @@ target_include_directories(fluid
 target_link_libraries(fluid 
   PUBLIC
     PacIFiC::MAC
-    PacIFiC::Grains
+    PacIFiC::Grains3D
 )
 
 

@@ -1,6 +1,6 @@
-add_executable(Grains_shapefile
+add_executable(Grains3D_shapefile
   src/PP_shapefile.cpp
 )
 
 
-set_target_properties(Grains_shapefile PROPERTIES OUTPUT_NAME shapefile)
+set_target_properties(Grains3D_shapefile PROPERTIES OUTPUT_NAME shapefile)

@@ -26,7 +26,7 @@ Description: PacIFiC common data files
 Package: pacific-tools
 Section: science
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, pacific-common, libpacific-grains0-mpi (=${binary:Version}), libpacific-mac0-mpi (=${binary:Version})
+Depends: ${shlibs:Depends}, ${misc:Depends}, pacific-common, libpacific-grains3d0-mpi (=${binary:Version}), libpacific-mac0-mpi (=${binary:Version})
 Description: PacIFiC command-line tools
  Command-line executables for PacIFiC.
 
@@ -38,7 +38,7 @@ Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: PacIFiC MAC shared library (default MPI)
  Shared library for the MAC module of PacIFiC built against the distro default MPI.
 
-Package: libpacific-grains0-mpi
+Package: libpacific-grains3d0-mpi
 Section: libs
 Architecture: any
 Multi-Arch: same
@@ -54,11 +54,11 @@ Depends: libpacific-mac0-mpi (= ${binary:Version}), ${misc:Depends}, zlib1g-dev,
 Description: PacIFiC MAC development files (default MPI)
  Headers and CMake package files for developing against PacIFiC MAC (default MPI build).
 
-Package: libpacific-grains-mpi-dev
+Package: libpacific-grasin3d-mpi-dev
 Section: libdevel
 Architecture: any
 Multi-Arch: same
-Depends: libpacific-grains0-mpi (= ${binary:Version}), libxerces-c-dev, mpi-default-dev, ${misc:Depends}
+Depends: libpacific-grains3d0-mpi (= ${binary:Version}), libxerces-c-dev, mpi-default-dev, ${misc:Depends}
 Description: PacIFiC Grains development files (default MPI)
  Headers and CMake package files for developing against PacIFiC Grains (default MPI build).
 
@@ -66,7 +66,7 @@ Description: PacIFiC Grains development files (default MPI)
 Package: libpacific-mpi0
 Section: libs
 Architecture: all
-Depends: libpacific-mac0-mpi (= ${binary:Version}), libpacific-grains0-mpi (= ${binary:Version}), ${misc:Depends}
+Depends: libpacific-mac0-mpi (= ${binary:Version}), libpacific-grains3d0-mpi (= ${binary:Version}), ${misc:Depends}
 Description: PacIFiC MPI runtime libraries (meta-package)
  Convenience package that pulls in all PacIFiC runtime shared libraries built with the distro default MPI.
 
@@ -74,6 +74,6 @@ Package: libpacific-mpi-dev
 Section: libdevel
 Architecture: all
 Depends:
- libpacific-mac-mpi-dev (= ${binary:Version}), libpacific-grains-mpi-dev (= ${binary:Version}), ${misc:Depends}
+ libpacific-mac-mpi-dev (= ${binary:Version}), libpacific-grasin3d-mpi-dev (= ${binary:Version}), ${misc:Depends}
 Description: PacIFiC MPI development files (meta-package)
  Convenience package that pulls in all PacIFiC development components (headers + CMake package files) for the default MPI build.

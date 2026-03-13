@@ -196,11 +196,19 @@ endif()
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 include(PacificEnv)
 
+if (OCTREE_BASILISK_PROVIDER STREQUAL "SYSTEM")
 pacific_generate_dev_env_script(
   OUTPUT  "${CMAKE_BINARY_DIR}/pacific-env.sh"
-  TARGETS Grains_main fluid qcc
+  TARGETS Grains3D_main Grains3D_position Grains3D_rotationmatrix Grains3D_shapefile fluid
   # EXTRA_LIB_DIRS "${CMAKE_BINARY_DIR}/src/Grains3D/Grains"
 )
+else()
+pacific_generate_dev_env_script(
+  OUTPUT  "${CMAKE_BINARY_DIR}/pacific-env.sh"
+  TARGETS Grains3D_main Grains3D_position Grains3D_rotationmatrix Grains3D_shapefile fluid qcc
+  # EXTRA_LIB_DIRS "${CMAKE_BINARY_DIR}/src/Grains3D/Grains"
+)
+endif()
 
 message(STATUS "Environment Script: ${CMAKE_BINARY_DIR}/pacific-env.sh")
  

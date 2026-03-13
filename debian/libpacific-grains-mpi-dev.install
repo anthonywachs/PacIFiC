@@ -1,3 +1,3 @@
-usr/include/Grains/*
-usr/lib/*/libGrains.so
-usr/lib/*/cmake/Grains/*
+usr/include/Grains3D/*
+usr/lib/*/libGrains3D.so
+usr/lib/*/cmake/Grains3D/*

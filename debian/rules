@@ -24,6 +24,6 @@ override_dh_auto_configure:
 # 		-Xpacific 
 
 override_dh_makeshlibs:
-	dh_makeshlibs -p libpacific-grains0-mpi -V 'libpacific-grains0-mpi (= $${binary:Version})'
+	dh_makeshlibs -p libpacific-grains3d0-mpi -V 'libpacific-grains3d0-mpi (= $${binary:Version})'
 	dh_makeshlibs -p libpacific-mac0-mpi -V 'libpacific-mac0-mpi (= $${binary:Version})'
 

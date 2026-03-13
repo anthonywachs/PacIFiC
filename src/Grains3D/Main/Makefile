@@ -15,7 +15,7 @@ LDLIBS += $(PACIFIC_XERCESC_LFLAGS) $(PACIFIC_ZLIB_LFLAGS)
 # Target directories
 LIBGRAINS_SO := $(LIBGRAINS_LIBDIR)/libGrains3D.so
 
-TARGET := $(MAIN_BINDIR)/grains3D
+TARGET := $(MAIN_BINDIR)/grains3d
 SRC := src/main.cpp
 OBJ := $(LIBGRAINS_OBJDIR)/main.o
 DEP := $(OBJ:.o=.d)
@@ -35,7 +35,7 @@ $(OBJ): $(SRC) | $(MAIN_BINDIR)
 
 $(TARGET): $(OBJ) $(LIBGRAINS_SO)
 	$(CXX) -o $@ $(OBJ) $(LDFLAGS) $(LDLIBS)
-	@echo -e '-----------------------\n''Software grains built !\n''-----------------------'
+	@echo -e '-----------------------\n''Software grains3d built !\n''-----------------------'
 
 clean:
 	rm -f $(OBJ) $(DEP) $(TARGET)

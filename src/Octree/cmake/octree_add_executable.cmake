@@ -24,7 +24,7 @@ function(octree_add_executable SOURCE_FILE)
 
   target_link_libraries(${source_name}
     PRIVATE
-      PacIFiC::Grains
+      PacIFiC::Grains3D
       MPI::MPI_C
       HDF5::HDF5
       m

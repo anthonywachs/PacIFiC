@@ -45,7 +45,7 @@ Since RPM-based distros require installation under `/usr/lib64/openmpi/` or simi
 source /etc/profile.d/modules.sh
 module load mpi/openmpi-x86_64
 ```
-Then our MPI-linked libraries and binaries become availible under `$PATH`, `$LD_LIBRARY_PATH` as well as the include path from `mpicc --showme`. You should now be able to run ``grains --version``. 
+Then our MPI-linked libraries and binaries become availible under `$PATH`, `$LD_LIBRARY_PATH` as well as the include path from `mpicc --showme`. You should now be able to run ``grains3d --version``. 
 
 ### Ubuntu
 
@@ -99,10 +99,10 @@ cmake --build --preset Default
 To build just one target in the project (for example, Grains) run 
 
 ```bash
-cmake --build --preset Default --target Grains_main
+cmake --build --preset Default --target Grains3D_main
 ```
 
-Once the `--build` step is run, the resulting executable `grains` may be found in `build/release/src/Grains3D/Main` which itself links against the shared libraries such as `libGrains.so` that also live in the build tree. 
+Once the `--build` step is run, the resulting executable `grains3d` may be found in `build/release/src/Grains3D/Main` which itself links against the shared libraries such as `libGrains3D.so` that also live in the build tree. 
 
 You may run the executable using the absolute or relative path e.g. by typing 
 

@@ -1,7 +1,7 @@
 @PACKAGE_INIT@
 
 include(CMakeFindDependencyMacro)
-find_dependency(PacIFiC::Grains)
+find_dependency(PacIFiC::Grains3D)
 find_dependency(PacIFiC::MAC)
 
 include("${CMAKE_CURRENT_LIST_DIR}/FLUIDTargets.cmake")

@@ -73,6 +73,6 @@ stdenv.mkDerivation {
     homepage = "https://github.com/tortotubus/PacIFiC";
     platforms = platforms.linux;
     license = licenses.mit;
-    mainProgram = "grains";
+    mainProgram = "grains3d";
   };
 }

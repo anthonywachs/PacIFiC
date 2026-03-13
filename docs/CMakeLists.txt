@@ -15,13 +15,13 @@ set(PACIFIC_DOCS_WORKDIR "${CMAKE_CURRENT_SOURCE_DIR}")
 set(PACIFIC_DOCS_DOXYFILES
   DoxyFLUID
   DoxyMAC
-  DoxyGrains
+  DoxyGrains3D
 )
 
 add_custom_target(docs_doxygen
   COMMAND "${PACIFIC_DOXYGEN_EXECUTABLE}" "${PACIFIC_DOCS_WORKDIR}/DoxyFLUID"
   COMMAND "${PACIFIC_DOXYGEN_EXECUTABLE}" "${PACIFIC_DOCS_WORKDIR}/DoxyMAC"
-  COMMAND "${PACIFIC_DOXYGEN_EXECUTABLE}" "${PACIFIC_DOCS_WORKDIR}/DoxyGrains"
+  COMMAND "${PACIFIC_DOXYGEN_EXECUTABLE}" "${PACIFIC_DOCS_WORKDIR}/DoxyGrains3D"
   WORKING_DIRECTORY "${PACIFIC_DOCS_WORKDIR}"
   COMMENT "Generating Doxygen documentation"
   VERBATIM
@@ -31,7 +31,7 @@ add_custom_target(docs_doxygen
 add_custom_target(docs_clean
   COMMAND "${CMAKE_COMMAND}" -E rm -rf
     "${PACIFIC_DOCS_WORKDIR}/site"
-    "${PACIFIC_DOCS_WORKDIR}/pages/doxygen/grains_html"
+    "${PACIFIC_DOCS_WORKDIR}/pages/doxygen/grains3d_html"
     "${PACIFIC_DOCS_WORKDIR}/pages/doxygen/fluid_html"
     "${PACIFIC_DOCS_WORKDIR}/pages/doxygen/mac_html"
   WORKING_DIRECTORY "${PACIFIC_DOCS_WORKDIR}"
