@@ -20,7 +20,7 @@ LDFLAGS += -L$(MAC_LIBDIR) -Wl,-rpath,$(MAC_LIBDIR)
 GRAINS_INCDIRS := \
   $(GRAINS_INCDIR)
 CPPFLAGS += $(addprefix -I,$(GRAINS_INCDIRS))
-LDLIBS += -L$(GRAINS_LIBDIR) -lGrains
+LDLIBS += -L$(GRAINS_LIBDIR) -lGrains3D
 LDFLAGS += -L$(GRAINS_LIBDIR) -Wl,-rpath,$(GRAINS_LIBDIR)
 
 # Source and include directories
