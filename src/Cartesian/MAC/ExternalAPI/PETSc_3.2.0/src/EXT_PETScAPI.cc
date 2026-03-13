@@ -111,7 +111,7 @@ EXT_PETScAPI:: initialize( int& argc, char **& argv )
          std::cout << "    " << my_argv[i] << std::endl ;
       }
    }
-   PetscInitialize( &my_argc, &my_argv, PETSC_NULL, help ) ;
+   PetscInitialize( &my_argc, &my_argv, PETSC_NULLPTR, help ) ;
    delete [] my_argv ;
 }
 
@@ -143,7 +143,7 @@ EXT_PETScAPI:: parse_options( MAC_ModuleExplorer const* exp,
          
          if( val.empty() )
          {
-            PetscOptionsSetValue( name.c_str(), PETSC_NULL ) ;
+            PetscOptionsSetValue( name.c_str(), PETSC_NULLPTR ) ;
          }
          else
          {

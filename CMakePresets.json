@@ -17,7 +17,8 @@
         "CMAKE_BUILD_TYPE": "Release",
         "BUILD_THIRD_PARTY_HDF5": "OFF",
         "BUILD_THIRD_PARTY_XERCESC": "OFF",
-        "BUILD_THIRD_PARTY_ZLIB": "OFF"
+        "BUILD_THIRD_PARTY_ZLIB": "OFF",
+        "PACIFIC_DEV_ENV": "ON"
       }
     },
     {

@@ -110,11 +110,27 @@ set(CMAKE_CXX_FLAGS_RELWITHWARNINGS "${CMAKE_CXX_FLAGS_RELEASE}")
 set(CMAKE_C_FLAGS_RELWITHWARNINGS  "${CMAKE_C_FLAGS_RELEASE}")
 
 set(_WARN_FLAGS
-  "-Werror=return-type -Werror=format-security -Werror=format=2 \
-   -Werror=nonnull -Werror=array-bounds -Werror=stringop-overflow \
+  "-Werror=return-type \
+   -Werror=format-security \
+   -Werror=format=2 \
+   -Werror=nonnull \
+   -Werror=array-bounds \
+   -Werror=stringop-overflow \
    -Werror=stringop-truncation \
    -Werror=alloc-size-larger-than=9223372036854775807 \
-   -Werror=address -Werror=maybe-uninitialized"
+   -Werror=address \
+   -Werror=maybe-uninitialized \
+   -Werror=mismatched-new-delete \
+   -Werror=overloaded-virtual \
+   -Wunused-but-set-variable \
+   -Wunused-variable \
+   -Wparentheses \
+   -Wcomment \
+   -Wsign-compare \
+   -Wunused-function \
+   -Wdangling-else \
+   -Wmisleading-indentation \
+   -Wreorder"
 )
 
 set(_SANITIZER_FLAGS "-fsanitize=address,undefined -fno-omit-frame-pointer")
@@ -196,19 +212,24 @@ endif()
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 include(PacificEnv)
 
-if (OCTREE_BASILISK_PROVIDER STREQUAL "SYSTEM")
-pacific_generate_dev_env_script(
-  OUTPUT  "${CMAKE_BINARY_DIR}/pacific-env.sh"
-  TARGETS Grains3D_main Grains3D_position Grains3D_rotationmatrix Grains3D_shapefile fluid
-  # EXTRA_LIB_DIRS "${CMAKE_BINARY_DIR}/src/Grains3D/Grains"
-)
-else()
-pacific_generate_dev_env_script(
-  OUTPUT  "${CMAKE_BINARY_DIR}/pacific-env.sh"
-  TARGETS Grains3D_main Grains3D_position Grains3D_rotationmatrix Grains3D_shapefile fluid qcc
-  # EXTRA_LIB_DIRS "${CMAKE_BINARY_DIR}/src/Grains3D/Grains"
-)
+option(PACIFIC_DEV_ENV "Create environment file" OFF) 
+
+if (PACIFIC_DEV_ENV) 
+  if (OCTREE_BASILISK_PROVIDER STREQUAL "SYSTEM")
+    pacific_generate_dev_env_script(
+      OUTPUT  "${CMAKE_BINARY_DIR}/pacific-env.sh"
+      TARGETS Grains3D_main Grains3D_position Grains3D_rotationmatrix Grains3D_shapefile fluid
+      # EXTRA_LIB_DIRS "${CMAKE_BINARY_DIR}/src/Grains3D/Grains"
+    )
+  else()
+    pacific_generate_dev_env_script(
+      OUTPUT  "${CMAKE_BINARY_DIR}/pacific-env.sh"
+      TARGETS Grains3D_main Grains3D_position Grains3D_rotationmatrix Grains3D_shapefile fluid qcc
+      # EXTRA_LIB_DIRS "${CMAKE_BINARY_DIR}/src/Grains3D/Grains"
+    )
+  endif()
+  message(STATUS "Environment Script: ${CMAKE_BINARY_DIR}/pacific-env.sh")
 endif()
 
-message(STATUS "Environment Script: ${CMAKE_BINARY_DIR}/pacific-env.sh")
+
  

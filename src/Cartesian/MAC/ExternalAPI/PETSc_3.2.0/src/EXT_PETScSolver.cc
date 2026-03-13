@@ -553,10 +553,10 @@ EXT_PETScSolver:: build_ksp( KSP &ksp, MAC_ModuleExplorer const* A_EXP )
    if( VERB && SUBEXP==0 )
    {
 //     PETSc_do( KSPMonitorSet( ksp, KSPMonitorDefault, 
-//                              PETSC_NULL, PETSC_NULL ) ) ;
+//                              PETSC_NULLPTR, PETSC_NULLPTR ) ) ;
 //for a more extensive monitoring
       PETSc_do( KSPMonitorSet( ksp,  KSPMonitorTrueResidualNorm, 
-                               PETSC_NULL, PETSC_NULL ) ) ;
+                               PETSC_NULLPTR, PETSC_NULLPTR ) ) ;
 //
    }   
    if( has_opt ) PETSc_do( KSPSetFromOptions( ksp ) ) ;
