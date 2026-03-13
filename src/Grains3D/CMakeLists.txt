@@ -80,20 +80,20 @@ install(DIRECTORY
   ${CMAKE_CURRENT_SOURCE_DIR}/Grains/XML/include/
   ${CMAKE_CURRENT_SOURCE_DIR}/Grains/InterfaceCBasilisk/include/
   DESTINATION ${PACIFIC_MPI_INSTALL_INCLUDEDIR}/Grains3D
-  COMPONENT Grains_Devel
+  COMPONENT Grains3D_Devel
   FILES_MATCHING PATTERN "*.h*" # match .h, .hh, .hpp
 )
 
 # ---- 3. Install data/config files --------------------------------
-install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Grains3D/Dtd/
+install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Grains/Dtd/
   DESTINATION ${CMAKE_INSTALL_DATADIR}/Grains3D/Dtd
-  COMPONENT Grains_Data
+  COMPONENT Grains3D_Data
   FILES_MATCHING PATTERN "*.dtd"
 )
 
-install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Grains3D/Tools/
+install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Grains/Tools/
   DESTINATION ${CMAKE_INSTALL_DATADIR}/Grains3D/Tools
-  COMPONENT Grains_Data
+  COMPONENT Grains3D_Data
   FILES_MATCHING PATTERN "*.exec"
 )
 

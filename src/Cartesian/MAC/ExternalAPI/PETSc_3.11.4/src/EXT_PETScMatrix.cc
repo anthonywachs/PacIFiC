@@ -495,7 +495,7 @@ EXT_PETScMatrix:: scale_as_diag_mat_mat( LA_Vector const* lvec )
    EXT_PETScVector const* plvec =
                        static_cast<EXT_PETScVector const* >( lvec ) ;
 
-   PETSc_do( MatDiagonalScale( matrix(), plvec->vector(), PETSC_NULL ) ) ;
+   PETSc_do( MatDiagonalScale( matrix(), plvec->vector(), PETSC_NULLPTR ) ) ;
 
    MAC_CHECK_POST( scale_as_diag_mat_mat_POST() ) ;
 }
@@ -512,7 +512,7 @@ EXT_PETScMatrix:: scale_as_mat_diag_mat( LA_Vector const* rvec )
    EXT_PETScVector const* prvec =
                        static_cast<EXT_PETScVector const* >( rvec ) ;
 
-   PETSc_do( MatDiagonalScale( matrix(), PETSC_NULL, prvec->vector() ) ) ;
+   PETSc_do( MatDiagonalScale( matrix(), PETSC_NULLPTR, prvec->vector() ) ) ;
 
    MAC_CHECK_POST( scale_as_mat_diag_mat_POST() ) ;
 }
@@ -873,8 +873,8 @@ EXT_PETScMatrix:: build( intVector const& nnz )
 
    if( SEQ )
    {
-      int const*  nnzptr = ( nnz.size()==NB_ROWS ? nnz.data() : PETSC_NULL ) ;
-      int nz = ( EXP->has_entry( "nz" ) && nnzptr == PETSC_NULL ?
+      int const*  nnzptr = ( nnz.size()==NB_ROWS ? nnz.data() : PETSC_NULLPTR ) ;
+      int nz = ( EXP->has_entry( "nz" ) && nnzptr == PETSC_NULLPTR ?
                                      EXP->int_data( "nz" ) : PETSC_DEFAULT ) ;
       if( mat_type == "PETSc_SeqSBAIJ" )
       {
@@ -908,8 +908,8 @@ EXT_PETScMatrix:: build( intVector const& nnz )
    {
       int d_nz = EXP->int_data( "d_nz" ) ;
       int o_nz = EXP->int_data( "o_nz" ) ;
-      int* d_nnz = PETSC_NULL ;
-      int* o_nnz = PETSC_NULL ;
+      int* d_nnz = PETSC_NULLPTR ;
+      int* o_nnz = PETSC_NULLPTR ;
 
       if( mat_type == "PETSc_MPIAIJ" || mat_type == "PETSc_AIJ" )
       {
