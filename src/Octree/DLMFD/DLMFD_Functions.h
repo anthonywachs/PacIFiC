@@ -165,7 +165,7 @@ typedef struct {
 typedef struct {
   size_t pnum;
   size_t geomType;
-  char typetag[3];
+  char typetag[4];
   enum RigidBodyType type;
   enum RigidBodyShape shape;  
   RigidBodyBoundary s;
