@@ -8,13 +8,13 @@
   "configurePresets": [
     {
       "name": "Default",
-      "displayName": "Default",
+      "displayName": "Default (Release)",
       "description": "Release build with system default generator.",
       "generator": "Unix Makefiles",
       "binaryDir": "${sourceDir}/build/release",
       "cacheVariables": {
-        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/release",
         "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/release",
         "BUILD_THIRD_PARTY_HDF5": "OFF",
         "BUILD_THIRD_PARTY_XERCESC": "OFF",
         "BUILD_THIRD_PARTY_ZLIB": "OFF",
@@ -22,18 +22,21 @@
       }
     },
     {
-      "name": "Release",
-      "displayName": "Release",
-      "description": "Release build",
+      "name": "Fir",
+      "displayName": "HPC Release for Fir",
+      "description": "Release buuild for Fir with specific compiler and flags.",
       "generator": "Unix Makefiles",
-      "binaryDir": "${sourceDir}/build/release",
+      "binaryDir": "${sourceDir}/build/fir_release",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
+      	"CMAKE_INSTALL_PREFIX": "${sourceDir}/install/fir_release",
+        "CMAKE_INSTALL_RPATH": "${sourceDir}/install/fir_release/lib64",
+        "USE_SUBMODULES": "ON",
+        "OCTREE_BASILISK_PROVIDER": "VENDORED",
         "BUILD_THIRD_PARTY_HDF5": "OFF",
         "BUILD_THIRD_PARTY_XERCESC": "OFF",
         "BUILD_THIRD_PARTY_ZLIB": "OFF"
       }
-    },    
+    },
     {
       "name": "Debug",
       "displayName": "Debug",
@@ -41,7 +44,8 @@
       "inherits": "Default",
       "binaryDir": "${sourceDir}/build/debug",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/debug"
       }
     },
     {
@@ -51,108 +55,65 @@
       "inherits": "Default",
       "binaryDir": "${sourceDir}/build/rel-with-warnings",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "RelWithWarnings"
-      }
-    },{
-      "name": "SockeyeRelease",
-      "displayName": "HPC Release for Sockeye",
-      "description": "Release build for Sockeye with specific compiler and flags.",
-      "generator": "Unix Makefiles",
-      "binaryDir": "${sourceDir}/build/",
-      "environment": {
-        "CC" : "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-11.4.1/gcc-9.4.0-xraorchustmpt5xtpv3f7z2mw4wdkpef/bin/gcc",
-        "CXX" : "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-11.4.1/gcc-9.4.0-xraorchustmpt5xtpv3f7z2mw4wdkpef/bin/g++",
-        "GCC_ROOT" : "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-11.4.1/gcc-9.4.0-xraorchustmpt5xtpv3f7z2mw4wdkpef",
-        "MPICC" : "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/openmpi-4.1.1-7c42tpwdhfycqa3vdhit4mspyk6a32nn/bin/mpicc",
-        "MPICXX" : "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/openmpi-4.1.1-7c42tpwdhfycqa3vdhit4mspyk6a32nn/bin/mpic++",
-        "OPENMPI_ROOT" : "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/openmpi-4.1.1-7c42tpwdhfycqa3vdhit4mspyk6a32nn",
-        "HDF5_ROOT" : "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/hdf5-1.10.7-4adrgv33fgmjh5tete3n4hzlk23cyudf",
-        "ZLIB_NG_ROOT" : "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/zlib-ng-2.0.7-joh4ncvu4opnvgu5yk4dwsmaxq2attjo",
-        "PATH": "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/cmake-3.30.2-rqzh7vkeki4vg7ttajpsnx67dtwzsrkf/bin:/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/ncurses-6.2-oaf7gg7ya6ykzhqzdhknr5wdfmrip5qi/bin:/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/curl-8.4.0-geha52sl3kihrhwsyrjijuuxlmxxz2an/bin:/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/hdf5-1.10.7-4adrgv33fgmjh5tete3n4hzlk23cyudf/bin:/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/openmpi-4.1.1-7c42tpwdhfycqa3vdhit4mspyk6a32nn/bin:/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/libxml2-2.9.10-n7vzxzludlt5n22fne77gaw3naiyuzgn/bin:/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-11.4.1/gcc-9.4.0-xraorchustmpt5xtpv3f7z2mw4wdkpef/bin:/home/colive1/.local/bin:/home/colive1/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/arc/software/bin:/arc/system/opt/slurm/bin:/arc/software/cuda/el9/latest/bin",
-        "LD_LIBRARY_PATH": "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/hdf5-1.10.7-4adrgv33fgmjh5tete3n4hzlk23cyudf/lib"
-      },
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/",
-        "USE_SUBMODULES": "ON",
-        "OCTREE_BASILISK_PROVIDER": "VENDORED",
-        "BUILD_THIRD_PARTY_HDF5": "OFF",
-        "BUILD_THIRD_PARTY_XERCESC": "ON",
-        "BUILD_THIRD_PARTY_ZLIB": "OFF",
-        "CMAKE_C_COMPILER": "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-11.4.1/gcc-9.4.0-xraorchustmpt5xtpv3f7z2mw4wdkpef/bin/gcc",
-        "CMAKE_CXX_COMPILER": "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-11.4.1/gcc-9.4.0-xraorchustmpt5xtpv3f7z2mw4wdkpef/bin/g++",
-        "CMAKE_PREFIX_PATH" : "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-11.4.1/gcc-9.4.0-xraorchustmpt5xtpv3f7z2mw4wdkpef/.;/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/openmpi-4.1.1-7c42tpwdhfycqa3vdhit4mspyk6a32nn/.;/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/hdf5-1.10.7-4adrgv33fgmjh5tete3n4hzlk23cyudf/.;/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/zlib-ng-2.0.7-joh4ncvu4opnvgu5yk4dwsmaxq2attjo/.",
-        "MPI_HOME": "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/openmpi-4.1.1-7c42tpwdhfycqa3vdhit4mspyk6a32nn",
-        "ZLIB_ROOT": "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/zlib-ng-2.0.7-joh4ncvu4opnvgu5yk4dwsmaxq2attjo"
+        "CMAKE_BUILD_TYPE": "RelWithWarnings",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/rel_with_warnings"
       }
     },
     {
-      "name": "MyRelease",
-      "displayName": "Release on my workstation",
-      "description": "Release build for my workstation with specific compiler and flags.",
+      "name": "Sockeye",
+      "displayName": "HPC Release for Sockeye",
+      "description": "Release build for Sockeye with specific compiler and flags.",
       "generator": "Unix Makefiles",
-      "binaryDir": "${sourceDir}/build/release",
-      "environment": {   
-	"CC" : "/home/wachs/local/openmpi-4.0.3/bin/mpicc",
-        "CXX" : "/home/wachs/local/openmpi-4.0.3/bin/mpic++",        
-	"MPICC" : "/home/wachs/local/openmpi-4.0.3/bin/mpicc",
-        "MPICXX" : "/home/wachs/local/openmpi-4.0.3/bin/mpic++",
-        "OPENMPI_ROOT" : "/home/wachs/local/openmpi-4.0.3",
-        "HDF5_ROOT" : "/home/wachs/local/hdf5-1.14.6",
-        "PATH": "/home/wachs/local/openmpi-4.0.3/bin:/home/wachs/local/hdf5-1.14.6/bin:/usr/bin",
-        "LD_LIBRARY_PATH": "/home/wachs/local/hdf5-1.14.6/lib:/home/wachs/local/openmpi-4.0.3/lib:/usr/bin"
+      "binaryDir": "${sourceDir}/build/sockeye_release",
+      "environment": {
+      	"CC":"/cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/x86_64-pc-linux-gnu/gcc-bin/12/gcc",
+        "CXX":"/cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/x86_64-pc-linux-gnu/gcc-bin/12/g++"
       },
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/release",
-        "USE_SUBMODULES": "OFF",
-        "OCTREE_BASILISK_PROVIDER": "GIT",
-	"CMAKE_MAKE_PROGRAM": "/usr/bin/gmake",
-	"CMAKE_C_COMPILER": "/home/wachs/local/openmpi-4.0.3/bin/mpicc",
-        "CMAKE_CXX_COMPILER": "/home/wachs/local/openmpi-4.0.3/bin/mpic++",
-        "CMAKE_PREFIX_PATH" : "/home/wachs/local/openmpi-4.0.3/bin/.:/home/wachs/local/hdf5-1.14.6/bin/.:/usr/bin/.",
-        "MPI_HOME": "/home/wachs/local/openmpi-4.0.3"
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/sockeye_release",
+        "CMAKE_BUILD_RPATH": "/cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/lib64:/cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/lib/gcc/x86_64-pc-linux-gnu/12/",
+        "CMAKE_INSTALL_RPATH": "/cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/lib64:/cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/lib/gcc/x86_64-pc-linux-gnu/12/",
+        "CMAKE_SKIP_INSTALL_RPATH": "FALSE",
+        "USE_SUBMODULES": "ON",
+        "OCTREE_BASILISK_PROVIDER": "VENDORED",
+        "BUILD_THIRD_PARTY_HDF5": "OFF",
+        "BUILD_THIRD_PARTY_XERCESC": "OFF",
+        "BUILD_THIRD_PARTY_ZLIB": "OFF"
       }
-    }    
+    }
   ],
   "buildPresets": [
     {
       "name": "Default",
       "configurePreset": "Default",
       "description": "Build the release configuration",
-      "jobs": 4
+      "jobs": 16
     },
     {
-      "name": "Release",
-      "configurePreset": "Release",
-      "description": "Build the release configuration",
-      "jobs": 4
+      "name": "Fir",
+      "configurePreset": "Fir",
+      "description": "Build the Fir configuration",
+      "jobs": 1
     },
     {
       "name": "Debug",
       "configurePreset": "Debug",
       "description": "Build the debug configuration",
-      "jobs": 4
+      "jobs": 16
     },
     {
       "name": "RelWithWarnings",
       "configurePreset": "RelWithWarnings",
       "description": "Build the RelWithWarnings configuration",
-      "jobs": 4
+      "jobs": 16
     },
     {
-      "name": "SockeyeRelease",
-      "configurePreset": "SockeyeRelease",
+      "name": "Sockeye",
+      "configurePreset": "Sockeye",
       "description": "Build on Sockeye",
-      "jobs": 8
-    },
-    {
-      "name": "MyRelease",
-      "configurePreset": "MyRelease",
-      "description": "Build on my workstation",
-      "jobs": 4
+      "jobs": 1
     }
-
   ],
   "testPresets": [
     {

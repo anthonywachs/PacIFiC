@@ -1,0 +1,272 @@
+#
+# Modules to load for fir.alliancecanada.ca
+#
+
+module reset
+module load StdEnv/2023 hdf5-mpi/1.14.2 petsc
+
+#
+# CC/CXX
+#
+
+export PACIFIC_CC_DISTRIB="GNU"
+
+if [ $PACIFIC_CC_DISTRIB = "GNU" ]
+then
+export PACIFIC_CC=$(which gcc)
+export PACIFIC_CC_VER="$(gcc -dumpfullversion 2>/dev/null || gcc -dumpversion)"
+export PACIFIC_CXX=$(which g++)
+export PACIFIC_CXX_VER="$(g++ -dumpfullversion 2>/dev/null || g++ -dumpversion)"
+fi 
+
+#
+# MPICC/MPICXX
+#
+
+export PACIFIC_MPI_DISTRIB="OpenMPI"
+
+export PACIFIC_MPIEXEC=$(which mpiexec)
+
+export PACIFIC_MPICC=$(which mpicc)
+export PACIFIC_MPICC_CFLAGS=$(pkg-config --cflags ompi-c)
+export PACIFIC_MPICC_LFLAGS=$(pkg-config --libs ompi-c)
+export PACIFIC_MPICC_VER=$(pkg-config --modversion ompi-c)
+
+export PACIFIC_MPICXX=$(which mpicxx)
+export PACIFIC_MPICXX_CFLAGS=$(pkg-config --cflags ompi-cxx)
+export PACIFIC_MPICXX_LFLAGS=$(pkg-config --libs ompi-cxx)
+export PACIFIC_MPICXX_VER=$(pkg-config --modversion ompi-cxx)
+
+
+#
+# Pacific Directories
+#
+
+PACIFIC_ENV_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+export PACIFIC_ROOT_ABS="$(cd -- "$PACIFIC_ENV_DIR/.." && pwd -P)"
+
+export PACIFIC_ARCH="${PACIFIC_CC_DISTRIB}-${PACIFIC_CC_VER}-${PACIFIC_MPI_DISTRIB}-${PACIFIC_MPICC_VER}"
+export PACIFIC_BUILDDIR="build/PacIFiC-${PACIFIC_ARCH}"
+export PACIFIC_BUILDDIR_ABS="${PACIFIC_ROOT_ABS}/${PACIFIC_BUILDDIR}"
+
+export PACIFIC_SRCDIR="src"
+export PACIFIC_SRCDIR_ABS="${PACIFIC_ROOT_ABS}/${PACIFIC_SRCDIR}"
+
+export PACIFIC_INSTALLDIR="install/PacIFiC-${PACIFIC_ARCH}"
+export PACIFIC_INSTALLDIR_ABS="${PACIFIC_ROOT_ABS}/${PACIFIC_INSTALLDIR}"
+
+export PACIFIC_THIRDPARTY_BUILDDIR_ABS="${PACIFIC_BUILDDIR_ABS}/third_party/build"
+export PACIFIC_THIRDPARTY_INSTALLDIR_ABS="${PACIFIC_BUILDDIR_ABS}/third_party"
+
+# Export Grains binary path
+export PATH="$PACIFIC_BUILDDIR_ABS/Grains3D/bin:$PATH"
+export PATH="$PACIFIC_BUILDDIR_ABS/FLUID/bin:$PATH"
+
+#
+# MAC
+#
+
+export MAC_LEVEL=0
+
+#
+# XERCESC
+#
+
+export PACIFIC_XERCESC_USE_THIRDPARTY=0
+
+if [ $PACIFIC_XERCESC_USE_THIRDPARTY = 0 ]
+then
+export PACIFIC_XERCESC_CFLAGS=$(pkg-config --cflags xerces-c)
+export PACIFIC_XERCESC_LFLAGS=$(pkg-config --libs xerces-c)
+export PACIFIC_XERCESC_PREFIX=$(pkg-config --variable=prefix xerces-c)
+export PACIFIC_XERCESC_VER=$(pkg-config --modversion xerces-c)
+else
+export PACIFIC_XERCESC_CFLAGS="-I${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}/include"
+export PACIFIC_XERCESC_LFLAGS="-L${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}/lib64 -Wl,-rpath,${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}/lib64 -lxerces-c"
+export PACIFIC_XERCESC_PREFIX="${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}"
+export PACIFIC_XERCESC_VER="3.3.0"
+fi
+
+#
+# HDF5
+#
+
+export PACIFIC_HDF5_USE_THIRDPARTY=0
+if [ $PACIFIC_HDF5_USE_THIRDPARTY = 0 ]
+then
+export PACIFIC_HDF5_CFLAGS=$(pkg-config --cflags hdf5)
+export PACIFIC_HDF5_LFLAGS=$(pkg-config --libs hdf5)
+export PACIFIC_HDF5_PREFIX=$(pkg-config --variable=prefix hdf5)
+export PACIFIC_HDF5_VER=$(pkg-config --modversion hdf5)
+else
+export PACIFIC_HDF5_CFLAGS="-I${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}/include"
+export PACIFIC_HDF5_LFLAGS="-L${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}/lib -Wl,-rpath,${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}/lib -lhdf5"
+export PACIFIC_HDF5_PREFIX="${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}"
+export PACIFIC_HDF5_VER="2.0.0"
+fi
+
+#
+# ZLIB
+#
+
+export PACIFIC_ZLIB_USE_THIRDPARTY=0
+if [ $PACIFIC_ZLIB_USE_THIRDPARTY = 0 ]
+then
+export PACIFIC_ZLIB_CFLAGS=$(pkg-config --cflags zlib)
+export PACIFIC_ZLIB_LFLAGS=$(pkg-config --libs zlib)
+export PACIFIC_ZLIB_PREFIX=$(pkg-config --variable=prefix zlib)
+export PACIFIC_ZLIB_VER=$(pkg-config --modversion zlib)
+else 
+export PACIFIC_ZLIB_CFLAGS="-I${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}/include"
+export PACIFIC_ZLIB_LFLAGS="-L${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}/lib -Wl,-rpath,${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}/lib -lz-ng"
+export PACIFIC_ZLIB_PREFIX="${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}"
+export PACIFIC_ZLIB_VER="2.2.4"
+fi
+
+#
+# BASILISK
+#
+
+export PACIFIC_BASILISK_USE_THIRDPARTY=1
+
+if [ $PACIFIC_BASILISK_USE_THIRDPARTY = 0 ]
+then
+export PACIFIC_BASILISK_QCC=$(which qcc)
+else
+export PACIFIC_BASILISK_QCC="${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}/bin/qcc"
+
+# Export Basilisk binary path
+export PATH="${PATH}:${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}/bin"
+fi
+
+#
+# PETSc
+#
+
+export PACIFIC_PETSC_USE_THIRDPARTY=0
+
+if [ $PACIFIC_PETSC_USE_THIRDPARTY = 0 ]
+then
+export PACIFIC_PETSC_CFLAGS=$(pkg-config --cflags petsc)
+export PACIFIC_PETSC_LFLAGS=$(pkg-config --libs petsc)
+export PACIFIC_PETSC_PREFIX=$(pkg-config --variable=prefix petsc)
+export PACIFIC_PETSC_VER=$(pkg-config --modversion petsc)
+else
+export PACIFIC_PETSC_CFLAGS="-I${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}/include"
+export PACIFIC_PETSC_LFLAGS="-L${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}/lib -Wl,-rpath,${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}/lib -lpetsc"
+export PACIFIC_PETSC_PREFIX="${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}"
+export PACIFIC_PETSC_VER="3.24.3"
+fi
+
+
+#
+# Summary
+#
+
+C_RESET=$'\033[0m'
+C_BOLD=$'\033[1m'
+C_DIM=$'\033[2m'
+C_UNDERLINE=$'\033[4m'
+
+# foregrounds
+C_BLACK=$'\033[30m'
+C_RED=$'\033[31m'
+C_GREEN=$'\033[32m'
+C_YELLOW=$'\033[33m'
+C_BLUE=$'\033[34m'
+C_MAGENTA=$'\033[35m'
+C_CYAN=$'\033[36m'
+C_WHITE=$'\033[37m'
+
+# bright foregrounds
+C_BBLACK=$'\033[90m'
+C_BRED=$'\033[91m'
+C_BGREEN=$'\033[92m'
+C_BYELLOW=$'\033[93m'
+C_BBLUE=$'\033[94m'
+C_BMAGENTA=$'\033[95m'
+C_BCYAN=$'\033[96m'
+C_BWHITE=$'\033[97m'
+
+# backgrounds
+C_BG_BLACK=$'\033[40m'
+C_BG_RED=$'\033[41m'
+C_BG_GREEN=$'\033[42m'
+C_BG_YELLOW=$'\033[43m'
+C_BG_BLUE=$'\033[44m'
+C_BG_MAGENTA=$'\033[45m'
+C_BG_CYAN=$'\033[46m'
+C_BG_WHITE=$'\033[47m'
+
+# bright backgrounds
+C_BGBLACK=$'\033[100m'
+C_BGRED=$'\033[101m'
+C_BGGREEN=$'\033[102m'
+C_BGYELLOW=$'\033[103m'
+C_BGBLUE=$'\033[104m'
+C_BGMAGENTA=$'\033[105m'
+C_BGCYAN=$'\033[106m'
+C_BGWHITE=$'\033[107m'
+
+echo -e "${C_RED}${C_BOLD}PACIFIC${C_RESET}"
+echo -e "${C_RED}PACIFIC_ROOT_ABS      ${C_RESET} = ${PACIFIC_ROOT_ABS}"
+echo -e "${C_RED}PACIFIC_BUILDDIR_ABS  ${C_RESET} = ${PACIFIC_BUILDDIR_ABS}"
+echo -e "${C_RED}PACIFIC_SRCDIR_ABS    ${C_RESET} = ${PACIFIC_SRCDIR_ABS}"
+echo -e "${C_RED}PACIFIC_INSTALLDIR_ABS${C_RESET} = ${PACIFIC_INSTALLDIR_ABS}"
+echo -e ""
+echo -e "${C_CYAN}${C_BOLD}CC${C_RESET}"
+echo -e "${C_CYAN}PACIFIC_CC    ${C_RESET} = ${PACIFIC_CC}"
+echo -e "${C_CYAN}PACIFIC_CC_VER${C_RESET} = ${PACIFIC_CC_VER}"
+echo -e ""
+echo -e "${C_CYAN}${C_BOLD}CXX${C_RESET}"
+echo -e "${C_CYAN}PACIFIC_CXX    ${C_RESET} = ${PACIFIC_CXX}"
+echo -e "${C_CYAN}PACIFIC_CXX_VER${C_RESET} = ${PACIFIC_CXX_VER}"
+echo -e ""
+echo -e "${C_CYAN}${C_BOLD}MPI${C_RESET}"
+echo -e "${C_CYAN}PACIFIC_MPI_DISTRIB${C_RESET} = ${PACIFIC_MPI_DISTRIB}"
+echo -e "${C_CYAN}PACIFIC_MPIEXEC${C_RESET}    = ${PACIFIC_MPIEXEC}"
+echo -e ""
+echo -e "${C_CYAN}${C_BOLD}MPICC${C_RESET}"
+echo -e "${C_CYAN}PACIFIC_MPICC       ${C_RESET} = ${PACIFIC_MPICC}"
+echo -e "${C_CYAN}PACIFIC_MPICC_CFLAGS${C_RESET} = ${PACIFIC_MPICC_CFLAGS}"
+echo -e "${C_CYAN}PACIFIC_MPICC_LFLAGS${C_RESET} = ${PACIFIC_MPICC_LFLAGS}"
+echo -e "${C_CYAN}PACIFIC_MPICC_VER   ${C_RESET} = ${PACIFIC_MPICC_VER}"
+echo -e ""
+echo -e "${C_CYAN}${C_BOLD}MPICXX${C_RESET}"
+echo -e "${C_CYAN}PACIFIC_MPICXX       ${C_RESET} = ${PACIFIC_MPICXX}"
+echo -e "${C_CYAN}PACIFIC_MPICXX_CFLAGS${C_RESET} = ${PACIFIC_MPICXX_CFLAGS}"
+echo -e "${C_CYAN}PACIFIC_MPICXX_LFLAGS${C_RESET} = ${PACIFIC_MPICXX_LFLAGS}"
+echo -e "${C_CYAN}PACIFIC_MPICXX_VER   ${C_RESET} = ${PACIFIC_MPICXX_VER}"
+echo -e ""
+echo -e "${C_GREEN}${C_BOLD}Xerces${C_RESET}"
+echo -e "${C_GREEN}PACIFIC_XERCESC_USE_THIRDPARTY${C_RESET} = ${PACIFIC_XERCESC_USE_THIRDPARTY}"
+echo -e "${C_GREEN}PACIFIC_XERCESC_CFLAGS        ${C_RESET} = ${PACIFIC_XERCESC_CFLAGS}"
+echo -e "${C_GREEN}PACIFIC_XERCESC_LFLAGS        ${C_RESET} = ${PACIFIC_XERCESC_LFLAGS}"
+echo -e "${C_GREEN}PACIFIC_XERCESC_PREFIX        ${C_RESET} = ${PACIFIC_XERCESC_PREFIX}"
+echo -e "${C_GREEN}PACIFIC_XERCESC_VER           ${C_RESET} = ${PACIFIC_XERCESC_VER}"
+echo -e ""
+echo -e "${C_GREEN}${C_BOLD}HDF5${C_RESET}"
+echo -e "${C_GREEN}PACIFIC_HDF5_USE_THIRDPARTY${C_RESET} = ${PACIFIC_HDF5_USE_THIRDPARTY}"
+echo -e "${C_GREEN}PACIFIC_HDF5_CFLAGS        ${C_RESET} = ${PACIFIC_HDF5_CFLAGS}"
+echo -e "${C_GREEN}PACIFIC_HDF5_LFLAGS        ${C_RESET} = ${PACIFIC_HDF5_LFLAGS}"
+echo -e "${C_GREEN}PACIFIC_HDF5_PREFIX        ${C_RESET} = ${PACIFIC_HDF5_PREFIX}"
+echo -e "${C_GREEN}PACIFIC_HDF5_VER           ${C_RESET} = ${PACIFIC_HDF5_VER}"
+echo -e ""
+echo -e "${C_GREEN}${C_BOLD}ZLIB${C_RESET}"
+echo -e "${C_GREEN}PACIFIC_ZLIB_USE_THIRDPARTY${C_RESET} = ${PACIFIC_ZLIB_USE_THIRDPARTY}"
+echo -e "${C_GREEN}PACIFIC_ZLIB_CFLAGS${C_RESET} = ${PACIFIC_ZLIB_CFLAGS}"
+echo -e "${C_GREEN}PACIFIC_ZLIB_LFLAGS${C_RESET} = ${PACIFIC_ZLIB_LFLAGS}"
+echo -e "${C_GREEN}PACIFIC_ZLIB_PREFIX${C_RESET} = ${PACIFIC_ZLIB_PREFIX}"
+echo -e "${C_GREEN}PACIFIC_ZLIB_VER   ${C_RESET} = ${PACIFIC_ZLIB_VER}"
+echo -e ""
+echo -e "${C_GREEN}${C_BOLD}PETSC${C_RESET}"
+echo -e "${C_GREEN}PACIFIC_PETSC_USE_THIRDPARTY${C_RESET} = ${PACIFIC_PETSC_USE_THIRDPARTY}"
+echo -e "${C_GREEN}PACIFIC_PETSC_CFLAGS${C_RESET} = ${PACIFIC_PETSC_CFLAGS}"
+echo -e "${C_GREEN}PACIFIC_PETSC_LFLAGS${C_RESET} = ${PACIFIC_PETSC_LFLAGS}"
+echo -e "${C_GREEN}PACIFIC_PETSC_PREFIX${C_RESET} = ${PACIFIC_PETSC_PREFIX}"
+echo -e "${C_GREEN}PACIFIC_PETSC_VER   ${C_RESET} = ${PACIFIC_PETSC_VER}"
+echo -e ""
+echo -e "${C_GREEN}${C_BOLD}Basilisk${C_RESET}"
+echo -e "${C_GREEN}PACIFIC_BASILISK_USE_THIRDPARTY${C_RESET} = ${PACIFIC_BASILISK_USE_THIRDPARTY}"
+echo -e "${C_GREEN}PACIFIC_BASILISK_QCC${C_RESET} = ${PACIFIC_BASILISK_QCC}"
+echo -e ""

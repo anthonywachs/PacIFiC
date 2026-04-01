@@ -4,7 +4,8 @@
 #include <MAC_ExternalAPI.hh>
 #include <MAC_Timer.hh>
 #include <MAC.hh>
-#include <mpi.h>
+// #include <mpi.h> 
+#include <EXT_MPI.hh>
 class MAC_ModuleExplorer ;
 // Some defs to allow PETSc tracelogs.
 // #define PETSC_USE_DEBUG 1
@@ -16,13 +17,14 @@ class MAC_ModuleExplorer ;
 // Not very clear why ... the error we get is the following, at the linking
 // stage of the code that use libmac0.so :
 // libmac0.so: undefined reference to `petscstack'
-// collect2: ld a retourné 1 code d'état d'exécution
+// collect2: ld a retournï¿½ 1 code d'ï¿½tat d'exï¿½cution
 // The problem is documented on the web by googling "undefined reference to
 // `petscstack'" 
 // !!! END IMPORTANT !!!
 #define PETSC_USE_LOG 1
 #define PETSC_USE_STACK 1
-#include <mpi.h>
+// #include <mpi.h> 
+#include <EXT_MPI.hh>
 
 // From version 3.6, extern "C" causes odd compiling problems related to c++
 // complex numbers. It turned out that extern "C" is not even needed.

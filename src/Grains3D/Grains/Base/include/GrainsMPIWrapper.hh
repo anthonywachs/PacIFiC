@@ -1,7 +1,9 @@
 #ifndef _GRAINSMPIWRAPPER_HH_
 #define _GRAINSMPIWRAPPER_HH_
 
-#include <mpi.h>
+// #include <mpi.h>
+#include "MPI.hh"
+
 #include "MPINeighbors.hh"
 #include "solvercomputingtime.hh"
 #include "computingtime.hh"

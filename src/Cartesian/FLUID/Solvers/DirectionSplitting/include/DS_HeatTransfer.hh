@@ -1,7 +1,8 @@
 #ifndef DS_HeatTransfer_HH
 #define DS_HeatTransfer_HH
 
-#include <mpi.h>
+// #include <mpi.h>
+#include <PAC_MPI.hh>
 #include <FV_OneStepIteration.hh>
 #include <geomVector.hh>
 #include <PAC_computingtime.hh>
