@@ -579,7 +579,7 @@ void reinitialize_vtk_restart( void )
   if ( fpvtk )
   {
     int result = fscanf( fpvtk, "%d", &init_cycle_number );
-    if ( result != 3 ) 
+    if ( result != 1 ) 
       if ( pid() == 0 )
         printf( "WARNING: problem when reading cycle number in file %s\n", 
 		filename_lcn );    
@@ -611,9 +611,8 @@ void reinitialize_vtk_restart( void )
         while ( fgets( time_line, sizeof(time_line), fpvtk ) ) 
         {      
           // Extract 8 first characters
-          strncpy( start, time_line, 8 );
-          start[8] = '\0';
-
+	  snprintf( start, 9, "%s", time_line );
+	  
           // If 8 first characters equal "<DataSet", it is an output time line
           // We add to the vtk time series string
           if ( ! strcmp( start, start_ref_pvd ) )
@@ -636,9 +635,8 @@ void reinitialize_vtk_restart( void )
       {
         while ( fgets( time_line, sizeof(time_line), fpvtk ) ) 
         {      
-          // Extract 9 first characters without the 2 first tabs
-          strncpy( start, time_line, 11 );
-	  start[11] = '\0';
+          // Extract 11 first characters without the 2 first tabs
+	  snprintf( start, 12, "%s", time_line );	  
 	  for (size_t k=0;k<9;++k) start[k] = start[k+2];
 	  start[9] = '\0';
 
@@ -666,8 +664,7 @@ void reinitialize_vtk_restart( void )
         while ( fgets( time_line, sizeof(time_line), fpvtk ) ) 
         {      
           // Extract 8 first characters
-          strncpy( start, time_line, 8 );
-          start[8] = '\0';
+          snprintf( start, 9, "%s", time_line );
 
           // If 8 first characters equal "<DataSet", it is an output time line
           // We add to the vtk time series string
@@ -693,8 +690,7 @@ void reinitialize_vtk_restart( void )
         while ( fgets( time_line, sizeof(time_line), fpvtk ) ) 
         {      
           // Extract 8 first characters
-          strncpy( start, time_line, 8 );
-          start[8] = '\0';
+          snprintf( start, 9, "%s", time_line );
 
           // If 8 first characters equal "<DataSet", it is an output time line
           // We add to the vtk time series string
