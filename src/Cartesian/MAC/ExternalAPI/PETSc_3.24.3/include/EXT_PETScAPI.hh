@@ -4,7 +4,8 @@
 #include <MAC_ExternalAPI.hh>
 #include <MAC_Timer.hh>
 #include <MAC.hh>
-#include <mpi.h>
+// #include <mpi.h> 
+#include <EXT_MPI.hh>
 class MAC_ModuleExplorer ;
 // Some defs to allow PETSc tracelogs.
 // #define PETSC_USE_DEBUG 1
@@ -22,7 +23,8 @@ class MAC_ModuleExplorer ;
 // !!! END IMPORTANT !!!
 #define PETSC_USE_LOG 1
 #define PETSC_USE_STACK 1
-#include <mpi.h>
+// #include <mpi.h> 
+#include <EXT_MPI.hh>
 
 // From version 3.6, extern "C" causes odd compiling problems related to c++
 // complex numbers. It turned out that extern "C" is not even needed.

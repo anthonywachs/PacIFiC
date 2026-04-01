@@ -1,7 +1,8 @@
 #ifndef DDS_HeatEquation_HH
 #define DDS_HeatEquation_HH
 
-#include <mpi.h>
+// #include <mpi.h>
+#include <PAC_MPI.hh>
 #include <FV_OneStepIteration.hh>
 #include <geomVector.hh>
 #include <PAC_computingtime.hh>
