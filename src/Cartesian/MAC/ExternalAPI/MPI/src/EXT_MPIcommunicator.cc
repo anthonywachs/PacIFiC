@@ -15,8 +15,7 @@
 // Our solution is to define MPICH_IGNORE_CXX_SEEK which works at least 
 // with MPICH2
 #define MPICH_IGNORE_CXX_SEEK 1
-// #include <mpi.h> 
-#include <EXT_MPI.hh>
+#include <mpi.h>  
 
 #include <iostream>
 #include <sstream>

@@ -1,8 +1,7 @@
 #ifndef FV_MESH_HH
 #define FV_MESH_HH
 
-// #include <mpi.h> 
-#include <EXT_MPI.hh>
+#include <mpi.h>  
 #include <MAC_Object.hh>
 #include <MAC_Data.hh>
 #include <doubleVector.hh>
