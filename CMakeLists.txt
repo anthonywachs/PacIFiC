@@ -93,6 +93,12 @@ project(PacIFiC
  
 option(PACIFIC_ENABLE_MPI "Enable MPI-dependent targets" ON)
 
+# Avoid deprecated MPI C++ bindings in mpi.h across all targets.
+add_compile_definitions(
+  MPICH_SKIP_MPICXX=1
+  OMPI_SKIP_MPICXX=1
+)
+
 # ==========================================================
 #
 # Custom Build Configurations

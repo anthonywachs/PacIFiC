@@ -1,8 +1,7 @@
 #ifndef DS_NavierStokes_HH
 #define DS_NavierStokes_HH
 
-// #include <mpi.h>
-#include <PAC_MPI.hh>
+#include <mpi.h> 
 #include <FV_OneStepIteration.hh>
 #include <geomVector.hh>
 #include <PAC_computingtime.hh>
