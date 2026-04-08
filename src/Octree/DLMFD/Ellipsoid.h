@@ -74,14 +74,16 @@ void compute_nboundary_Ellipsoid( GeomParameter const* gcp, int* nb )
 {
   double delta = L0 / (double)(1 << MAXLEVEL) ;
   double spacing = INTERBPCOEF * delta, lb, ub, mid, sol = - 1.;
-  double a = gcp->elgp->a, b = gcp->elgp->b, shift, rr;
-  size_t maxnx = (size_t)( 2. * a / delta ), ninterior = 0, totalnx = 0, i;
-  double* vx = (double*) calloc( maxnx, sizeof(double) ); 
-    
+  double a = gcp->elgp->a, b = gcp->elgp->b, shift, rr, vx1;
+  size_t maxnx = (size_t)( 2. * ( a + b ) / delta ), ninterior = 0, 
+  	totalnx = 0, i;
+  double* vx = (double*) calloc( maxnx, sizeof(double) );
+  bool compress = true; 
+
   // Distribution of points along the x-axis such that points on the surface
   // are approximately distant by spacing
   vx[0] = - a;
-  for ( i=1;i<maxnx && sol < 0.;++i)
+  for (i=1;i<maxnx && sol < 0.;++i)
   {
     // Knowing x[i-1], we find x[i] by solving a non-linear equation via the 
     // bi-section method
@@ -101,26 +103,46 @@ void compute_nboundary_Ellipsoid( GeomParameter const* gcp, int* nb )
     ++ninterior;     
   }
   totalnx = 2 * ( ninterior - 1 ) + 3;
+
   // We need to correct the x positions such that x=0 is a point and points 
   // are symmetric wrt x=0
+  // We first check whether we need to stretch or compress the x positions
+  // We test whether compressing would work, if not we stretch
+  // After compression, the inter-point distance on the ellipsoid surface should
+  // not be less than 0.9 the prescribed distance
   shift = vx[ninterior] / (double)( ninterior );
-  for ( i=1;i<ninterior+1;++i) vx[i] -= (double)(i) * shift;
-  for ( i=ninterior+1;i<totalnx;++i) vx[i] = - vx[2*ninterior-i];
-
-
+  vx1 = vx[1] - shift;
+  if ( - a - vx1 > 0. ) compress = false;
+  else if ( sqrt( sq( - a - vx1 ) 
+  	+ sq( b ) * ( 1. - sq( vx1 / a ) ) ) < 0.9 * spacing ) 
+	compress = false;  
+    
+  if ( compress )
+  {
+    shift = vx[ninterior] / (double)( ninterior ); 
+    for (i=1;i<ninterior+1;++i) vx[i] -= (double)(i) * shift;
+  }
+  else
+  {
+    --ninterior;
+    totalnx -= 2;
+    shift = fabs( vx[ninterior] ) / (double)( ninterior );
+    for (i=1;i<ninterior+1;++i) vx[i] += (double)(i) * shift;        
+  } 
+  for (i=ninterior+1;i<totalnx;++i) vx[i] = - vx[2*ninterior-i];
+    
   // Since we impose b=c, each perimeter at a given x is a circle, we equally
   // distribute point over each circle  
   for (i=1;i<totalnx-1;++i)
   {
-    rr = b * sqrt( 1. - sq( vx[i] / a ) );
+    rr = b * sqrt( 1. - sq( vx[i] / a ) );    
     *nb += (size_t)( 2. * pi * rr / spacing ); 
   }
   *nb += 2;   
             
   if( *nb == 0 )
-    printf( "nboundary = 0: No boundary points !!!\n" );
-    
-  free( vx ); vx = NULL;
+    printf( "nboundary = 0: No boundary points !!!\n" );    
+  free( vx ); vx = NULL; 
 }
 
 
@@ -136,16 +158,17 @@ void create_referenceRB_boundary_geomfeatures_Ellipsoid(
   double delta = L0 / (double)(1 << MAXLEVEL) ;
   double spacing = INTERBPCOEF * delta, lb, ub, mid, sol = - 1.;
   double a = gcp->elgp->a, b = gcp->elgp->b, shift, local_radius, dangle, 
-  	local_angle, bin, norm;
-  size_t maxnx = (size_t)( 2. * a / delta ), ninterior = 0, totalnx = 0, i,
-  	ntheta = 0, j;
+  	local_angle, bin, norm, vx1;
+  size_t maxnx = (size_t)( 2. * ( a + b ) / delta ), ninterior = 0, 
+  	totalnx = 0, i, ntheta = 0, j;
   double* vx = (double*) calloc( maxnx, sizeof(double) );
   int isb = 0; 
-  
+  bool compress = true; 
+    
   // Distribution of points along the x-axis such that points on the surface
   // are approximately distant by spacing
   vx[0] = - a;
-  for ( i=1;i<maxnx && sol < 0.;++i)
+  for (i=1;i<maxnx && sol < 0.;++i)
   {
     lb = vx[i-1];
     ub = vx[i-1] + 1.2 * spacing;
@@ -163,11 +186,33 @@ void create_referenceRB_boundary_geomfeatures_Ellipsoid(
     ++ninterior;     
   }
   totalnx = 2 * ( ninterior - 1 ) + 3;
+
   // We need to correct the x positions such that x=0 is a point and points 
   // are symmetric wrt x=0
+  // We first check whether we need to stretch or compress the x positions
+  // We test whether compressing would work, if not we stretch
+  // After compression, the inter-point distance on the ellipsoid surface should
+  // not be less than 0.9 the prescribed distance
   shift = vx[ninterior] / (double)( ninterior );
-  for ( i=1;i<ninterior+1;++i) vx[i] -= (double)(i) * shift;
-  for ( i=ninterior+1;i<totalnx;++i) vx[i] = - vx[2*ninterior-i];
+  vx1 = vx[1] - shift;
+  if ( - a - vx1 > 0. ) compress = false;
+  else if ( sqrt( sq( - a - vx1 ) 
+  	+ sq( b ) * ( 1. - sq( vx1 / a ) ) ) < 0.9 * spacing ) 
+	compress = false;  
+    
+  if ( compress )
+  {
+    shift = vx[ninterior] / (double)( ninterior ); 
+    for (i=1;i<ninterior+1;++i) vx[i] -= (double)(i) * shift;
+  }
+  else
+  {
+    --ninterior;
+    totalnx -= 2;
+    shift = fabs( vx[ninterior] ) / (double)( ninterior );
+    for (i=1;i<ninterior+1;++i) vx[i] += (double)(i) * shift;        
+  } 
+  for (i=ninterior+1;i<totalnx;++i) vx[i] = - vx[2*ninterior-i];
 
   // x=-a tip
   dlm_bd->bp[isb].x = - a;
