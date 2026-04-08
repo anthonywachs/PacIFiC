@@ -1,7 +1,7 @@
 # Compilation & linking flags
 CXX = $(PACIFIC_MPICXX)
 CC = $(PACIFIC_MPICC)
-CPPFLAGS += $(PACIFIC_XERCESC_CFLAGS) $(PACIFIC_ZLIB_CFLAGS)
+CPPFLAGS += $(PACIFIC_MPI_SKIP_CPPFLAGS) $(PACIFIC_XERCESC_CFLAGS) $(PACIFIC_ZLIB_CFLAGS) 
 LDLIBS   += $(PACIFIC_XERCESC_LFLAGS) $(PACIFIC_ZLIB_LFLAGS)
 
 # Target directories
@@ -184,7 +184,7 @@ MBAS    :
 	@echo -e '*** Package Basilisk compiled\n'	
 		
 MESS   :
-	@echo -e '************************************************************\n''Grains3D compiled with' $(CXX) $(CPPFLAGS) $(CXXFLAGS)'\n************************************************************'	
+	@echo -e '************************************************************\n''Grains3D compiled with' $(CXX) $(CPPFLAGS) $(CXXFLAGS)'\n************************************************************'
 
 $(OBJDIR)/%.o : %.cpp
 	@mkdir -p $(dir $@)
