@@ -1,8 +1,7 @@
 #ifndef DS_DirectionSplitting_HH
 #define DS_DirectionSplitting_HH
 
-// #include <mpi.h>
-#include <PAC_MPI.hh>
+#include <mpi.h> 
 #include <FV_OneStepIteration.hh>
 #include <PAC_computingtime.hh>
 #include <PAC_solvercomputingtime.hh>

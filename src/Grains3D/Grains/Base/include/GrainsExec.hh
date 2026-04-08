@@ -1,8 +1,7 @@
 #ifndef _GRAINSEXEC_HH_
 #define _GRAINSEXEC_HH_
 
-// #include <mpi.h>
-#include "MPI.hh"
+#include <mpi.h> 
 
 #include "Vector3.hh"
 #include "Point3.hh"

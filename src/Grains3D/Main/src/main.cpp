@@ -1,7 +1,6 @@
 
 
-// #include <mpi.h>
-#include "MPI.hh"
+#include <mpi.h> 
 
 #include "Grains.hh"
 #include "GrainsBuilderFactory.hh"
