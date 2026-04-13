@@ -2268,7 +2268,8 @@ void init_file_pointers( RigidBody const* allrbs, const size_t nrb, FILE** p,
 {
   char name[80] = "";
   char suffix[80] = "";
-  char buffer[80] = "";  
+  char buffer[80] = "";
+    
 # if _MPI
     if ( pid() == 0 )
 # endif
@@ -2328,6 +2329,99 @@ void init_file_pointers( RigidBody const* allrbs, const size_t nrb, FILE** p,
       }
       else
         *CVT = fopen( DLMFD_CELLS_FILENAME_complete_name, "a" );          
+    }    
+}
+
+
+
+
+/** Check particle data files in case of restart */
+//----------------------------------------------------------------------------
+void check_one_particle_datafile( char const* name, 
+	const double current_time, const double current_dt,
+	bool mess ) 
+//----------------------------------------------------------------------------
+{  
+  char line[256] = "";
+  double time;
+  size_t ndatalines = 0;
+     
+  FILE * fp = fopen( name,  "r" );
+  if ( fp )
+  {
+    fgets( line, sizeof(line), fp );
+    ndatalines = 1;
+    while ( fgets( line, sizeof(line), fp ) ) {++ndatalines;}
+    sscanf( line, "%lf", &time);
+    fclose( fp );
+	    
+    if ( fabs( time - current_time ) > 0.01 * current_dt )
+    {
+      if ( mess )
+        printf( "Time mismatch in particle data files handled\n" );
+		
+      char** datarray = (char**) calloc( ndatalines, sizeof(char*) );
+      fp = fopen( name,  "r" );
+      for (size_t i=0;i<ndatalines;++i)
+      {
+	datarray[i] = (char*) calloc( 257, sizeof(char) );
+	fgets( datarray[i], 256, fp );
+      }
+      fclose( fp );
+      
+      fp = fopen( name,  "w" );
+      fprintf( fp, "%s", datarray[0] );
+      for (size_t i=1;i<ndatalines;++i)
+      {
+	sscanf( datarray[i], "%lf", &time);
+	if ( time - current_time < 0.01 * current_dt )
+	  fprintf( fp, "%s", datarray[i] );
+      }
+      fclose( fp );
+		
+      for (size_t i=0;i<ndatalines;++i) free( datarray[i] );
+      free( datarray );	
+    }
+  }	              
+}
+
+
+
+
+/** Check particle data files in case of restart */
+//----------------------------------------------------------------------------
+void check_particle_datafiles_restart( RigidBody const* allrbs, 
+	const size_t nrb, const bool check_pdata, const double current_time,
+	const double current_dt ) 
+//----------------------------------------------------------------------------
+{
+  char name[80] = "";
+  char suffix[80] = "";  
+     
+# if _MPI
+    if ( pid() == 0 )
+# endif
+    {
+      // Particle data
+      for (size_t k = 0; k < nrb; k++) 
+      {
+        sprintf( suffix, "_%lu.dat", allrbs[k].pnum );
+
+        if ( check_pdata )
+	{
+          strcpy( name, RESULT_DIR );
+          strcat( name, "/" );
+          strcat( name, RESULT_RIGIDBODY_VP_ROOTFILENAME );
+          strcat( name, suffix );	  
+          check_one_particle_datafile( name, current_time, current_dt, !k );
+	}
+	
+        strcpy( name, RESULT_DIR );
+        strcat( name, "/" );
+        strcat( name, RESULT_RIGIDBODY_HYDROFAT_ROOTFILENAME );
+        strcat( name, suffix );	  
+        check_one_particle_datafile( name, current_time, current_dt, false );
+      }         
     }    
 }
 

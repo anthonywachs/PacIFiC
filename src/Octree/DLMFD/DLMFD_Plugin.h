@@ -362,6 +362,12 @@ event init (i = 0)
   print_referencerigidbodies( ReferenceRigidBodies, nbReferenceRigidBodies, 
     	&outputshift[0] );	  
 
+ 
+  // Check particle data files in case of restart
+  if ( restarted_simu )
+    check_particle_datafiles_restart( allRigidBodies, 
+	nbRigidBodies, !RIGIDBODIES_AS_FIXED_OBSTACLES, trestart, dtrestart );
+
 
   // Initialize/open all DLMFD file pointers
   init_file_pointers( allRigidBodies, nbRigidBodies, pdata, 
