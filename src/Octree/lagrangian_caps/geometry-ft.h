@@ -1,8 +1,8 @@
 /**
 # Toolbox to perform operations on a triangulated meshes
 
-From defining geometric computations such as normal vectors, volume and 
-centroid, useful macros, subdividing triangles, below is a collection of helpful 
+From defining geometric computations such as normal vectors, volume and
+centroid, useful macros, subdividing triangles, below is a collection of helpful
 functions to deal with triangular meshes.
 */
 
@@ -18,7 +18,7 @@ double edge_length(lagMesh* mesh, int i) {
   v1 = mesh->edges[i].node_ids[0];
   v2 = mesh->edges[i].node_ids[1];
   foreach_dimension() {
-    length += sq(GENERAL_1DIST(mesh->nodes[v1].pos.x, mesh->nodes[v2].pos.x));
+    length += sq(GENERAL_1DIST(mesh->nodes[v1].pos.x, mesh->nodes[v2].pos.x, L0*L0_ratio.x));
   }
   return sqrt(length);
 }
@@ -28,12 +28,14 @@ The function ```compute_lengths``` below computes the lengths of all edges. It
 takes as an argument a pointer to the mesh. If the optional argument
 ```force``` is set to ```true```, the edges' lengths are computed no matter the value of ```updated_stretches```.
 */
-struct _compute_lengths{
+struct compute_lengths_type{
   lagMesh* mesh;
   bool force;
 };
 
-void compute_lengths(struct _compute_lengths p) {
+typedef struct compute_lengths_type _compute_lengths;
+
+void compute_lengths(_compute_lengths p) {
   lagMesh* mesh = p.mesh;
   bool force = (p.force) ? p.force : false;
   if (force || !mesh->updated_stretches) {
@@ -52,9 +54,9 @@ void comp_edge_normal(lagMesh* mesh, int i) {
   int node_id[2];
   for(int j=0; j<2; j++) node_id[j] = mesh->edges[i].node_ids[j];
   mesh->edges[i].normal.y = GENERAL_1DIST(mesh->nodes[node_id[0]].pos.x,
-    mesh->nodes[node_id[1]].pos.x);
+    mesh->nodes[node_id[1]].pos.x, L0*L0_ratio.x );
   mesh->edges[i].normal.x = GENERAL_1DIST(mesh->nodes[node_id[1]].pos.y,
-    mesh->nodes[node_id[0]].pos.y);
+    mesh->nodes[node_id[0]].pos.y, L0*L0_ratio.y );
   double normn = sqrt(sq(mesh->edges[i].normal.x)
     + sq(mesh->edges[i].normal.y));
   foreach_dimension() mesh->edges[i].normal.x /= normn;
@@ -84,7 +86,7 @@ void comp_initial_area_normals(lagMesh* mesh) {
     for(int j=0; j<2; j++)
       foreach_dimension()
         e[j].x = GENERAL_1DIST(mesh->nodes[nid[0]].pos.x,
-          mesh->nodes[nid[j+1]].pos.x);
+          mesh->nodes[nid[j+1]].pos.x, L0*L0_ratio.x);
     foreach_dimension() normal.x = e[0].y*e[1].z - e[0].z*e[1].y;
     double norm = sqrt(sq(normal.x) + sq(normal.y) + sq(normal.z));
     double dp = 0.; // dp for "dot product"
@@ -112,27 +114,40 @@ void comp_triangle_area_normal(lagMesh* mesh, int i) {
   /** The next 15 lines compute the centroid of the triangle, making sure it is
   valid when the triangle lies across periodic boundaries. */
   foreach_dimension() mesh->triangles[i].centroid.x = 0.;
+
+  // for(int j=0; j<3; j++) {
+  //   foreach_dimension() {
+  //     mesh->triangles[i].centroid.x +=
+  //       ACROSS_PERIODIC(mesh->nodes[nid[j]].pos.x/3,
+  //       mesh->nodes[nid[0]].pos.x/3) ? mesh->nodes[nid[j]].pos.x/3 - L0 :
+  //       mesh->nodes[nid[j]].pos.x/3;
+  //   }
+  // }
+
+///////ggd 
   for(int j=0; j<3; j++) {
     foreach_dimension() {
-      mesh->triangles[i].centroid.x +=
-        ACROSS_PERIODIC(mesh->nodes[nid[j]].pos.x/3,
-        mesh->nodes[nid[0]].pos.x/3) ? mesh->nodes[nid[j]].pos.x/3 - L0 :
-        mesh->nodes[nid[j]].pos.x/3;
+      mesh->triangles[i].centroid.x += mesh->centroid.x + GENERAL_1DIST(mesh->nodes[nid[j]].pos.x, mesh->centroid.x, L0*L0_ratio.x);
     }
   }
-  coord origin = {X0 + L0/2, Y0 + L0/2, Z0 + L0/2};
+foreach_dimension() mesh->triangles[i].centroid.x /=3.;
+////ggd 
+
+
+  coord origin = {X0 + L0*L0_ratio.x/2, Y0 + L0*L0_ratio.y/2, Z0 + L0*L0_ratio.z/2}; //FIXM
+
   foreach_dimension() {
-    if (fabs(mesh->triangles[i].centroid.x - origin.x) > L0/2.) {
+    if (fabs(mesh->triangles[i].centroid.x - origin.x) > L0*L0_ratio.x/2.) {
       if (mesh->triangles[i].centroid.x - origin.x > 0)
-        mesh->triangles[i].centroid.x -= L0;
-      else mesh->triangles[i].centroid.x += L0;
+        mesh->triangles[i].centroid.x -= L0*L0_ratio.x;
+      else mesh->triangles[i].centroid.x += L0*L0_ratio.x;
     }
   }
   coord normal, e[2];
   for(int j=0; j<2; j++)
     foreach_dimension()
       e[j].x = GENERAL_1DIST(mesh->nodes[nid[0]].pos.x,
-        mesh->nodes[nid[j+1]].pos.x);
+        mesh->nodes[nid[j+1]].pos.x, L0*L0_ratio.x);
   foreach_dimension() normal.x = e[0].y*e[1].z - e[0].z*e[1].y;
   double norm = sqrt(sq(normal.x) + sq(normal.y) + sq(normal.z));
   foreach_dimension() mesh->triangles[i].normal.x = normal.x/norm;
@@ -155,16 +170,17 @@ bool on_face(double p, int n, double l0) {
   else return false;
 }
 
-void correct_node_pos(coord* node) {
-  coord origin = {X0 + L0/2, Y0 + L0/2, Z0 + L0/2};
+void correct_node_pos(coord* node) {  
+  coord origin = {X0 + L0*L0_ratio.x/2, Y0 + L0*L0_ratio.y/2, Z0 + L0*L0_ratio.z/2};
+  
   foreach_dimension() {
-    if (on_face(node->x, N, L0))
+    if (on_face(node->x, N, L0*L0_ratio.x))
       node->x += 1.e-10;
     //FIXME: the nodes should not be sent to the other side of the domain if the boundary is not periodic...
-    if (node->x > origin.x + L0/2)
-      node->x -= L0;
-    else if (node->x < origin.x - L0/2)
-      node->x += L0;
+    if (node->x > origin.x + L0*L0_ratio.x/2)
+      node->x -= L0*L0_ratio.x;
+    else if (node->x < origin.x - L0*L0_ratio.x/2)
+      node->x += L0*L0_ratio.x;
   }
 }
 
@@ -183,24 +199,24 @@ coordinates of all its nodes. The centroid is stored as an attribute of the
 caps structure.
 */
 void comp_centroid(lagMesh* mesh) {
-  coord origin = {X0 + L0/2, Y0 + L0/2, Z0 + L0/2};
+  coord origin = {X0 + L0/2, Y0 + L0*L0_ratio.y/2, Z0 + L0*L0_ratio.z/2};
   foreach_dimension() mesh->centroid.x = 0.;
   for(int i=0; i<mesh->nln; i++)
     foreach_dimension() {
       double tentative_pos = mesh->nodes[i].pos.x - mesh->nodes[0].pos.x;
-      mesh->centroid.x += (tentative_pos < origin.x - L0/2) ?
-        tentative_pos + L0 : 
-          ((tentative_pos > origin.x + L0/2) ? tentative_pos - L0 :
+      mesh->centroid.x += (tentative_pos < origin.x - L0*L0_ratio.x/2) ?
+        tentative_pos + L0*L0_ratio.x :
+          ((tentative_pos > origin.x + L0*L0_ratio.x/2) ? tentative_pos - L0*L0_ratio.x :
           tentative_pos);
     }
-  foreach_dimension() 
+  foreach_dimension()
     mesh->centroid.x = mesh->centroid.x/mesh->nln + mesh->nodes[0].pos.x;
   correct_node_pos(&mesh->centroid);
 }
 
 trace
 void comp_volume(lagMesh* mesh) {
-  coord origin = {X0 + L0/2, Y0 + L0/2, Z0 + L0/2};
+  coord origin = {X0 + L0*L0_ratio.x/2, Y0 + L0*L0_ratio.y/2, Z0 + L0*L0_ratio.z/2}; //FIXME
   comp_centroid(mesh);
   double volume = 0;
   for(int i=0; i<mesh->nlt; i++) {
@@ -209,15 +225,15 @@ void comp_volume(lagMesh* mesh) {
       foreach_dimension() {
         double tentative_pos = mesh->nodes[mesh->triangles[i].node_ids[j]].pos.x
           - mesh->centroid.x;
-        nodes[j].x = (tentative_pos < origin.x - L0/2) ?
-          tentative_pos + L0 : 
-          ((tentative_pos > origin.x + L0/2) ? tentative_pos - L0 :
+        nodes[j].x = (tentative_pos < origin.x - L0*L0_ratio.x/2) ?
+          tentative_pos + L0*L0_ratio.x :
+          ((tentative_pos > origin.x + L0*L0_ratio.x/2) ? tentative_pos - L0*L0_ratio.x :
           tentative_pos);
       }
     for(int j=0; j<3; j++) {
       coord cross_product;
-      foreach_dimension() 
-        cross_product.x = nodes[(j+1)%3].y*nodes[(j+2)%3].z - 
+      foreach_dimension()
+        cross_product.x = nodes[(j+1)%3].y*nodes[(j+2)%3].z -
           nodes[(j+1)%3].z*nodes[(j+2)%3].y;
       volume += cdot(nodes[j],cross_product);
     }
@@ -226,13 +242,257 @@ void comp_volume(lagMesh* mesh) {
 }
 
 
+void compute_taylor_factor(lagMesh* mesh, double* Taylor_deform, double* Inclin_angle, 
+coord* rs, double* TDmaxmin, double* TDang)
+{
+    /* To store the components of the diagonal inertia tensor Ixx, Iyy, Izz*/
+  double Ixx = 0., Iyy = 0., Izz = 0., Ixy = 0., Ixz = 0., Iyz = 0.; 
+  for(int i = 0; i < mesh->nlt; i++) 
+  {
+    double rn = 0.;
+    double rSquared = sq(GENERAL_1DIST(mesh->triangles[i].centroid.x, mesh->centroid.x, L0*L0_ratio.x)) 
+    + sq(GENERAL_1DIST(mesh->triangles[i].centroid.y, mesh->centroid.y, L0*L0_ratio.y))
+    + sq(GENERAL_1DIST(mesh->triangles[i].centroid.z, mesh->centroid.z, L0*L0_ratio.z)) ;     
+    coord tri_vec = {0};
+
+    foreach_dimension() tri_vec.x = GENERAL_1DIST(mesh->triangles[i].centroid.x, mesh->centroid.x, L0*L0_ratio.x);
+    foreach_dimension() rn += tri_vec.x * mesh->triangles[i].normal.x;
+    // rn = fabs(rn); // In case of centroid ouside of capsule, we change the sign of rn
+    
+    //Compute the components of inertia tensor
+    Ixx += mesh->triangles[i].area / 5.0 * rn * (rSquared - tri_vec.x * tri_vec.x);
+    Iyy += mesh->triangles[i].area / 5.0 * rn * (rSquared - tri_vec.y * tri_vec.y);
+    Izz += mesh->triangles[i].area / 5.0 * rn * (rSquared - tri_vec.z * tri_vec.z);
+    Ixy += mesh->triangles[i].area / 5.0 * rn * (0. - tri_vec.x * tri_vec.y);
+    Ixz += mesh->triangles[i].area / 5.0 * rn * (0. - tri_vec.x * tri_vec.z);
+    Iyz += mesh->triangles[i].area / 5.0 * rn * (0. - tri_vec.y * tri_vec.z);
+ }
+
+
+
+  double aa = 0., bb = 0., cc = 0., dd = 0.;
+  aa = 1.;
+  bb = -(Ixx + Iyy + Izz);
+  cc = (Ixx*Iyy + Ixx*Izz + Iyy*Izz - Ixy*Ixy - Ixz*Ixz - Iyz*Iyz);
+  dd = (Ixx*Iyz*Iyz + Iyy*Ixz*Ixz + Izz*Ixy*Ixy - 2*Ixy*Ixz*Iyz - Ixx*Iyy*Izz);
+
+  // solve_cubic(aa, bb, cc, dd);
+    // Normalize the coefficients
+    double A = bb / aa;
+    double B = cc / aa;
+    double C = dd / aa;
+
+    // Compute the discriminant
+    double Q = (A*A - 3*B) / 9;
+    double R = (2*A*A*A - 9*A*B + 27*C) / 54;
+    double D = Q*Q*Q - R*R;
+
+    if((D < 0) && (t > dt)) fprintf(stderr, "No roots found for inertia equivalent ellipsoid!\n");
+    // Normal Case: Three real roots
+    double theta = acos(R / sqrt(Q*Q*Q));
+    double r = -2 * sqrt(Q);
+    double lambd1 = r * cos(theta / 3) - A / 3;
+    double lambd2 = r * cos((theta - 2*M_PI) / 3) - A / 3;
+    double lambd3 = r * cos((theta - 4*M_PI) / 3) - A / 3;
+
+
+  double lambd_tmp =  0.;
+  if(lambd1 > lambd2)
+  {
+    lambd_tmp = lambd1;
+    lambd1 = lambd2;
+    lambd2 = lambd_tmp;
+  }
+  if(lambd2 > lambd3)
+  {
+    lambd_tmp = lambd2;
+    lambd2 = lambd3;
+    lambd3 = lambd_tmp;
+  }
+  if(lambd1 > lambd2)
+  {
+    lambd_tmp = lambd1;
+    lambd1 = lambd2;
+    lambd2 = lambd_tmp;
+  }
+
+  double Evx = 1.;
+  double Evy = -(Ixx - lambd1) / Ixy;
+  // double Evz = -(Ixy * Evx + (Iyy - lambd1) * Evy) / Iyz;
+
+  double r1 = sqrt((5.0 / (2.0 * mesh->volume)) * (lambd2 - lambd1 + lambd3));
+  double r2 = sqrt((5.0 / (2.0 * mesh->volume)) * (lambd3 - lambd2 + lambd1));
+  double r3 = sqrt((5.0 / (2.0 * mesh->volume)) * (lambd1 - lambd3 + lambd2));
+
+  *Taylor_deform = (r1 - r3)/(r1 + r3);
+  *Inclin_angle = atan2(Evy, Evx);
+
+  rs->x = r1;
+  rs->y = r2;
+  rs->z = r3;
+
+//////////////////////////////////////////////////////////Taylor Maxmin
+    double rmax = -HUGE;
+    double rmin = HUGE;
+    
+    for(int i = 0; i < mesh->nln; i++) 
+    {
+    /** The post-processing is only carried out if we are in the shear plane */
+        double projx, projy, projz;
+        projx = GENERAL_1DIST(mesh->nodes[i].pos.x, mesh->centroid.x, L0*L0_ratio.x);
+        projy = GENERAL_1DIST(mesh->nodes[i].pos.y, mesh->centroid.y, L0*L0_ratio.y);
+        projz = GENERAL_1DIST(mesh->nodes[i].pos.z, mesh->centroid.z, L0*L0_ratio.z);
+        double rad  = sqrt(sq(projx) + sq(projy) + sq(projz));
+        if (rad > rmax) 
+        {
+          rmax = rad;
+          *TDang = (fabs(projx) < 1.e-14) ? (projy>0. ? pi/2. : 3*pi/2.) : fmod(atan2(projy, projx) + pi, pi);
+        }
+        if (rad < rmin)
+         rmin = rad;
+    }
+
+    *TDmaxmin = (rmax - rmin)/(rmax + rmin);
+}
+
+
+trace
+void comp_capsule_geodynamics(lagMesh* mesh) {
+  
+  /*Compute the cell size in the grid*/
+  #if MULT_GRID == 1   
+    double delta = (L0/(1 << grid->maxdepth)/Dimensions.x);
+  #else
+    double delta = (L0/(1 << grid->maxdepth));
+  #endif
+
+
+
+  coord center_vel = {0., 0., 0.};
+  for(int i=0; i<mesh->nln; i++) 
+  {
+    foreach_dimension()
+      center_vel.x += mesh->nodes[i].lagVel.x / mesh->nln;
+  }
+
+
+  comp_centroid(mesh);
+  double max_radius = -HUGE;
+  double min_radius = HUGE;
+  coord angvel={0.,0.,0.};
+
+
+  for(int i=0; i<mesh->nln; i++) 
+  {
+    double tentative_radius = sqrt(GENERAL_SQNORM(mesh->nodes[i].pos, mesh->centroid));
+
+    max_radius = (tentative_radius > max_radius)? tentative_radius: max_radius; 
+    min_radius = (tentative_radius < min_radius)? tentative_radius: min_radius; 
+
+    foreach_dimension()
+      angvel.x += (GENERAL_1DIST(mesh->nodes[i].pos.y, mesh->centroid.y, L0*L0_ratio.y)*(mesh->nodes[i].lagVel.z - center_vel.z) -
+        GENERAL_1DIST(mesh->nodes[i].pos.z, mesh->centroid.z, L0*L0_ratio.z)*(mesh->nodes[i].lagVel.y - center_vel.y)) /tentative_radius /tentative_radius;
+ 
+  }
+
+  /* Compute the circumference radius */
+  mesh->circum_radius = max_radius + 3*delta;
+  
+  /*Compute the angular velocity of the capsule*/
+  foreach_dimension()
+    mesh->ang_vel.x = angvel.x / mesh->nln;
+
+  // /* To store the components of the diagonal inertia tensor Ixx, Iyy, Izz*/
+  // double Ixx = 0., Iyy = 0., Izz = 0., Ixy = 0., Ixz = 0., Iyz = 0.; 
+  // for(int i=0; i<mesh->nlt; i++) 
+  // {
+  //   double rn = 0.;
+  //   double rSquared = GENERAL_SQNORM(mesh->triangles[i].centroid, mesh->centroid);     
+  //   coord tri_vec = {0};
+
+  //   foreach_dimension() tri_vec.x = GENERAL_1DIST(mesh->triangles[i].centroid.x, mesh->centroid.x);
+  //   foreach_dimension() rn += tri_vec.x * mesh->triangles[i].normal.x;
+  //   rn = fabs(rn); // In case of centroid ouside of capsule, we change the sign of rn
+    
+  //   //Compute the components of inertia tensor
+  //   Ixx += mesh->triangles[i].area / 5.0 * rn * (rSquared - tri_vec.x * tri_vec.x);
+  //   Iyy += mesh->triangles[i].area / 5.0 * rn * (rSquared - tri_vec.y * tri_vec.y);
+  //   Izz += mesh->triangles[i].area / 5.0 * rn * (rSquared - tri_vec.z * tri_vec.z);
+  //   Ixy += mesh->triangles[i].area / 5.0 * rn * (0. - tri_vec.x * tri_vec.y);
+  //   Ixz += mesh->triangles[i].area / 5.0 * rn * (0. - tri_vec.x * tri_vec.z);
+  //   Iyz += mesh->triangles[i].area / 5.0 * rn * (0. - tri_vec.y * tri_vec.z);
+  // }
+
+  // //printf("Ixx: %lf, Iyy: %lf, Izz: %lf Ixy: %lf, Ixz: %lf, Iyz: %lf\n", Ixx, Iyy, Izz, Ixy, Ixz, Iyz);
+
+  // double aa = 0., bb = 0., cc = 0., dd = 0.;
+  // aa = 1.;
+  // bb = -(Ixx + Iyy + Izz);
+  // cc = (Ixx*Iyy + Ixx*Izz + Iyy*Izz - Ixy*Ixy - Ixz*Ixz - Iyz*Iyz);
+  // dd = (Ixx*Iyz*Iyz + Iyy*Ixz*Ixz + Izz*Ixy*Ixy - 2*Ixy*Ixz*Iyz - Ixx*Iyy*Izz);
+
+  // // solve_cubic(aa, bb, cc, dd);
+  //   // Normalize the coefficients
+  //   double A = bb / aa;
+  //   double B = cc / aa;
+  //   double C = dd / aa;
+
+  //   // Compute the discriminant
+  //   double Q = (A*A - 3*B) / 9;
+  //   double R = (2*A*A*A - 9*A*B + 27*C) / 54;
+  //   double D = Q*Q*Q - R*R;
+
+  //   if(D < 0) fprintf(stderr, "No roots found for inertia equivalent ellipsoid!\n");
+  //   // Normal Case: Three real roots
+  //   double theta = acos(R / sqrt(Q*Q*Q));
+  //   double r = -2 * sqrt(Q);
+  //   double lambd1 = r * cos(theta / 3) - A / 3;
+  //   double lambd2 = r * cos((theta - 2*M_PI) / 3) - A / 3;
+  //   double lambd3 = r * cos((theta - 4*M_PI) / 3) - A / 3;
+
+
+  // double lambd_tmp =  0.;
+  // if(lambd1 > lambd2)
+  // {
+  //   lambd_tmp = lambd1;
+  //   lambd1 = lambd2;
+  //   lambd2 = lambd_tmp;
+  // }
+  // if(lambd2 > lambd3)
+  // {
+  //   lambd_tmp = lambd2;
+  //   lambd2 = lambd3;
+  //   lambd3 = lambd_tmp;
+  // }
+  // if(lambd1 > lambd2)
+  // {
+  //   lambd_tmp = lambd1;
+  //   lambd1 = lambd2;
+  //   lambd2 = lambd_tmp;
+  // }
+
+  // double Evx = 1.;
+  // double Evy = -(Ixx - lambd1) / Ixy;
+  // double Evz = -(Ixy * Evx + (Iyy - lambd1) * Evy) / Iyz;
+
+  // double r1 = sqrt((5.0 / (2.0 * mesh->volume)) * (lambd2 - lambd1 + lambd3));
+  // double r2 = sqrt((5.0 / (2.0 * mesh->volume)) * (lambd3 - lambd2 + lambd1));
+  // double r3 = sqrt((5.0 / (2.0 * mesh->volume)) * (lambd1 - lambd3 + lambd2));
+
+  // mesh->taylor_deform = (r1 - r3)/(r1 + r3);
+
+}
+
+
+
+
 /** The function below updates the normal vectors on all the nodes as well as
 the lengths and midpoints of all the edges (in 2D) or the area and centroids of
 all the triangles (in 3D). */
 void comp_normals(lagMesh* mesh) {
   if (!mesh->updated_normals) {
     #if dimension < 3
-    compute_lengths(mesh);
+    compute_lengths((compute_lengths){.mesh=mesh});
     for(int i=0; i<mesh->nln; i++) {
       coord n[2];
       double l[2];
@@ -304,7 +564,7 @@ The macros below are useful to define an icosahedron
 
 The function below returns true if the two nodes $i$ and $j$ are neighbors
 */
-bool is_neighbor(lagMesh* mesh, int i, int j) {
+bool is_neighbor_ft(lagMesh* mesh, int i, int j) {
   for(int k=0; k<mesh->nodes[i].nb_neighbors; k++) {
     if (mesh->nodes[i].neighbor_ids[k] == j) return true;
   }
@@ -327,9 +587,9 @@ boundary. */
 bool is_edge_across_periodic(lagMesh* mesh, int i) {
   int n[2];
   for(int k=0; k<2; k++) n[k] = mesh->edges[i].node_ids[k];
-  if (ACROSS_PERIODIC(mesh->nodes[n[0]].pos.x, mesh->nodes[n[1]].pos.x)
-    || ACROSS_PERIODIC(mesh->nodes[n[0]].pos.y, mesh->nodes[n[1]].pos.y)
-    || ACROSS_PERIODIC(mesh->nodes[n[0]].pos.z, mesh->nodes[n[1]].pos.z))
+  if (ACROSS_PERIODIC(mesh->nodes[n[0]].pos.x, mesh->nodes[n[1]].pos.x, L0*L0_ratio.x)
+    || ACROSS_PERIODIC(mesh->nodes[n[0]].pos.y, mesh->nodes[n[1]].pos.y, L0*L0_ratio.y)
+    || ACROSS_PERIODIC(mesh->nodes[n[0]].pos.z, mesh->nodes[n[1]].pos.z, L0*L0_ratio.z))
       return true;
   return false;
 }
@@ -344,7 +604,7 @@ bool is_edge_across_periodic(lagMesh* mesh, int i) {
 // }
 
 
-struct _write_edge {
+struct write_edge_type {
   lagMesh* mesh;
   int i;
   int j;
@@ -353,10 +613,12 @@ struct _write_edge {
   bool overwrite;
 };
 
+typedef struct write_edge_type _write_edge;
+
 /** The function below writes edge i, connecting nodes j and k. If the edge
 exists, the function returns false (no edge creation), true otherwise (edge
 creation) */
-bool write_edge(struct _write_edge p) {
+bool write_edge(_write_edge p) {
   lagMesh* mesh = p.mesh;
   int i = p.i;
   int j = p.j;
@@ -379,6 +641,7 @@ bool write_edge(struct _write_edge p) {
     return true;
   }
 }
+
 
 /** The function below creates a new edge between nodes i and j, and updates the
 connectivity information of its nodes (but not its triangles, since they
@@ -437,8 +700,8 @@ void split_edge(lagMesh* mesh, int i) {
   }
 
   /** Create new edge and update current one */
-  write_edge(mesh, i, nid[0], mesh->nln, overwrite = true);
-  write_edge(mesh, mesh->nle, nid[1], mesh->nln);
+  write_edge((_write_edge){.mesh=mesh, .i = i, .j = nid[0], .k = mesh->nln, .overwrite = true});
+  write_edge((_write_edge){.mesh=mesh, .i = mesh->nle, .j = nid[1], .k = mesh->nln});
   for (int j=0; j<2; j++) {
     mesh->edges[i].triangle_ids[j] = -1;
     mesh->edges[mesh->nle].triangle_ids[j] = -1;
@@ -495,7 +758,7 @@ bool is_triangle_across_periodic(lagMesh* mesh, int i) {
   return false;
 }
 
-struct _write_triangle {
+struct write_triangle_type {
   lagMesh* mesh;
   int tid;
   int i;
@@ -504,9 +767,11 @@ struct _write_triangle {
   bool overwrite;
 };
 
+typedef struct write_triangle_type _write_triangle;
+
 /** The function below writes a triangle at index location tid, connecting nodes
 i, j and k. It updates the connectivity information of its nodes and edges.*/
-bool write_triangle(struct _write_triangle p) {
+bool write_triangle(_write_triangle p) {
   lagMesh* mesh = p.mesh;
   int tid = p.tid;
   int i = p.i;
@@ -660,13 +925,12 @@ by the nodes [*n1, *n2] and [*n1, *n3].
 */
 double comp_angle(lagNode* n1, lagNode* n2, lagNode* n3) {
   double theta = 0.;
-  foreach_dimension() theta += (n1->pos.x - n2->pos.x)*(n1->pos.x - n3->pos.x);
-  double norm1, norm2;
-  norm1 = 0.; norm2 = 0.;
   foreach_dimension() {
-    norm1 += sq(n1->pos.x - n2->pos.x);
-    norm2 += sq(n1->pos.x - n3->pos.x);
+    theta += GENERAL_1DIST(n2->pos.x, n1->pos.x, L0*L0_ratio.x)*
+             GENERAL_1DIST(n3->pos.x, n1->pos.x, L0*L0_ratio.x);
   }
+  double norm1 = GENERAL_SQNORM(n1->pos, n2->pos);
+  double norm2 = GENERAL_SQNORM(n1->pos, n3->pos);
   theta /= sqrt(norm1)*sqrt(norm2);
   theta = acos(theta);
   return theta;
@@ -678,9 +942,22 @@ triangle $tid$ is greater than $\pi$ radians.
 */
 bool is_obtuse_node(lagMesh* mesh, int tid, int i) {
   lagNode* n[3];
+  // n[0] is the node to check if obtuse in the triangle tid
+  n[0] = &(mesh->nodes[i]);
+  int count_pts = 1;
   for(int j=0; j<3; j++)
-    n[j] = &(mesh->nodes[mesh->triangles[tid].node_ids[j]]);
-  if (comp_angle(n[i], n[(i+1)%3], n[(i+2)%3]) > pi/2.) return true;
+  {
+      if(mesh->triangles[tid].node_ids[j] != i)
+      {
+        n[count_pts] = &(mesh->nodes[mesh->triangles[tid].node_ids[j]]);
+        count_pts ++;
+      }
+  }
+
+  // Check if three points of the triangle are all found and well assigned
+  assert(count_pts==3);
+
+  if (comp_angle(n[0], n[1], n[2]) > pi/2.) return true;
   else return false;
 }
 
@@ -689,9 +966,23 @@ The function below returns true if the triangle $tid$ is obtuse at any of its
 three angles.
 */
 bool is_obtuse_triangle(lagMesh* mesh, int tid) {
-  for(int i=0; i<3; i++) if (is_obtuse_node(mesh, tid, i)) return true;
-  return false;
+  lagNode* n[3];
+  for(int j=0; j<3; j++)
+    n[j] = &(mesh->nodes[mesh->triangles[tid].node_ids[j]]);
+  if (comp_angle(n[0], n[1], n[2]) > pi/2.) return true;
+  else if (comp_angle(n[1], n[2], n[0]) > pi/2.) return true;
+  else if (comp_angle(n[2], n[0], n[1]) > pi/2.) return true;
+  else return false;
 }
+
+// /**
+// The function below returns true if the triangle $tid$ is obtuse at any of its
+// three angles.
+// */
+// bool is_obtuse_triangle(lagMesh* mesh, int tid) {
+//   for(int i=0; i<3; i++) if (is_obtuse_node(mesh, tid, i)) return true;
+//   return false;
+// }
 
 /**
 ## Uniform refinement of a mesh by subdividing its triangles
@@ -730,8 +1021,8 @@ void refine_mesh(lagMesh* mesh) {
       int corner_id = -1;
       for(int k=0; k<3; k++) { // Loop over the current triangle vertices
         corner_id = mesh->triangles[i].node_ids[k];
-        if (is_neighbor(mesh, corner_id, mid_ids[j]) &&
-          is_neighbor(mesh, corner_id, mid_ids[(j+1)%3])) {
+        if (is_neighbor_ft(mesh, corner_id, mid_ids[j]) &&
+          is_neighbor_ft(mesh, corner_id, mid_ids[(j+1)%3])) {
           break;
         }
       }
@@ -746,9 +1037,9 @@ void refine_mesh(lagMesh* mesh) {
 /**
 ## Periodicity helper functions
 
-In some situations, for instance to compute the volume of a capsule, we need to 
+In some situations, for instance to compute the volume of a capsule, we need to
 take the dot and cross products of
-neighboring nodes that can be across periodic boundaries. The next three 
+neighboring nodes that can be across periodic boundaries. The next three
 functions implement ``periodic-friendly" versions of the dot and cross products
 that do not take into account the coordinates jump across the periodic
 boundaries. The implementation relies on the assumption that a capsule is
@@ -758,14 +1049,14 @@ boundaries. The implementation relies on the assumption that a capsule is
 /**
 The function below corrects the coordinates of one node $a$ in order to
 ensure it is placed on the same side of a reference coordinate (in practice,
-the centroid of the capsule). The function returns the corrected node 
+the centroid of the capsule). The function returns the corrected node
 coordinate.
 */
 coord correct_periodic_node_pos(coord a, coord ref) {
     coord result;
     foreach_dimension() {
-        result.x = (fabs(a.x - ref.x) < L0/2) ? a.x : 
-            (a.x > ref.x) ? a.x - L0 : a.x + L0;
+        result.x = (fabs(a.x - ref.x) < L0*L0_ratio.x/2) ? a.x :
+            (a.x > ref.x) ? a.x - L0*L0_ratio.x : a.x + L0*L0_ratio.x;
     }
     return result;
 }
@@ -778,17 +1069,17 @@ length 2.
 */
 void correct_periodic_nodes_pos(coord* result, coord a, coord b, coord ref) {
   foreach_dimension() {
-    result[0].x = (fabs(a.x - ref.x) < L0/2) ? a.x : 
-      (a.x > ref.x) ? a.x - L0 : a.x + L0;
-    result[1].x = (fabs(b.x - ref.x) < L0/2) ? b.x : 
-      (b.x > ref.x) ? b.x - L0 : b.x + L0;
+    result[0].x = (fabs(a.x - ref.x) < L0*L0_ratio.x/2) ? a.x :
+      (a.x > ref.x) ? a.x - L0*L0_ratio.x : a.x + L0*L0_ratio.x;
+    result[1].x = (fabs(b.x - ref.x) < L0*L0_ratio.x/2) ? b.x :
+      (b.x > ref.x) ? b.x - L0*L0_ratio.x : b.x + L0*L0_ratio.x;
   }
 }
 
 /**
 The function below computes the cross product of two coordinates $a$ and $b$
-that potentially lie across periodic boundaries. The coordinates are 
-temporarilly moved on the same side of the periodic boundary as a reference 
+that potentially lie across periodic boundaries. The coordinates are
+temporarilly moved on the same side of the periodic boundary as a reference
 coordinate `ref`, in practice the centroid of the capsule.
 */
 foreach_dimension()
@@ -800,8 +1091,8 @@ double periodic_friendly_cross_product_x(coord a, coord b, coord ref) {
 
 /**
 The function below computes the dot product of two coordinates $a$ and $b$
-that potentially lie across periodic boundaries. The coordinates are 
-temporarilly moved on the same side of the periodic boundary as a reference 
+that potentially lie across periodic boundaries. The coordinates are
+temporarilly moved on the same side of the periodic boundary as a reference
 coordinate `ref`, in practice the centroid of the capsule.
 */
 double periodic_friendly_dot_product(coord a, coord b, coord ref) {
@@ -809,6 +1100,71 @@ double periodic_friendly_dot_product(coord a, coord b, coord ref) {
   correct_periodic_nodes_pos(nodes, a, b, ref);
   return cdot(nodes[0], nodes[1]);
 }
+
+
+
+
+
+/**
+The function below computes the nodal area of node $i$.
+*/
+
+#define cot(x) (cos(x)/sin(x))
+
+trace
+double compute_node_area(lagMesh* mesh, int i) {
+  double area = 0.;
+  for(int j=0; j<mesh->nodes[i].nb_triangles; j++) {
+    int tid = mesh->nodes[i].triangle_ids[j];
+    if (is_obtuse_triangle(mesh, tid)) {
+      area += (is_obtuse_node(mesh, tid, i)) ? mesh->triangles[tid].area/2 :
+        mesh->triangles[tid].area/4;
+    }
+    else {
+      double voronoi_area = 0.;
+      for(int k=0; k<3; k++) {
+        int nid = mesh->triangles[tid].node_ids[k];
+        if (nid != i) {
+          int eid = -1; // eid for "edge id", connecting i and nid
+          for (int l=0; l<3; l++) {
+            int teid = mesh->triangles[tid].edge_ids[l]; // temporary edge id
+            if ((mesh->edges[teid].node_ids[0] == i ||
+              mesh->edges[teid].node_ids[1] == i) &&
+              (mesh->edges[teid].node_ids[0] == nid ||
+              mesh->edges[teid].node_ids[1] == nid)) eid = teid;
+          }
+          int onid[2]; // onid for "opposite node ids"
+          // find onid[0], onid[1]
+          for(int l=0; l<2; l++) {
+            // tneid for "triangle neighboring eid"
+            int tneid = mesh->edges[eid].triangle_ids[l];
+            for(int m=0; m<3; m++)
+              if (mesh->triangles[tneid].node_ids[m] != i &&
+                mesh->triangles[tneid].node_ids[m] != nid)
+                onid[l] = mesh->triangles[tneid].node_ids[m];
+          }
+          // compute their angle facing the relevant triangle
+          double theta[2];
+          for(int l=0; l<2; l++) {
+            theta[l] = comp_angle(&(mesh->nodes[onid[l]]), &(mesh->nodes[i]),
+              &(mesh->nodes[nid]));
+          }
+          // compute the squared length of [i:nid]
+          double edge_length = 0.;
+          foreach_dimension()
+            edge_length += sq(GENERAL_1DIST(mesh->nodes[i].pos.x,
+              mesh->nodes[nid].pos.x, L0*L0_ratio.x));
+          voronoi_area += (cot(theta[0]) + cot(theta[1]))*edge_length;
+        }
+      }
+      area += voronoi_area/16.;
+    }
+  }
+  return area;
+}
+
+
+
 
 
 #endif // dimension > 2

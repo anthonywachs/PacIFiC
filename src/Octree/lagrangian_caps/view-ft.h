@@ -5,6 +5,23 @@ This file provides functions to display the Lagrangian mesh. */
 
 #include "view.h"
 
+macro draw_vertices (bview * view, float color[3], float ps)
+{
+  glMatrixMode (GL_PROJECTION);
+  glPushMatrix();
+  glTranslatef (0., 0., view->lc*view->fov/24.);
+  glColor3f (color[0], color[1], color[2]);
+  glEnable(GL_POINTS);
+  glPointSize (view->samples*(ps > 0. ? ps : 8.));
+  bool _reversed = view->reversed;
+  view->reversed = false;
+  {...}
+  glMatrixMode (GL_PROJECTION);
+  glPopMatrix();
+  view->reversed = _reversed;
+}
+
+/*
 static void begin_draw_vertices (bview * view, float color[3], float ps)
 {
   glMatrixMode (GL_PROJECTION);
@@ -13,7 +30,7 @@ static void begin_draw_vertices (bview * view, float color[3], float ps)
   glColor3f (color[0], color[1], color[2]);
   glEnable(GL_POINTS);
   glPointSize (view->samples*(ps > 0. ? ps : 8.));
-  _reversed = view->reversed;
+  //_reversed = view->reversed;
   view->reversed = false;
 }
 
@@ -21,10 +38,10 @@ static void end_draw_vertices()
 {
   glMatrixMode (GL_PROJECTION);
   glPopMatrix();
-  bview * view = draw();
-  view->reversed = _reversed;
+  //bview * view = draw();
+  //view->reversed = _reversed;
 }
-
+*/
 
 /**
 The function `draw_lag` displays a triangulation in the current view. It does
@@ -49,7 +66,7 @@ true.
 sets `nodes` to true.
 */
 
-struct _draw_lag {
+struct draw_lag_type {
   lagMesh * mesh; // Compulsory
   bool nodes;
   bool edges;
@@ -57,7 +74,9 @@ struct _draw_lag {
   float fc[3], lc[3], nc[3], lw, ns;
 };
 
-void draw_lag (struct _draw_lag p)
+typedef struct draw_lag_type _draw_lag;
+
+void draw_lag (_draw_lag p)
 {
   if (pid() == 0) {
     bool edges = p.edges;
@@ -146,14 +165,14 @@ The function below display all active capsules. Its optional arguments are the
 same as the `draw_lag` function.
 */
 
-void draw_lags (struct _draw_lag p)
+void draw_lags (_draw_lag p)
 {
   for (int k = 0; k < NCAPS; k++)
     if (CAPS(k).isactive)
-      draw_lag (&CAPS(k), nodes = p.nodes, edges = p.edges,
-		facets = p.facets,
-		fc = {p.fc[0], p.fc[1], p.fc[2]},
-		lc = {p.lc[0], p.lc[1], p.lc[2]},
-		nc = {p.nc[0], p.nc[1], p.nc[2]},
-		lw = p.lw, ns = p.ns);
+      draw_lag ((_draw_lag){.mesh=&CAPS(k), .nodes = p.nodes, .edges = p.edges,
+		.facets = p.facets,
+		.fc = {p.fc[0], p.fc[1], p.fc[2]},
+		.lc = {p.lc[0], p.lc[1], p.lc[2]},
+		.nc = {p.nc[0], p.nc[1], p.nc[2]},
+		.lw = p.lw, .ns = p.ns});
 }

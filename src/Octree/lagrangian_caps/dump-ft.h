@@ -103,6 +103,10 @@ void restore_triangle(FILE* fp, Triangle* triangle) {
 }
 
 void dump_lagmesh(FILE* fp, lagMesh* mesh) {
+  fwrite(&(mesh->cap_id), sizeof(int), 1, fp);
+  fwrite(&(mesh->cap_type), sizeof(int), 1, fp);
+  fwrite(&(mesh->cap_es), sizeof(double), 1, fp);
+  fwrite(&(mesh->cap_radius), sizeof(double), 1, fp);
   fwrite(&(mesh->nln), sizeof(int), 1, fp);
   for(int i=0; i<mesh->nln; i++) dump_lagnode(fp, &(mesh->nodes[i]));
   fwrite(&(mesh->nle), sizeof(int), 1, fp);
@@ -111,7 +115,10 @@ void dump_lagmesh(FILE* fp, lagMesh* mesh) {
   for(int i=0; i<mesh->nlt; i++) 
     dump_triangle(fp, &(mesh->triangles[i]));
   foreach_dimension() fwrite(&(mesh->centroid.x), sizeof(double), 1, fp);
+  foreach_dimension() fwrite(&(mesh->ang_vel.x), sizeof(double), 1, fp);
   fwrite(&(mesh->volume), sizeof(double), 1, fp);
+  fwrite(&(mesh->circum_radius), sizeof(double), 1, fp);
+  fwrite(&(mesh->taylor_deform), sizeof(double), 1, fp);
   fwrite(&(mesh->initial_volume), sizeof(double), 1, fp);
   int tmp;
   tmp = mesh->updated_stretches ? 1 : 0; fwrite(&(tmp), sizeof(int), 1, fp);
@@ -121,6 +128,10 @@ void dump_lagmesh(FILE* fp, lagMesh* mesh) {
 }
 
 void restore_lagmesh(FILE* fp, lagMesh* mesh) {
+  fread(&(mesh->cap_id), sizeof(int), 1, fp);
+  fread(&(mesh->cap_type), sizeof(int), 1, fp);
+  fread(&(mesh->cap_es), sizeof(double), 1, fp);
+  fread(&(mesh->cap_radius), sizeof(double), 1, fp);
   fread(&(mesh->nln), sizeof(int), 1, fp);
   mesh->nodes = malloc(mesh->nln*sizeof(lagNode));
   for(int i=0; i<mesh->nln; i++) restore_lagnode(fp, &mesh->nodes[i]);
@@ -131,7 +142,10 @@ void restore_lagmesh(FILE* fp, lagMesh* mesh) {
   mesh->triangles = malloc(mesh->nlt*sizeof(Triangle));
   for(int i=0; i<mesh->nlt; i++) restore_triangle(fp, &mesh->triangles[i]);
   foreach_dimension() fread(&(mesh->centroid.x), sizeof(double), 1, fp);
+  foreach_dimension() fread(&(mesh->ang_vel.x), sizeof(double), 1, fp);
   fread(&(mesh->volume), sizeof(double), 1, fp);
+  fread(&(mesh->circum_radius), sizeof(double), 1, fp);
+  fread(&(mesh->taylor_deform), sizeof(double), 1, fp);
   fread(&(mesh->initial_volume), sizeof(double), 1, fp);
   int tmp;
   fread(&(tmp), sizeof(int), 1, fp);
@@ -151,13 +165,13 @@ struct _dump_capsules {
     FILE* fp;
 };
 
-void dump_capsules(struct _dump_capsules p) {
-    char default_name[10] = "caps.dump\0";
-    char* name = p.name ? p.name : default_name;
-    FILE* file = p.fp ? p.fp : fopen(name, "w");
+void dump_capsules(const char* fname, FILE* fp) {
+    const char default_name[10] = "caps.dump\0";
+    const char* name = fname ? fname : default_name;
+    FILE* file = fp ? fp : fopen(name, "w");
     assert(file);
     for(int i=0; i<NCAPS; i++) dump_lagmesh(file, &CAPS(i));
-    fclose(file);
+    if(!fp) fclose(file);
 }
 
 void restore_capsules(char* filename) {
@@ -166,5 +180,5 @@ void restore_capsules(char* filename) {
   for(int i=0; i<NCAPS; i++) restore_lagmesh(file, &CAPS(i));
   fclose(file);
   initialize_all_capsules_stencils();
-  generate_lag_stencils(no_warning = true);
+  generate_lag_stencils(true);
 }

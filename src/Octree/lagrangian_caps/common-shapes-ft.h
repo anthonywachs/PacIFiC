@@ -12,9 +12,13 @@
 /**
 ## 2D circular membrane
 */
-struct _initialize_circular_capsule {
+struct initialize_circular_capsule_type {
   lagMesh* mesh;
-  double radius;
+  int cap_id;
+  int cap_type;
+  double cap_radius;
+  double cap_es;
+  // double radius;
   int nln;
   int level;
   double inclination;
@@ -23,9 +27,11 @@ struct _initialize_circular_capsule {
   bool verbose;
 };
 
+typedef struct initialize_circular_capsule_type _initialize_circular_capsule;
+
 #if dimension < 3
-void initialize_circular_capsule(struct _initialize_circular_capsule p) {
-  double radius = (p.radius) ? p.radius : RADIUS;
+void initialize_circular_capsule(_initialize_circular_capsule p) {
+  double radius = (p.cap_radius) ? p.cap_radius : RADIUS;
   int nln = (p.nln) ? p.nln : NLP;
   coord shift;
   if (p.shift.x || p.shift.y || p.shift.z)
@@ -85,8 +91,8 @@ void initialize_circular_capsule(struct _initialize_circular_capsule p) {
 /**
 ## 2D biconcave membrane
 */
-void initialize_biconcave_capsule(struct _initialize_circular_capsule p) {
-  double radius = (p.radius) ? p.radius : RADIUS;
+void initialize_biconcave_capsule(_initialize_circular_capsule p) {
+  double radius = (p.cap_radius) ? p.cap_radius : RADIUS;
   int nln = (p.nln) ? p.nln : NLP;
   double inclination = (p.inclination) ? p.inclination : 0.;
   coord shift;
@@ -217,8 +223,8 @@ void initialize_elliptic_capsule(struct _initialize_elliptic_capsule p) {
 /**
 ## 3D icosahedron
 */
-void initialize_icosahedron(struct _initialize_circular_capsule p) {
-  double radius = (p.radius) ? p.radius : RADIUS;
+void initialize_icosahedron(_initialize_circular_capsule p) {
+  double radius = (p.cap_radius) ? p.cap_radius : RADIUS;
   p.mesh->nln = 12;
   p.mesh->nodes = malloc(p.mesh->nln*sizeof(lagNode));
   p.mesh->nle = 0;
@@ -257,13 +263,13 @@ void initialize_icosahedron(struct _initialize_circular_capsule p) {
     for(int j=0; j<p.mesh->nln; j++) {
       if (p.mesh->nodes[j].nb_triangles == my_gr && j != i) {
         if (my_ld_sign == GET_LD_SIGN(p.mesh->nodes[j])) {
-          if (write_edge(p.mesh, p.mesh->nle, i, j, new_mesh = true))
+          if (write_edge((_write_edge){.mesh=p.mesh, .i=p.mesh->nle, .j=i, .k=j, .new_mesh = true}))
             p.mesh->nle++;
         }
       }
       else if (GET_LD(p.mesh->nodes[j]) == GET_ZD(p.mesh->nodes[i])) {
         if (GET_SD_SIGN(p.mesh->nodes[j]) == GET_LD_SIGN(p.mesh->nodes[i])) {
-          if (write_edge(p.mesh, p.mesh->nle, i, j, new_mesh = true))
+          if (write_edge((_write_edge){.mesh=p.mesh, .i=p.mesh->nle, .j=i, .k=j, .new_mesh = true}))
             p.mesh->nle++;
         }
       }
@@ -283,8 +289,8 @@ void initialize_icosahedron(struct _initialize_circular_capsule p) {
       for(int k=0; k<p.mesh->nodes[nid[1]].nb_neighbors; k++) {
         if (p.mesh->nodes[nid[0]].neighbor_ids[j] ==
           p.mesh->nodes[nid[1]].neighbor_ids[k] && p.mesh->nodes[nid[0]].neighbor_ids[j] != -1)
-          if (write_triangle(p.mesh, p.mesh->nlt, nid[0], nid[1],
-            p.mesh->nodes[nid[0]].neighbor_ids[j]))
+          if (write_triangle((_write_triangle){.mesh=p.mesh, .tid=p.mesh->nlt, .i=nid[0], .j=nid[1],
+            .k=p.mesh->nodes[nid[0]].neighbor_ids[j]}))
               p.mesh->nlt++;
       }
     }
@@ -302,10 +308,14 @@ void initialize_icosahedron(struct _initialize_circular_capsule p) {
 subdivides each of its triangles into four smaller ones until the desired number
 of Lagrangian nodes is reached or exceeded, and projects the resulting mesh
 onto a sphere. */
-void initialize_spherical_capsule(struct _initialize_circular_capsule p) {
+void initialize_spherical_capsule(_initialize_circular_capsule p) {
   initialize_icosahedron(p);
 
-  double radius = (p.radius) ? p.radius : RADIUS;
+  double cap_es = (p.cap_es) ? p.cap_es : E_S;
+  double radius = (p.cap_radius) ? p.cap_radius : RADIUS;
+  p.mesh->cap_es = cap_es;
+  p.mesh->cap_radius = radius;
+
   int nln = (p.nln) ? p.nln : -1;
   int ns = (p.level) ? p.level : -1;
   coord shift;
@@ -374,11 +384,27 @@ void initialize_spherical_capsule(struct _initialize_circular_capsule p) {
           p.mesh->nodes[i].pos.x += shift.x;
     }
 
-    #ifdef CAPS_VISCOSITY
-      fraction(I, sq(RADIUS) - sq(x - shift.x) - sq(y - shift.y)
-        - sq(z - shift.z));
-      foreach() if (I[] > 1.e-6) prevI[] = I[];
-    #endif
+    // #ifdef CAPS_VISCOSITY
+    //   // fraction(I, sq(RADIUS) - sq(x - shift.x) - sq(y - shift.y)
+    //   //   - sq(z - shift.z)); //previous
+
+    //   foreach()
+    //   {
+    //     coord loc;
+    //     loc.x = x - shift.x;
+    //     loc.y = y - shift.y;
+    //     loc.z = z - shift.z;
+
+    //     for(int k = 0; k < NCAPS; k++)
+    //     {
+    //       if(I[] == 0)
+    //         I[] = GENERAL_SQNORM(loc, CAPS(k).centroid)- sq(RADIUS) > 0 ? 0 : 1;
+    //     } //ggd 
+    //   }
+    // foreach() if (I[] > 1.e-6) prevI[] = I[];
+    
+    // #endif
+
   }
   correct_lag_pos(p.mesh);
   comp_normals(p.mesh);
@@ -387,13 +413,13 @@ void initialize_spherical_capsule(struct _initialize_circular_capsule p) {
   p.mesh->initial_volume = p.mesh->volume;
 }
 
-void initialize_rbc_capsule(struct _initialize_circular_capsule p) {
-  initialize_spherical_capsule(mesh = p.mesh, radius = p.radius, nln = p.nln,
-    level = p.level, disregard_shift = true);
+void initialize_rbc_capsule(_initialize_circular_capsule p) {
+  initialize_spherical_capsule((_initialize_circular_capsule){.mesh = p.mesh, .cap_radius = p.cap_radius, .cap_es = p.cap_es, .nln = p.nln,
+    .level = p.level, .disregard_shift = true});
 
   double c0, c1, c2;
   c0 = 0.2072; c1 = 2.0026; c2 = -1.1228;
-  double radius = (p.radius) ? p.radius : RADIUS;
+  double radius = (p.cap_radius) ? p.cap_radius : RADIUS;
   for(int i=0; i<p.mesh->nln; i++) {
     double rho = sqrt(sq(p.mesh->nodes[i].pos.x) +
       sq(p.mesh->nodes[i].pos.z))/radius;
@@ -419,7 +445,8 @@ void initialize_rbc_capsule(struct _initialize_circular_capsule p) {
   #ifdef CAPS_VISCOSITY
     double a, c;
     c = 1.3858189;
-    a = RADIUS/c;
+    // a = RADIUS/c;
+    a = p.mesh->cap_radius / c;
     // We define below the local coordinates of the RBC and the parametric angle
     #define COSPHI2 ((sq(x - shift.x) + sq(z - shift.z))/sq(a*c))
     #define RHS (0.207 + 2.003*COSPHI2 - 1.123*sq(COSPHI2))
@@ -433,12 +460,16 @@ void initialize_rbc_capsule(struct _initialize_circular_capsule p) {
   p.mesh->initial_volume = p.mesh->volume;
 }
 
-void activate_spherical_capsule(struct _initialize_circular_capsule p) {
+void activate_spherical_capsule(_initialize_circular_capsule p) {
   initialize_empty_capsule(p.mesh);
+  p.mesh->cap_es = p.cap_es;
+  p.mesh->cap_radius = p.cap_radius;
+  p.mesh->cap_id = p.cap_id;
+  p.mesh->cap_type = p.cap_type;
   p.mesh->isactive = true;
   initialize_spherical_capsule(p);
   initialize_capsule_stencils(p.mesh);
-  generate_lag_stencils(no_warning = true);
+  generate_lag_stencils(true);
   #if _ELASTICITY_FT
     store_initial_configuration(p.mesh);
   #endif
@@ -447,12 +478,16 @@ void activate_spherical_capsule(struct _initialize_circular_capsule p) {
   #endif
 }
 
-void activate_biconcave_capsule(struct _initialize_circular_capsule p) {
+void activate_biconcave_capsule(_initialize_circular_capsule p) {
   initialize_empty_capsule(p.mesh);
+  p.mesh->cap_id = p.cap_id;
+  p.mesh->cap_type = p.cap_type;
+  p.mesh->cap_es = p.cap_es;
+  p.mesh->cap_radius = p.cap_radius;
   p.mesh->isactive = true;
   initialize_rbc_capsule(p);
   initialize_capsule_stencils(p.mesh);
-  generate_lag_stencils(no_warning = true);
+  generate_lag_stencils(true);
   #if _ELASTICITY_FT
     store_initial_configuration(p.mesh);
   #endif

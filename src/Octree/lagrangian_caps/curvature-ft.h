@@ -13,6 +13,8 @@ In 2D, we compute the curvature by fitting a 4th-degree polynomial to the mesh u
 void compute_2d_curvature(lagMesh*) {
   bool up; // decide if we switch the x and y axes
   lagNode* cn; // current node
+  coord L0_ratio = {1., Dimensions.y/Dimensions.x, Dimensions.z/Dimensions.x};
+
   for(int i=0; i<mesh->nln; i++) {
     cn = &(mesh->nodes[i]);
     up = (fabs(cn->normal.y) > fabs(cn->normal.x)) ? true : false;
@@ -28,8 +30,8 @@ correct its position */
     for(int j=0; j<5; j++) {
       if (j!=2) {
         foreach_dimension() {
-          if (ACROSS_PERIODIC(p[j].x,p[2].x)) {
-            p[j].x += (ACROSS_PERIODIC(p[j].x + L0, p[2].x)) ? -L0 : L0;
+          if (ACROSS_PERIODIC(p[j].x,p[2].x, L0*L0_ratio.x)) {
+            p[j].x += (ACROSS_PERIODIC(p[j].x + L0*L0_ratio.x, p[2].x, L0*L0_ratio.x)) ? -L0*L0_ratio.x : L0*L0_ratio.x;
           }
         }
       }
@@ -193,6 +195,7 @@ the return value is not relevant and set to 0.
 If diff_curv is set to true, this function instead returns the surface Laplacian
 of the (previously computed) curvature.
 */
+trace
 double laplace_beltrami(lagMesh* mesh, int i, bool diff_curv) {
   /** If we wish to compute $\Delta_{LB} \kappa$, the result is stored in the
   variable $lbcurv$ and returned by the function. Otherwise the $lbcurv$ is
@@ -200,6 +203,8 @@ double laplace_beltrami(lagMesh* mesh, int i, bool diff_curv) {
   double lbcurv = 0.; // lbcurv for "Laplace-Beltrami of the curvature"
   lagNode* cn = &(mesh->nodes[i]); // cn for "current node"
   int* ngb = cn->neighbor_ids;
+
+  coord L0_ratio = {1., Dimensions.y/Dimensions.x, Dimensions.z/Dimensions.x};
 
   /** The following three variables are the data structures that will be
   fed to the least squares method */
@@ -219,7 +224,7 @@ double laplace_beltrami(lagMesh* mesh, int i, bool diff_curv) {
     coord ex, ey, ez;
     foreach_dimension() ez.x = cn->normal.x;
     foreach_dimension() ey.x = GENERAL_1DIST(mesh->nodes[ngb[0]].pos.x,
-      cn->pos.x);
+      cn->pos.x, L0*L0_ratio.x);
     double eydez, ney, nex;
     eydez = 0.; ney = 0.; nex = 0.;
     foreach_dimension() eydez += ey.x*ez.x; // eydez for "ey dot ez"
@@ -237,9 +242,9 @@ double laplace_beltrami(lagMesh* mesh, int i, bool diff_curv) {
     double ipngb[6][3]; // ipngb for "initial position of neighbors"
     double rpngb[6][3]; // rpngb for "rotated position of neighbors"
     for(int j=0; j<cn->nb_neighbors; j++) {
-      ipngb[j][0] = GENERAL_1DIST(mesh->nodes[ngb[j]].pos.x, cn->pos.x);
-      ipngb[j][1] = GENERAL_1DIST(mesh->nodes[ngb[j]].pos.y, cn->pos.y);
-      ipngb[j][2] = GENERAL_1DIST(mesh->nodes[ngb[j]].pos.z, cn->pos.z);
+      ipngb[j][0] = GENERAL_1DIST(mesh->nodes[ngb[j]].pos.x, cn->pos.x, L0*L0_ratio.x);
+      ipngb[j][1] = GENERAL_1DIST(mesh->nodes[ngb[j]].pos.y, cn->pos.y, L0*L0_ratio.y);
+      ipngb[j][2] = GENERAL_1DIST(mesh->nodes[ngb[j]].pos.z, cn->pos.z, L0*L0_ratio.z);
       for(int k=0; k<3; k++) {
         rpngb[j][k] = 0;
         for(int l=0; l<3; l++) {
@@ -327,8 +332,12 @@ void initialize_refcurv_onecaps(lagMesh* mesh) {
   #endif
   for(int j=0; j<mesh->nln; j++) {
     #if (REF_CURV)
-      #if GLOBAL_REF_CURV
-        mesh->nodes[j].ref_curv = C0;
+      #if GLOBAL_REF_CURV    
+
+        /** $c_0/a = -2.09$ is the typical reference curvature of a red blood cell. */
+        double C0_ref = -2.09/mesh->cap_radius;
+      
+        mesh->nodes[j].ref_curv = C0_ref;
       #else
         mesh->nodes[j].ref_curv = mesh->nodes[j].curv;
       #endif
