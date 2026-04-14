@@ -44,7 +44,9 @@ void bending(lagMesh* mesh) {
     }
     double ddcurv = (curv[0]/(l[0]*lavg) - 2.*curv[1]/(l[0]*l[1])
       + curv[2]/(l[1]*lavg));
-    foreach_dimension() raw_bending[i].x = -E_B*(ddcurv
+     // E_B=(ND_EB*E_S*sq(RADIUS))
+    double Eb = ND_EB * mesh->cap_es * sq(mesh->cap_radius);
+    foreach_dimension() raw_bending[i].x = -Eb*(ddcurv
       + .5*cube(curv[1]))*mesh->nodes[i].normal.x*lavg;
   }
   /** We apply a smoothing to the bending force, from Longuet-Higgins &

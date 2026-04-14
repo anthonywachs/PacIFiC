@@ -9,14 +9,18 @@
 #ifndef MUC
   #define MUC 1.;
 #endif
-#define CAPS_VISCOSITY 1.
+#ifndef CAPS_VISCOSITY
+ #define CAPS_VISCOSITY 1
+#endif
+
 
 /** We define the "grid gradient" $\bm{G}$, according to Tryggvason, JCP 2001.*/
 vector G[];
 void construct_divG(scalar divG, lagMesh* mesh) {
+
   comp_normals(mesh);
   #if dimension < 3
-  compute_lengths(mesh);
+  compute_lengths((compute_lengths){.mesh=mesh});
   for(int i=0; i<mesh->nle; i++) {
     // compute the grid gradient on the midpoint of the edge
     coord gg; // grid gradient
@@ -29,12 +33,13 @@ void construct_divG(scalar divG, lagMesh* mesh) {
         //spread half the grid gradient of the edge from each of its nodes
         if (point.level >= 0) {
         coord dist;
-          dist.x = GENERAL_1DIST(x, mesh->nodes[en[j]].pos.x);
-          dist.y = GENERAL_1DIST(y, mesh->nodes[en[j]].pos.y);
+          dist.x = GENERAL_1DIST(x, mesh->nodes[en[j]].pos.x, L0*L0_ratio.x);
+          dist.y = GENERAL_1DIST(y, mesh->nodes[en[j]].pos.y, L0*L0_ratio.y);
           if (sq(dist.x) <= sq(2*Delta) && sq(dist.y) <= sq(2*Delta)) {
-            double weight =
-              (1 + cos(.5*pi*dist.x/Delta))*(1 + cos(.5*pi*dist.y/Delta))/
-              (16.*sq(Delta));
+            // double weight =
+            //   (1 + cos(.5*pi*dist.x/Delta))*(1 + cos(.5*pi*dist.y/Delta))/
+            //   (16.*sq(Delta));
+            double weight =  weight_stencil(dist.x/Delta) * weight_stencil(dist.y/Delta) / sq(Delta);
             foreach_dimension() G.x[] -= weight*.5*gg.x;
           }
         }
@@ -56,14 +61,15 @@ void construct_divG(scalar divG, lagMesh* mesh) {
         /** Spread one third of the grid gradient of the triangle to each of its vertices */
         if (point.level >= 0) {
         coord dist;
-          dist.x = GENERAL_1DIST(x, mesh->nodes[tn[j]].pos.x);
-          dist.y = GENERAL_1DIST(y, mesh->nodes[tn[j]].pos.y);
-          dist.z = GENERAL_1DIST(z, mesh->nodes[tn[j]].pos.z);
+          dist.x = GENERAL_1DIST(x, mesh->nodes[tn[j]].pos.x, L0*L0_ratio.x);
+          dist.y = GENERAL_1DIST(y, mesh->nodes[tn[j]].pos.y, L0*L0_ratio.y);
+          dist.z = GENERAL_1DIST(z, mesh->nodes[tn[j]].pos.z, L0*L0_ratio.z);
           if (sq(dist.x) <= sq(2*Delta) && sq(dist.y) <= sq(2*Delta)
             && sq(dist.z) <= sq(2*Delta)) {
-            double weight = (1 + cos(.5*pi*dist.x/Delta))
-              *(1 + cos(.5*pi*dist.y/Delta))*(1 + cos(.5*pi*dist.z/Delta))
-              /(cube(4*Delta));
+            // double weight = (1 + cos(.5*pi*dist.x/Delta))
+            //   *(1 + cos(.5*pi*dist.y/Delta))*(1 + cos(.5*pi*dist.z/Delta))
+            //   /(cube(4*Delta));
+            double weight =  weight_stencil(dist.x/Delta) * weight_stencil(dist.y/Delta) * weight_stencil(dist.z/Delta) / cube(Delta);
             foreach_dimension() G.x[] -= weight*gg.x/3.;
           }
         }
@@ -71,9 +77,6 @@ void construct_divG(scalar divG, lagMesh* mesh) {
     }
   }
   #endif
-  foreach()
-    if (cm[] > 1.e-20)
-      foreach_dimension() divG[] += (G.x[1] - G.x[-1])/(2.*Delta);
 }
 
 double muc, mup;
@@ -122,19 +125,29 @@ event properties (i++) {
   for (int k=0; k<NCAPS; k++)
     if (CAPS(k).isactive) 
       construct_divG(divG, &CAPS(k));
-  poisson(I, divG, tolerance = 1.e-6, minlevel = 4);
+
+  foreach()
+    if (cm[] > 1.e-20)
+      foreach_dimension() divG[] += (G.x[1] - G.x[-1])/(2.*Delta);
+  
+  //ggd try poisson problem
+  //poisson(I, divG, tolerance = 1.e-6, minlevel = 4);
+  poisson(I, divG);
+  
 
   // Simple clamping of I:
   foreach() {
-    if (cm[] > 1.e-20) {
-      if (fabs(divG[]) > 1.e-10) {
-        I[] = clamp(I[], 0, 1);
-        prevI[] = I[];
-      }
-      else {
-        prevI[] = round(prevI[]);
-        I[] = prevI[];
-      }
+    if (cm[] > 1.e-20) 
+    {
+      //  if (fabs(divG[]) > 1.e-10) 
+      //  {
+      //    I[] = clamp(I[], 0, 1);
+      //    prevI[] = I[];
+      //  }
+      //  else {
+      //    prevI[] = round(prevI[]);
+      //    I[] = prevI[];
+      //  }
       I[] = clamp(I[], 0, 1);
     }
   }

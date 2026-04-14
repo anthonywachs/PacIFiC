@@ -41,9 +41,9 @@ implemented in [elasticity-ft.h](elasticity-ft.h).
   #define AREA_DILATATION_MODULUS 1.
 #endif
 
-#define DWDL1(L1, L2) (E_S*(L1*(sq(L1) - 1.) \
+#define DWDL1(L1, L2, Es) (Es*(L1*(sq(L1) - 1.) \
   + AREA_DILATATION_MODULUS*L1*sq(L2)*(sq(L1*L2) - 1.)))
-#define DWDL2(L1, L2) (E_S*(L2*(sq(L2) - 1.) \
+#define DWDL2(L1, L2, Es) (Es*(L2*(sq(L2) - 1.) \
   + AREA_DILATATION_MODULUS*L2*sq(L1)*(sq(L1*L2) - 1.)))
 
 #include "elasticity-ft.h"

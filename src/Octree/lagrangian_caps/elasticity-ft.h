@@ -15,8 +15,8 @@ method introduced by [Charrier et al.](#charrier1989free).
   #ifndef E_S
     #define E_S 1.
   #endif
-  #define DWDL1(L1, L2) (E_S/(3.*L1)*(sq(L1) - 1./(sq(L1*L2))))
-  #define DWDL2(L1, L2) (E_S/(3.*L2)*(sq(L2) - 1./(sq(L1*L2))))
+  #define DWDL1(L1, L2, Es) (Es/(3.*L1)*(sq(L1) - 1./(sq(L1*L2))))
+  #define DWDL2(L1, L2, Es) (Es/(3.*L2)*(sq(L2) - 1./(sq(L1*L2))))
 #endif
 
 /**
@@ -36,6 +36,8 @@ void rotate_to_reference_plane(lagMesh* mesh, int tid, coord rn[2],
   int nodes[3];
   for(int i=0; i<3; i++) nodes[i] = mesh->triangles[tid].node_ids[i];
 
+  //coord L0_ratio = {1., Dimensions.y/Dimensions.x, Dimensions.z/Dimensions.x};
+
   /** Step 1. compute the rotation matrix $\bm{M}$ from the current plane to the reference plane
 
   We also compute its inverse $\bm{IM}$ */
@@ -50,7 +52,7 @@ void rotate_to_reference_plane(lagMesh* mesh, int tid, coord rn[2],
   $ec[1] = ec[2] \times ec[0]$*/
   foreach_dimension() {
     ec[0].x = GENERAL_1DIST(mesh->nodes[nodes[2]].pos.x,
-      mesh->nodes[nodes[0]].pos.x);
+      mesh->nodes[nodes[0]].pos.x, L0*L0_ratio.x);
     ec[2].x = -mesh->triangles[tid].normal.x;
   }
   double enorm = cnorm(ec[0]);
@@ -71,11 +73,11 @@ void rotate_to_reference_plane(lagMesh* mesh, int tid, coord rn[2],
   for(int k=0; k<2; k++) {
     double cv[3]; // cv for "current vector"
     cv[0] = GENERAL_1DIST(mesh->nodes[nodes[k+1]].pos.x,
-      mesh->nodes[nodes[0]].pos.x);
+      mesh->nodes[nodes[0]].pos.x, L0*L0_ratio.x);
     cv[1] = GENERAL_1DIST(mesh->nodes[nodes[k+1]].pos.y,
-      mesh->nodes[nodes[0]].pos.y);
+      mesh->nodes[nodes[0]].pos.y, L0*L0_ratio.y);
     cv[2] = GENERAL_1DIST(mesh->nodes[nodes[k+1]].pos.z,
-      mesh->nodes[nodes[0]].pos.z);
+      mesh->nodes[nodes[0]].pos.z, L0*L0_ratio.z);
     for(int i=0; i<3; i++) {
       refNode[i] = 0.;
       for(int j=0; j<3; j++)
@@ -129,7 +131,7 @@ void comp_elastic_stress(lagMesh* mesh) {
   /** In 2D, the tensions are an explicit function of the edges' lengths and we
   don't need the finite element framework. For the moment, the Neo-Hookean law
   is hard-coded below, but other 2D elastic laws will be available soon.*/
-  compute_lengths(mesh);
+  compute_lengths((compute_lengths){.mesh=mesh});
   for(int i=0; i<mesh->nln; i++) {
     coord T[2];
     for(int j=0; j<2; j++) {
@@ -138,19 +140,20 @@ void comp_elastic_stress(lagMesh* mesh) {
       double stretch_cube =
         cube(mesh->edges[edge_id].length/mesh->edges[edge_id].l0);
       double tension_norm = (fabs(stretch_cube) > 1.e-10) ?
-        E_S*(stretch_cube - 1.)/sqrt(stretch_cube) : 0.;
+        mesh->cap_es*(stretch_cube - 1.)/sqrt(stretch_cube) : 0.;
       /** We compute the direction vector $e$ for the tension */
       edge_node1 = mesh->edges[edge_id].node_ids[0];
       edge_node2 = mesh->edges[edge_id].node_ids[1];
       coord e;
       double ne = 0.;
+      //coord L0_ratio = {1., Dimensions.y/Dimensions.x, Dimensions.z/Dimensions.x};
       foreach_dimension() {
         double x1 = mesh->nodes[edge_node1].pos.x;
         double x2 = mesh->nodes[edge_node2].pos.x;
         /** Warning: the line below was not tested when the origin is not
         (0,0,0): it might be wrong in that case.*/
-        e.x = (fabs(x1 - x2) < L0/2.) ? x1 - x2 : ((fabs(x1 - L0 - x2) > L0/2.)
-          ? x1 + L0 - x2 : x1 - L0 - x2) ;
+        e.x = (fabs(x1 - x2) < L0*L0_ratio.x/2.) ? x1 - x2 : ((fabs(x1 - L0*L0_ratio.x - x2) > L0*L0_ratio.x/2.)
+          ? x1 + L0*L0_ratio.x - x2 : x1 - L0*L0_ratio.x - x2) ;
         ne += sq(e.x);
       }
       ne = sqrt(ne);
@@ -222,8 +225,8 @@ void comp_elastic_stress(lagMesh* mesh) {
 
     /** Below we add the stretch and stress  */
     double t1, t2;
-    t1 = DWDL1(lambda[0], lambda[1])/lambda[1];
-    t2 = DWDL2(lambda[0], lambda[1])/lambda[0];
+    t1 = DWDL1(lambda[0], lambda[1], mesh->cap_es)/lambda[1];
+    t2 = DWDL2(lambda[0], lambda[1], mesh->cap_es)/lambda[0];
     mesh->triangles[i].tension[0] = t1;
     mesh->triangles[i].tension[1] = t2;
     mesh->triangles[i].stretch[0] = lambda[0];
@@ -262,10 +265,11 @@ void comp_elastic_stress(lagMesh* mesh) {
       \frac{\partial W}{\partial \lambda_2}
       \frac{\partial \lambda_2}{\partial \bm{v_j}} $$*/
       coord fj;
-      fj.x = DWDL1(lambda[0], lambda[1])*dldv[0][0] +
-        DWDL2(lambda[0], lambda[1])*dldv[1][0];
-      fj.y = DWDL1(lambda[0], lambda[1])*dldv[0][1] +
-        DWDL2(lambda[0], lambda[1])*dldv[1][1];
+      fj.x = DWDL1(lambda[0], lambda[1], mesh->cap_es)*dldv[0][0] +
+        DWDL2(lambda[0], lambda[1], mesh->cap_es)*dldv[1][0];
+      fj.y = DWDL1(lambda[0], lambda[1], mesh->cap_es)*dldv[0][1] +
+        DWDL2(lambda[0], lambda[1], mesh->cap_es)*dldv[1][1];
+     
 
       /** 5.3 Rotate the force in the common plane to the current plane:
       $\bm{f_j} = \bm{R^T} \bm{f_j}^P$ */
