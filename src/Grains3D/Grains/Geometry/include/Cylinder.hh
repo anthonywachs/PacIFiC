@@ -63,9 +63,8 @@ class Cylinder : public Convex
     convention */
     vector<vector<int> > const* getFaces() const;
 
-    /** @brief Returns the number of vertices/corners or a code corresponding to
-    a specific convex shape. Here returns the code 777 */
-    int getNbCorners() const;
+    /** @brief Returns a code corresponding to the cylinder shape */
+    int getShapeCode() const;
 
     /** @brief Cylinder support function, returns the support point P, i.e. the
     point on the surface of the cylinder that satisfies max(P.v)

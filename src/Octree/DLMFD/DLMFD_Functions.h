@@ -49,7 +49,8 @@ enum RigidBodyShape {
   CIRCULARCYLINDER3D,
   CONE,
   TRUNCATEDCONE,
-  ELLIPSOID
+  ELLIPSOID,
+  HEXAGONALPRISM
 };
 
 
@@ -727,6 +728,7 @@ void compute_local_domain_AABB( AABB* A )
 # include "TruncatedCone.h"
 # include "Cone.h"
 # include "Ellipsoid.h"
+# include "HexagonalPrism.h"
 
 /** Frees the rigid body data that were dynamically allocated */
 //----------------------------------------------------------------------------
@@ -812,8 +814,12 @@ void free_rigidbodies( RigidBody* allrbs, const size_t nrb, bool full_free )
 	  
         case ELLIPSOID:
 	  free_Ellipsoid( &(allrbs[k].g) );
-	  break;	  	  	  	  	
-	  
+	  break;
+	  	  	  	  	  	
+        case HEXAGONALPRISM:
+          free_Polyhedron( &(allrbs[k].g) );
+	  break;	  
+		  
         default:
           fprintf( stderr,"Unknown Rigid Body shape !!\n" );
       }
@@ -884,6 +890,10 @@ void print_rigidbody( RigidBody const* p, char const* poshift )
       case ELLIPSOID:
         printf( "ELLIPSOID" );
 	break;					
+	  
+      case HEXAGONALPRISM:
+        printf( "HEXAGONALPRISM" );
+	break;	      	  
 	  
       default:
         fprintf( stderr,"Unknown Rigid Body shape !!\n" );
@@ -1054,7 +1064,11 @@ void print_referencerigidbody( RigidBody const* p, char const* poshift )
       case ELLIPSOID:
         printf( "ELLIPSOID" );
 	break;	
-	  
+
+      case HEXAGONALPRISM:
+        printf( "HEXAGONALPRISM" );
+	break;
+			  
       default:
         fprintf( stderr,"Unknown Rigid Body shape !!\n" );
     }
@@ -1211,7 +1225,11 @@ bool is_in_rigidbody( RigidBody const* p, double x, double y, double z )
       
     case ELLIPSOID:
       is_in = is_in_Ellipsoid( x, y, z, p );             
-      break;                        
+      break;
+      
+    case HEXAGONALPRISM:
+      is_in = is_in_Polyhedron( x, y, z, gcp );  
+      break;	                              
 	  
     default:
       fprintf( stderr,"Unknown Rigid Body shape !!\n" );
@@ -1693,7 +1711,7 @@ void create_referencerigidbody_boundary_geomfeatures( RigidBody* p )
 {  
   GeomParameter gci = p->g;
   int m = 0;
-  int lN = 0;
+  int lN = 0, lH = 0;
     
   switch( p->shape )
   {
@@ -1775,7 +1793,14 @@ void create_referencerigidbody_boundary_geomfeatures( RigidBody* p )
       allocate_RigidBodyBoundary( &(p->s), m );
       create_referenceRB_boundary_geomfeatures_Ellipsoid( &gci, 
       	&(p->s), m );
-      break;                       	
+      break;
+      
+    case HEXAGONALPRISM:
+      compute_nboundary_HexagonalPrism( &gci, &m, &lN, &lH );	
+      allocate_RigidBodyBoundary( &(p->s), m );
+      create_referenceRB_boundary_geomfeatures_HexagonalPrism( &gci, &(p->s), m,
+      	lN, lH ); 
+      break;	                             	
 	  
     default:
       fprintf( stderr, "Unknown Rigid Body shape !!\n" );
@@ -2469,30 +2494,20 @@ void vorticity_3D( const vector u, vector omega )
 
 
 
-/** Computes the flow rate on the right boundary (x+ direction) */
+/** Computes the flow rate in the x periodic direction */
 //----------------------------------------------------------------------------
-double compute_flowrate_right( const vector u, const int level ) 
+double compute_flowrate_xperiodic( const vector u ) 
 //----------------------------------------------------------------------------
 {
-  double flowrate = 0.;
-# if ADAPTIVE
-    double hh = L0 / pow(2,level);
-# else
-    double hh = Delta;
-# endif 
-  double zi = 0., yj = 0., xval = X0 + 0.999999 * L0, uinter = 0.;
-  int ii = 0, jj = 0;
-    
-  for (ii = 0; ii < pow(2,level); ii++) 
-  {
-    zi = 0.5 * hh + ii * hh + Z0;
-    for (jj = 0; jj < pow(2,level); jj++) 
+  double flowrate = 0., delta = L0 / (double)(1 << MAXLEVEL),
+  	xval = X0 + 0.1 * delta;   
+
+  foreach(reduction(+:flowrate))
+    if ( x - X0 < 0.6 * Delta )
     {
-      yj = 0.5 * hh + jj * hh + Y0;
-      uinter = interpolate( u.x, xval, yj, zi );
-      flowrate += sq(hh) * uinter;
+      double uinter = interpolate_linear( point, u.x, xval, y, z ); 
+      flowrate += uinter * sq(Delta);      
     }
-  }      
  
   return flowrate;
 }
@@ -2500,30 +2515,20 @@ double compute_flowrate_right( const vector u, const int level )
 
 
 
-/** Computes the flow rate on the top boundary (y+ direction) */
+/** Computes the flow rate in the y periodic direction */
 //----------------------------------------------------------------------------
-double compute_flowrate_top( const vector u, const int level ) 
+double compute_flowrate_yperiodic( const vector u ) 
 //----------------------------------------------------------------------------
 {
-  double flowrate = 0.;
-# if ADAPTIVE
-    double hh = L0 / pow(2,level);
-# else
-    double hh = Delta;
-# endif 
-  double zi = 0., yval = Y0 + 0.999999 * L0, xj = 0., uinter = 0.;
-  int ii = 0, jj = 0;
+  double flowrate = 0., delta = L0 / (double)(1 << MAXLEVEL), 
+  	yval = Y0 + 0.1 * delta;
   
-  for (ii = 0; ii < pow(2,level); ii++) 
-  {
-    zi = 0.5 * hh + ii * hh + Z0;
-    for (jj = 0; jj < pow(2,level); jj++) 
+  foreach(reduction(+:flowrate))
+    if ( y - Y0 < 0.6 * Delta )
     {
-      xj = 0.5 * hh + jj * hh + X0;
-      uinter = interpolate( u.y, xj, yval, zi );
-      flowrate += sq(hh) * uinter;
-    }
-  }  
+      double uinter = interpolate_linear( point, u.y, x, yval, z ); 
+      flowrate += uinter * sq(Delta);      
+    }     
  
   return flowrate;
 }
@@ -2531,30 +2536,20 @@ double compute_flowrate_top( const vector u, const int level )
 
 
 
-/** Computes the flow rate on the front boundary (z+ direction) */
+/** Computes the flow rate in the z periodic direction */
 //----------------------------------------------------------------------------
-double compute_flowrate_front( const vector u, const int level ) 
+double compute_flowrate_zperiodic( const vector u ) 
 //----------------------------------------------------------------------------
 {
-  double flowrate = 0.;  
-# if ADAPTIVE
-    double hh = L0 / pow(2,level);
-# else
-    double hh = Delta;
-# endif    
-  double xi = 0., yj = 0., zval = Z0 + 0.999999 * L0, uinter = 0.;
-  int ii = 0, jj = 0;
-
-  for (ii = 0; ii < pow(2,level); ii++) 
-  {
-    xi = 0.5 * hh + ii * hh + X0;
-    for (jj = 0; jj < pow(2,level); jj++) 
+  double flowrate = 0., delta = L0 / (double)(1 << MAXLEVEL),
+  	zval = Z0 + 0.1 * delta;  
+  
+  foreach(reduction(+:flowrate))
+    if ( z - Z0 < 0.6 * Delta )
     {
-      yj = 0.5 * hh + jj * hh + Y0;
-      uinter = interpolate ( u.z, xi, yj, zval );
-      flowrate += sq(hh) * uinter;
-    }
-  }
+      double uinter = interpolate_linear( point, u.z, x, y, zval ); 
+      flowrate += uinter * sq(Delta);      
+    }      
  
   return flowrate;
 }

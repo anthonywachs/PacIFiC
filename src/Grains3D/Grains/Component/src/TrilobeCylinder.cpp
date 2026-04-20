@@ -541,11 +541,10 @@ void TrilobeCylinder::write_polygonsStr_PARAVIEW( list<int>& connectivity,
 
 
 // ----------------------------------------------------------------------------
-// Returns the number of corners of the rigib body shape and a code
-// describing the rigid body shape
-int TrilobeCylinder::getNbCorners() const
+// Returns a code describing the rigid body shape
+int TrilobeCylinder::getShapeCode() const
 {
-  return ( 1001 );
+  return ( 1000001 );
 }
 
 

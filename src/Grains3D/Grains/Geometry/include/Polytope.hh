@@ -48,9 +48,6 @@ class Polytope : public Convex
     polytope */
     vector<Point3> getEnvelope() const;
   
-    /** @brief Returns the number of vertices/corners */
-    int getNbCorners() const; 
-  
     /** @brief Returns the number of points to write the polytope in a
     Paraview format */
     virtual int numberOfPoints_PARAVIEW() const;

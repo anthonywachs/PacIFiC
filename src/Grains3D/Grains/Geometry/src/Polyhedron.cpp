@@ -237,6 +237,16 @@ vector<vector<int> > const* Polyhedron::getFaces() const
 
 
 
+// ----------------------------------------------------------------------------
+// Returns a code corresponding to the polyhedron shape
+int Polyhedron::getShapeCode() const
+{
+  return ( 100 * numVerts() + int(m_allFaces->size()) );
+}
+
+
+
+
 // ----------------------------------------------------------------------
 // Returns the polyhedron volume
 double Polyhedron::getVolume() const 

@@ -96,8 +96,6 @@ void create_referenceRB_boundary_geomfeatures_Dodecahedron(
     foreach_dimension()
       dlm_bd->bp[isb].x = refcorner.x;
 
-    isb++;
-
     for (int k = 0; k < npoints; k++)
     {
       i1 = gcp->pgp->cornersIndex[i][k];
@@ -121,13 +119,22 @@ void create_referenceRB_boundary_geomfeatures_Dodecahedron(
         dir2.x /= ( lN - 1 );
       }
 		
-      VecVecCrossProduct( dir1, dir2, &normal );
-      if ( VecVecDotProduct( gc_to_center_face, normal ) < 0. )
-        foreach_dimension() normal.x *= -1.;
-      norm = 0.;
-      foreach_dimension() norm += sq( normal.x );
-      norm = sqrt( norm );
-      foreach_dimension() normal.x *= 0.25 * gcp->radius / norm;		
+      if ( !k )
+      {
+        // Compute normal vector of the face
+	VecVecCrossProduct( dir1, dir2, &normal );
+        if ( VecVecDotProduct( gc_to_center_face, normal ) < 0. )
+          foreach_dimension() normal.x *= -1.;
+        norm = 0.;
+        foreach_dimension() norm += sq( normal.x );
+        norm = sqrt( norm );
+        foreach_dimension() normal.x *= 0.25 * gcp->radius / norm;
+	
+	// Set normal vector of the central point
+	foreach_dimension()
+          dlm_bd->normal[isb].x = normal.x;
+	isb++;
+      }		
 
       // Insert points on the innerface edges
       distribute_points_edge( gcp, refcorner, pt1, dlm_bd, lN, isb, normal );

@@ -52,6 +52,9 @@ class Polyhedron : public Polytope
 
     /** @brief Returns the convex type */
     ConvexType getConvexType() const;
+
+    /** @brief Returns a code corresponding to the polyhedron shape */
+    int getShapeCode() const; 
   
     /** @brief Returns a pointer to a 2D array describing the relationship
     between the face indices and the vertex indices */

@@ -256,13 +256,11 @@ vector<vector<int> > const* Box::getFaces() const
 
 
 // ----------------------------------------------------------------------------
-// Returns the number of vertices/corners or a code corresponding to
-// a specific convex shape. Here returns the code 444 for a 2D box and 666 for
-// a 3D box
-int Box::getNbCorners() const
+// Returns a code corresponding to the box shape
+int Box::getShapeCode() const
 {
-  if ( GrainsBuilderFactory::getContext() == DIM_2 ) return ( 444 );
-  else return ( 666 );
+  if ( GrainsBuilderFactory::getContext() == DIM_2 ) return ( 10000 );
+  else return ( 10001 );
 }
 
 

@@ -154,11 +154,10 @@ vector<Point3> Cylinder::getEnvelope() const
 
 
 // ----------------------------------------------------------------------------
-// Returns the number of vertices/corners or a code corresponding to
-// a specific convex shape. Here returns the code 777
-int Cylinder::getNbCorners() const
+// Returns a code corresponding to the cylinder shape
+int Cylinder::getShapeCode() const
 {
-  return ( 777 );
+  return ( 10002 );
 }
 
 

@@ -70,9 +70,8 @@ class TrapezoidalPrism : public Convex
     between the face indices and the point indices */
     vector<vector<int> > const* getFaces() const;
 
-    /** @brief Returns the number of vertices/corners or a code corresponding to
-    a specific convex shape. Here returns the code 1111 */
-    int getNbCorners() const;
+    /** @brief Returns a code corresponding to the trapezoidal prism shape */
+    int getShapeCode() const;
 
     /** @brief Returns the trapezoidal prism volume */
     double getVolume() const;

@@ -102,11 +102,10 @@ vector<Point3> Cone::getEnvelope() const
 
 
 // ----------------------------------------------------------------------------
-// Returns the number of vertices/corners or a code corresponding to
-// a specific convex shape. Here returns the code 888
-int Cone::getNbCorners() const
+// Returns a code corresponding to the cone shape
+int Cone::getShapeCode() const
 {
-  return ( 888 );
+  return ( 10003 );
 }
 
 

@@ -482,7 +482,11 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
 
       case ELLIPSOID: 
 	update_Ellipsoid_from_RBRef( gg, RBRef, allrbs[k].RotMat );
-        break; 
+        break;
+	
+      case HEXAGONALPRISM:
+	update_Polyhedron_from_RBRef( gg, RBRef, allrbs[k].RotMat );
+        break;      	 
 	        
       default:
         printf( "Unknown shape in UpdateParticlesBasilisk!!\n" );
@@ -531,7 +535,7 @@ char* CreateReferenceRBBasilisk( char* pstr, const int pstrsize,
   	Iyz = 0., Izz = 0., gx = 0., gy = 0., gz = 0., radiusp = 0.,
         MRxx = 0., MRxy = 0., MRxz = 0., MRyx = 0., MRyy = 0., MRyz = 0.,
  	MRzx = 0., MRzy = 0., MRzz = 0.;
-  int ncornersp = 0;
+  int nshapecode = 0;
   size_t geomType = 0;
   
   for (size_t k = 0; k < nrefrb_; k++) 
@@ -549,9 +553,9 @@ char* CreateReferenceRBBasilisk( char* pstr, const int pstrsize,
       printf ("Error in geometric type numbering of reference rigid bodies in "
     	"CreateReferenceRBBasilisk\n");    
 
-    // Read the rigid body's number of corners or code
+    // Read the rigid body's shape code
     token = strtok( NULL, " " );
-    sscanf( token, "%d", &ncornersp ); 
+    sscanf( token, "%d", &nshapecode ); 
     
     // Set the rigid body type to reference
     allrefrbs[k].type = REFERENCERIGIDBODY; 
@@ -707,10 +711,13 @@ char* CreateReferenceRBBasilisk( char* pstr, const int pstrsize,
       gg->center.z = 0.;      
 #   endif    
       
-    gg->ncorners = ncornersp;
-    if ( gg->ncorners == 666 ) gg->ncorners = 8;
-    else if ( gg->ncorners == 777 || gg->ncorners == 777
-    	|| gg->ncorners == 8888 ) gg->ncorners = 0;
+    if ( nshapecode < 10000 ) // Disc, sphere, polygon and polyhedron
+      gg->ncorners = (int)( (double)nshapecode / 100. );
+    else if ( nshapecode == 10000 ) // 2D Box, not implemented
+      gg->ncorners = 4;
+    else if ( nshapecode == 10001 ) // 3D Box
+      gg->ncorners = 8;       
+    else gg->ncorners = 0; // Any other shape
     gg->radius = radiusp; 
             
     
@@ -727,7 +734,7 @@ char* CreateReferenceRBBasilisk( char* pstr, const int pstrsize,
     // Note that the C function strtok keeps track of the pointer to 
     // the last C string, which explains why we do not need to pass any
     // parameter to the functions below 
-    switch ( ncornersp )
+    switch ( nshapecode )
     {
 #     if dimension == 3
         case 1: 
@@ -735,66 +742,72 @@ char* CreateReferenceRBBasilisk( char* pstr, const int pstrsize,
 	  read_reference_Sphere( gg, allrefrbs[k].RotMat ); 
           break;
 
-        // For now, we assume that all 4-corner polyhedrons are regular 
+        // For now, we assume that all 4-corner/4-face polyhedrons are regular 
 	// tetrahedrons
-	case 4: 
+	case 404: 
           allrefrbs[k].shape = TETRAHEDRON;
 	  read_reference_Tetrahedron( gg, allrefrbs[k].RotMat );
           break;
 	  
-        // For now, we assume that all 6-corner polyhedrons are regular 
+        // For now, we assume that all 6-corner/8-face polyhedrons are regular 
 	// octahedrons
-	case 6: 
+	case 608: 
           allrefrbs[k].shape = OCTAHEDRON;
 	  read_reference_Octahedron( gg, allrefrbs[k].RotMat );
           break;	  
 	  
-        // For now, we assume that all 8-corner polyhedrons are cubes
-	case 8: 
+        // For now, we assume that all 8-corner/6-face polyhedrons are cubes
+	case 806: 
           allrefrbs[k].shape = CUBE;
 	  read_reference_Cube( gg, allrefrbs[k].RotMat );
           break;
 	  
-        // For now, we assume that all 12-corner polyhedrons are regular 
-	// icosahedrons
-        case 12: 
-         allrefrbs[k].shape = ICOSAHEDRON;
+        // For now, we assume that all 12-corner/20-face polyhedrons are regular
+	// icosahedrons 
+        case 1220: 
+	 allrefrbs[k].shape = ICOSAHEDRON;
 	 read_reference_Icosahedron( gg, allrefrbs[k].RotMat );
-         break;  
+
+        // For now, we assume that all 12-corner/8-face polyhedrons are 
+	// hexagonal prism (8 faces) 
+	case 1208:
+	  allrefrbs[k].shape = HEXAGONALPRISM;
+	  read_reference_HexagonalPrism( gg, allrefrbs[k].RotMat );
+          break;  
           
-        // For now, we assume that all 20-corner polyhedrons are regular 
+        // For now, we assume that all 20-corner/12-face polyhedrons are regular
 	// dodecahedrons
-        case 20: 
+        case 2012: 
           allrefrbs[k].shape = DODECAHEDRON;
 	  read_reference_Dodecahedron( gg, allrefrbs[k].RotMat );
           break;
 
-        case 222: 
+        case 10005: 
           allrefrbs[k].shape = ELLIPSOID;
 	  read_reference_Ellipsoid( gg, allrefrbs[k].RotMat );
           break;
 	 
-        case 666: 
+        case 10001: 
           allrefrbs[k].shape = BOX;
 	  read_reference_Box( gg, allrefrbs[k].RotMat );
           break;	
 	 
-        case 777: 
+        case 10002: 
           allrefrbs[k].shape = CIRCULARCYLINDER3D;
 	  read_reference_CircularCylinder3D( gg, allrefrbs[k].RotMat );
           break;
 
-        case 888: 
+        case 10003: 
           allrefrbs[k].shape = CONE;
 	  read_reference_Cone( gg, allrefrbs[k].RotMat );
           break;
 	 
-        case 8888: 
+        case 10004: 
           allrefrbs[k].shape = TRUNCATEDCONE;
 	  read_reference_TruncatedCone( gg, allrefrbs[k].RotMat );
           break;	 	        	  
 #     else
-        case 1: 
+        case 2: 
           allrefrbs[k].shape = CIRCULARCYLINDER2D;
 	  read_reference_CircularCylinder2D( gg, allrefrbs[k].RotMat );
           break;

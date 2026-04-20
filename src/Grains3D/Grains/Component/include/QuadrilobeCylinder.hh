@@ -126,9 +126,8 @@ class QuadrilobeCylinder : public CompositeParticle
 
     /**@name Accessors */
     //@{
-    /** @brief Returns the number of corners of the rigib body shape and a code
-    describing the rigid body shape */
-    int getNbCorners() const;   
+    /** @brief Returns a code describing the rigid body shape */
+    int getShapeCode() const;   
     //@}
     
     

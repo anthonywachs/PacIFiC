@@ -75,10 +75,8 @@ class Box : public Convex
     between the face indices and the point indices */
     vector<vector<int> > const* getFaces() const;
 
-    /** @brief Returns the number of vertices/corners or a code corresponding to
-    a specific convex shape. Here returns the code 444 for a 2D box and 666 for
-    a 3D box */
-    int getNbCorners() const;
+    /** @brief Returns a code corresponding to the box shape */ 
+    int getShapeCode() const;
 
     /** @brief Returns the box volume */
     double getVolume() const;

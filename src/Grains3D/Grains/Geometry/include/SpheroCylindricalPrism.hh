@@ -63,9 +63,9 @@ class SpheroCylindricalPrism : public Convex
     convention */
     vector<vector<int> > const* getFaces() const;
 
-    /** @brief Returns the number of vertices/corners or a code corresponding to
-    a specific convex shape. Here returns the code 4444 */
-    int getNbCorners() const;
+    /** @brief Returns a code corresponding to the spherocylindrical prism 
+    shape */
+    int getShapeCode() const;
 
     /** @brief Returns the spherocylindrical prism volume */
     double getVolume() const;

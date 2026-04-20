@@ -458,11 +458,10 @@ size_t CompositeParticle::getNbElemPart() const
 
 
 // ----------------------------------------------------------------------------
-// Returns the number of corners of the rigib body shape and a code
-// describing the rigid body shape
-int CompositeParticle::getNbCorners() const
+// Returns a code describing the rigid body shape
+int CompositeParticle::getShapeCode() const
 {
-  return ( 999 );
+  return ( 1000000 );
 }
 
 

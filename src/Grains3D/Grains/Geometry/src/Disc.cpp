@@ -124,11 +124,10 @@ vector<Point3> Disc::getEnvelope() const
 
 
 // ----------------------------------------------------------------------------
-// Returns the number of vertices/corners or a code corresponding to
-// a specific convex shape. Here 1 as a convention
-int Disc::getNbCorners() const
+// Returns a code corresponding to the 2D cylinder shape
+int Disc::getShapeCode() const
 {
-  return ( 1 );
+  return ( 2 );
 }
 
 

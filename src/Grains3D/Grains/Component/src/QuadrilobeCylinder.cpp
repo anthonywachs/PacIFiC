@@ -282,11 +282,10 @@ Particle* QuadrilobeCylinder::createCloneCopy( int const& id_,
 
 
 // ----------------------------------------------------------------------------
-// Returns the number of corners of the rigib body shape and a code
-// describing the rigid body shape
-int QuadrilobeCylinder::getNbCorners() const
+// Returns a code describing the rigid body shape
+int QuadrilobeCylinder::getShapeCode() const
 {
-  return ( 1001 );
+  return ( 1000002 );
 }
 
 

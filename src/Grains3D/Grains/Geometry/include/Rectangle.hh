@@ -68,9 +68,8 @@ class Rectangle : public Convex
     between the face indices and the point indices */
     vector<vector<int> > const* getFaces() const;
 
-    /** @brief Returns the number of vertices/corners or a code corresponding to
-    a specific convex shape. Here returns the code 444 */
-    int getNbCorners() const;
+    /** @brief Returns a code corresponding to the rectangle shape */
+    int getShapeCode() const;
 
     /** @brief Returns the area */
     double getVolume() const;

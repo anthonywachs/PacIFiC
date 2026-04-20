@@ -53,6 +53,9 @@ class Polygon : public Polytope
     /** @brief Returns the convex type */
     ConvexType getConvexType() const;
 
+    /** @brief Returns a code corresponding to the polygon shape */
+    int getShapeCode() const; 
+
     /** @brief Returns the polygon surface area */
     double getVolume() const;
 

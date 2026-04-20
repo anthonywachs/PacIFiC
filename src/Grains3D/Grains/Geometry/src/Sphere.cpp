@@ -126,8 +126,8 @@ vector<Point3> Sphere::getEnvelope() const
 
 
 // ----------------------------------------------------------------------------
-// Returns the number of vertices/corners, here 1 as a convention
-int Sphere::getNbCorners() const
+// Returns a code corresponding to the sphere shape
+int Sphere::getShapeCode() const
 {
   return ( 1 );
 }

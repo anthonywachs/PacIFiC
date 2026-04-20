@@ -77,9 +77,8 @@ class Superquadric : public Convex
     convention */
     vector< vector < int > > const* getFaces() const;
 
-    /** @brief Returns the number of vertices/corners or a code corresponding to
-    a specific convex shape. Here 777(?) as a convention */
-    int getNbCorners() const;
+    /** @brief Returns a code corresponding to the superquadric shape */
+    int getShapeCode() const;
 
     /** @brief Returns the superquadric volume */
     double getVolume() const;

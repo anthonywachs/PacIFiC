@@ -244,6 +244,11 @@ void DLMFD_construction()
 	  	DLM_PeriodicRefCenter, &local_domain );
 	  break;
 	  
+        case HEXAGONALPRISM:
+          create_FD_Interior_Polyhedron( &allRigidBodies[k], DLM_Index, 
+	  	DLM_PeriodicRefCenter, &local_domain );
+          break;	  
+	  
 	default:
           fprintf( stderr,"Unknown Rigid Body shape !!\n" );
       }

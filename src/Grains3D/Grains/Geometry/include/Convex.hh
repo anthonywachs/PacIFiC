@@ -115,9 +115,8 @@ class Convex : public Shape
     between the face indices and the vertex indices */
     virtual vector<vector<int> > const* getFaces() const;
 
-    /** @brief Returns the number of vertices/corners or a code corresponding to
-    a specific convex shape having to vertices/corners as, e.g., a cylinder */
-    virtual int getNbCorners() const;
+    /** @brief Returns a code corresponding to a specific convex shape */
+    virtual int getShapeCode() const;
 
     /** @brief Returns the volume of the convex shape */
     virtual double getVolume() const = 0;

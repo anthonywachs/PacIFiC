@@ -136,9 +136,8 @@ vector< vector<int> > const* SpheroCylinder::getFaces() const
 
 
 // ----------------------------------------------------------------------------
-// Returns the number of vertices/corners or a code corresponding to
-// a specific convex shape. Here returns the code 3333
-int SpheroCylinder::getNbCorners() const
+// Returns a code corresponding to the spherocylinder shape
+int SpheroCylinder::getShapeCode() const
 {
   return ( 3333 );
 }

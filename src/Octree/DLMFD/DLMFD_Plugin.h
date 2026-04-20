@@ -69,10 +69,6 @@
 #   define IMPOSED_PERIODICFLOW_DIRECTION 0 
 # endif
 
-# ifndef PERIODICFLOWRATE_LEVEL
-#   define PERIODICFLOWRATE_LEVEL MAXLEVEL 
-# endif
-
 # ifndef DLMFD_PROB_AFTER_NAVIERSTOKES
 #   define DLMFD_PROB_AFTER_NAVIERSTOKES 0
 # endif
@@ -910,11 +906,11 @@ event end_timestep (i++)
     double flowrate = 0.;
 #   if IMPOSED_PERIODICFLOW_TYPE == 0
 #     if IMPOSED_PERIODICFLOW_DIRECTION == 0 
-        flowrate = compute_flowrate_right( u, PERIODICFLOWRATE_LEVEL );
+        flowrate = compute_flowrate_xperiodic( u );
 #     elif IMPOSED_PERIODICFLOW_DIRECTION == 1
-        flowrate = compute_flowrate_top( u, PERIODICFLOWRATE_LEVEL );
+        flowrate = compute_flowrate_yperiodic( u );
 #     else 
-        flowrate = compute_flowrate_front( u, PERIODICFLOWRATE_LEVEL );
+        flowrate = compute_flowrate_zperiodic( u );
 #     endif 
       if ( pid() == 0 )
         printf( "   Periodic flow rate = %8.5e\n", flowrate );           
@@ -922,19 +918,19 @@ event end_timestep (i++)
       double Q1 = - dt / ( L0 * FLUID_DENSITY );
       double deltaflowrate = 0.;                    
 #     if IMPOSED_PERIODICFLOW_DIRECTION == 0 
-        flowrate = compute_flowrate_right( u, PERIODICFLOWRATE_LEVEL );
+        flowrate = compute_flowrate_xperiodic( u );
 	deltaflowrate = imposed_periodicflowrate - flowrate;
 	imposed_periodicpressuredrop += deltaflowrate / ( Q1 * L0 * L0 );
 	foreach()
 	  u.x[] += deltaflowrate / ( L0 * L0 );  
 #     elif IMPOSED_PERIODICFLOW_DIRECTION == 1
-        flowrate = compute_flowrate_top( u, PERIODICFLOWRATE_LEVEL );
+        flowrate = compute_flowrate_yperiodic( u );
 	deltaflowrate = imposed_periodicflowrate - flowrate;
 	imposed_periodicpressuredrop += deltaflowrate / ( Q1 * L0 * L0 );
 	foreach()
 	  u.y[] += deltaflowrate / ( L0 * L0 ); 
 #     else 
-        flowrate = compute_flowrate_front( u, PERIODICFLOWRATE_LEVEL );
+        flowrate = compute_flowrate_zperiodic( u );
 	deltaflowrate = imposed_periodicflowrate - flowrate;		
 	imposed_periodicpressuredrop += deltaflowrate / ( Q1 * L0 * L0 );
 	foreach()

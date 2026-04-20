@@ -236,10 +236,10 @@ vector<Point3> Superquadric::getEnvelope() const
 
 
 // ----------------------------------------------------------------------------
-// Returns the number of vertices/corners
-int Superquadric::getNbCorners() const
+// Returns a code corresponding to the superquadric shape
+int Superquadric::getShapeCode() const
 {
-  return ( 222 );
+  return ( 10005 );
 }
 
 

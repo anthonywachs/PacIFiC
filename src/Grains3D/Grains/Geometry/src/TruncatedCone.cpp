@@ -192,11 +192,10 @@ vector<Point3> TruncatedCone::getEnvelope() const
 
 
 // ----------------------------------------------------------------------------
-// Returns the number of vertices/corners or a code corresponding to
-// a specific convex shape. Here returns the code 8888
-int TruncatedCone::getNbCorners() const
+// Returns a code corresponding to the truncated cone shape
+int TruncatedCone::getShapeCode() const
 {
-  return ( 8888 );
+  return ( 10004 );
 }
 
 

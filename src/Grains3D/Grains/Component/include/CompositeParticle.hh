@@ -263,9 +263,8 @@ class CompositeParticle : public Particle
     /** @brief Returns the number of elementary particles */
     size_t getNbElemPart() const;
 
-    /** @brief Returns the number of corners of the rigib body shape and a code
-    describing the rigid body shape */
-    virtual int getNbCorners() const;
+    /** @brief Returns a code describing the rigid body shape */
+    virtual int getShapeCode() const;
 
     /** @brief Returns the volume of the composite particle */
     double getVolume() const;

@@ -255,9 +255,8 @@ vector<vector<int> > const* TrapezoidalPrism::getFaces() const
 
 
 // ----------------------------------------------------------------------------
-// Returns the number of vertices/corners or a code corresponding to
-// a specific convex shape. Here returns the code 1111
-int TrapezoidalPrism::getNbCorners() const
+// Returns a code corresponding to the trapezoidal prism shape
+int TrapezoidalPrism::getShapeCode() const
 {
   return ( 1111 );
 }

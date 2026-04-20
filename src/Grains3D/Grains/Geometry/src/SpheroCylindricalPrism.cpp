@@ -143,9 +143,8 @@ vector< vector<int> > const* SpheroCylindricalPrism::getFaces() const
 
 
 // ----------------------------------------------------------------------------
-// Returns the number of vertices/corners or a code corresponding to
-// a specific convex shape. Here returns the code 4444
-int SpheroCylindricalPrism::getNbCorners() const
+// Returns a code corresponding to the spherocylindrical prism shape
+int SpheroCylindricalPrism::getShapeCode() const
 {
   return ( 4444 );
 }

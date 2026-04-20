@@ -88,16 +88,6 @@ vector<Point3> Polytope::getEnvelope() const
 
 
 // ----------------------------------------------------------------------------
-// Returns the number of vertices/corners
-int Polytope::getNbCorners() const
-{
-  return ( numVerts() );
-}
-
-
-
-
-// ----------------------------------------------------------------------------
 // Returns the number of points to write the polytope in a Paraview format
 int Polytope::numberOfPoints_PARAVIEW() const 
 { 

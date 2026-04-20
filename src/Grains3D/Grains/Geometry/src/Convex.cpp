@@ -97,11 +97,10 @@ vector<vector<int> > const* Convex::getFaces() const
 
 
 // ----------------------------------------------------------------------------
-// Returns the number of vertices/corners or a code corresponding to
-// a specific convex shape having to vertices/corners as, e.g., a cylinder
-int Convex::getNbCorners() const
+// Returns a code corresponding to a specific convex shape
+int Convex::getShapeCode() const
 {
-  cout << "Warning for this Convex the method Convex::getNbCorners() "
+  cout << "Warning for this Convex the method Convex::getShapeCode() "
        << "is not yet implemented !\n"
        << "Need for an assistance ! Stop running !\n";
   exit(10);

@@ -52,9 +52,8 @@ class Disc : public Convex
     Here simply returns the point (0,0,0) as a convention */
     vector<Point3> getEnvelope() const;
 
-    /** @brief Returns the number of vertices/corners or a code corresponding to
-    a specific convex shape. Here 1 as a convention */
-    int getNbCorners() const;  
+    /** @brief Returns a code corresponding to the 2D cylinder shape */
+    int getShapeCode() const;  
 
     /** @brief Returns the disc surface area */
     double getVolume() const;

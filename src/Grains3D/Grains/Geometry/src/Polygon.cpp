@@ -248,6 +248,16 @@ Convex* Polygon::clone() const
 
 
 // ----------------------------------------------------------------------------
+// Returns a code corresponding to the polygon shape
+int Polygon::getShapeCode() const
+{
+  return ( 100 * numVerts() );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
 // Returns the polygon surface area
 double Polygon::getVolume() const 
 {

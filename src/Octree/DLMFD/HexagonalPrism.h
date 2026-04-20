@@ -1,0 +1,397 @@
+/**
+# Set of functions for a hexagonal prism
+*/
+
+# include "Polyhedron.h"
+
+/** Computes the number of boundary points on the surface of the hexagonal 
+prism */
+//----------------------------------------------------------------------------
+void compute_nboundary_HexagonalPrism( GeomParameter const* gcp, int* nb, 
+	int* lN, int* lH )
+//----------------------------------------------------------------------------
+{
+  double delta = L0 / (double)(1 << MAXLEVEL), lengthedge, height ;  
+  *nb = 0;
+  
+  /* Compute edge length and height */
+  lengthedge = sqrt( 
+  	sq( gcp->pgp->cornersCoord[1][0] - gcp->pgp->cornersCoord[0][0] )
+  	+ sq( gcp->pgp->cornersCoord[1][1] - gcp->pgp->cornersCoord[0][1] )
+	+ sq( gcp->pgp->cornersCoord[1][2] - gcp->pgp->cornersCoord[0][2] ) );
+  height = sqrt( sq( gcp->pgp->cornersCoord[6][0] - gcp->pgp->cornersCoord[0][0] )
+  	+ sq( gcp->pgp->cornersCoord[6][1] - gcp->pgp->cornersCoord[0][1] )
+	+ sq( gcp->pgp->cornersCoord[6][2] - gcp->pgp->cornersCoord[0][2] ) );
+
+  /* We compute the number of intervals on the hexagonal prism edge */
+  *lN = floor( lengthedge / ( INTERBPCOEF * delta ) ); 
+  
+  /* The number of points on a hexagonal prism edge is the number of intervals 
+  + 1 */
+  *lN += 1;
+  
+  /* We compute the number of intervals on the hexagonal prism height */
+  *lH = floor( height / ( INTERBPCOEF * delta ) ); 
+  
+  /* The number of points on a hexagonal prism height is the number of 
+  intervals + 1 */
+  *lH += 1;     
+
+  /* Number of points required over the 12 hexa edges */
+  *nb += 12 * ( *lN - 2 );
+  
+  /* Number of points required over the 6 height edges */
+  *nb += 6 * ( *lH - 2 ); 
+
+  /* Number of points required over the inner edges */
+  *nb += 12 * ( *lN - 2 ); 
+  
+  /* Number of points required over the 6 rectangular faces */
+  *nb += 6 * ( *lH - 2 ) * ( *lN - 2 );     
+
+  /* Number of points required over the 2 hexagonal faces */
+  *nb += 12 * ( *lN - 2 ) * ( *lN - 3 ) / 2;  
+
+  /* Number of points required for the 12 corners and 2 central points */
+  *nb += 12 + 2;    
+
+  if ( *nb == 0 )
+    fprintf( stderr,"nboundary = 0: No boundary points for the"
+    	" HexagonalPrism !!!\n" );
+}
+
+
+
+
+/** Creates boundary points and normal vectors of the reference hexagonal 
+prism */
+//----------------------------------------------------------------------------
+void create_referenceRB_boundary_geomfeatures_HexagonalPrism( 
+	GeomParameter const* gcp, RigidBodyBoundary* dlm_bd, const int m, 
+	const int lN, const int lH )
+//----------------------------------------------------------------------------
+{
+  int nc = gcp->ncorners, npoints;
+  int iref, isb = 0, i1, i2, ndir1, ndir2;  
+  coord pos, gc_to_center_face, normal;
+  double norm = 0., delta = L0 / (double)(1 << MAXLEVEL), orig_x, orig_y, 
+  	orig_z;
+  
+  // Note: we arbitrary set the norm of the normal vector to 0.25 *
+  // circumscribed radius
+  // Faces are numbered as follows: 0-5 side faces, 6 bottom, 7 top 
+  
+  /* Normal at the corners */
+  coord* corner_normals = (coord*) calloc( nc, sizeof(coord) );
+  for (size_t k=0;k<nc;++k)
+  {
+    corner_normals[k].x = gcp->pgp->cornersCoord[k][0] - gcp->center.x;
+    corner_normals[k].y = gcp->pgp->cornersCoord[k][1] - gcp->center.y;
+    norm = sqrt( sq( corner_normals[k].x ) + sq( corner_normals[k].y ) );    
+    corner_normals[k].z = gcp->pgp->cornersCoord[k][2] - gcp->center.z; 
+    corner_normals[k].z = corner_normals[k].z > 0. ? norm : - norm;
+    norm = 0.;
+    foreach_dimension() norm += sq( corner_normals[k].x );
+    norm = sqrt( norm );
+    foreach_dimension() corner_normals[k].x *= 0.25 * gcp->radius / norm;       
+  }  
+
+
+  /* Points over edges */
+  for (size_t i=6;i<8;++i)
+  {
+    for (size_t k = 0; k < 6; ++k)
+    {
+      i1 = gcp->pgp->cornersIndex[i][k];
+      i2 = gcp->pgp->cornersIndex[i][(k+1) % 6];
+    
+      coord pt1 = { gcp->pgp->cornersCoord[i1][0],
+    		gcp->pgp->cornersCoord[i1][1],
+    		gcp->pgp->cornersCoord[i1][2] };
+		
+      coord pt2 = { gcp->pgp->cornersCoord[i2][0],
+    		gcp->pgp->cornersCoord[i2][1],
+    		gcp->pgp->cornersCoord[i2][2] };		
+    
+      foreach_dimension() 
+        normal.x = 0.5 * ( corner_normals[i1].x + corner_normals[i2].x );
+      norm = 0.;
+      foreach_dimension() norm += sq( normal.x );
+      norm = sqrt( norm );
+      foreach_dimension() normal.x *= 0.25 * gcp->radius / norm;
+    
+      distribute_points_edge( gcp, pt1, pt2, dlm_bd, lN, isb, normal );
+      isb += lN - 2; 
+    }     
+  }
+  
+  for (size_t i=0;i<6;++i)
+  {
+    i1 = i;
+    i2 = i + 6;
+    
+    coord pt1 = { gcp->pgp->cornersCoord[i1][0],
+    		gcp->pgp->cornersCoord[i1][1],
+    		gcp->pgp->cornersCoord[i1][2] };
+		
+    coord pt2 = { gcp->pgp->cornersCoord[i2][0],
+    		gcp->pgp->cornersCoord[i2][1],
+    		gcp->pgp->cornersCoord[i2][2] };		
+    
+    foreach_dimension() 
+      normal.x = 0.5 * ( corner_normals[i1].x + corner_normals[i2].x );
+    norm = 0.;
+    foreach_dimension() norm += sq( normal.x );
+    norm = sqrt( norm );
+    foreach_dimension() normal.x *= 0.25 * gcp->radius / norm;
+    
+    distribute_points_edge( gcp, pt1, pt2, dlm_bd, lH, isb, normal );
+    isb += lH - 2; 
+  }        
+
+
+  /* Points over lateral faces */
+  for (int i = 0; i < 6; i++)
+  {
+    i1 = gcp->pgp->cornersIndex[i][0];
+    coord refcorner = { gcp->pgp->cornersCoord[i1][0],
+    		gcp->pgp->cornersCoord[i1][1],
+    		gcp->pgp->cornersCoord[i1][2] };
+
+    i2 = gcp->pgp->cornersIndex[i][1];
+    coord dir1 = { gcp->pgp->cornersCoord[i2][0],
+    		gcp->pgp->cornersCoord[i2][1],
+    		gcp->pgp->cornersCoord[i2][2]};
+    foreach_dimension() dir1.x -= refcorner.x;
+    norm = 0.;
+    foreach_dimension() norm += sq( dir1.x );
+    norm = sqrt( norm );
+    ndir1 = floor( norm / ( INTERBPCOEF * delta ) );
+    foreach_dimension() dir1.x /= ndir1;    
+        
+    i2 = gcp->pgp->cornersIndex[i][3];
+    coord dir2 = { gcp->pgp->cornersCoord[i2][0],
+    		gcp->pgp->cornersCoord[i2][1],
+    		gcp->pgp->cornersCoord[i2][2]};
+    foreach_dimension() dir2.x -= refcorner.x;
+    norm = 0.;
+    foreach_dimension() norm += sq( dir2.x );
+    norm = sqrt( norm );
+    ndir2 = floor( norm / ( INTERBPCOEF * delta ) );
+    foreach_dimension() dir2.x /= ndir2;     
+    
+    foreach_dimension() normal.x = 0.;
+    for (size_t k=0;k<4;++k)
+      foreach_dimension() 
+        normal.x += corner_normals[gcp->pgp->cornersIndex[i][k]].x;
+    foreach_dimension() normal.x /= 4.;
+    norm = 0.;
+    foreach_dimension() norm += sq( normal.x );
+    norm = sqrt( norm );
+    foreach_dimension() normal.x *= 0.25 * gcp->radius / norm;
+    
+    for (int ii = 1; ii <= ndir1-1; ii++)
+    {
+      for (int jj = 1; jj <= ndir2-1; jj++)
+      {
+        foreach_dimension()
+	{
+	  dlm_bd->bp[isb].x = refcorner.x + (double) ii * dir1.x
+		      + (double) jj * dir2.x;
+	  dlm_bd->normal[isb].x = normal.x ;	      
+	}
+        isb++;
+      }
+    }         
+  }
+  
+  
+  /* Points over hexagonal faces */
+  for (size_t i=6;i<8;++i)
+  {
+    npoints = gcp->pgp->numPointsOnFaces[i];
+    orig_x = 0.;
+    orig_y = 0.;
+    orig_z = 0.;
+
+    for (int j = 0; j < npoints; j++)
+    {
+      iref = gcp->pgp->cornersIndex[i][j];
+      orig_x += gcp->pgp->cornersCoord[iref][0] / npoints;
+      orig_y += gcp->pgp->cornersCoord[iref][1] / npoints;
+      orig_z += gcp->pgp->cornersCoord[iref][2] / npoints;
+    }
+
+    coord refcorner = { orig_x, orig_y, orig_z } ;
+    
+    foreach_dimension() 
+      gc_to_center_face.x = refcorner.x - gcp->center.x;    
+
+    // Add central point on each hexagonal face
+    foreach_dimension()
+      dlm_bd->bp[isb].x = refcorner.x;    
+
+    for (int k = 0; k < npoints; k++)
+    {
+      i1 = gcp->pgp->cornersIndex[i][k];
+      i2 = gcp->pgp->cornersIndex[i][(k+1) % npoints];
+
+      coord dir1 = {gcp->pgp->cornersCoord[i1][0],
+    		gcp->pgp->cornersCoord[i1][1],
+    		gcp->pgp->cornersCoord[i1][2]};
+      coord pt1;
+      foreach_dimension() pt1.x = dir1.x;		
+
+      coord dir2 = {gcp->pgp->cornersCoord[i2][0],
+   	 	gcp->pgp->cornersCoord[i2][1],
+   	 	gcp->pgp->cornersCoord[i2][2]};
+
+      foreach_dimension()
+      {
+        dir1.x -= refcorner.x;
+        dir2.x -= refcorner.x;
+        dir1.x /= ( lN - 1 );
+        dir2.x /= ( lN - 1 );
+      }
+		
+      if ( !k )
+      {
+        // Compute normal vector of the face
+	VecVecCrossProduct( dir1, dir2, &normal );
+        if ( VecVecDotProduct( gc_to_center_face, normal ) < 0. )
+          foreach_dimension() normal.x *= -1.;
+        norm = 0.;
+        foreach_dimension() norm += sq( normal.x );
+        norm = sqrt( norm );
+        foreach_dimension() normal.x *= 0.25 * gcp->radius / norm;
+	
+	// Set normal vector of the central point
+	foreach_dimension()
+          dlm_bd->normal[isb].x = normal.x;
+	isb++;
+      }		
+
+      // Insert points on the innerface edges
+      distribute_points_edge( gcp, refcorner, pt1, dlm_bd, lN, isb, normal );
+      isb += lN - 2;
+
+      // Insert points on the innerface triangles
+      for (int ii = 1; ii <= lN-2; ii++)
+      {
+        for (int jj = 1; jj <= lN-2 - ii; jj++)
+        {
+          foreach_dimension()
+	  {
+	    dlm_bd->bp[isb].x = refcorner.x + (double) ii * dir1.x
+		      + (double) jj * dir2.x;
+	    dlm_bd->normal[isb].x = normal.x ;	      
+	  }
+          isb++;
+        }
+      }
+    }    
+  }      
+
+
+  /* Add the 12 corners points */
+  for (size_t i = 0; i < nc; i++)
+  {
+    pos.x = gcp->pgp->cornersCoord[i][0];
+    pos.y = gcp->pgp->cornersCoord[i][1];
+    pos.z = gcp->pgp->cornersCoord[i][2];
+
+    foreach_dimension()
+    {
+      dlm_bd->bp[isb].x = pos.x;
+      dlm_bd->normal[isb].x = corner_normals[i].x;
+    }
+
+    isb++;
+  }
+}
+
+
+
+
+/** Reads geometric parameters of the hexagonal prism */
+//----------------------------------------------------------------------------
+void read_reference_HexagonalPrism( GeomParameter* gcp, 
+	const double RotMat[3][3] )
+//----------------------------------------------------------------------------
+{
+  char* token = NULL;
+
+  // Read number of corners, check that it is 12
+  size_t nc = 0;
+  token = strtok(NULL, " " );
+  sscanf( token, "%lu", &nc );
+  if ( nc != 12 )
+    printf ("Error in number of corners in update_HexagonalPrism \n");
+
+  // Allocate the PolyGeomParameter structure
+  gcp->pgp = (PolyGeomParameter*) malloc( sizeof(PolyGeomParameter) );
+  gcp->pgp->allPoints = nc;
+
+  // Allocate the array of corner coordinates
+  gcp->pgp->cornersCoord = (double**) malloc( nc * sizeof(double*) );
+  for (size_t i=0;i<nc;i++)
+    gcp->pgp->cornersCoord[i] = (double*) malloc( 3 * sizeof(double) );
+
+  // Read the point/corner coordinates
+  for (size_t i=0;i<nc;++i)
+    for (size_t j=0;j<3;++j)
+    {
+      token = strtok(NULL, " " );
+      sscanf( token, "%lf", &(gcp->pgp->cornersCoord[i][j]) );
+    }
+
+  // Read number of faces, check that it is 8
+  size_t nf = 0;
+  token = strtok(NULL, " " );
+  sscanf( token, "%lu", &nf );
+  if ( nf != 8 )
+    printf ("Error in number of faces in update_HexagonalPrism\n");
+  gcp->pgp->allFaces = nf;
+
+  // Allocate the array of number of points/corners on each face
+  gcp->pgp->numPointsOnFaces = (long int*) malloc( nf * sizeof(long int) );
+
+  // Allocate the array of point/corner indices on each face
+  gcp->pgp->cornersIndex = (long int**) malloc( nf * sizeof(long int*) );
+
+  // Read the face indices
+  long int nppf = 0;
+  for (size_t i=0;i<nf;++i)
+  {
+    // Read the number of points/corners on the face
+    token = strtok(NULL, " " );
+    sscanf( token, "%ld", &nppf );
+    gcp->pgp->numPointsOnFaces[i] = nppf;
+
+    // Allocate the point/corner index vector on the face
+    gcp->pgp->cornersIndex[i] = (long int*) malloc( nppf * sizeof(long int) );
+
+    // Read the point/corner indices
+    for (size_t j=0;j<nppf;++j)
+    {
+      token = strtok(NULL, " " );
+      sscanf( token, "%ld", &(gcp->pgp->cornersIndex[i][j]));
+    }
+  }
+
+
+  // In case the reference rigid body was sent by the granular solver with 
+  // a non zero center of mass and/or a non-zero identity angular position
+  // we need to reset all corners to the neutral reference position
+  double v[3];
+  for (size_t i=0;i<nc;++i)
+  {
+    // Translation    
+    v[0] = gcp->pgp->cornersCoord[i][0] - gcp->center.x;
+    v[1] = gcp->pgp->cornersCoord[i][1] - gcp->center.y;
+    v[2] = gcp->pgp->cornersCoord[i][2] - gcp->center.z;
+
+    // Rotation
+    matTransposedVecDotProduct( RotMat, v, gcp->pgp->cornersCoord[i] );
+  }
+}

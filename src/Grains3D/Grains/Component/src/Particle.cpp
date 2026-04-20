@@ -1527,11 +1527,10 @@ void Particle::setRandomMotion( double const& coefTrans,
 
 
 // ----------------------------------------------------------------------------
-// Returns the number of corners of the rigib body shape and a code
-// describing the rigid body shape
-int Particle::getNbCorners() const
+// Returns a code describing the rigid body shape
+int Particle::getShapeCode() const
 {
-  return ( m_geoRBWC->getConvex()->getNbCorners() );
+  return ( m_geoRBWC->getConvex()->getShapeCode() );
 }
 
 

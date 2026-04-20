@@ -167,9 +167,8 @@ vector<Point3> Rectangle::getEnvelope() const
 
 
 // ----------------------------------------------------------------------------
-// Returns the number of vertices/corners or a code corresponding to
-// a specific convex shape. Here 444 as a convention
-int Rectangle::getNbCorners() const
+// Returns a code corresponding to the rectangle shape
+int Rectangle::getShapeCode() const
 {
   return ( 444 );
 }

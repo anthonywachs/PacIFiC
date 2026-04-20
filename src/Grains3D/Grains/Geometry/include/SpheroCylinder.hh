@@ -62,9 +62,8 @@ class SpheroCylinder : public Convex
     convention */
     vector<vector<int> > const* getFaces() const;
 
-    /** @brief Returns the number of vertices/corners or a code corresponding to
-    a specific convex shape. Here returns the code 3333 */
-    int getNbCorners() const;
+    /** @brief Returns a code corresponding to the spherocylinder shape */
+    int getShapeCode() const;
 
     /** @brief Returns the SpheroCylinder volume */
     double getVolume() const;

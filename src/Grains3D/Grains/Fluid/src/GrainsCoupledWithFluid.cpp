@@ -937,7 +937,7 @@ void GrainsCoupledWithFluid::GrainsToFluid( istringstream &is )
     list<Obstacle*> obstaclesToFluid = m_allcomponents.getObstaclesToFluid();
     ostringstream particles_features;
     list<Particle*>::const_iterator particle, clone;
-    int componentIDinFluid = 0, particleID = 0, ncorners = 0;
+    int componentIDinFluid = 0, particleID = 0, ncodeshape = 0;
     size_t nclonesper = 0, nparticles = 0;
     Vector3 const* vtrans = NULL;
     Vector3 const* vrot = NULL;
@@ -977,7 +977,7 @@ void GrainsCoupledWithFluid::GrainsToFluid( istringstream &is )
         mass = m_orderedParticles[i]->getMass();
         m_orderedParticles[i]->computeInertiaTensorSpaceFixed( inertia );
         radius = m_orderedParticles[i]->getCircumscribedRadius();
-        ncorners = m_orderedParticles[i]->getNbCorners();
+        ncodeshape = m_orderedParticles[i]->getShapeCode();
         particleID = m_orderedParticles[i]->getID();
 	if ( componentIDinFluid != particleID )
 	  cout << "Warning: numbering problem in "
@@ -987,7 +987,7 @@ void GrainsCoupledWithFluid::GrainsToFluid( istringstream &is )
         if ( nclonesper ) particleType = "PP";
         mr = m_orderedParticles[i]->getRigidBody()->getTransform()->getBasis();
 
-        particles_features << componentIDinFluid << " " << ncorners << endl;
+        particles_features << componentIDinFluid << " " << ncodeshape << endl;
         particles_features << particleType << " " <<
 		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			(*vtrans)[X] ) << " " << 
@@ -1087,10 +1087,10 @@ void GrainsCoupledWithFluid::GrainsToFluid( istringstream &is )
       vrot = (*obst)->getAngularVelocity();
       centre = (*obst)->getPosition();
       radius = (*obst)->getCircumscribedRadius();
-      ncorners = (*obst)->getRigidBody()->getConvex()->getNbCorners();
+      ncodeshape = (*obst)->getRigidBody()->getConvex()->getShapeCode();
       mr = (*obst)->getRigidBody()->getTransform()->getBasis();
 
-      particles_features << componentIDinFluid << " " << ncorners << endl;
+      particles_features << componentIDinFluid << " " << ncodeshape << endl;
       particles_features << obstacleType << " " <<
 		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			(*vtrans)[X] ) << " " << 
@@ -1363,7 +1363,7 @@ void GrainsCoupledWithFluid::GrainsToFluidReference( istringstream &is )
     list<Obstacle*> obstaclesToFluid = m_allcomponents.getObstaclesToFluid();
     ostringstream rb_features;
     vector<Particle*>::const_iterator particle;
-    int geomType = 0, ncorners = 0;
+    int geomType = 0, ncodeshape = 0;
     double const* inertia;
     double density = 0., mass = 0., radius = 0.;
     Point3 const* centre = NULL;
@@ -1376,7 +1376,7 @@ void GrainsCoupledWithFluid::GrainsToFluidReference( istringstream &is )
     for (particle=refParticles->begin();particle!=refParticles->end();
     	particle++)
     {
-      ncorners = (*particle)->getNbCorners();
+      ncodeshape = (*particle)->getShapeCode();
       geomType = (*particle)->getGeometricType();
       inertia = (*particle)->getInertiaTensorBodyFixed();
       density = (*particle)->getDensity();
@@ -1385,7 +1385,7 @@ void GrainsCoupledWithFluid::GrainsToFluidReference( istringstream &is )
       centre = (*particle)->getPosition();
       mr = (*particle)->getRigidBody()->getTransform()->getBasis();
       	
-      rb_features << geomType << " " << ncorners << endl;
+      rb_features << geomType << " " << ncodeshape << endl;
       rb_features << 
       		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			density ) << " " <<
@@ -1439,10 +1439,10 @@ void GrainsCoupledWithFluid::GrainsToFluidReference( istringstream &is )
     {
       radius = (*obst)->getCircumscribedRadius();
       centre = (*obst)->getPosition();
-      ncorners = (*obst)->getRigidBody()->getConvex()->getNbCorners();
+      ncodeshape = (*obst)->getRigidBody()->getConvex()->getShapeCode();
       mr = (*obst)->getRigidBody()->getTransform()->getBasis();
 
-      rb_features << geomType << " " << ncorners << endl;
+      rb_features << geomType << " " << ncodeshape << endl;
       rb_features << "1000. 0. 0. 0. 0. 0. 0. 0. " << 
 		GrainsExec::doubleToString( ios::scientific, FORMAT16DIGITS,
 			mr[X][X] ) << " " <<
