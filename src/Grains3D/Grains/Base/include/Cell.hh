@@ -210,7 +210,10 @@ class Cell
     /** @brief Output operator
     @param f output stream
     @param C the cell */
-    friend ostream& operator << ( ostream& f, Cell const& C );  
+    friend ostream& operator << ( ostream& f, Cell const& C );
+    
+    /** @brief Returns basic geometric features of the cell */    
+    string writeGeoFeatures() const;  
     //@}
 
 

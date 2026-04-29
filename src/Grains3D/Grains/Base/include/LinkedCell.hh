@@ -216,7 +216,14 @@ class LinkedCell : public AppCollision
     void managePartialPeriodicity( double time,
 	list<Particle*>* particles,
 	list<Particle*>* particlesClones,
-	GrainsMPIWrapper const* wrapper = NULL );    	  		
+	GrainsMPIWrapper const* wrapper = NULL );
+	
+    /** @brief Writes basic geometric features of all cells in a stream
+    for debug purposes in MPI
+    @param f output stream
+    @param wrapper MPI wrapper */ 
+    void checkCellTagGeoLocMPI( ostream& f, 
+    	GrainsMPIWrapper const* wrapper ) const;
     //@}
 
 

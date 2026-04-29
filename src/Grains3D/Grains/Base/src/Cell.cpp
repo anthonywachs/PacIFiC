@@ -683,3 +683,17 @@ bool Cell::isInParticle( Point3 const& position, Particle const* particle_ )
       
   return ( isIn );
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns basic geometric features of the cell
+string Cell::writeGeoFeatures() const
+{
+  ostringstream oss;
+  oss << m_cel[0] << " " << m_cel[1] << " " << m_cel[2] << " " 
+  	<< m_centre << " " << m_tag << " " << m_GeoPosCell;
+
+  return( oss.str() ); 
+}

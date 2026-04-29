@@ -343,7 +343,7 @@ void GrainsMPI::readDomainDecomposition( DOMNode* root,
 bool GrainsMPI::insertParticle( PullMode const& mode )
 {
   static size_t insert_counter = 0;
-  pair<bool,bool> insert( false, false );
+  pair<bool,bool> insert( false, true );
   Vector3 vtrans, vrot ;
   Point3 position;
   Matrix mrot;

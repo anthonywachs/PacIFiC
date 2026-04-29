@@ -1646,6 +1646,28 @@ ostream& operator <<( ostream& f, LinkedCell const& LC )
 
 
 // ----------------------------------------------------------------------------
+// Writes basic geometric features of all cells in a stream for debug purposes 
+// in MPI
+void LinkedCell::checkCellTagGeoLocMPI( ostream& f, 
+	GrainsMPIWrapper const* wrapper ) const
+{
+  string out, shift, scell;
+  for (int i=0; i<m_nbi; i++)
+    for (int j=0; j<m_nbj; j++)
+      for (int k=0; k<m_nbk; k++)
+      {
+        Cell* cell_ = getCell( i, j, k );
+	scell = cell_->writeGeoFeatures() + "\n";
+	out += scell;
+      }
+
+  wrapper->writeStringPerProcess( f, out, true, shift );        
+}
+
+
+
+
+// ----------------------------------------------------------------------------
 // Returns whether a point lies inside the linked cell grid
 bool LinkedCell::isInLinkedCell( Point3 const& position ) const
 {
