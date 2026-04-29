@@ -1027,7 +1027,6 @@ void Grains::Construction( DOMElement* rootElement )
 
     // Define the linked cell grid
     defineLinkedCell( LC_coef * maxR, GrainsExec::m_shift9 );
-    m_collision->checkCellTagGeoLocMPI( cout, m_wrapper );
     
     // If reload with 2024 format, read the particle reload file
     if ( m_restart && b2024 )
