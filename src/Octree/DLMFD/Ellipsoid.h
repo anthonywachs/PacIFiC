@@ -60,25 +60,34 @@ bool is_in_Ellipsoid( const double x1, const double y1,
 
 
 
+/** Computes the distance between 2 points (xip1,y,0) and (xi,y,0) that lie
+on the ellipsoid surface */
+//----------------------------------------------------------------------------
 double fx( double xip1, double xi, double a, double b, double l )
+//----------------------------------------------------------------------------
 {
   return( sq( xip1 - xi ) + sq( b ) * sq( sqrt( 1. - sq( xip1 / a )  ) 
   	- sqrt( 1. - sq( xi / a ) ) ) - sq( l ) ); 
 }
 
-/** Computes the number of boundary points on the perimeter of the 3D circular 
-cylinder */
+
+
+
+/** Distributes points over the x-axis of the ellipsoid surface that points 
+that lie on the surface at z=0 are equidistant by roughly spacing */
 //----------------------------------------------------------------------------
-void compute_nboundary_Ellipsoid( GeomParameter const* gcp, int* nb ) 
-//----------------------------------------------------------------------------
+double* xaxis_points_distribution( GeomParameter const* gcp, size_t* totalnx,
+	double* spacing )
+//----------------------------------------------------------------------------	
 {
+  *totalnx = 0;  
   double delta = L0 / (double)(1 << MAXLEVEL) ;
-  double spacing = INTERBPCOEF * delta, lb, ub, mid, sol = - 1.;
-  double a = gcp->elgp->a, b = gcp->elgp->b, shift, rr, vx1;
-  size_t maxnx = (size_t)( 2. * ( a + b ) / delta ), ninterior = 0, 
-  	totalnx = 0, i;
+  *spacing = INTERBPCOEF * delta;
+  double refs = *spacing;  
+  double lb, ub, mid, sol = - 1.;
+  double a = gcp->elgp->a, b = gcp->elgp->b;
+  size_t maxnx = (size_t)( 2. * ( a + b ) / delta ), ninterior = 0, i;
   double* vx = (double*) calloc( maxnx, sizeof(double) );
-  bool compress = true; 
 
   // Distribution of points along the x-axis such that points on the surface
   // are approximately distant by spacing
@@ -88,12 +97,18 @@ void compute_nboundary_Ellipsoid( GeomParameter const* gcp, int* nb )
     // Knowing x[i-1], we find x[i] by solving a non-linear equation via the 
     // bi-section method
     lb = vx[i-1];
-    ub = vx[i-1] + 1.2 * spacing;
-    while ( ( ub - lb ) > 1.e-8 * gcp->radius )
+    
+    // At lb, fx is negative, so we look for the first sign change before
+    // running the bi-section method to set ub
+    ub = lb;    
+    while ( fx( ub, lb, a, b, refs ) < 0. ) ub += 1.e-4 * refs;
+    
+    // Bi-section method
+    while ( ( ub - lb ) > 1.e-8 * refs )
     {
       mid = 0.5 * ( lb + ub );
-      if ( copysign( 1., fx( mid, vx[i-1], a, b, spacing ) ) ==
-      	copysign( 1., fx( ub, vx[i-1], a, b, spacing ) ) )
+      if ( copysign( 1., fx( mid, vx[i-1], a, b, refs ) ) ==
+      	copysign( 1., fx( ub, vx[i-1], a, b, refs ) ) )
         ub = mid;
       else
         lb = mid; 	
@@ -102,34 +117,98 @@ void compute_nboundary_Ellipsoid( GeomParameter const* gcp, int* nb )
     vx[i] = sol;
     ++ninterior;     
   }
-  totalnx = 2 * ( ninterior - 1 ) + 3;
-
-  // We need to correct the x positions such that x=0 is a point and points 
-  // are symmetric wrt x=0
-  // We first check whether we need to stretch or compress the x positions
-  // We test whether compressing would work, if not we stretch
-  // After compression, the inter-point distance on the ellipsoid surface should
-  // not be less than 0.9 the prescribed distance
-  shift = vx[ninterior] / (double)( ninterior );
-  vx1 = vx[1] - shift;
-  if ( - a - vx1 > 0. ) compress = false;
-  else if ( sqrt( sq( - a - vx1 ) 
-  	+ sq( b ) * ( 1. - sq( vx1 / a ) ) ) < 0.9 * spacing ) 
-	compress = false;  
+  *totalnx = 2 * ( ninterior - 1 ) + 3;
+  
+  // Bi-section method to find optimal spacing
+  double lbs = 0.5 * refs, ubs = refs, fubs = vx[ninterior], mids, fmids;
+  while ( ( ubs - lbs ) > 1.e-6 * refs )
+  {
+    mids = 0.5 * ( ubs + lbs );
+     
+    // The function to find the root of is vx[ninterior]
+    vx[0] = - a;
+    for (i=1;i<ninterior+1;++i)
+    {
+      // Knowing x[i-1], we find x[i] by solving a non-linear equation via the 
+      // bi-section method
+      lb = vx[i-1];
     
-  if ( compress )
-  {
-    shift = vx[ninterior] / (double)( ninterior ); 
-    for (i=1;i<ninterior+1;++i) vx[i] -= (double)(i) * shift;
+      // At lb, fx is negative, so we look for the first sign change before
+      // running the bi-section method to set ub
+      ub = lb;      
+      while ( fx( ub, lb, a, b, mids ) < 0. ) ub += 1.e-4 * mids;
+    
+      // Bi-section method
+      while ( ( ub - lb ) > 1.e-8 * refs )
+      {
+        mid = 0.5 * ( lb + ub );
+        if ( copysign( 1., fx( mid, vx[i-1], a, b, mids ) ) ==
+      	  copysign( 1., fx( ub, vx[i-1], a, b, mids ) ) )
+          ub = mid;
+        else
+          lb = mid; 	
+      }
+      sol = 0.5 * ( lb + ub );
+      vx[i] = sol;    
+    }
+    
+    fmids = vx[ninterior];
+    if ( copysign( 1., fmids ) == copysign( 1., fubs ) )
+    {
+      ubs = mids;
+      fubs = fmids;
+    }
+    else
+      lbs = mids;
   }
-  else
+
+  // Computes point distribution with the optimal spacing  
+  *spacing = 0.5 * ( ubs + lbs );
+  vx[0] = - a;
+  for (i=1;i<ninterior+1;++i)
   {
-    --ninterior;
-    totalnx -= 2;
-    shift = fabs( vx[ninterior] ) / (double)( ninterior );
-    for (i=1;i<ninterior+1;++i) vx[i] += (double)(i) * shift;        
-  } 
-  for (i=ninterior+1;i<totalnx;++i) vx[i] = - vx[2*ninterior-i];
+    // Knowing x[i-1], we find x[i] by solving a non-linear equation via the 
+    // bi-section method
+    lb = vx[i-1];
+    
+    // At lb, fx is negative, so we look for the first sign change before
+    // running the bi-section method to set ub
+    ub = lb;      
+    while ( fx( ub, lb, a, b, *spacing ) < 0. ) ub += 1.e-4 * *spacing;
+    
+    // Bi-section method
+    while ( ( ub - lb ) > 1.e-8 * refs )
+    {
+      mid = 0.5 * ( lb + ub );
+      if ( copysign( 1., fx( mid, vx[i-1], a, b, *spacing ) ) ==
+      	  copysign( 1., fx( ub, vx[i-1], a, b, *spacing ) ) )
+        ub = mid;
+      else
+        lb = mid; 	
+    }
+    sol = 0.5 * ( lb + ub );
+    vx[i] = sol;    
+  }
+           
+  // Points mirroring over positive x
+  vx[ninterior] = 0.;
+  for (i=ninterior+1;i<*totalnx;++i) vx[i] = - vx[2*ninterior-i]; 
+  
+  return( vx ); 
+} 
+
+
+
+
+/** Computes the number of boundary points on the perimeter of the 3D circular 
+cylinder */
+//----------------------------------------------------------------------------
+void compute_nboundary_Ellipsoid( GeomParameter const* gcp, int* nb ) 
+//----------------------------------------------------------------------------
+{
+  size_t totalnx = 0, i;
+  double spacing = 0., a = gcp->elgp->a, b = gcp->elgp->b, rr;
+  double* vx = xaxis_points_distribution( gcp, &totalnx, &spacing );
     
   // Since we impose b=c, each perimeter at a given x is a circle, we equally
   // distribute point over each circle  
@@ -138,9 +217,9 @@ void compute_nboundary_Ellipsoid( GeomParameter const* gcp, int* nb )
     rr = b * sqrt( 1. - sq( vx[i] / a ) );    
     *nb += (size_t)( 2. * pi * rr / spacing ); 
   }
-  *nb += 2;   
+  *nb += 2;
             
-  if( *nb == 0 )
+  if ( *nb == 0 )
     printf( "nboundary = 0: No boundary points !!!\n" );    
   free( vx ); vx = NULL; 
 }
@@ -155,64 +234,11 @@ void create_referenceRB_boundary_geomfeatures_Ellipsoid(
 	GeomParameter const* gcp, RigidBodyBoundary* dlm_bd, const int m ) 
 //----------------------------------------------------------------------------
 {  
-  double delta = L0 / (double)(1 << MAXLEVEL) ;
-  double spacing = INTERBPCOEF * delta, lb, ub, mid, sol = - 1.;
-  double a = gcp->elgp->a, b = gcp->elgp->b, shift, local_radius, dangle, 
-  	local_angle, bin, norm, vx1;
-  size_t maxnx = (size_t)( 2. * ( a + b ) / delta ), ninterior = 0, 
-  	totalnx = 0, i, ntheta = 0, j;
-  double* vx = (double*) calloc( maxnx, sizeof(double) );
+  size_t totalnx = 0, i, ntheta = 0, j;
   int isb = 0; 
-  bool compress = true; 
-    
-  // Distribution of points along the x-axis such that points on the surface
-  // are approximately distant by spacing
-  vx[0] = - a;
-  for (i=1;i<maxnx && sol < 0.;++i)
-  {
-    lb = vx[i-1];
-    ub = vx[i-1] + 1.2 * spacing;
-    while ( ( ub - lb ) > 1.e-8 * gcp->radius )
-    {
-      mid = 0.5 * ( lb + ub );
-      if ( copysign( 1., fx( mid, vx[i-1], a, b, spacing ) ) ==
-      	copysign( 1., fx( ub, vx[i-1], a, b, spacing ) ) )
-        ub = mid;
-      else
-        lb = mid; 	
-    }
-    sol = 0.5 * ( lb + ub );
-    vx[i] = sol;
-    ++ninterior;     
-  }
-  totalnx = 2 * ( ninterior - 1 ) + 3;
-
-  // We need to correct the x positions such that x=0 is a point and points 
-  // are symmetric wrt x=0
-  // We first check whether we need to stretch or compress the x positions
-  // We test whether compressing would work, if not we stretch
-  // After compression, the inter-point distance on the ellipsoid surface should
-  // not be less than 0.9 the prescribed distance
-  shift = vx[ninterior] / (double)( ninterior );
-  vx1 = vx[1] - shift;
-  if ( - a - vx1 > 0. ) compress = false;
-  else if ( sqrt( sq( - a - vx1 ) 
-  	+ sq( b ) * ( 1. - sq( vx1 / a ) ) ) < 0.9 * spacing ) 
-	compress = false;  
-    
-  if ( compress )
-  {
-    shift = vx[ninterior] / (double)( ninterior ); 
-    for (i=1;i<ninterior+1;++i) vx[i] -= (double)(i) * shift;
-  }
-  else
-  {
-    --ninterior;
-    totalnx -= 2;
-    shift = fabs( vx[ninterior] ) / (double)( ninterior );
-    for (i=1;i<ninterior+1;++i) vx[i] += (double)(i) * shift;        
-  } 
-  for (i=ninterior+1;i<totalnx;++i) vx[i] = - vx[2*ninterior-i];
+  double spacing = 0., a = gcp->elgp->a, b = gcp->elgp->b, local_radius, 
+  	dangle, local_angle, bin, norm;
+  double* vx = xaxis_points_distribution( gcp, &totalnx, &spacing );  
 
   // x=-a tip
   dlm_bd->bp[isb].x = - a;
