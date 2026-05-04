@@ -2374,8 +2374,8 @@ void check_one_particle_datafile( char const* name,
   FILE * fp = fopen( name,  "r" );
   if ( fp )
   {
-    fgets( line, sizeof(line), fp );
-    ndatalines = 1;
+    if ( fgets( line, sizeof(line), fp ) != NULL ) ndatalines = 1;
+    else printf( "Failed to read line in check_one_particle_datafile\n" );
     while ( fgets( line, sizeof(line), fp ) ) {++ndatalines;}
     sscanf( line, "%lf", &time);
     fclose( fp );
@@ -2390,7 +2390,8 @@ void check_one_particle_datafile( char const* name,
       for (size_t i=0;i<ndatalines;++i)
       {
 	datarray[i] = (char*) calloc( 257, sizeof(char) );
-	fgets( datarray[i], 256, fp );
+	if ( fgets( datarray[i], 256, fp ) == NULL )
+	  printf( "Failed to read line in check_one_particle_datafile\n" );
       }
       fclose( fp );
       
