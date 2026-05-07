@@ -971,11 +971,17 @@ event adapt (i++)
       printf( "total = %d, ", totalcell );
     }
 
+# if LEVELDIFF_FLAG_U == 0
+    astats s = adapt_wavelet( (scalar *){DLM_FlagMesh, u}, 
+	(double[]){FLAG_ADAPT_CRIT, UX_ADAPT_CRIT, UY_ADAPT_CRIT, 
+	UZ_ADAPT_CRIT}, maxlevel = MAXLEVEL, minlevel = LEVEL );	
+# else
     astats s = adapt_wavelet_multimaxlevel( (scalar *){DLM_FlagMesh, u}, 
 	(double[]){FLAG_ADAPT_CRIT, UX_ADAPT_CRIT, UY_ADAPT_CRIT, 
 	UZ_ADAPT_CRIT}, (int[]){MAXLEVEL, MAXLEVEL-LEVELDIFF_FLAG_U, 
 	MAXLEVEL-LEVELDIFF_FLAG_U, MAXLEVEL-LEVELDIFF_FLAG_U}, 
-	minlevel = LEVEL );	
+	minlevel = LEVEL );
+# endif	
 	
 # if EMBED
     event( "Compute_cs" ); 
