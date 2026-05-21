@@ -40,6 +40,36 @@ bool is_in_Sphere( const double x, const double y, const double z,
 
 
 
+/** Flag boundary layer around the sphere */
+//----------------------------------------------------------------------------
+void flag_boundarylayer_Sphere( scalar flag_maxlevel, double const dcoef, 
+	RigidBody const* p )
+//----------------------------------------------------------------------------
+{
+  GeomParameter const* gcp = &(p->g); 
+  coord min = gcp->BBox.min, max = gcp->BBox.max;
+  double delta = L0 / (double)(1 << MAXLEVEL) ;
+  double ext_radius = gcp->radius + dcoef * delta; 
+  
+  foreach_dimension()
+  {
+    min.x -= dcoef * delta;
+    max.x += dcoef * delta;
+  } 
+      
+  foreach_region_plus_plus( min, max ) 
+    if ( is_leaf(cell) )
+      if ( flag_maxlevel[] == 0. )
+      {    
+        if ( sqrt( sq( x - gcp->center.x ) + sq( y - gcp->center.y )
+    	+ sq( z - gcp->center.z ) ) < ext_radius )
+	  flag_maxlevel[] = 1.;
+      }
+}
+
+
+
+
 /** Computes the number of boundary points on the surface of the sphere */
 //----------------------------------------------------------------------------
 void compute_nboundary_Sphere( GeomParameter const* gcp, int* nb )

@@ -975,12 +975,15 @@ event adapt (i++)
     astats s = adapt_wavelet( (scalar *){DLM_FlagMesh, u}, 
 	(double[]){FLAG_ADAPT_CRIT, UX_ADAPT_CRIT, UY_ADAPT_CRIT, 
 	UZ_ADAPT_CRIT}, maxlevel = MAXLEVEL, minlevel = LEVEL );	
-# else
-    astats s = adapt_wavelet_multimaxlevel( (scalar *){DLM_FlagMesh, u}, 
-	(double[]){FLAG_ADAPT_CRIT, UX_ADAPT_CRIT, UY_ADAPT_CRIT, 
-	UZ_ADAPT_CRIT}, (int[]){MAXLEVEL, MAXLEVEL-LEVELDIFF_FLAG_U, 
-	MAXLEVEL-LEVELDIFF_FLAG_U, MAXLEVEL-LEVELDIFF_FLAG_U}, 
-	minlevel = LEVEL );
+# else	
+    // Flag regions around rigid bodies
+    flag_rigidbodies_with_boundarylayers( allRigidBodies, nbRigidBodies,
+    	DLM_FlagMaxLev, BOUNDARY_LAYER_THICKNESS_COEF );       
+
+    astats s = adapt_wavelet_spatial ( DLM_FlagMaxLev, MAXLEVEL,
+	(scalar *){DLM_FlagMesh, u}, (double[]){FLAG_ADAPT_CRIT, UX_ADAPT_CRIT,
+	UY_ADAPT_CRIT, UZ_ADAPT_CRIT}, MAXLEVEL-LEVELDIFF_FLAG_U, 
+	minlevel = LEVEL );	
 # endif	
 	
 # if EMBED

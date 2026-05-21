@@ -58,6 +58,36 @@ void compute_nboundary_CircularCylinder2D( GeomParameter const* gcp, int* nb )
 
 
 
+/** Flag boundary layer around the  2D circular cylinder */
+//----------------------------------------------------------------------------
+void flag_boundarylayer_CircularCylinder2D( scalar flag_maxlevel, 
+	double const dcoef, RigidBody const* p )
+//----------------------------------------------------------------------------
+{
+  GeomParameter const* gcp = &(p->g); 
+  coord min = gcp->BBox.min, max = gcp->BBox.max;
+  double delta = L0 / (double)(1 << MAXLEVEL) ;
+  double ext_radius = gcp->radius + dcoef * delta; 
+  
+  foreach_dimension()
+  {
+    min.x -= dcoef * delta;
+    max.x += dcoef * delta;
+  } 
+      
+  foreach_region_plus_plus( min, max ) 
+    if ( is_leaf(cell) )
+      if ( flag_maxlevel[] == 0. )
+      {    
+        if ( sqrt( sq( x - gcp->center.x ) + sq( y - gcp->center.y ) ) 
+		< ext_radius )
+	  flag_maxlevel[] = 1.;
+      }
+}
+
+
+
+
 /** Creates boundary points and normal vectors of the 2D circular cylinder */
 //----------------------------------------------------------------------------
 void create_referenceRB_boundary_geomfeatures_CircularCylinder2D( 

@@ -71,6 +71,71 @@ bool is_in_TruncatedCone( const double x1, const double y1,
 
 
 
+/** Flag boundary layer around the truncated cone */
+//----------------------------------------------------------------------------
+void flag_boundarylayer_TruncatedCone( scalar flag_maxlevel, double const dcoef,
+	RigidBody const* p )
+//----------------------------------------------------------------------------
+{
+  GeomParameter const* gcp = &(p->g); 
+  coord min = gcp->BBox.min, max = gcp->BBox.max, vec;
+  double delta = L0 / (double)(1 << MAXLEVEL) ;
+  double swellheight = 1. + 2. * dcoef * delta / gcp->tcgp->height;
+  double R1 = dcoef * delta * ( gcp->tcgp->BottomRadius
+  	- gcp->tcgp->TopRadius ) / gcp->tcgp->height;
+  double R2 = dcoef * delta * sqrt( 1. + sq( ( gcp->tcgp->BottomRadius
+  	- gcp->tcgp->TopRadius ) / gcp->tcgp->height ) );	
+  
+  coord bottomToTopVec;  
+  foreach_dimension()
+    bottomToTopVec.x = swellheight * gcp->tcgp->BottomToTopVec.x;
+  coord bottomCenter;
+  double norm = sqrt( sq( gcp->tcgp->BottomToTopVec.x ) 
+  	+ sq( gcp->tcgp->BottomToTopVec.y ) 
+	+ sq( gcp->tcgp->BottomToTopVec.z ) );
+  foreach_dimension()
+    bottomCenter.x = gcp->tcgp->BottomCenter.x - dcoef * delta
+    	* gcp->tcgp->BottomToTopVec.x / norm;
+  double height = swellheight * gcp->tcgp->height; 	
+  double bottomRadius = gcp->tcgp->BottomRadius + R1 + R2;
+  double topRadius = gcp->tcgp->TopRadius - R1 + R2;  
+         
+  foreach_dimension()
+  {
+    min.x -= dcoef * delta;
+    max.x += dcoef * delta;
+  } 
+      
+  foreach_region_plus_plus( min, max ) 
+    if ( is_leaf(cell) )
+      if ( flag_maxlevel[] == 0. )
+      {    
+        vec.x = x - bottomCenter.x;
+        vec.y = y - bottomCenter.y;
+        vec.z = z - bottomCenter.z; 
+  
+        double proj = vec.x * bottomToTopVec.x
+		+ vec.y * bottomToTopVec.y 
+		+ vec.z * bottomToTopVec.z; 
+        proj /= height;
+	
+        if ( proj >= 0. && proj <= height )
+        {
+          foreach_dimension() 
+            vec.x -= proj * bottomToTopVec.x / height;
+      
+          double local_radius = ( topRadius - bottomRadius )
+    		* proj / height + bottomRadius;
+	
+          if ( sqrt( sq( vec.x ) + sq( vec.y ) + sq( vec.z ) ) <= local_radius )
+            flag_maxlevel[] = 1.;	  
+        }
+      }
+}
+
+
+
+
 /** Computes the number of boundary points on the perimeter of the truncated 
 cone */
 //----------------------------------------------------------------------------

@@ -60,6 +60,43 @@ bool is_in_Ellipsoid( const double x1, const double y1,
 
 
 
+/** Flag boundary layer around the ellipsoid */
+//----------------------------------------------------------------------------
+void flag_boundarylayer_Ellipsoid( scalar flag_maxlevel, double const dcoef, 
+	RigidBody const* p )
+//----------------------------------------------------------------------------
+{
+  GeomParameter const* gcp = &(p->g); 
+  coord min = gcp->BBox.min, max = gcp->BBox.max, v, vr;
+  double delta = L0 / (double)(1 << MAXLEVEL) ;
+  double a = gcp->elgp->a + dcoef * delta,
+  	b = gcp->elgp->b + dcoef * delta,
+	c = gcp->elgp->c + dcoef * delta; 
+  
+  foreach_dimension()
+  {
+    min.x -= dcoef * delta;
+    max.x += dcoef * delta;
+  } 
+      
+  foreach_region_plus_plus( min, max ) 
+    if ( is_leaf(cell) )
+      if ( flag_maxlevel[] == 0. )
+      {    
+        v.x = x - gcp->center.x;
+	v.y = y - gcp->center.y;  
+	v.z = z - gcp->center.z;  
+  
+        matTransposedCoordDotProduct( p->RotMat, v, &vr );
+  
+        if ( sq( vr.x / a ) + sq( vr.y / b ) + sq( vr.z / c ) - 1. <= 0. )
+	  flag_maxlevel[] = 1.;
+      }
+}
+
+
+
+
 /** Computes the distance between 2 points (xip1,y,0) and (xi,y,0) that lie
 on the ellipsoid surface */
 //----------------------------------------------------------------------------

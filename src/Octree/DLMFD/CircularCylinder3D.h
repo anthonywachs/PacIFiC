@@ -60,6 +60,56 @@ bool is_in_CircularCylinder3D( const double x1, const double y1,
 
 
 
+/** Flag boundary layer around the 3D circular cylinder */
+//----------------------------------------------------------------------------
+void flag_boundarylayer_CircularCylinder3D( scalar flag_maxlevel, 
+	double const dcoef, RigidBody const* p )
+//----------------------------------------------------------------------------
+{
+  GeomParameter const* gcp = &(p->g); 
+  coord min = gcp->BBox.min, max = gcp->BBox.max;
+  double delta = L0 / (double)(1 << MAXLEVEL) ;
+  double swellheight = 1. + 2. * dcoef * delta / gcp->cgp->height;
+  
+  coord bottomToTopVec;  
+  foreach_dimension()
+    bottomToTopVec.x = swellheight * gcp->cgp->BottomToTopVec.x;
+  coord bottomCenter;
+  double norm = sqrt( sq( gcp->cgp->BottomToTopVec.x ) 
+  	+ sq( gcp->cgp->BottomToTopVec.y ) 
+	+ sq( gcp->cgp->BottomToTopVec.z ) );
+  foreach_dimension()
+    bottomCenter.x = gcp->cgp->BottomCenter.x - dcoef * delta
+    	* gcp->cgp->BottomToTopVec.x / norm;
+  double height = swellheight * gcp->cgp->height; 
+  double radius = gcp->cgp->radius + dcoef * delta; 
+       
+  foreach_dimension()
+  {
+    min.x -= dcoef * delta;
+    max.x += dcoef * delta;
+  } 
+      
+  foreach_region_plus_plus( min, max ) 
+    if ( is_leaf(cell) )
+      if ( flag_maxlevel[] == 0. )
+      {    
+        double dot = ( ( x - bottomCenter.x ) * bottomToTopVec.x
+  		+ ( y - bottomCenter.y ) * bottomToTopVec.y
+  		+ ( z - bottomCenter.z ) * bottomToTopVec.z ) / height ;
+
+        if ( dot < height && dot > 0. )
+          if ( ( x - bottomCenter.x ) * ( x - bottomCenter.x )
+  	+ ( y - bottomCenter.y ) * ( y - bottomCenter.y )
+  	+ ( z - bottomCenter.z ) * ( z - bottomCenter.z ) - sq( dot ) 
+		< sq( radius ) )
+            flag_maxlevel[] = 1.;	  
+      }
+}
+
+
+
+
 /** Computes the number of boundary points on the perimeter of the 3D circular 
 cylinder */
 //----------------------------------------------------------------------------

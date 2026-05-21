@@ -2041,8 +2041,8 @@ void rigidbody_data( RigidBody* allrbs, const size_t nrb, const double t,
 //----------------------------------------------------------------------------
 void computeHydroForceTorque( RigidBody* allrbs, const size_t nrb, FILE** sl, 
 	const double t, const double dt, 
-	scalar Flag, vector lambda, vector Index, 
-	const double rho_f, vector prefcenter ) 
+	scalar const Flag, vector const lambda, vector const Index, 
+	const double rho_f, vector const prefcenter ) 
 //----------------------------------------------------------------------------
 {
   /* Compute hydrodynamic force & torque and write to a file */
@@ -3028,4 +3028,245 @@ astats adapt_wavelet_multimaxlevel (scalar * slist,       // list of scalars
     free (list);
   
   return st;
+}
+
+
+
+
+/** Adapt_wavelet algorithm with a different max lev in regions flagged
+by the Flag field larger than 0 */
+//----------------------------------------------------------------------------
+astats adapt_wavelet_spatial ( scalar Flag, // Flag field
+		int maxlevel_flag,    // max level in flagged regions > maxlevel
+		scalar * slist,       // list of scalars
+		double * max,         // tolerance for each scalar
+		int maxlevel,         // maximum level of refinement
+		int minlevel = 1,     // minimum level of refinement
+		scalar * list = all)
+//----------------------------------------------------------------------------
+{
+  scalar * ilist = list;
+  
+  if (is_constant(cm)) {
+    if (list == NULL || list == all)
+      list = list_copy (all);
+    boundary (list);
+    restriction (slist);
+  }
+  else {
+    if (list == NULL || list == all) {
+      list = list_copy ({cm, fm});
+      for (scalar s in all)
+	list = list_add (list, s);
+    }
+    boundary (list);
+    scalar * listr = list_concat (slist, {cm});
+    restriction (listr);
+    free (listr);
+  }
+
+  astats st = {0, 0};
+  scalar * listc = NULL;
+  for (scalar s in list)
+    listc = list_add_depend (listc, s);
+
+  // refinement
+  if (minlevel < 1)
+    minlevel = 1;
+  tree->refined.n = 0;
+  static const int refined = 1 << user, too_fine = 1 << (user + 1);
+  foreach_cell() {
+    int cellMAX = Flag[] > 1.e-8 ? maxlevel_flag : maxlevel;
+    if (is_active(cell)) {
+      static const int too_coarse = 1 << (user + 2);
+      if (is_leaf (cell)) {
+	if (cell.flags & too_coarse) {
+	  cell.flags &= ~too_coarse;
+	  refine_cell (point, listc, refined, &tree->refined);
+	  st.nf++;
+	}
+	continue;
+      }
+      else { // !is_leaf (cell)
+	if (cell.flags & refined) {
+	  // cell has already been refined, skip its children
+	  cell.flags &= ~too_coarse;
+	  continue;
+	}
+	// check whether the cell or any of its children is local
+	bool local = is_local(cell);
+	if (!local)
+	  foreach_child()
+	    if (is_local(cell)) {
+	      local = true; break;
+	    }
+	if (local) {
+	  int i = 0;
+	  static const int just_fine = 1 << (user + 3);
+	  for (scalar s in slist) {
+	    double emax = max[i++], sc[(1 << dimension)*s.block];
+	    double * b = sc;
+	    foreach_child()
+	      foreach_blockf(s)
+	        *b++ = s[];
+	    s.prolongation (point, s);
+	    b = sc;
+	    foreach_child()
+	      foreach_blockf(s) {
+	        double e = fabs(*b - s[]);
+		if (e > emax && level < cellMAX) {
+		  cell.flags &= ~too_fine;
+		  cell.flags |= too_coarse;
+		}
+		else if ((e <= emax/1.5 || level > cellMAX) &&
+			 !(cell.flags & (too_coarse|just_fine))) {
+		  if (level >= minlevel)
+		    cell.flags |= too_fine;
+		}
+		else if (!(cell.flags & too_coarse)) {
+		  cell.flags &= ~too_fine;
+		  cell.flags |= just_fine;
+		}
+		s[] = *b++;
+	      }
+	  }
+	  foreach_child() {
+	    cell.flags &= ~just_fine;
+	    if (!is_leaf(cell)) {
+	      cell.flags &= ~too_coarse;
+	      if (level >= cellMAX)
+		cell.flags |= too_fine;
+	    }
+	    else if (!is_active(cell))
+	      cell.flags &= ~too_coarse;
+	  }
+	}
+      }
+    }
+    else // inactive cell
+      continue;
+  }
+  mpi_boundary_refine (listc);
+  
+  // coarsening
+  // the loop below is only necessary to ensure symmetry of 2:1 constraint
+  for (int l = depth(); l >= 0; l--) {
+    foreach_cell()
+      if (!is_boundary(cell)) {
+	if (level == l) {
+	  if (!is_leaf(cell)) {
+	    if (cell.flags & refined)
+	      // cell was refined previously, unset the flag
+	      cell.flags &= ~(refined|too_fine);
+	    else if (cell.flags & too_fine) {
+	      if (is_local(cell) && coarsen_cell (point, listc))
+		st.nc++;
+	      cell.flags &= ~too_fine; // do not coarsen parent
+	    }
+	  }
+	  if (cell.flags & too_fine)
+	    cell.flags &= ~too_fine;
+	  else if (level > 0 && (aparent(0).flags & too_fine))
+	    aparent(0).flags &= ~too_fine;
+	  continue;
+	}
+	else if (is_leaf(cell))
+	  continue;
+      }
+    mpi_boundary_coarsen (l, too_fine);
+  }
+  free (listc);
+
+  mpi_all_reduce (st.nf, MPI_INT, MPI_SUM);
+  mpi_all_reduce (st.nc, MPI_INT, MPI_SUM);
+  if (st.nc || st.nf)
+    mpi_boundary_update (list);
+
+  if (list != ilist)
+    free (list);
+  
+  return st;
+} 
+
+
+
+
+/** Flag regions  */
+//----------------------------------------------------------------------------
+void flag_rigidbodies_with_boundarylayers( RigidBody const* allrbs, 
+	const size_t nrb, scalar flag_maxlevel, double const dcoef )
+//----------------------------------------------------------------------------
+{
+  // Re-initialize the flag field to 0 
+  foreach() flag_maxlevel[] = 0.;
+
+  for (size_t k = 0; k < nrb; k++)
+  {
+    // Flag cells that are already identified as interior points
+    foreach_cache(allrbs[k].Interior) flag_maxlevel[] = 1.;
+    
+    // Flag additional cells in a halo of width dcoef * min_dx around 
+    // the rigid body
+    switch ( allrbs[k].shape )
+    {
+      case SPHERE:
+        flag_boundarylayer_Sphere( flag_maxlevel, dcoef, &(allrbs[k]) );
+	break;
+	  
+      case CIRCULARCYLINDER2D:
+        flag_boundarylayer_CircularCylinder2D( flag_maxlevel, dcoef, 
+	  	&(allrbs[k]) );
+	break;
+	  
+//       case CUBE:
+//         flag_boundarylayer_Polyhedron( flag_maxlevel, dcoef, &(allrbs[k]) );
+// 	break;
+// 
+//       case TETRAHEDRON:
+//         flag_boundarylayer_Polyhedron( flag_maxlevel, dcoef, &(allrbs[k]) );
+// 	break;
+// 	
+//       case OCTAHEDRON:
+// 	flag_boundarylayer_Polyhedron( flag_maxlevel, dcoef, &(allrbs[k]) );
+// 	break;
+// 	
+//       case ICOSAHEDRON:
+// 	flag_boundarylayer_Polyhedron( flag_maxlevel, dcoef, &(allrbs[k]) );
+// 	break;
+// 
+//       case DODECAHEDRON:
+// 	flag_boundarylayer_Polyhedron( flag_maxlevel, dcoef, &(allrbs[k]) );
+// 	break;
+// 	  
+//       case BOX:
+// 	flag_boundarylayer_Polyhedron( flag_maxlevel, dcoef, &(allrbs[k]) );
+// 	break;
+	  
+      case CIRCULARCYLINDER3D:
+	flag_boundarylayer_CircularCylinder3D( flag_maxlevel, dcoef, 
+		&(allrbs[k]) );
+	break;
+
+      case CONE:
+	flag_boundarylayer_Cone( flag_maxlevel, dcoef, &(allrbs[k]) );
+	break;
+	  
+      case TRUNCATEDCONE:
+	flag_boundarylayer_TruncatedCone( flag_maxlevel, dcoef, &(allrbs[k]) );
+	break;
+	  
+      case ELLIPSOID:
+	flag_boundarylayer_Ellipsoid( flag_maxlevel, dcoef, &(allrbs[k]) );
+	break;
+	  	  	  	  	  	
+//       case HEXAGONALPRISM:
+//         flag_boundarylayer_Polyhedron( flag_maxlevel, dcoef, &(allrbs[k]) );
+// 	break;	  
+		  
+      default:
+        fprintf( stderr,"Unknown Rigid Body shape !!\n" );
+    }    
+  }
+
+  synchronize({flag_maxlevel});  
 }

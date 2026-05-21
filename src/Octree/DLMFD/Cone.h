@@ -23,7 +23,7 @@ bool is_in_Cone_geomtest( const double x, const double y,
 	+ vec.z * gcp->tcgp->BottomToTopVec.z; 
   proj /= gcp->tcgp->height;
 	
-  if ( proj > 0. && proj < gcp->tcgp->height )
+  if ( proj >= 0. && proj <= gcp->tcgp->height )
   {
     foreach_dimension() 
       vec.x -= proj * gcp->tcgp->BottomToTopVec.x / gcp->tcgp->height;
@@ -65,6 +65,68 @@ bool is_in_Cone( const double x1, const double y1,
     }
 
   return ( status );
+}
+
+
+
+
+/** Flag boundary layer around the cone */
+//----------------------------------------------------------------------------
+void flag_boundarylayer_Cone( scalar flag_maxlevel, double const dcoef, 
+	RigidBody const* p )
+//----------------------------------------------------------------------------
+{
+  GeomParameter const* gcp = &(p->g); 
+  coord min = gcp->BBox.min, max = gcp->BBox.max, vec;
+  double delta = L0 / (double)(1 << MAXLEVEL) ;
+  double swell = 1. + dcoef * delta * ( 1. / gcp->tcgp->height
+    	+ sqrt( sq( 1. / gcp->tcgp->height ) 
+		+ sq( 1. / gcp->tcgp->BottomRadius) ) );
+  
+  coord bottomToTopVec;  
+  foreach_dimension()
+    bottomToTopVec.x = swell * gcp->tcgp->BottomToTopVec.x;
+  coord bottomCenter;
+  double norm = sqrt( sq( gcp->tcgp->BottomToTopVec.x ) 
+  	+ sq( gcp->tcgp->BottomToTopVec.y ) 
+	+ sq( gcp->tcgp->BottomToTopVec.z ) );
+  foreach_dimension()
+    bottomCenter.x = gcp->tcgp->BottomCenter.x - dcoef * delta
+    	* gcp->tcgp->BottomToTopVec.x / norm;
+  double bottomRadius = swell * gcp->tcgp->BottomRadius;
+  double height = swell * gcp->tcgp->height;   
+       
+  foreach_dimension()
+  {
+    min.x -= dcoef * delta;
+    max.x += dcoef * delta;
+  } 
+      
+  foreach_region_plus_plus( min, max ) 
+    if ( is_leaf(cell) )
+      if ( flag_maxlevel[] == 0. )
+      {    
+        vec.x = x - bottomCenter.x;
+        vec.y = y - bottomCenter.y;
+        vec.z = z - bottomCenter.z; 
+  
+        double proj = vec.x * bottomToTopVec.x
+		+ vec.y * bottomToTopVec.y 
+		+ vec.z * bottomToTopVec.z; 
+        proj /= height;
+	
+        if ( proj >= 0. && proj <= height )
+        {
+          foreach_dimension() 
+            vec.x -= proj * bottomToTopVec.x / height;
+      
+          double local_radius = - bottomRadius * proj / height 
+	  	+ bottomRadius;
+	
+          if ( sqrt( sq( vec.x ) + sq( vec.y ) + sq( vec.z ) ) <= local_radius )
+            flag_maxlevel[] = 1.;	  
+        }
+      }
 }
 
 
