@@ -107,17 +107,17 @@ Once the `--build` step is run, the resulting executable `grains3d` may be found
 You may run the executable using the absolute or relative path e.g. by typing 
 
 ```bash
-./build/release/src/Grains3D/Main/grains
+./build/release/src/Grains3D/Main/grains3d
 ```
 
-from the project root. But typing `grains` alone *does not work* since the build folder is not part of the `$PATH` variable that your system uses to find binaries. If you are someone who is developing grains (and frequently rebuilding) you may find it useful to not type this everytime. In this case, a file is generated that may be sourced as 
+from the project root. But typing `grains3d` alone *does not work* since the build folder is not part of the `$PATH` variable that your system uses to find binaries. If you are someone who is developing Grains3D (and frequently rebuilding) you may find it useful to not type this everytime. In this case, a file is generated that may be sourced as 
 
 ```bash
 source ./build/release/pacific-env.sh
 ```
-which temporarily adds the build folder to `$PATH`. Once your shell is closed (or you type `exit`) then `grains` will no longer run without typing the full path.
+which temporarily adds the build folder to `$PATH`. Once your shell is closed (or you type `exit`) then `grains3d` will no longer run without typing the full path.
 
-If you are not frequently rebuilding and wish to install the entire project to a system directory, where `grains` will be found in `$PATH` every type, then you may install your build to a system directory with
+If you are not frequently rebuilding and wish to install the entire project to a system directory, where `grains3d` will be found in `$PATH` every type, then you may install your build to a system directory with
 
 ```bash
 sudo cmake --install build/release 
@@ -138,14 +138,14 @@ Next, build the project
 make all
 ```
 
-Individial targets (e.g. `grains` or `fluid`) may be built with 
+Individual targets (e.g. `grains3d` or `fluid`) may be built with 
 ```bash
-make grains
+make grains3d
 ```
 
 Once they are built, the resulting binaries may be found in `build/PacIFiC-{$PACIFIC_ARCH}`. So long as you have run `source` in your current shell session, they will be added and findable via your `$PATH` variable and thus you should now be able to simply type e.g.
 ```bash
-grains --help
+grains3d --help
 ```
 
 At the moment there is no `install` step for the make build system: In order to use the software you must always first run `source`.
