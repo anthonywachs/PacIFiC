@@ -230,7 +230,7 @@ void HookeContactForceModel::computeAndWriteEstimates( Component* p0_,
     	<< endl;
   OUT << "  Collisional relative velocity = " << v0 << endl;
   OUT << "  Tc = " << tc << "  delta_max = " << delta_max << endl;    
-  OUT << "  eta_n = " << etan << endl; 
+  OUT << "  gamma_n = " << 2.*avmass*etan << endl; 
   OUT << "  Maximum elastic force fel = " << m_kn*delta_allowed << endl;
   if ( !p0_->isObstacle() )
     OUT << "  fel/weight0 ratio = " << m_kn * delta_allowed / ( mass0 * 9.81 ) 
