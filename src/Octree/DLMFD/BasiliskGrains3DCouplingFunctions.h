@@ -765,9 +765,10 @@ char* CreateReferenceRBBasilisk( char* pstr, const int pstrsize,
         // For now, we assume that all 12-corner/20-face polyhedrons are regular
 	// icosahedrons 
         case 1220: 
-	 allrefrbs[k].shape = ICOSAHEDRON;
-	 read_reference_Icosahedron( gg, allrefrbs[k].RotMat );
-
+	  allrefrbs[k].shape = ICOSAHEDRON;
+	  read_reference_Icosahedron( gg, allrefrbs[k].RotMat );
+          break;
+	  
         // For now, we assume that all 12-corner/8-face polyhedrons are 
 	// hexagonal prism (8 faces) 
 	case 1208:
@@ -826,7 +827,7 @@ char* CreateReferenceRBBasilisk( char* pstr, const int pstrsize,
         if ( i == j )
           allrefrbs[k].RotMat[i][j] = 1.;
 	else
-	  allrefrbs[k].RotMat[i][j] = 0.;                                    
+	  allrefrbs[k].RotMat[i][j] = 0.;
   }
 
   return ( pstr );         

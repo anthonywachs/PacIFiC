@@ -89,8 +89,8 @@ typedef struct {
 
 /** Additional geometric parameters for polygons/polyhedrons */
 typedef struct {
-  int allPoints, allFaces;
-  double** cornersCoord;
+  int ncorners, nfaces;
+  coord* cornersCoord;
   long int** cornersIndex;
   long int* numPointsOnFaces;
 } PolyGeomParameter;
