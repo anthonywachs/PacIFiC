@@ -88,12 +88,12 @@ void flag_boundarylayer_Cone( scalar flag_maxlevel, double const dcoef,
   foreach_dimension()
     bottomToTopVec.x = swell * gcp->tcgp->BottomToTopVec.x;
   coord bottomCenter;
-  double norm = sqrt( sq( gcp->tcgp->BottomToTopVec.x ) 
+  double vecnorm = sqrt( sq( gcp->tcgp->BottomToTopVec.x ) 
   	+ sq( gcp->tcgp->BottomToTopVec.y ) 
 	+ sq( gcp->tcgp->BottomToTopVec.z ) );
   foreach_dimension()
     bottomCenter.x = gcp->tcgp->BottomCenter.x - dcoef * delta
-    	* gcp->tcgp->BottomToTopVec.x / norm;
+    	* gcp->tcgp->BottomToTopVec.x / vecnorm;
   double bottomRadius = swell * gcp->tcgp->BottomRadius;
   double height = swell * gcp->tcgp->height;   
        
@@ -227,14 +227,14 @@ void create_referenceRB_boundary_geomfeatures_Cone( GeomParameter const* gcp,
   double delta = L0 / (double)(1 << MAXLEVEL) ;
   double spacing = INTERBPCOEF * delta, local_angle, local_radius,
   	local_radius_ratio, delta_radius, inclined_height, bin, dangle, 
-	delta_height, norm, div = 4. * ( sqrt( 1 + sq( gcp->tcgp->BottomRadius )
+	delta_height, vecnorm, div = 4. * ( sqrt( 1 + sq( gcp->tcgp->BottomRadius )
 		/ sq( gcp->tcgp->height ) ) - gcp->tcgp->BottomRadius
 		/ gcp->tcgp->height );
   int isb = 0;
   coord pos, unit_axial, n_cross_rad, bottom_normal;
   size_t npts_local_radius, npts_radius, npts_height;
 
-  // Note: we arbitrary set the norm of the normal vector to 0.25 * radius
+  // Note: we arbitrary set the vecnorm of the normal vector to 0.25 * radius
 
   foreach_dimension() 
     unit_axial.x = gcp->tcgp->BottomToTopVec.x / gcp->tcgp->height;  
@@ -247,7 +247,7 @@ void create_referenceRB_boundary_geomfeatures_Cone( GeomParameter const* gcp,
   foreach_dimension() 
   {
     dlm_bd->bp[isb].x = gcp->tcgp->BottomCenter.x;
-    dlm_bd->normal[isb].x = bottom_normal.x;
+    dlm_bd->outwardnormalvector[isb].x = bottom_normal.x;
   }  
   isb++;
 
@@ -281,21 +281,21 @@ void create_referenceRB_boundary_geomfeatures_Cone( GeomParameter const* gcp,
       
       if ( i == npts_radius - 1 )
       {
-        norm = 0.;
+        vecnorm = 0.;
 	foreach_dimension()
 	{
-	  dlm_bd->normal[isb].x = bottom_normal.x
+	  dlm_bd->outwardnormalvector[isb].x = bottom_normal.x
 	  	+ ( cos( local_angle ) * gcp->tcgp->BottomRadialRefVec.x
 			+ sin( local_angle ) * n_cross_rad.x ) / div;
-	  norm += sq( dlm_bd->normal[isb].x );
+	  vecnorm += sq( dlm_bd->outwardnormalvector[isb].x );
         }
-        norm = sqrt( norm );
+        vecnorm = sqrt( vecnorm );
         foreach_dimension() 
-          dlm_bd->normal[isb].x *= 0.25 * gcp->tcgp->BottomRadius / norm;
+          dlm_bd->outwardnormalvector[isb].x *= 0.25 * gcp->tcgp->BottomRadius / vecnorm;
       }		     
       else
         foreach_dimension()
-	  dlm_bd->normal[isb].x = bottom_normal.x;      
+	  dlm_bd->outwardnormalvector[isb].x = bottom_normal.x;      
       
       isb++;          
     }
@@ -305,7 +305,7 @@ void create_referenceRB_boundary_geomfeatures_Cone( GeomParameter const* gcp,
   foreach_dimension() 
   {
     dlm_bd->bp[isb].x = gcp->tcgp->TopCenter.x;
-    dlm_bd->normal[isb].x = ( gcp->tcgp->TopCenter.x - gcp->center.x )
+    dlm_bd->outwardnormalvector[isb].x = ( gcp->tcgp->TopCenter.x - gcp->center.x )
     	* (  gcp->tcgp->BottomRadius / ( 3. * gcp->tcgp->height ) );
   }  
   isb++;
@@ -342,20 +342,20 @@ void create_referenceRB_boundary_geomfeatures_Cone( GeomParameter const* gcp,
 		+ (double)(i) * delta_height * unit_axial.x
 		+ gcp->tcgp->BottomCenter.x;                
 		
-      norm = 0.;
+      vecnorm = 0.;
       foreach_dimension() 
       {
         dlm_bd->bp[isb].x = pos.x;
-	dlm_bd->normal[isb].x = 
+	dlm_bd->outwardnormalvector[isb].x = 
 		( cos( local_angle ) * gcp->tcgp->BottomRadialRefVec.x  
       		+ sin( local_angle ) * n_cross_rad.x ) / gcp->tcgp->BottomRadius
 		+ ( gcp->tcgp->BottomRadius / gcp->tcgp->height ) 
 			* unit_axial.x ;
-	norm += sq( dlm_bd->normal[isb].x );
+	vecnorm += sq( dlm_bd->outwardnormalvector[isb].x );
       }
-      norm = sqrt( norm );
+      vecnorm = sqrt( vecnorm );
       foreach_dimension() 
-        dlm_bd->normal[isb].x *= 0.25 * gcp->tcgp->BottomRadius / norm;
+        dlm_bd->outwardnormalvector[isb].x *= 0.25 * gcp->tcgp->BottomRadius / vecnorm;
             
       isb++;
     }         		    	

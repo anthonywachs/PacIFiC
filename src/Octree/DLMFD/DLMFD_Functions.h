@@ -86,7 +86,7 @@ typedef struct {
 /** Structure for the rigid body boundary points */
 typedef struct {
   coord* bp;
-  coord* normal;
+  coord* outwardnormalvector;
   bool* deactivated;
   int m;
 } RigidBodyBoundary;
@@ -329,13 +329,13 @@ trace void synchronize( scalar* list )
 
 
 
-/** Allocates memory for m points in the RigidBodyBoundary structure. */
+/** Allocates memory for m points in the RigidBodyBoundary structure */
 //----------------------------------------------------------------------------
 void allocate_RigidBodyBoundary( RigidBodyBoundary* sbm, const int m ) 
 //----------------------------------------------------------------------------
 {
   sbm->bp = (coord*) calloc( m, sizeof(coord) );
-  sbm->normal = (coord*) calloc( m, sizeof(coord) );   
+  sbm->outwardnormalvector = (coord*) calloc( m, sizeof(coord) );   
   sbm->deactivated = (bool*) calloc( m, sizeof(bool) );
   sbm->m = m;
 }
@@ -343,27 +343,28 @@ void allocate_RigidBodyBoundary( RigidBodyBoundary* sbm, const int m )
 
 
 
-/** Re-allocates memory for m points in the RigidBodyBoundary structure. */
+/** Re-allocates memory for m points in the RigidBodyBoundary structure */
 //----------------------------------------------------------------------------
 void reallocate_RigidBodyBoundary( RigidBodyBoundary* sbm, const int m ) 
 //----------------------------------------------------------------------------
 {
   sbm->bp = (coord*) realloc( sbm->bp, m * sizeof(coord) ); 
-  sbm->normal = (coord*) realloc( sbm->normal, m * sizeof(coord) );   
-  sbm->deactivated = (bool*) realloc( sbm->deactivated, m * sizeof(bool) );       
+  sbm->outwardnormalvector = (coord*) realloc( sbm->outwardnormalvector, 
+  	m * sizeof(coord) );   
+  sbm->deactivated = (bool*) realloc( sbm->deactivated, m * sizeof(bool) );
   sbm->m = m;
 }
 
 
 
 
-/** Frees memory associated to the points in the RigidBodyBoundary structure. */
+/** Frees memory associated to the points in the RigidBodyBoundary structure */
 //----------------------------------------------------------------------------
 void free_RigidBodyBoundary( RigidBodyBoundary* sbm ) 
 //----------------------------------------------------------------------------
 {
   free( sbm->bp ); sbm->bp = NULL;
-  free( sbm->normal ); sbm->normal = NULL;  
+  free( sbm->outwardnormalvector ); sbm->outwardnormalvector = NULL;  
   free( sbm->deactivated ); sbm->deactivated = NULL;
   sbm->m = 0;  
 }
@@ -474,7 +475,7 @@ void matCoordDotProduct( const double Matrix[3][3], const coord v, coord* res )
 /** 3 x 3 matrix - vector dot product where the matrix is stored as a 
 double[][] and the vector as a double*, the result is stored as a double* */
 //----------------------------------------------------------------------------
-void matVecDotProduct( const double Matrix[3][3], double const* v, double* res ) 
+void matVecDotProduct( const double Matrix[3][3], double const* v, double* res )
 //----------------------------------------------------------------------------
 {
   res[0] = Matrix[0][0] * v[0] + Matrix[0][1] * v[1] + Matrix[0][2] * v[2];
@@ -1007,7 +1008,7 @@ void print_all_rigidbodies( RigidBody const* allrbs, const size_t nrb,
   strcat( poshift, oshift );
   for (size_t k=0;k<nrb;k++)
   { 
-    if ( pid() == 0 ) printf( "%sRigid body %lu\n", oshift, allrbs[k].pnum );    
+    if ( pid() == 0 ) printf( "%sRigid body %lu\n", oshift, allrbs[k].pnum );
     print_rigidbody( &(allrbs[k]), &poshift[0] );
   }
 }
@@ -1545,12 +1546,12 @@ void reverse_fill_DLM_Flag( RigidBody* allrbs, const size_t nrb,
       lambdacellpos.y = y;
       lambdapos.x = allrbs[pindex].s.bp[bpnum].x;
       lambdapos.y = allrbs[pindex].s.bp[bpnum].y;
-      normal.x = allrbs[pindex].s.normal[bpnum].x;
-      normal.y = allrbs[pindex].s.normal[bpnum].y;            
+      normal.x = allrbs[pindex].s.outwardnormalvector[bpnum].x;
+      normal.y = allrbs[pindex].s.outwardnormalvector[bpnum].y;            
 #     if dimension == 3 
         lambdacellpos.z = z;
 	lambdapos.z = allrbs[pindex].s.bp[bpnum].z;
-	normal.z = allrbs[pindex].s.normal[bpnum].z; 	
+	normal.z = allrbs[pindex].s.outwardnormalvector[bpnum].z; 	
 #     endif
 
       /* Compute relative vector from the cell (containning the boundary) 
@@ -1705,7 +1706,8 @@ void create_boundary_points( RigidBody* p, RigidBody const* refrb,
       p->s.bp[i].x = pos.x; 
       
     // Rotate normal vector of the reference rigid body
-    matCoordDotProduct( p->RotMat, refrb->s.normal[i], &(p->s.normal[i]) );
+    matCoordDotProduct( p->RotMat, refrb->s.outwardnormalvector[i], 
+    	&(p->s.outwardnormalvector[i]) );
   }      
 }
 

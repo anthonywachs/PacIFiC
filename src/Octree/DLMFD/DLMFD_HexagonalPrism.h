@@ -78,12 +78,11 @@ void create_referenceRB_boundary_geomfeatures_HexagonalPrism(
 {
   int nc = gcp->ncorners, npoints;
   int iref, isb = 0, i1, i2, ndir1, ndir2;  
-  coord gc_to_center_face, normal, refcorner, dir1, dir2, pt1;
-  double norm = 0., delta = L0 / (double)(1 << MAXLEVEL);
+  coord gc_to_center_face, surfnormvec, refcorner, dir1, dir2, pt1;
+  double surfnormvecnorm = 0., delta = L0 / (double)(1 << MAXLEVEL);
   
-  // Note: we arbitrary set the norm of the normal vector to 0.25 *
+  // Note: we arbitrary set the norm of the surface normal vector to 0.25 *
   // circumscribed radius
-  // Faces are numbered as follows: 0-5 side faces, 6 bottom, 7 top 
   
   /* Normal at the corners */
   coord* corner_normals = (coord*) calloc( nc, sizeof(coord) );
@@ -91,12 +90,15 @@ void create_referenceRB_boundary_geomfeatures_HexagonalPrism(
   {
     foreach_dimension()
       corner_normals[k].x = gcp->pgp->cornersCoord[k].x - gcp->center.x;
-    norm = sqrt( sq( corner_normals[k].x ) + sq( corner_normals[k].y ) );    
-    corner_normals[k].z = corner_normals[k].z > 0. ? norm : - norm;
-    norm = 0.;
-    foreach_dimension() norm += sq( corner_normals[k].x );
-    norm = sqrt( norm );
-    foreach_dimension() corner_normals[k].x *= 0.25 * gcp->radius / norm;       
+    surfnormvecnorm = sqrt( sq( corner_normals[k].x ) 
+    	+ sq( corner_normals[k].y ) );    
+    corner_normals[k].z = corner_normals[k].z > 0. ? 
+    	surfnormvecnorm : - surfnormvecnorm;
+    surfnormvecnorm = 0.;
+    foreach_dimension() surfnormvecnorm += sq( corner_normals[k].x );
+    surfnormvecnorm = sqrt( surfnormvecnorm );
+    foreach_dimension() corner_normals[k].x *= 0.25 * gcp->radius 
+    	/ surfnormvecnorm;       
   }  
 
 
@@ -109,14 +111,15 @@ void create_referenceRB_boundary_geomfeatures_HexagonalPrism(
       i2 = gcp->pgp->cornersIndex[i][(k+1) % 6];		
     
       foreach_dimension() 
-        normal.x = 0.5 * ( corner_normals[i1].x + corner_normals[i2].x );
-      norm = 0.;
-      foreach_dimension() norm += sq( normal.x );
-      norm = sqrt( norm );
-      foreach_dimension() normal.x *= 0.25 * gcp->radius / norm;
+        surfnormvec.x = 0.5 * ( corner_normals[i1].x + corner_normals[i2].x );
+      surfnormvecnorm = 0.;
+      foreach_dimension() surfnormvecnorm += sq( surfnormvec.x );
+      surfnormvecnorm = sqrt( surfnormvecnorm );
+      foreach_dimension() surfnormvec.x *= 0.25 * gcp->radius 
+      	/ surfnormvecnorm;
     
       distribute_points_edge( gcp, gcp->pgp->cornersCoord[i1], 
-      	gcp->pgp->cornersCoord[i2], dlm_bd, lN, isb, normal );
+      	gcp->pgp->cornersCoord[i2], dlm_bd, lN, isb, surfnormvec );
       isb += lN - 2; 
     }     
   }
@@ -127,14 +130,14 @@ void create_referenceRB_boundary_geomfeatures_HexagonalPrism(
     i2 = i + 6;	
     
     foreach_dimension() 
-      normal.x = 0.5 * ( corner_normals[i1].x + corner_normals[i2].x );
-    norm = 0.;
-    foreach_dimension() norm += sq( normal.x );
-    norm = sqrt( norm );
-    foreach_dimension() normal.x *= 0.25 * gcp->radius / norm;
+      surfnormvec.x = 0.5 * ( corner_normals[i1].x + corner_normals[i2].x );
+    surfnormvecnorm = 0.;
+    foreach_dimension() surfnormvecnorm += sq( surfnormvec.x );
+    surfnormvecnorm = sqrt( surfnormvecnorm );
+    foreach_dimension() surfnormvec.x *= 0.25 * gcp->radius / surfnormvecnorm;
     
     distribute_points_edge( gcp, gcp->pgp->cornersCoord[i1], 
-    	gcp->pgp->cornersCoord[i2], dlm_bd, lH, isb, normal );
+    	gcp->pgp->cornersCoord[i2], dlm_bd, lH, isb, surfnormvec );
     isb += lH - 2; 
   }        
 
@@ -150,30 +153,30 @@ void create_referenceRB_boundary_geomfeatures_HexagonalPrism(
       dir1.x = gcp->pgp->cornersCoord[i2].x - refcorner.x;
     }
     
-    norm = 0.;
-    foreach_dimension() norm += sq( dir1.x );
-    norm = sqrt( norm );
-    ndir1 = floor( norm / ( INTERBPCOEF * delta ) );
+    surfnormvecnorm = 0.;
+    foreach_dimension() surfnormvecnorm += sq( dir1.x );
+    surfnormvecnorm = sqrt( surfnormvecnorm );
+    ndir1 = floor( surfnormvecnorm / ( INTERBPCOEF * delta ) );
     foreach_dimension() dir1.x /= ndir1;    
         
     i2 = gcp->pgp->cornersIndex[i][3];
     foreach_dimension()
       dir2.x = gcp->pgp->cornersCoord[i2].x - refcorner.x;
-    norm = 0.;
-    foreach_dimension() norm += sq( dir2.x );
-    norm = sqrt( norm );
-    ndir2 = floor( norm / ( INTERBPCOEF * delta ) );
+    surfnormvecnorm = 0.;
+    foreach_dimension() surfnormvecnorm += sq( dir2.x );
+    surfnormvecnorm = sqrt( surfnormvecnorm );
+    ndir2 = floor( surfnormvecnorm / ( INTERBPCOEF * delta ) );
     foreach_dimension() dir2.x /= ndir2;     
     
-    foreach_dimension() normal.x = 0.;
+    foreach_dimension() surfnormvec.x = 0.;
     for (size_t k=0;k<4;++k)
       foreach_dimension() 
-        normal.x += corner_normals[gcp->pgp->cornersIndex[i][k]].x;
-    foreach_dimension() normal.x /= 4.;
-    norm = 0.;
-    foreach_dimension() norm += sq( normal.x );
-    norm = sqrt( norm );
-    foreach_dimension() normal.x *= 0.25 * gcp->radius / norm;
+        surfnormvec.x += corner_normals[gcp->pgp->cornersIndex[i][k]].x;
+    foreach_dimension() surfnormvec.x /= 4.;
+    surfnormvecnorm = 0.;
+    foreach_dimension() surfnormvecnorm += sq( surfnormvec.x );
+    surfnormvecnorm = sqrt( surfnormvecnorm );
+    foreach_dimension() surfnormvec.x *= 0.25 * gcp->radius / surfnormvecnorm;
     
     for (int ii = 1; ii <= ndir1-1; ii++)
     {
@@ -183,7 +186,7 @@ void create_referenceRB_boundary_geomfeatures_HexagonalPrism(
 	{
 	  dlm_bd->bp[isb].x = refcorner.x + (double) ii * dir1.x
 		      + (double) jj * dir2.x;
-	  dlm_bd->normal[isb].x = normal.x ;	      
+	  dlm_bd->outwardnormalvector[isb].x = surfnormvec.x ;	      
 	}
         isb++;
       }
@@ -233,23 +236,25 @@ void create_referenceRB_boundary_geomfeatures_HexagonalPrism(
 		
       if ( !k )
       {
-        // Compute normal vector of the face
-	VecVecCrossProduct( dir1, dir2, &normal );
-        if ( VecVecDotProduct( gc_to_center_face, normal ) < 0. )
-          foreach_dimension() normal.x *= -1.;
-        norm = 0.;
-        foreach_dimension() norm += sq( normal.x );
-        norm = sqrt( norm );
-        foreach_dimension() normal.x *= 0.25 * gcp->radius / norm;
+        // Compute surfnormvec vector of the face
+	VecVecCrossProduct( dir1, dir2, &surfnormvec );
+        if ( VecVecDotProduct( gc_to_center_face, surfnormvec ) < 0. )
+          foreach_dimension() surfnormvec.x *= -1.;
+        surfnormvecnorm = 0.;
+        foreach_dimension() surfnormvecnorm += sq( surfnormvec.x );
+        surfnormvecnorm = sqrt( surfnormvecnorm );
+        foreach_dimension() surfnormvec.x *= 0.25 * gcp->radius 
+		/ surfnormvecnorm;
 	
-	// Set normal vector of the central point
+	// Set surfnormvec vector of the central point
 	foreach_dimension()
-          dlm_bd->normal[isb].x = normal.x;
+          dlm_bd->outwardnormalvector[isb].x = surfnormvec.x;
 	isb++;
       }		
 
       // Insert points on the innerface edges
-      distribute_points_edge( gcp, refcorner, pt1, dlm_bd, lN, isb, normal );
+      distribute_points_edge( gcp, refcorner, pt1, dlm_bd, lN, isb, 
+      	surfnormvec );
       isb += lN - 2;
 
       // Insert points on the innerface triangles
@@ -261,7 +266,7 @@ void create_referenceRB_boundary_geomfeatures_HexagonalPrism(
 	  {
 	    dlm_bd->bp[isb].x = refcorner.x + (double) ii * dir1.x
 		      + (double) jj * dir2.x;
-	    dlm_bd->normal[isb].x = normal.x ;	      
+	    dlm_bd->outwardnormalvector[isb].x = surfnormvec.x ;	      
 	  }
           isb++;
         }
@@ -276,7 +281,7 @@ void create_referenceRB_boundary_geomfeatures_HexagonalPrism(
     foreach_dimension()
     {
       dlm_bd->bp[isb].x = gcp->pgp->cornersCoord[i].x;
-      dlm_bd->normal[isb].x = corner_normals[i].x;
+      dlm_bd->outwardnormalvector[isb].x = corner_normals[i].x;
     }
 
     isb++;
@@ -372,14 +377,14 @@ void read_reference_HexagonalPrism( GeomParameter* gcp,
     // Compute corner coordinates of the expanded hexagonal prism
     double delta = L0 / (double)(1 << MAXLEVEL), 
     	width = BOUNDARY_LAYER_THICKNESS_COEF * delta,
-	hext = 2. * width / sqrt( 3. ), norm = 0.;
+	hext = 2. * width / sqrt( 3. ), vecnorm = 0.;
     for (size_t i=0;i<nc;++i)
     {	
-      norm = sqrt( sq( gcp->pgp->cornersCoord[i].x ) 
+      vecnorm = sqrt( sq( gcp->pgp->cornersCoord[i].x ) 
       		+ sq( gcp->pgp->cornersCoord[i].y ) ); 
-      gcp->pgp->cornersCoordExp[i].x = ( 1. + hext / norm )
+      gcp->pgp->cornersCoordExp[i].x = ( 1. + hext / vecnorm )
 		* gcp->pgp->cornersCoord[i].x ;
-      gcp->pgp->cornersCoordExp[i].y = ( 1. + hext / norm )
+      gcp->pgp->cornersCoordExp[i].y = ( 1. + hext / vecnorm )
 		* gcp->pgp->cornersCoord[i].y ;
       gcp->pgp->cornersCoordExp[i].z = gcp->pgp->cornersCoord[i].z
       		+ ( i < 6 ? - width : width ) ;

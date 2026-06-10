@@ -175,7 +175,7 @@ void create_referenceRB_boundary_geomfeatures_Sphere(
     { 
       dlm_bd->bp[k].x = pos.x;
       // We arbitrary set the norm of the normal vector to 0.25 * radius
-      dlm_bd->normal[k].x = ( pos.x - gcp->center.x ) / 4.;
+      dlm_bd->outwardnormalvector[k].x = ( pos.x - gcp->center.x ) / 4.;
     }
   }
 }

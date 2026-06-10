@@ -47,10 +47,10 @@ void create_referenceRB_boundary_geomfeatures_Octahedron(
 {
   int nfaces = gcp->pgp->nfaces, nc = gcp->ncorners;
   int iref, i1, i2, isb = 0, npoints;
-  coord gc_to_center_face, normal, refcorner, dir1, dir2;
-  double norm = 0.;
+  coord gc_to_center_face, surfnormvec, refcorner, dir1, dir2;
+  double surfnormvecnorm = 0.;
   
-  // Note: we arbitrary set the norm of the normal vector to 0.25 *
+  // Note: we arbitrary set the norm of the surface normal vector to 0.25 *
   // circumscribed radius
 
   /* Normal at the corners */
@@ -59,10 +59,11 @@ void create_referenceRB_boundary_geomfeatures_Octahedron(
   {
     foreach_dimension()
       corner_normals[k].x = gcp->pgp->cornersCoord[k].x - gcp->center.x;
-    norm = 0.;
-    foreach_dimension() norm += sq( corner_normals[k].x );
-    norm = sqrt( norm );
-    foreach_dimension() corner_normals[k].x *= 0.25 * gcp->radius / norm;       
+    surfnormvecnorm = 0.;
+    foreach_dimension() surfnormvecnorm += sq( corner_normals[k].x );
+    surfnormvecnorm = sqrt( surfnormvecnorm );
+    foreach_dimension() corner_normals[k].x *= 0.25 * gcp->radius 
+    	/ surfnormvecnorm;       
   }  
 
   /* Add first interrior points on surfaces */
@@ -92,13 +93,13 @@ void create_referenceRB_boundary_geomfeatures_Octahedron(
       dir2.x /= (lN-1);
     }
     
-    VecVecCrossProduct( dir1, dir2, &normal );
-    if ( VecVecDotProduct( gc_to_center_face, normal ) < 0. )
-      foreach_dimension() normal.x *= -1.;
-    norm = 0.;
-    foreach_dimension() norm += sq( normal.x );
-    norm = sqrt( norm );
-    foreach_dimension() normal.x *= 0.25 * gcp->radius / norm;    
+    VecVecCrossProduct( dir1, dir2, &surfnormvec );
+    if ( VecVecDotProduct( gc_to_center_face, surfnormvec ) < 0. )
+      foreach_dimension() surfnormvec.x *= -1.;
+    surfnormvecnorm = 0.;
+    foreach_dimension() surfnormvecnorm += sq( surfnormvec.x );
+    surfnormvecnorm = sqrt( surfnormvecnorm );
+    foreach_dimension() surfnormvec.x *= 0.25 * gcp->radius / surfnormvecnorm;
 
     for (int ii = 1; ii <= lN-2; ii++)
     {
@@ -108,7 +109,7 @@ void create_referenceRB_boundary_geomfeatures_Octahedron(
 	{
 	  dlm_bd->bp[isb].x = refcorner.x + (double) ii * dir1.x
 		      + (double) jj * dir2.x;
-	  dlm_bd->normal[isb].x = normal.x ;	      
+	  dlm_bd->outwardnormalvector[isb].x = surfnormvec.x ;	      
 	}
         isb++;
       }
@@ -130,18 +131,18 @@ void create_referenceRB_boundary_geomfeatures_Octahedron(
       j1 = gcp->pgp->cornersIndex[i][(j+1) % npoints];
 
       foreach_dimension() 
-        normal.x = 0.5 * ( corner_normals[jm1].x + corner_normals[j1].x );
-      norm = 0.;
-      foreach_dimension() norm += sq( normal.x );
-      norm = sqrt( norm );
-      foreach_dimension() normal.x *= 0.25 * gcp->radius / norm;
+        surfnormvec.x = 0.5 * ( corner_normals[jm1].x + corner_normals[j1].x );
+      surfnormvecnorm = 0.;
+      foreach_dimension() surfnormvecnorm += sq( surfnormvec.x );
+      surfnormvecnorm = sqrt( surfnormvecnorm );
+      foreach_dimension() surfnormvec.x *= 0.25 * gcp->radius / surfnormvecnorm;
 
       if ( jm1 > j1 )
       {
 	if ( allindextable[jm1][j1] == 0 )
 	{
 	  distribute_points_edge( gcp, gcp->pgp->cornersCoord[jm1], 
-	  	gcp->pgp->cornersCoord[j1], dlm_bd, lN, isb, normal );
+	  	gcp->pgp->cornersCoord[j1], dlm_bd, lN, isb, surfnormvec );
 	  allindextable[jm1][j1] = 1;
 	  isb += lN - 2;
 	}
@@ -151,7 +152,7 @@ void create_referenceRB_boundary_geomfeatures_Octahedron(
 	if ( allindextable[j1][jm1] == 0 )
 	{
 	  distribute_points_edge( gcp, gcp->pgp->cornersCoord[j1], 
-	  	gcp->pgp->cornersCoord[jm1], dlm_bd, lN, isb, normal );
+	  	gcp->pgp->cornersCoord[jm1], dlm_bd, lN, isb, surfnormvec );
 	  allindextable[j1][jm1] = 1;
 	  isb += lN - 2;
 	}
@@ -165,7 +166,7 @@ void create_referenceRB_boundary_geomfeatures_Octahedron(
     foreach_dimension()
     {
       dlm_bd->bp[isb].x = gcp->pgp->cornersCoord[i].x;
-      dlm_bd->normal[isb].x = corner_normals[i].x;
+      dlm_bd->outwardnormalvector[isb].x = corner_normals[i].x;
     }
 
     isb++;
@@ -264,14 +265,14 @@ void read_reference_Octahedron( GeomParameter* gcp, const double RotMat[3][3] )
     // Compute corner coordinates of the expanded octahedron
     double delta = L0 / (double)(1 << MAXLEVEL), 
     	width = BOUNDARY_LAYER_THICKNESS_COEF * delta,
-	ext = sqrt( 3. ) * width, norm = 0.;
+	ext = sqrt( 3. ) * width, vecnorm = 0.;
     for (size_t i=0;i<nc;++i)
     {	
-      norm = sqrt( sq( gcp->pgp->cornersCoord[i].x ) 
+      vecnorm = sqrt( sq( gcp->pgp->cornersCoord[i].x ) 
       		+ sq( gcp->pgp->cornersCoord[i].y ) 
 		+ sq( gcp->pgp->cornersCoord[i].z ) ); 
       foreach_dimension()
-        gcp->pgp->cornersCoordExp[i].x = ( 1. + ext / norm )
+        gcp->pgp->cornersCoordExp[i].x = ( 1. + ext / vecnorm )
 		* gcp->pgp->cornersCoord[i].x ;		
     }          
 # endif    

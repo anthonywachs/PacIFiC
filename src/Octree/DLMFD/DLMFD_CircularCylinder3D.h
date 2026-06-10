@@ -228,19 +228,19 @@ void create_referenceRB_boundary_geomfeatures_CircularCylinder3D(
       
       if ( i == 0 )
         foreach_dimension() 
-          dlm_bd->normal[isb].x = ( ( cos( local_angle ) 
+          dlm_bd->outwardnormalvector[isb].x = ( ( cos( local_angle ) 
 	  	* gcp->cgp->RadialRefVec.x
       		+ sin( local_angle ) * n_cross_rad.x ) / 4.
 		+ bottom_normal.x ) / sqrt(2.) ;
       else if ( i == npts_height - 1 )
         foreach_dimension() 
-          dlm_bd->normal[isb].x = ( ( cos( local_angle ) 
+          dlm_bd->outwardnormalvector[isb].x = ( ( cos( local_angle ) 
 	  	* gcp->cgp->RadialRefVec.x
       		+ sin( local_angle ) * n_cross_rad.x ) / 4.
 		+ top_normal.x ) / sqrt(2.) ;
       else
         foreach_dimension() 
-          dlm_bd->normal[isb].x = ( cos( local_angle ) 
+          dlm_bd->outwardnormalvector[isb].x = ( cos( local_angle ) 
 	  	* gcp->cgp->RadialRefVec.x
       		+ sin( local_angle ) * n_cross_rad.x ) / 4.;
       isb++;
@@ -251,14 +251,14 @@ void create_referenceRB_boundary_geomfeatures_CircularCylinder3D(
   foreach_dimension() 
   {
     dlm_bd->bp[isb].x = gcp->cgp->BottomCenter.x;
-    dlm_bd->normal[isb].x = bottom_normal.x;
+    dlm_bd->outwardnormalvector[isb].x = bottom_normal.x;
   }
   isb++;
   		  
   foreach_dimension() 
   {
     dlm_bd->bp[isb].x = gcp->cgp->TopCenter.x;
-    dlm_bd->normal[isb].x = top_normal.x;
+    dlm_bd->outwardnormalvector[isb].x = top_normal.x;
   }    
   isb++;  
 
@@ -286,7 +286,7 @@ void create_referenceRB_boundary_geomfeatures_CircularCylinder3D(
       foreach_dimension() 
       {
         dlm_bd->bp[isb].x = pos.x;
-	dlm_bd->normal[isb].x = bottom_normal.x;
+	dlm_bd->outwardnormalvector[isb].x = bottom_normal.x;
       }
       isb++;      
       
@@ -296,7 +296,7 @@ void create_referenceRB_boundary_geomfeatures_CircularCylinder3D(
       foreach_dimension() 
       {
         dlm_bd->bp[isb].x = pos.x;
-        dlm_bd->normal[isb].x = top_normal.x;
+        dlm_bd->outwardnormalvector[isb].x = top_normal.x;
       }	
       isb++;      
     }

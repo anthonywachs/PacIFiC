@@ -304,16 +304,16 @@ void create_referenceRB_boundary_geomfeatures_Ellipsoid(
   size_t totalnx = 0, i, ntheta = 0, j;
   int isb = 0; 
   double spacing = 0., a = gcp->elgp->a, b = gcp->elgp->b, local_radius, 
-  	dangle, local_angle, bin, norm;
+  	dangle, local_angle, bin, vecnorm;
   double* vx = xaxis_points_distribution( gcp, &totalnx, &spacing );  
 
   // x=-a tip
   dlm_bd->bp[isb].x = - a;
   dlm_bd->bp[isb].y = 0.;  
   dlm_bd->bp[isb].z = 0.;
-  dlm_bd->normal[isb].x = - 0.25 * a;
-  dlm_bd->normal[isb].y = 0.;  
-  dlm_bd->normal[isb].z = 0.;  
+  dlm_bd->outwardnormalvector[isb].x = - 0.25 * a;
+  dlm_bd->outwardnormalvector[isb].y = 0.;  
+  dlm_bd->outwardnormalvector[isb].z = 0.;  
   ++isb;
 
   // Points over each circular perimeter at the determined x positions 
@@ -334,12 +334,14 @@ void create_referenceRB_boundary_geomfeatures_Ellipsoid(
       dlm_bd->bp[isb].x = vx[i];
       dlm_bd->bp[isb].y = cos( local_angle ) * local_radius ;  
       dlm_bd->bp[isb].z = sin( local_angle ) * local_radius;
-      dlm_bd->normal[isb].x = 2. * dlm_bd->bp[isb].x / sq( a );
-      dlm_bd->normal[isb].y = 2. * dlm_bd->bp[isb].y / sq( b );  
-      dlm_bd->normal[isb].z = 2. * dlm_bd->bp[isb].z / sq( b );     
-      norm = sqrt( sq( dlm_bd->normal[isb].x ) + sq( dlm_bd->normal[isb].y )
-      	+ sq( dlm_bd->normal[isb].z ) );
-      foreach_dimension() dlm_bd->normal[isb].x *= 0.25 * a / norm;	 
+      dlm_bd->outwardnormalvector[isb].x = 2. * dlm_bd->bp[isb].x / sq( a );
+      dlm_bd->outwardnormalvector[isb].y = 2. * dlm_bd->bp[isb].y / sq( b );  
+      dlm_bd->outwardnormalvector[isb].z = 2. * dlm_bd->bp[isb].z / sq( b );
+      vecnorm = sqrt( sq( dlm_bd->outwardnormalvector[isb].x ) 
+      	+ sq( dlm_bd->outwardnormalvector[isb].y )
+      	+ sq( dlm_bd->outwardnormalvector[isb].z ) );
+      foreach_dimension() 
+        dlm_bd->outwardnormalvector[isb].x *= 0.25 * a / vecnorm;	 
       ++isb;      
     }    
   }
@@ -348,9 +350,9 @@ void create_referenceRB_boundary_geomfeatures_Ellipsoid(
   dlm_bd->bp[isb].x = a;
   dlm_bd->bp[isb].y = 0.;  
   dlm_bd->bp[isb].z = 0.;
-  dlm_bd->normal[isb].x = 0.25 * a;
-  dlm_bd->normal[isb].y = 0.;  
-  dlm_bd->normal[isb].z = 0.; 
+  dlm_bd->outwardnormalvector[isb].x = 0.25 * a;
+  dlm_bd->outwardnormalvector[isb].y = 0.;  
+  dlm_bd->outwardnormalvector[isb].z = 0.; 
     
   free( vx ); vx = NULL;     
 }

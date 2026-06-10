@@ -67,11 +67,11 @@ void create_referenceRB_boundary_geomfeatures_Box( GeomParameter const* gcp,
 {
   int nfaces = gcp->pgp->nfaces, nc = gcp->ncorners;
   int iref, i1, i2, i3, isb = 0, npoints, ndir1, ndir2;
-  coord gc_to_center_face, normal, refcorner, dir1, dir2, p4;
-  double delta = L0 / (double)(1 << MAXLEVEL), norm = 0.,
+  coord gc_to_center_face, surfnormvec, refcorner, dir1, dir2, p4;
+  double delta = L0 / (double)(1 << MAXLEVEL), surfnormvecnorm = 0.,
   	cornercomp = 0.25 * gcp->radius / sqrt( 3. ) ;    
 
-  // Note: we arbitrary set the norm of the normal vector to 0.25 *
+  // Note: we arbitrary set the norm of the surface normal vector to 0.25 *
   // circumscribed radius
 
   /* Normal at the corners */
@@ -125,13 +125,13 @@ void create_referenceRB_boundary_geomfeatures_Box( GeomParameter const* gcp,
       dir2.x /= ndir2;
     }
 
-    VecVecCrossProduct( dir1, dir2, &normal );
-    if ( VecVecDotProduct( gc_to_center_face, normal ) < 0. )
-      foreach_dimension() normal.x *= -1.;
-    norm = 0.;
-    foreach_dimension() norm += sq( normal.x );
-    norm = sqrt( norm );
-    foreach_dimension() normal.x *= 0.25 * gcp->radius / norm;
+    VecVecCrossProduct( dir1, dir2, &surfnormvec );
+    if ( VecVecDotProduct( gc_to_center_face, surfnormvec ) < 0. )
+      foreach_dimension() surfnormvec.x *= -1.;
+    surfnormvecnorm = 0.;
+    foreach_dimension() surfnormvecnorm += sq( surfnormvec.x );
+    surfnormvecnorm = sqrt( surfnormvecnorm );
+    foreach_dimension() surfnormvec.x *= 0.25 * gcp->radius / surfnormvecnorm;
     
     for (int ii = 1; ii <= ndir1-1; ii++)
     {
@@ -141,7 +141,7 @@ void create_referenceRB_boundary_geomfeatures_Box( GeomParameter const* gcp,
 	{
 	  dlm_bd->bp[isb].x = refcorner.x + (double) ii * dir1.x
       		+ (double) jj * dir2.x;
-	  dlm_bd->normal[isb].x = normal.x ;	
+	  dlm_bd->outwardnormalvector[isb].x = surfnormvec.x ;	
 	}
       	isb++;
       }
@@ -163,11 +163,11 @@ void create_referenceRB_boundary_geomfeatures_Box( GeomParameter const* gcp,
       j1 = gcp->pgp->cornersIndex[i][(j+1) % npoints];
 
       foreach_dimension() 
-        normal.x = 0.5 * ( corner_normals[jm1].x + corner_normals[j1].x );
-      norm = 0.;
-      foreach_dimension() norm += sq( normal.x );
-      norm = sqrt( norm );
-      foreach_dimension() normal.x *= 0.25 * gcp->radius / norm; 
+        surfnormvec.x = 0.5 * ( corner_normals[jm1].x + corner_normals[j1].x );
+      surfnormvecnorm = 0.;
+      foreach_dimension() surfnormvecnorm += sq( surfnormvec.x );
+      surfnormvecnorm = sqrt( surfnormvecnorm );
+      foreach_dimension() surfnormvec.x *= 0.25 * gcp->radius / surfnormvecnorm; 
 
       if ( jm1 > j1 )
       {
@@ -181,7 +181,7 @@ void create_referenceRB_boundary_geomfeatures_Box( GeomParameter const* gcp,
 				- gcp->pgp->cornersCoord[j1].z ) ) 
 			/ ( INTERBPCOEF * delta ) ) + 1;
 	  distribute_points_edge( gcp, gcp->pgp->cornersCoord[jm1], 
-	  	gcp->pgp->cornersCoord[j1], dlm_bd, ndir1, isb, normal );
+	  	gcp->pgp->cornersCoord[j1], dlm_bd, ndir1, isb, surfnormvec );
 	  allindextable[jm1][j1] = 1;
 	  isb += ndir1 - 2;
 	}
@@ -198,7 +198,7 @@ void create_referenceRB_boundary_geomfeatures_Box( GeomParameter const* gcp,
 				- gcp->pgp->cornersCoord[jm1].z ) ) 
 			/ ( INTERBPCOEF * delta ) ) + 1;		
 	  distribute_points_edge( gcp, gcp->pgp->cornersCoord[j1], 
-	  	gcp->pgp->cornersCoord[jm1], dlm_bd, ndir1, isb, normal );
+	  	gcp->pgp->cornersCoord[jm1], dlm_bd, ndir1, isb, surfnormvec );
 	  allindextable[j1][jm1] = 1;
 	  isb += ndir1 - 2;
 	}
@@ -212,7 +212,7 @@ void create_referenceRB_boundary_geomfeatures_Box( GeomParameter const* gcp,
     foreach_dimension()
     {
       dlm_bd->bp[isb].x = gcp->pgp->cornersCoord[i].x;
-      dlm_bd->normal[isb].x = corner_normals[i].x;
+      dlm_bd->outwardnormalvector[isb].x = corner_normals[i].x;
     }
 
     isb++;
