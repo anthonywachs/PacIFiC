@@ -19,10 +19,10 @@ than the fluid or neutrally buoyant */
 # endif
 
 /** Coupling Interface for Grains3D */
-# include "InterfaceGrains3DBasilisk.h"
+# include "DLMFD_InterfaceGrains3DBasilisk.h"
 
 /** Additional functions for the coupling with Grains3D */
-# include "BasiliskGrains3DCouplingFunctions.h"
+# include "DLMFD_BasiliskGrains3DCouplingFunctions.h"
 
 
 /** Here we overload the generic events defined in the general DLMFD plugin 

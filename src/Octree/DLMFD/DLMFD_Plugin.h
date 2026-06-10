@@ -204,7 +204,7 @@ size_t nbReferenceRigidBodies = 0;
 # include "DLMFD_Uzawa_velocity.h"
 
 /** Paraview output functions */
-# include "save_data_vtk.h"
+# include "DLMFD_save_data_vtk.h"
 
 /** Lambda criterion for visualizing wakes */
 # include "lambda2.h"

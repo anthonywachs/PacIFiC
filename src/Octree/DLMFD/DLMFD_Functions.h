@@ -726,19 +726,19 @@ void compute_local_domain_AABB( AABB* A )
 }
 
  
-# include "CircularCylinder2D.h"
-# include "Sphere.h"
-# include "Cube.h"
-# include "Tetrahedron.h"
-# include "Octahedron.h"
-# include "Dodecahedron.h"
-# include "Icosahedron.h"
-# include "Box.h"
-# include "CircularCylinder3D.h"
-# include "TruncatedCone.h"
-# include "Cone.h"
-# include "Ellipsoid.h"
-# include "HexagonalPrism.h"
+# include "DLMFD_CircularCylinder2D.h"
+# include "DLMFD_Sphere.h"
+# include "DLMFD_Cube.h"
+# include "DLMFD_Tetrahedron.h"
+# include "DLMFD_Octahedron.h"
+# include "DLMFD_Dodecahedron.h"
+# include "DLMFD_Icosahedron.h"
+# include "DLMFD_Box.h"
+# include "DLMFD_CircularCylinder3D.h"
+# include "DLMFD_TruncatedCone.h"
+# include "DLMFD_Cone.h"
+# include "DLMFD_Ellipsoid.h"
+# include "DLMFD_HexagonalPrism.h"
 
 /** Frees the rigid body data that were dynamically allocated */
 //----------------------------------------------------------------------------
@@ -1131,18 +1131,18 @@ number to the x component of the index field and the rigid body number to the y
 component of the index field. If there is no DLMFD boundary point, index.x is
 set to -1 */
 //----------------------------------------------------------------------------
-void fill_DLM_Index( size_t const* rbnumToIndex, const RigidBodyBoundary dlm_bd,
+void fill_DLM_Index( size_t const* rbnumToIndex, const RigidBodyBoundary rbb,
 	vector Index, const size_t pnum, dynUIarray* deactivatedBPindices_,
 	dynPDBarray* deactivatedIndexFieldValues_,
 	bool* at_least_one_deactivated_ ) 
 //----------------------------------------------------------------------------
 {    
-  for (int i=0;i<dlm_bd.m;i++) 
+  for (int i=0;i<rbb.m;i++) 
   {
     # if dimension == 2 
-        foreach_point( serial, dlm_bd.bp[i].x, dlm_bd.bp[i].y )
+        foreach_point( serial, rbb.bp[i].x, rbb.bp[i].y )
     # elif dimension == 3
-        foreach_point( serial, dlm_bd.bp[i].x, dlm_bd.bp[i].y, dlm_bd.bp[i].z )
+        foreach_point( serial, rbb.bp[i].x, rbb.bp[i].y, rbb.bp[i].z )
     # endif    
 
     if ( level == depth() ) 
@@ -1169,9 +1169,9 @@ void fill_DLM_Index( size_t const* rbnumToIndex, const RigidBodyBoundary dlm_bd,
     else  
       printf( "On thread %d, point dlmfd %d of RB %lu at (%f, %f, %f) is in a"
 	" cell that has not the maximum level of refinement %d, it "
-	"is on level %d \n", pid(), i, pnum, dlm_bd.bp[i].x, dlm_bd.bp[i].y, 
+	"is on level %d \n", pid(), i, pnum, rbb.bp[i].x, rbb.bp[i].y, 
         # if dimension == 3 
-            dlm_bd.bp[i].z, 
+            rbb.bp[i].z, 
         # endif	
 	depth(), level );    
   }    

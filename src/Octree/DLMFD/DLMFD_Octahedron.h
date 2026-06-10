@@ -1,52 +1,52 @@
 /**
-# Set of functions for a icosahedron
+# Set of functions for a octahedron
 */
 
-# include "Polyhedron.h"
+# include "DLMFD_Polyhedron.h"
 
-/** Computes the number of boundary points on the surface of the icosahedron */
+/** Computes the number of boundary points on the surface of the octahedron */
 //----------------------------------------------------------------------------
-void compute_nboundary_Icosahedron( GeomParameter const* gcp, int* nb, int* lN )
+void compute_nboundary_Octahedron( GeomParameter const* gcp, int* nb, int* lN )
 //----------------------------------------------------------------------------
 {
-  double delta = L0 / (double)(1 << MAXLEVEL) ; 
-
-  /* Grains sends the icosahedron circumscribed radius, so to get the
-  icosahedron edge length we divide by sin(2.pi/5.) */
-  double lengthedge = gcp->radius / sin( 2. * M_PI / 5. ) ;
+  double delta = L0 / (double)(1 << MAXLEVEL) ;  
+  
+  /* Grains sends the octahedron circumscribed radius, so to get the
+  octahedron edge length we multiply by sqrt(2.) */
+  double lengthedge = gcp->radius * sqrt(2.) ;  
 
   /* We compute the number of intervals on the cube edge */
   *lN = floor( lengthedge / ( INTERBPCOEF * delta ) );
 
   /* The number of points on a cube edge is the number of intervals + 1 */
   *lN += 1;
+  
+  /* Number of points required for the 12 edges of the octahedron */
+  *nb += ( *lN - 2 ) * 12;
 
-  /* Number of points required for the 30 edges of the icosahedron */
-  *nb += ( *lN - 2 ) * 30;
-  
-  /* Number of points required for the 20 faces of the icosahedron */
-  *nb += 20 * ( *lN - 2 ) * ( *lN - 3 ) / 2;
-  
-  /* Number of points required for the 12 corners */
-  *nb += 12;
+  /* Number of points required for the 8 faces of the octahedron */
+  *nb += 8 * ( *lN - 2 ) * ( *lN - 3 ) / 2;
+
+  /* Number of points required for the 6 corners of the octahedron */
+  *nb += 6;  
 
   if ( *nb == 0 )
     fprintf( stderr,"nboundary = 0: No boundary points for the"
-    	" Icosahedron !!!\n" );
+    	" Octahedron !!!\n" );
 }
 
 
 
 
-/** Creates boundary points and normal vectors of the reference icosahedron */
+/** Creates boundary points and normal vectors of the reference octahedron */
 //----------------------------------------------------------------------------
-void create_referenceRB_boundary_geomfeatures_Icosahedron( 
+void create_referenceRB_boundary_geomfeatures_Octahedron( 
 	GeomParameter const* gcp, RigidBodyBoundary* dlm_bd, const int m, 
 	const int lN )
 //----------------------------------------------------------------------------
 {
   int nfaces = gcp->pgp->nfaces, nc = gcp->ncorners;
-  int iref, i1, i2, isb = 0,  npoints;
+  int iref, i1, i2, isb = 0, npoints;
   coord gc_to_center_face, normal, refcorner, dir1, dir2;
   double norm = 0.;
   
@@ -58,13 +58,12 @@ void create_referenceRB_boundary_geomfeatures_Icosahedron(
   for (size_t k=0;k<nc;++k)
   {
     foreach_dimension()
-      corner_normals[k].x = gcp->pgp->cornersCoord[k].x - gcp->center.x; 
+      corner_normals[k].x = gcp->pgp->cornersCoord[k].x - gcp->center.x;
     norm = 0.;
     foreach_dimension() norm += sq( corner_normals[k].x );
     norm = sqrt( norm );
     foreach_dimension() corner_normals[k].x *= 0.25 * gcp->radius / norm;       
-  }
-    
+  }  
 
   /* Add first interrior points on surfaces */
   for (int i = 0; i < nfaces; i++)
@@ -79,7 +78,7 @@ void create_referenceRB_boundary_geomfeatures_Icosahedron(
     {
       refcorner.x = gcp->pgp->cornersCoord[iref].x;
       dir1.x = gcp->pgp->cornersCoord[i1].x;
-      dir2.x = gcp->pgp->cornersCoord[i2].x;
+      dir2.x = gcp->pgp->cornersCoord[i2].x;   
     }
 
     foreach_dimension() 
@@ -116,12 +115,11 @@ void create_referenceRB_boundary_geomfeatures_Icosahedron(
     }
   }
 
-
-  // We have 12 corner points for icosahedron
-  int allindextable[12][12] = {{0}};
+  // We have 6 corner points for the octahedron
+  int allindextable[6][6] = {{0}};
   int j1, jm1;
 
-  /* Add points on the edges without the corners */
+  /* Add points on the edges without the corners*/
   for (int i = 0; i < nfaces; i++)
   {
     npoints = gcp->pgp->numPointsOnFaces[i];
@@ -161,7 +159,7 @@ void create_referenceRB_boundary_geomfeatures_Icosahedron(
     }
   }
 
-  /* Add the final 12 corners points */
+  /* Add the final 6 corners points */
   for (size_t i = 0; i < nc; i++)
   {
     foreach_dimension()
@@ -179,19 +177,19 @@ void create_referenceRB_boundary_geomfeatures_Icosahedron(
 
 
 
-// Reads geometric parameters of the Icosahedron
+/** Reads geometric parameters of the octahedron */
 //----------------------------------------------------------------------------
-void read_reference_Icosahedron( GeomParameter* gcp, const double RotMat[3][3] )
+void read_reference_Octahedron( GeomParameter* gcp, const double RotMat[3][3] )
 //----------------------------------------------------------------------------
 {
   char* token = NULL;
 
-  // Read number of corners, check that it is 12
+  // Read number of corners, check that it is 6
   size_t nc = 0;
   token = strtok(NULL, " " );
   sscanf( token, "%lu", &nc );
-  if ( nc != 12 )
-    printf ("Error in number of corners in update_Icosahedron \n");
+  if ( nc != 6 )
+    printf ("Error in number of corners in update_Octahedron \n");
 
   // Allocate the PolyGeomParameter structure
   gcp->pgp = (PolyGeomParameter*) malloc( sizeof(PolyGeomParameter) );
@@ -208,12 +206,12 @@ void read_reference_Icosahedron( GeomParameter* gcp, const double RotMat[3][3] )
       sscanf( token, "%lf", &(gcp->pgp->cornersCoord[i].x) );
     }
 
-  // Read number of faces, check that it is 20
+  // Read number of faces, check that it is 8
   size_t nf = 0;
   token = strtok(NULL, " " );
   sscanf( token, "%lu", &nf );
-  if ( nf != 20 )
-    printf ("Error in number of faces in update_Icosahedron\n");
+  if ( nf != 8 )
+    printf ("Error in number of faces in update_Octahedron\n");
   gcp->pgp->nfaces = nf;
 
   // Allocate the array of number of points/corners on each face
@@ -230,7 +228,7 @@ void read_reference_Icosahedron( GeomParameter* gcp, const double RotMat[3][3] )
     token = strtok(NULL, " " );
     sscanf( token, "%ld", &nppf );
     if ( nppf != 3 )
-      printf ("Error in number of corners per face in update_Icosahedron\n");
+      printf ("Error in number of corners per face in update_Octahedron\n");
     gcp->pgp->numPointsOnFaces[i] = nppf;
 
     // Allocate the point/corner index vector on the face
@@ -243,8 +241,8 @@ void read_reference_Icosahedron( GeomParameter* gcp, const double RotMat[3][3] )
       sscanf( token, "%ld", &(gcp->pgp->cornersIndex[i][j]));
     }
   }
-  
-  
+
+
   // In case the reference rigid body was sent by the granular solver with 
   // a non zero center of mass and/or a non-zero identity angular position
   // we need to reset all corners to the neutral reference position
@@ -260,13 +258,13 @@ void read_reference_Icosahedron( GeomParameter* gcp, const double RotMat[3][3] )
   }
   
 # if LEVELDIFF_FLAG_U
-    // Allocate the array of corner coordinates of the expanded icosahedron
+    // Allocate the array of corner coordinates of the expanded octahedron
     gcp->pgp->cornersCoordExp = (coord*) malloc( nc * sizeof(coord) ); 
     
-    // Compute corner coordinates of the expanded icosahedron
+    // Compute corner coordinates of the expanded octahedron
     double delta = L0 / (double)(1 << MAXLEVEL), 
     	width = BOUNDARY_LAYER_THICKNESS_COEF * delta,
-	ext = sqrt( 15. / ( 5. + 2. * sqrt( 5. ) ) ) * width, norm = 0.;
+	ext = sqrt( 3. ) * width, norm = 0.;
     for (size_t i=0;i<nc;++i)
     {	
       norm = sqrt( sq( gcp->pgp->cornersCoord[i].x ) 

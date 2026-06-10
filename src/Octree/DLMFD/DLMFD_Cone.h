@@ -1,13 +1,13 @@
 /** 
-# Set of functions for a truncated cone 
+# Set of functions for a cone 
 */
 
-# include "foreach_region_plusplus.h"
+# include "DLMFD_foreach_region_plusplus.h"
 
 
-/** Tests whether a point lies inside the truncated cone */
+/** Tests whether a point lies inside the cone */
 //----------------------------------------------------------------------------
-bool is_in_TruncatedCone_geomtest( const double x, const double y, 
+bool is_in_Cone_geomtest( const double x, const double y, 
 	const double z, GeomParameter const* gcp )
 //----------------------------------------------------------------------------
 {
@@ -28,7 +28,7 @@ bool is_in_TruncatedCone_geomtest( const double x, const double y,
     foreach_dimension() 
       vec.x -= proj * gcp->tcgp->BottomToTopVec.x / gcp->tcgp->height;
       
-    double local_radius = ( gcp->tcgp->TopRadius - gcp->tcgp->BottomRadius )
+    double local_radius = - gcp->tcgp->BottomRadius
     	* proj / gcp->tcgp->height + gcp->tcgp->BottomRadius;
 	
     if ( sqrt( sq( vec.x ) + sq( vec.y ) + sq( vec.z ) ) <= local_radius )
@@ -41,15 +41,14 @@ bool is_in_TruncatedCone_geomtest( const double x, const double y,
 
 
 
-/** Tests whether a point lies inside the truncated cone or any of its 
-periodic clones */
+/** Tests whether a point lies inside the cone or any of its periodic clones */
 //----------------------------------------------------------------------------
-bool is_in_TruncatedCone( const double x1, const double y1, 
+bool is_in_Cone( const double x1, const double y1, 
 	const double z1, GeomParameter const* gcp )
 //----------------------------------------------------------------------------
 {
   // Check if it is in the master rigid body
-  bool status = is_in_TruncatedCone_geomtest( x1, y1, z1, gcp );
+  bool status = is_in_Cone_geomtest( x1, y1, z1, gcp );
 
   double x2, y2, z2;
 
@@ -62,7 +61,7 @@ bool is_in_TruncatedCone( const double x1, const double y1,
       x2 = x1 + gcp->center.x - clone.center.x;
       y2 = y1 + gcp->center.y - clone.center.y;
       z2 = z1 + gcp->center.z - clone.center.z;
-      status = is_in_TruncatedCone_geomtest( x2, y2, z2, gcp );
+      status = is_in_Cone_geomtest( x2, y2, z2, gcp );
     }
 
   return ( status );
@@ -71,9 +70,9 @@ bool is_in_TruncatedCone( const double x1, const double y1,
 
 
 
-/** Flag boundary layer around the truncated cone */
+/** Flag boundary layer around the cone */
 //----------------------------------------------------------------------------
-void flag_boundarylayer_TruncatedCone( scalar flag_maxlevel, double const dcoef,
+void flag_boundarylayer_Cone( scalar flag_maxlevel, double const dcoef, 
 	RigidBody const* p, AABB const* ld )
 //----------------------------------------------------------------------------
 {
@@ -81,15 +80,13 @@ void flag_boundarylayer_TruncatedCone( scalar flag_maxlevel, double const dcoef,
   AABB ExpBBox;
   coord vec;
   double delta = L0 / (double)(1 << MAXLEVEL), x2, y2, z2 ;
-  double swellheight = 1. + 2. * dcoef * delta / gcp->tcgp->height;
-  double R1 = dcoef * delta * ( gcp->tcgp->BottomRadius
-  	- gcp->tcgp->TopRadius ) / gcp->tcgp->height;
-  double R2 = dcoef * delta * sqrt( 1. + sq( ( gcp->tcgp->BottomRadius
-  	- gcp->tcgp->TopRadius ) / gcp->tcgp->height ) );	
+  double swell = 1. + dcoef * delta * ( 1. / gcp->tcgp->height
+    	+ sqrt( sq( 1. / gcp->tcgp->height ) 
+		+ sq( 1. / gcp->tcgp->BottomRadius) ) );
   
   coord bottomToTopVec;  
   foreach_dimension()
-    bottomToTopVec.x = swellheight * gcp->tcgp->BottomToTopVec.x;
+    bottomToTopVec.x = swell * gcp->tcgp->BottomToTopVec.x;
   coord bottomCenter;
   double norm = sqrt( sq( gcp->tcgp->BottomToTopVec.x ) 
   	+ sq( gcp->tcgp->BottomToTopVec.y ) 
@@ -97,17 +94,16 @@ void flag_boundarylayer_TruncatedCone( scalar flag_maxlevel, double const dcoef,
   foreach_dimension()
     bottomCenter.x = gcp->tcgp->BottomCenter.x - dcoef * delta
     	* gcp->tcgp->BottomToTopVec.x / norm;
-  double height = swellheight * gcp->tcgp->height; 	
-  double bottomRadius = gcp->tcgp->BottomRadius + R1 + R2;
-  double topRadius = gcp->tcgp->TopRadius - R1 + R2;  
-         
+  double bottomRadius = swell * gcp->tcgp->BottomRadius;
+  double height = swell * gcp->tcgp->height;   
+       
   foreach_dimension()
   {
     ExpBBox.min.x = gcp->BBox.min.x - dcoef * delta;
     ExpBBox.max.x = gcp->BBox.max.x + dcoef * delta;
   } 
       
-  // Loops over cells in the bounding box of the expanded truncated cone
+  // Loops over cells in the bounding box of the expanded cone
   if ( intersect( ld, &ExpBBox ) )  
     foreach_region_plus_plus( ExpBBox.min, ExpBBox.max ) 
       if ( is_leaf(cell) )
@@ -127,8 +123,8 @@ void flag_boundarylayer_TruncatedCone( scalar flag_maxlevel, double const dcoef,
             foreach_dimension() 
               vec.x -= proj * bottomToTopVec.x / height;
       
-            double local_radius = ( topRadius - bottomRadius )
-    		* proj / height + bottomRadius;
+            double local_radius = - bottomRadius * proj / height 
+	  	+ bottomRadius;
 	
             if ( sqrt( sq( vec.x ) + sq( vec.y ) + sq( vec.z ) ) 
 	    		<= local_radius )
@@ -166,8 +162,8 @@ void flag_boundarylayer_TruncatedCone( scalar flag_maxlevel, double const dcoef,
               foreach_dimension() 
                 vec.x -= proj * bottomToTopVec.x / height;
       
-              double local_radius = ( topRadius - bottomRadius )
-    		* proj / height + bottomRadius;
+              double local_radius = - bottomRadius * proj / height 
+	  	+ bottomRadius;
 	
               if ( sqrt( sq( vec.x ) + sq( vec.y ) + sq( vec.z ) ) 
 	    		<= local_radius )
@@ -180,10 +176,9 @@ void flag_boundarylayer_TruncatedCone( scalar flag_maxlevel, double const dcoef,
 
 
 
-/** Computes the number of boundary points on the perimeter of the truncated 
-cone */
+/** Computes the number of boundary points on the perimeter of the cone */
 //----------------------------------------------------------------------------
-void compute_nboundary_TruncatedCone( GeomParameter const* gcp, int* nb ) 
+void compute_nboundary_Cone( GeomParameter const* gcp, int* nb ) 
 //----------------------------------------------------------------------------
 {
   double delta = L0 / (double)(1 << MAXLEVEL) ;
@@ -200,29 +195,16 @@ void compute_nboundary_TruncatedCone( GeomParameter const* gcp, int* nb )
     *nb += (size_t)( 2. * pi * local_radius / spacing ) ;    
   }
   
-  npts_radius = (size_t)( gcp->tcgp->TopRadius / spacing ) + 1 ;
-  if ( npts_radius > 1 )
-  {  
-    delta_radius = gcp->tcgp->TopRadius 
-  	/ ( (double)(npts_radius) - 1. ) ;
-    for (size_t i=1;i<npts_radius;++i)
-    {
-      double local_radius = (double)(i) * delta_radius ;
-      *nb += (size_t)( 2. * pi * local_radius / spacing ) ;                
-    }  
-  } 
-  
   coord pos;
   foreach_dimension()
-    pos.x = gcp->tcgp->BottomToTopVec.x + gcp->tcgp->TopRadialRefVec.x
-    	- gcp->tcgp->BottomRadialRefVec.x;
+    pos.x = gcp->tcgp->BottomToTopVec.x - gcp->tcgp->BottomRadialRefVec.x;
   double inclined_height = sqrt( sq( pos.x ) + sq( pos.y ) + sq( pos.z ) );
   size_t npts_height = (size_t)( 2. * inclined_height / ( sqrt(3.) * spacing ) )
   	+ 1;
   double delta_height = gcp->tcgp->height / ( (double)(npts_height) - 1. ) ;	
   for (size_t i=1;i<npts_height-1;++i)
   {
-    double local_radius = ( gcp->tcgp->TopRadius - gcp->tcgp->BottomRadius )
+    double local_radius = - gcp->tcgp->BottomRadius
     	* (double)(i) * delta_height / gcp->tcgp->height 
 	+ gcp->tcgp->BottomRadius;
     n = (size_t)( 2. * pi * local_radius / spacing ); 	
@@ -236,58 +218,39 @@ void compute_nboundary_TruncatedCone( GeomParameter const* gcp, int* nb )
 
 
 
-/** Creates boundary points and normal vectors of the reference truncated 
-cone */
+/** Creates boundary points and normal vectors of the reference cone */
 //----------------------------------------------------------------------------
-void create_referenceRB_boundary_geomfeatures_TruncatedCone( 
-	GeomParameter const* gcp, RigidBodyBoundary* dlm_bd, const int m ) 
+void create_referenceRB_boundary_geomfeatures_Cone( GeomParameter const* gcp,
+	RigidBodyBoundary* dlm_bd, const int m ) 
 //----------------------------------------------------------------------------
 {
   double delta = L0 / (double)(1 << MAXLEVEL) ;
   double spacing = INTERBPCOEF * delta, local_angle, local_radius,
   	local_radius_ratio, delta_radius, inclined_height, bin, dangle, 
-	delta_height, norm, tan = sqrt( 1 + sq( gcp->tcgp->BottomRadius 
-		- gcp->tcgp->TopRadius ) / sq( gcp->tcgp->height ) ) 
-		- ( gcp->tcgp->BottomRadius - gcp->tcgp->TopRadius )
-		/ gcp->tcgp->height;
+	delta_height, norm, div = 4. * ( sqrt( 1 + sq( gcp->tcgp->BottomRadius )
+		/ sq( gcp->tcgp->height ) ) - gcp->tcgp->BottomRadius
+		/ gcp->tcgp->height );
   int isb = 0;
-  coord pos, unit_axial, n_cross_rad, top_normal, bottom_normal;
+  coord pos, unit_axial, n_cross_rad, bottom_normal;
   size_t npts_local_radius, npts_radius, npts_height;
 
-  // Note: we arbitrary set the norm of the normal vector to 0.25 * bottom 
-  // radius
+  // Note: we arbitrary set the norm of the normal vector to 0.25 * radius
 
   foreach_dimension() 
     unit_axial.x = gcp->tcgp->BottomToTopVec.x / gcp->tcgp->height;  
 
-  norm = 0.;
   foreach_dimension() 
-  {
-    bottom_normal.x = ( gcp->tcgp->BottomCenter.x - gcp->center.x );
-    norm += sq( bottom_normal.x );
-  }
-  norm = sqrt( norm );
-  foreach_dimension()
-    bottom_normal.x *= 0.25 * gcp->tcgp->BottomRadius / norm; 
+    bottom_normal.x = ( gcp->tcgp->BottomCenter.x - gcp->center.x ) 
+    	* ( gcp->tcgp->BottomRadius / gcp->tcgp->height );    
 
-  norm = 0.;
-  foreach_dimension() 
-  {
-    top_normal.x = ( gcp->tcgp->TopCenter.x - gcp->center.x );
-    norm += sq( top_normal.x );
-  }
-  norm = sqrt( norm );
-  foreach_dimension()
-    top_normal.x *= 0.25 * gcp->tcgp->BottomRadius / norm; 
-  
   // Bottom center
   foreach_dimension() 
   {
     dlm_bd->bp[isb].x = gcp->tcgp->BottomCenter.x;
     dlm_bd->normal[isb].x = bottom_normal.x;
-  } 
+  }  
   isb++;
- 
+
   // Bottom disk in concentric circles
   n_cross_rad.x = unit_axial.y * gcp->tcgp->BottomRadialRefVec.z 
   	- unit_axial.z * gcp->tcgp->BottomRadialRefVec.y; 
@@ -323,7 +286,7 @@ void create_referenceRB_boundary_geomfeatures_TruncatedCone(
 	{
 	  dlm_bd->normal[isb].x = bottom_normal.x
 	  	+ ( cos( local_angle ) * gcp->tcgp->BottomRadialRefVec.x
-			+ sin( local_angle ) * n_cross_rad.x ) / ( 4. * tan );
+			+ sin( local_angle ) * n_cross_rad.x ) / div;
 	  norm += sq( dlm_bd->normal[isb].x );
         }
         norm = sqrt( norm );
@@ -332,84 +295,31 @@ void create_referenceRB_boundary_geomfeatures_TruncatedCone(
       }		     
       else
         foreach_dimension()
-	  dlm_bd->normal[isb].x = bottom_normal.x;  
-	  
+	  dlm_bd->normal[isb].x = bottom_normal.x;      
+      
       isb++;          
     }
   }
- 
+
   // Top center
   foreach_dimension() 
   {
     dlm_bd->bp[isb].x = gcp->tcgp->TopCenter.x;
-    dlm_bd->normal[isb].x = top_normal.x;
-  } 
+    dlm_bd->normal[isb].x = ( gcp->tcgp->TopCenter.x - gcp->center.x )
+    	* (  gcp->tcgp->BottomRadius / ( 3. * gcp->tcgp->height ) );
+  }  
   isb++;
-
-  // Top disk in concentric circles 
-  npts_radius = (size_t)( gcp->tcgp->TopRadius / spacing ) + 1 ;
-  if ( npts_radius > 1 )
-  {
-    n_cross_rad.x = unit_axial.y * gcp->tcgp->TopRadialRefVec.z 
-  	- unit_axial.z * gcp->tcgp->TopRadialRefVec.y; 
-    n_cross_rad.y = unit_axial.z * gcp->tcgp->TopRadialRefVec.x 
-  	- unit_axial.x * gcp->tcgp->TopRadialRefVec.z;    
-    n_cross_rad.z = unit_axial.x * gcp->tcgp->TopRadialRefVec.y 
-  	- unit_axial.y * gcp->tcgp->TopRadialRefVec.x;   
-    delta_radius = gcp->tcgp->TopRadius 
-  	/ ( (double)(npts_radius) - 1. ) ;
-    for (size_t i=1;i<npts_radius;++i)
-    {
-      local_radius = (double)(i) * delta_radius ;
-      local_radius_ratio = local_radius / gcp->tcgp->TopRadius ;
-      npts_local_radius = (size_t)( 2. * pi * local_radius / spacing ) ;
-      
-      for (size_t j=0;j<npts_local_radius;++j)
-      {      
-        local_angle = 2. * pi * (double)(j) / (double)(npts_local_radius) ;
-      
-        foreach_dimension()
-	{ 
-          pos.x = local_radius_ratio * ( 
-			cos( local_angle ) * gcp->tcgp->TopRadialRefVec.x
-			+ sin( local_angle ) * n_cross_rad.x );     	
-          dlm_bd->bp[isb].x = pos.x + gcp->tcgp->TopCenter.x;
-	}
-
-        if ( i == npts_radius - 1 )
-        {
-          norm = 0.;
-	  foreach_dimension()
-	  {
-	    dlm_bd->normal[isb].x = top_normal.x
-	  	+ ( cos( local_angle ) * gcp->tcgp->BottomRadialRefVec.x
-			+ sin( local_angle ) * n_cross_rad.x ) * tan / 4.;
-	    norm += sq( dlm_bd->normal[isb].x );
-          }
-          norm = sqrt( norm );
-          foreach_dimension() 
-            dlm_bd->normal[isb].x *= 0.25 * gcp->tcgp->BottomRadius / norm;
-        }		     
-        else
-          foreach_dimension()
-	    dlm_bd->normal[isb].x = top_normal.x; 
-
-        isb++;          
-      }
-    }  
-  }
 
   // Lateral surface
   foreach_dimension()
-    pos.x = gcp->tcgp->BottomToTopVec.x + gcp->tcgp->TopRadialRefVec.x
-    	- gcp->tcgp->BottomRadialRefVec.x;
+    pos.x = gcp->tcgp->BottomToTopVec.x - gcp->tcgp->BottomRadialRefVec.x;
   inclined_height = sqrt( sq( pos.x ) + sq( pos.y ) + sq( pos.z ) );
   npts_height = (size_t)( 2. * inclined_height / ( sqrt(3.) * spacing ) )
   	+ 1;
   delta_height = gcp->tcgp->height / ( (double)(npts_height) - 1. ) ;	
   for (size_t i=1;i<npts_height-1;++i)
   {
-    local_radius = ( gcp->tcgp->TopRadius - gcp->tcgp->BottomRadius )
+    local_radius = - gcp->tcgp->BottomRadius
     	* (double)(i) * delta_height / gcp->tcgp->height 
 	+ gcp->tcgp->BottomRadius;
     npts_local_radius = (size_t)( 2. * pi * local_radius / spacing ) ;
@@ -425,50 +335,52 @@ void create_referenceRB_boundary_geomfeatures_TruncatedCone(
       local_angle = ( 2. * (double)(j) + bin ) * dangle ;      
       
       foreach_dimension() 
-        pos.x = cos( local_angle ) * gcp->tcgp->TopRadialRefVec.x 
-		* local_radius / gcp->tcgp->TopRadius 
+        pos.x = cos( local_angle ) * gcp->tcgp->BottomRadialRefVec.x 
+		* local_radius / gcp->tcgp->BottomRadius 
       		+ sin( local_angle ) * n_cross_rad.x * local_radius 
-			/ gcp->tcgp->TopRadius
+			/ gcp->tcgp->BottomRadius
 		+ (double)(i) * delta_height * unit_axial.x
 		+ gcp->tcgp->BottomCenter.x;                
 		
-      norm = 0.;      
+      norm = 0.;
       foreach_dimension() 
       {
         dlm_bd->bp[isb].x = pos.x;
 	dlm_bd->normal[isb].x = 
 		( cos( local_angle ) * gcp->tcgp->BottomRadialRefVec.x  
       		+ sin( local_angle ) * n_cross_rad.x ) / gcp->tcgp->BottomRadius
-		+ ( ( gcp->tcgp->BottomRadius - gcp->tcgp->TopRadius ) 
-			/ gcp->tcgp->height ) * unit_axial.x ;
+		+ ( gcp->tcgp->BottomRadius / gcp->tcgp->height ) 
+			* unit_axial.x ;
 	norm += sq( dlm_bd->normal[isb].x );
       }
       norm = sqrt( norm );
       foreach_dimension() 
         dlm_bd->normal[isb].x *= 0.25 * gcp->tcgp->BottomRadius / norm;
-		
+            
       isb++;
     }         		    	
-  }  
+  }
 }
 
 
 
-/** Finds cells lying inside the truncated cone */
+
+/** Finds cells lying inside the cone */
 //----------------------------------------------------------------------------
-void create_FD_Interior_TruncatedCone( RigidBody* p, vector Index,
+void create_FD_Interior_Cone( RigidBody* p, vector Index,
 	vector PeriodicRefCenter, AABB const* ld )
 //----------------------------------------------------------------------------
 {
   GeomParameter const* gcp = &(p->g);  
   Cache* fd = &(p->Interior);
   Point ppp;
+  double x2, y2, z2;  
 
   // Loops over cells in the bounding box of the sphere
   if ( intersect( ld, &(gcp->BBox) ) )
     foreach_region_plus_plus(gcp->BBox.min, gcp->BBox.max) 
       if ( is_leaf(cell) ) 
-        if ( is_in_TruncatedCone_geomtest( x, y, z, gcp ) )
+        if ( is_in_Cone_geomtest( x, y, z, gcp ) )
           if ( (int)Index.y[] == -1 )
           {
             foreach_dimension() PeriodicRefCenter.x[] = gcp->center.x;
@@ -479,8 +391,6 @@ void create_FD_Interior_TruncatedCone( RigidBody* p, vector Index,
 	    cache_append( fd, ppp, 0 );
             Index.y[] = p->pnum;
           }
-
-  double x2, y2, z2;
 
   // Loops over cells in the bounding box of its clones
   AABB cloneBBox;
@@ -496,7 +406,7 @@ void create_FD_Interior_TruncatedCone( RigidBody* p, vector Index,
           x2 = x - shift.x;
           y2 = y - shift.y;
           z2 = z - shift.z;        
-	  if ( is_in_TruncatedCone_geomtest( x2, y2, z2, gcp ) )
+	  if ( is_in_Cone_geomtest( x2, y2, z2, gcp ) )
             if ( (int)Index.y[] == -1 )
             {
               foreach_dimension() 
@@ -517,21 +427,20 @@ void create_FD_Interior_TruncatedCone( RigidBody* p, vector Index,
 
 
 
-/** Reads geometric parameters of the truncated cone */
+/** Reads geometric parameters of the cone */
 //----------------------------------------------------------------------------
-void read_reference_TruncatedCone( GeomParameter* gcp, 
-	const double RotMat[3][3] ) 
+void read_reference_Cone( GeomParameter* gcp, const double RotMat[3][3] ) 
 //----------------------------------------------------------------------------
 {    
   char* token = NULL;
   coord v;
-
+  
   // Read number of points, check that it is 4
   size_t np = 0;
   token = strtok(NULL, " " );
   sscanf( token, "%lu", &np );
-  if ( np != 4 )
-    printf ("Error in number of points in update_TruncatedCone\n");
+  if ( np != 3 )
+    printf ("Error in number of points in update_Cone\n");
     
   // Allocate the CylGeomParameter structure
   gcp->tcgp = (TruncConeGeomParameter*) malloc( 
@@ -552,22 +461,18 @@ void read_reference_TruncatedCone( GeomParameter* gcp,
     gcp->tcgp->BottomRadialRefVec.x -= gcp->tcgp->BottomCenter.x;
   }
 
-  // Read the top disk center
+  // For a cone, the top center corresponds to the tip
   foreach_dimension()
   {
     token = strtok(NULL, " " );
     sscanf( token, "%lf", &(gcp->tcgp->TopCenter.x) );
   }
   
-  // Read the point to compute the top radial reference vector
+  // The top radial reference vector is a zero vector for a cone
   foreach_dimension()
-  {
-    token = strtok(NULL, " " );
-    sscanf( token, "%lf", &(gcp->tcgp->TopRadialRefVec.x) );
-    gcp->tcgp->TopRadialRefVec.x -= gcp->tcgp->TopCenter.x;
-  }  
+    gcp->tcgp->TopRadialRefVec.x = 0.; 
   
-  // We already have all parameters for the truncated cone but the input 
+  // We already have all parameters for the 3D circular cylinder but the input 
   // array of characters contains an additional "0", hence we need to read one 
   // token but we do not do anything with it
   strtok( NULL, " " );
@@ -592,11 +497,6 @@ void read_reference_TruncatedCone( GeomParameter* gcp,
   foreach_dimension() v.x = gcp->tcgp->TopCenter.x - gcp->center.x;
   // Rotation
   matTransposedCoordDotProduct( RotMat, v, &(gcp->tcgp->TopCenter) );
-  
-  // Top radial reference vector 
-  foreach_dimension() v.x = gcp->tcgp->TopRadialRefVec.x; 
-  // Rotation
-  matTransposedCoordDotProduct( RotMat, v, &(gcp->tcgp->TopRadialRefVec) );    
 
   
   // Compute the bottom to top vector
@@ -604,16 +504,16 @@ void read_reference_TruncatedCone( GeomParameter* gcp,
     gcp->tcgp->BottomToTopVec.x = gcp->tcgp->TopCenter.x 
     		- gcp->tcgp->BottomCenter.x;
     
-  // Compute the bottom radius, top radius and the height
+  // Compute the bottom radius and the height
   gcp->tcgp->BottomRadius = sqrt( sq( gcp->tcgp->BottomRadialRefVec.x ) 
   	+ sq( gcp->tcgp->BottomRadialRefVec.y )
   	+ sq( gcp->tcgp->BottomRadialRefVec.z ) );
-  gcp->tcgp->TopRadius = sqrt( sq( gcp->tcgp->TopRadialRefVec.x ) 
-  	+ sq( gcp->tcgp->TopRadialRefVec.y )
-  	+ sq( gcp->tcgp->TopRadialRefVec.z ) );	
   gcp->tcgp->height = sqrt( sq( gcp->tcgp->BottomToTopVec.x ) 
   	+ sq( gcp->tcgp->BottomToTopVec.y )
-  	+ sq( gcp->tcgp->BottomToTopVec.z ) );   
+  	+ sq( gcp->tcgp->BottomToTopVec.z ) );
+	
+  // The top radius is zero for a cone
+  gcp->tcgp->TopRadius = 0.;				  
 }
 
 
@@ -621,7 +521,7 @@ void read_reference_TruncatedCone( GeomParameter* gcp,
 
 /** Update geometric parameters with the reference rigid body */
 //----------------------------------------------------------------------------
-void update_TruncatedCone_from_RBRef( GeomParameter* gcp, 
+void update_Cone_from_RBRef( GeomParameter* gcp, 
 	RigidBody const* RBRef, const double RotMat[3][3] ) 
 //----------------------------------------------------------------------------
 {        
@@ -649,9 +549,7 @@ void update_TruncatedCone_from_RBRef( GeomParameter* gcp,
   foreach_dimension() gcp->tcgp->TopCenter.x += gcp->center.x;
   
   // Top radial reference vector 
-  // Rotation
-  matCoordDotProduct( RotMat, RBRef->g.tcgp->TopRadialRefVec, 
-    	&(gcp->tcgp->TopRadialRefVec) );  	 
+  foreach_dimension() gcp->tcgp->TopRadialRefVec.x = 0.; 	 
   
   // Compute the bottom to top vector
   foreach_dimension() 
@@ -660,16 +558,16 @@ void update_TruncatedCone_from_RBRef( GeomParameter* gcp,
     
   // Assign the bottom radius, top radius and the height
   gcp->tcgp->BottomRadius = RBRef->g.tcgp->BottomRadius;
-  gcp->tcgp->TopRadius = RBRef->g.tcgp->TopRadius;	
+  gcp->tcgp->TopRadius = 0.;	
   gcp->tcgp->height = RBRef->g.tcgp->height;			  
 }
 
 
 
 
-/** Frees the geometric parameters of the truncated cone */
+/** Frees the geometric parameters of the cone */
 //----------------------------------------------------------------------------
-void free_TruncatedCone( GeomParameter* gcp ) 
+void free_Cone( GeomParameter* gcp ) 
 //----------------------------------------------------------------------------
 {  
   // Free the CylGeomParameter structure

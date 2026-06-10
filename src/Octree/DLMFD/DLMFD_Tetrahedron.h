@@ -1,19 +1,19 @@
 /**
-# Set of functions for a octahedron
+# Set of functions for a tetrahedron
 */
 
-# include "Polyhedron.h"
+# include "DLMFD_Polyhedron.h"
 
-/** Computes the number of boundary points on the surface of the octahedron */
+/** Computes the number of boundary points on the surface of the tetrahedron */
 //----------------------------------------------------------------------------
-void compute_nboundary_Octahedron( GeomParameter const* gcp, int* nb, int* lN )
+void compute_nboundary_Tetrahedron( GeomParameter const* gcp, int* nb, int* lN )
 //----------------------------------------------------------------------------
 {
   double delta = L0 / (double)(1 << MAXLEVEL) ;  
   
-  /* Grains sends the octahedron circumscribed radius, so to get the
-  octahedron edge length we multiply by sqrt(2.) */
-  double lengthedge = gcp->radius * sqrt(2.) ;  
+  /* Grains sends the tetrahedron circumscribed radius, so to get the 
+  tetrahedron edge length we multiply by sqrt(8/3) */
+  double lengthedge = gcp->radius * sqrt (8.) / sqrt(3.);  
 
   /* We compute the number of intervals on the cube edge */
   *lN = floor( lengthedge / ( INTERBPCOEF * delta ) );
@@ -21,35 +21,36 @@ void compute_nboundary_Octahedron( GeomParameter const* gcp, int* nb, int* lN )
   /* The number of points on a cube edge is the number of intervals + 1 */
   *lN += 1;
   
-  /* Number of points required for the 12 edges of the octahedron */
-  *nb += ( *lN - 2 ) * 12;
-
-  /* Number of points required for the 8 faces of the octahedron */
-  *nb += 8 * ( *lN - 2 ) * ( *lN - 3 ) / 2;
-
-  /* Number of points required for the 6 corners of the octahedron */
-  *nb += 6;  
+  /* Number of points required for the 6 edges of the tetrahedron */
+  *nb += ( *lN - 2 ) * 6;
+  
+  /* Number of points required for the 4 faces of the tetrahedron inside a 
+  triangle */
+  *nb += 4 * ( *lN - 2 ) * ( *lN - 3 ) / 2;
+  
+  /* Number of points required for the 4 corners */
+  *nb += 4;  
 
   if ( *nb == 0 )
     fprintf( stderr,"nboundary = 0: No boundary points for the"
-    	" Octahedron !!!\n" );
+    	" Tetrahedron !!!\n" );
 }
 
 
 
 
-/** Creates boundary points and normal vectors of the reference octahedron */
+/** Creates boundary points and normal vectors of the reference tetrahedron */
 //----------------------------------------------------------------------------
-void create_referenceRB_boundary_geomfeatures_Octahedron( 
-	GeomParameter const* gcp, RigidBodyBoundary* dlm_bd, const int m, 
-	const int lN )
+void create_referenceRB_boundary_geomfeatures_Tetrahedron( 
+	GeomParameter const* gcp,
+	RigidBodyBoundary* dlm_bd, const int m, const int lN )
 //----------------------------------------------------------------------------
 {
   int nfaces = gcp->pgp->nfaces, nc = gcp->ncorners;
   int iref, i1, i2, isb = 0, npoints;
   coord gc_to_center_face, normal, refcorner, dir1, dir2;
   double norm = 0.;
-  
+
   // Note: we arbitrary set the norm of the normal vector to 0.25 *
   // circumscribed radius
 
@@ -63,13 +64,14 @@ void create_referenceRB_boundary_geomfeatures_Octahedron(
     foreach_dimension() norm += sq( corner_normals[k].x );
     norm = sqrt( norm );
     foreach_dimension() corner_normals[k].x *= 0.25 * gcp->radius / norm;       
-  }  
+  }
+    
 
-  /* Add first interrior points on surfaces */
+  /* Add first interior points on surfaces */
   for (int i = 0; i < nfaces; i++)
   {
     npoints = gcp->pgp->numPointsOnFaces[i];
-
+    
     iref = gcp->pgp->cornersIndex[i][0];
     i1 = gcp->pgp->cornersIndex[i][1];
     i2 = gcp->pgp->cornersIndex[i][npoints-1];
@@ -78,7 +80,7 @@ void create_referenceRB_boundary_geomfeatures_Octahedron(
     {
       refcorner.x = gcp->pgp->cornersCoord[iref].x;
       dir1.x = gcp->pgp->cornersCoord[i1].x;
-      dir2.x = gcp->pgp->cornersCoord[i2].x;   
+      dir2.x = gcp->pgp->cornersCoord[i2].x;    
     }
 
     foreach_dimension() 
@@ -98,8 +100,8 @@ void create_referenceRB_boundary_geomfeatures_Octahedron(
     norm = 0.;
     foreach_dimension() norm += sq( normal.x );
     norm = sqrt( norm );
-    foreach_dimension() normal.x *= 0.25 * gcp->radius / norm;    
-
+    foreach_dimension() normal.x *= 0.25 * gcp->radius / norm;
+    
     for (int ii = 1; ii <= lN-2; ii++)
     {
       for (int jj = 1; jj <= lN-2 - ii; jj++)
@@ -110,14 +112,15 @@ void create_referenceRB_boundary_geomfeatures_Octahedron(
 		      + (double) jj * dir2.x;
 	  dlm_bd->normal[isb].x = normal.x ;	      
 	}
-        isb++;
+	isb++;
       }
     }
   }
 
-  // We have 6 corner points for the octahedron
-  int allindextable[6][6] = {{0}};
-  int j1, jm1;
+  // We have 4 corner points for the tetrahedron
+  int allindextable[4][4] = {{0}};
+  int j1,jm1;
+
 
   /* Add points on the edges without the corners*/
   for (int i = 0; i < nfaces; i++)
@@ -128,13 +131,13 @@ void create_referenceRB_boundary_geomfeatures_Octahedron(
     {
       jm1 = gcp->pgp->cornersIndex[i][j];
       j1 = gcp->pgp->cornersIndex[i][(j+1) % npoints];
-
+      
       foreach_dimension() 
         normal.x = 0.5 * ( corner_normals[jm1].x + corner_normals[j1].x );
       norm = 0.;
       foreach_dimension() norm += sq( normal.x );
       norm = sqrt( norm );
-      foreach_dimension() normal.x *= 0.25 * gcp->radius / norm;
+      foreach_dimension() normal.x *= 0.25 * gcp->radius / norm;	
 
       if ( jm1 > j1 )
       {
@@ -159,7 +162,7 @@ void create_referenceRB_boundary_geomfeatures_Octahedron(
     }
   }
 
-  /* Add the final 6 corners points */
+  /* Add the final 4 corners points */
   for (size_t i = 0; i < nc; i++)
   {
     foreach_dimension()
@@ -171,25 +174,25 @@ void create_referenceRB_boundary_geomfeatures_Octahedron(
     isb++;
   }
   
-  free( corner_normals ); corner_normals = NULL;
+  free( corner_normals ); corner_normals = NULL;  
 }
 
 
 
 
-/** Reads geometric parameters of the octahedron */
+// Reads geometric parameters of the tetrahedron
 //----------------------------------------------------------------------------
-void read_reference_Octahedron( GeomParameter* gcp, const double RotMat[3][3] )
+void read_reference_Tetrahedron( GeomParameter* gcp, const double RotMat[3][3] )
 //----------------------------------------------------------------------------
 {
   char* token = NULL;
 
-  // Read number of corners, check that it is 6
+  // Read number of corners, check that it is 4
   size_t nc = 0;
   token = strtok(NULL, " " );
   sscanf( token, "%lu", &nc );
-  if ( nc != 6 )
-    printf ("Error in number of corners in update_Octahedron \n");
+  if ( nc != 4 )
+    printf ("Error in number of corners in update_Tetrahedron \n");
 
   // Allocate the PolyGeomParameter structure
   gcp->pgp = (PolyGeomParameter*) malloc( sizeof(PolyGeomParameter) );
@@ -206,12 +209,12 @@ void read_reference_Octahedron( GeomParameter* gcp, const double RotMat[3][3] )
       sscanf( token, "%lf", &(gcp->pgp->cornersCoord[i].x) );
     }
 
-  // Read number of faces, check that it is 8
+  // Read number of faces, check that it is 4
   size_t nf = 0;
   token = strtok(NULL, " " );
   sscanf( token, "%lu", &nf );
-  if ( nf != 8 )
-    printf ("Error in number of faces in update_Octahedron\n");
+  if ( nf != 4 )
+    printf ("Error in number of faces in update_Tetrahedron\n");
   gcp->pgp->nfaces = nf;
 
   // Allocate the array of number of points/corners on each face
@@ -228,7 +231,7 @@ void read_reference_Octahedron( GeomParameter* gcp, const double RotMat[3][3] )
     token = strtok(NULL, " " );
     sscanf( token, "%ld", &nppf );
     if ( nppf != 3 )
-      printf ("Error in number of corners per face in update_Octahedron\n");
+      printf ("Error in number of corners per face in update_Tetrahedron\n");
     gcp->pgp->numPointsOnFaces[i] = nppf;
 
     // Allocate the point/corner index vector on the face
@@ -241,8 +244,8 @@ void read_reference_Octahedron( GeomParameter* gcp, const double RotMat[3][3] )
       sscanf( token, "%ld", &(gcp->pgp->cornersIndex[i][j]));
     }
   }
-
-
+  
+  
   // In case the reference rigid body was sent by the granular solver with 
   // a non zero center of mass and/or a non-zero identity angular position
   // we need to reset all corners to the neutral reference position
@@ -258,13 +261,13 @@ void read_reference_Octahedron( GeomParameter* gcp, const double RotMat[3][3] )
   }
   
 # if LEVELDIFF_FLAG_U
-    // Allocate the array of corner coordinates of the expanded octahedron
+    // Allocate the array of corner coordinates of the expanded tetrahedron
     gcp->pgp->cornersCoordExp = (coord*) malloc( nc * sizeof(coord) ); 
     
-    // Compute corner coordinates of the expanded octahedron
+    // Compute corner coordinates of the expanded tetrahedron
     double delta = L0 / (double)(1 << MAXLEVEL), 
     	width = BOUNDARY_LAYER_THICKNESS_COEF * delta,
-	ext = sqrt( 3. ) * width, norm = 0.;
+	ext = 3. * width, norm = 0.;
     for (size_t i=0;i<nc;++i)
     {	
       norm = sqrt( sq( gcp->pgp->cornersCoord[i].x ) 

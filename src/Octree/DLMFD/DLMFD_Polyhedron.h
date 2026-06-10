@@ -2,7 +2,7 @@
 # Set of functions for a polyhedron
 */
 
-# include "foreach_region_plusplus.h"
+# include "DLMFD_foreach_region_plusplus.h"
 
 
 /** Distributes points over an edge of the polyhedron */

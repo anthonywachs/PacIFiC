@@ -7,7 +7,7 @@ vertices with positive z
 * Faces are numbered as follows: 0-5 side faces, 6 bottom, 7 top 
 */
 
-# include "Polyhedron.h"
+# include "DLMFD_Polyhedron.h"
 
 /** Computes the number of boundary points on the surface of the hexagonal 
 prism */

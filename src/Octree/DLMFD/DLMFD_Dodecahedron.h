@@ -1,56 +1,58 @@
 /**
-# Set of functions for a tetrahedron
+# Set of functions for a dodecahedron
 */
 
-# include "Polyhedron.h"
+# include "DLMFD_Polyhedron.h"
 
-/** Computes the number of boundary points on the surface of the tetrahedron */
+/** Computes the number of boundary points on the surface of the dodecahedron */
 //----------------------------------------------------------------------------
-void compute_nboundary_Tetrahedron( GeomParameter const* gcp, int* nb, int* lN )
+void compute_nboundary_Dodecahedron( GeomParameter const* gcp, int* nb, 
+	int* lN )
 //----------------------------------------------------------------------------
 {
-  double delta = L0 / (double)(1 << MAXLEVEL) ;  
+  double delta = L0 / (double)(1 << MAXLEVEL) ; 
   
-  /* Grains sends the tetrahedron circumscribed radius, so to get the 
-  tetrahedron edge length we multiply by sqrt(8/3) */
-  double lengthedge = gcp->radius * sqrt (8.) / sqrt(3.);  
+  /* Grains sends the dodecahedron circumscribed radius, so to get the
+  dodecahedron edge length we multiply by sqrt(3.)/3.*(sqrt(5.)-1) */
+  double lengthedge = gcp->radius * sqrt(3.) / 3. * ( sqrt(5.) - 1. );  
 
-  /* We compute the number of intervals on the cube edge */
+  /* We compute the number of intervals on the dodecahedron edge */
   *lN = floor( lengthedge / ( INTERBPCOEF * delta ) );
 
-  /* The number of points on a cube edge is the number of intervals + 1 */
+  /* The number of points on a dodecahedron edge is the number of intervals 
+  + 1 */
   *lN += 1;
+
+  /* Number of points required for the 30 edges and 12 * 5 inner edges of the 
+  dodecahedron */
+  *nb += ( *lN - 2 ) * ( 30 + 12 * 5 );
   
-  /* Number of points required for the 6 edges of the tetrahedron */
-  *nb += ( *lN - 2 ) * 6;
+  /* Number of points required for the 12 faces of the dodecahedron */
+  *nb += 12 * ( *lN - 2 ) * ( *lN - 3 ) / 2 * 5;
   
-  /* Number of points required for the 4 faces of the tetrahedron inside a 
-  triangle */
-  *nb += 4 * ( *lN - 2 ) * ( *lN - 3 ) / 2;
-  
-  /* Number of points required for the 4 corners */
-  *nb += 4;  
+  /* Number of points required for the 20 corners and 12 central points */
+  *nb += 20 + 12;
 
   if ( *nb == 0 )
     fprintf( stderr,"nboundary = 0: No boundary points for the"
-    	" Tetrahedron !!!\n" );
+    	" Dodecahedron !!!\n" );
 }
 
 
 
 
-/** Creates boundary points and normal vectors of the reference tetrahedron */
+/** Creates boundary points and normal vectors of the reference dodecahedron */
 //----------------------------------------------------------------------------
-void create_referenceRB_boundary_geomfeatures_Tetrahedron( 
-	GeomParameter const* gcp,
-	RigidBodyBoundary* dlm_bd, const int m, const int lN )
+void create_referenceRB_boundary_geomfeatures_Dodecahedron( 
+	GeomParameter const* gcp, RigidBodyBoundary* dlm_bd, const int m, 
+	const int lN )
 //----------------------------------------------------------------------------
 {
   int nfaces = gcp->pgp->nfaces, nc = gcp->ncorners;
   int iref, i1, i2, isb = 0, npoints;
-  coord gc_to_center_face, normal, refcorner, dir1, dir2;
+  coord gc_to_center_face, normal, refcorner, dir1, dir2, pt1;
   double norm = 0.;
-
+  
   // Note: we arbitrary set the norm of the normal vector to 0.25 *
   // circumscribed radius
 
@@ -64,65 +66,92 @@ void create_referenceRB_boundary_geomfeatures_Tetrahedron(
     foreach_dimension() norm += sq( corner_normals[k].x );
     norm = sqrt( norm );
     foreach_dimension() corner_normals[k].x *= 0.25 * gcp->radius / norm;       
-  }
-    
+  }  
+
 
   /* Add first interior points on surfaces */
   for (int i = 0; i < nfaces; i++)
   {
     npoints = gcp->pgp->numPointsOnFaces[i];
-    
-    iref = gcp->pgp->cornersIndex[i][0];
-    i1 = gcp->pgp->cornersIndex[i][1];
-    i2 = gcp->pgp->cornersIndex[i][npoints-1];
+    foreach_dimension() refcorner.x = 0. ;
 
-    foreach_dimension() 
+    for (int j = 0; j < npoints; j++)
     {
-      refcorner.x = gcp->pgp->cornersCoord[iref].x;
-      dir1.x = gcp->pgp->cornersCoord[i1].x;
-      dir2.x = gcp->pgp->cornersCoord[i2].x;    
+      iref = gcp->pgp->cornersIndex[i][j];
+      foreach_dimension() 
+       refcorner.x += gcp->pgp->cornersCoord[iref].x / npoints;
     }
-
+    
     foreach_dimension() 
-      gc_to_center_face.x = refcorner.x + dir1.x + dir2.x - gcp->center.x;
+      gc_to_center_face.x = refcorner.x - gcp->center.x;    
 
+    // Add central points on each surface of the Dodecahedron (12 points)
     foreach_dimension()
+      dlm_bd->bp[isb].x = refcorner.x;
+
+    for (int k = 0; k < npoints; k++)
     {
-      dir1.x -= refcorner.x;
-      dir2.x -= refcorner.x;
-      dir1.x /= (lN-1);
-      dir2.x /= (lN-1);
-    }
-    
-    VecVecCrossProduct( dir1, dir2, &normal );
-    if ( VecVecDotProduct( gc_to_center_face, normal ) < 0. )
-      foreach_dimension() normal.x *= -1.;
-    norm = 0.;
-    foreach_dimension() norm += sq( normal.x );
-    norm = sqrt( norm );
-    foreach_dimension() normal.x *= 0.25 * gcp->radius / norm;
-    
-    for (int ii = 1; ii <= lN-2; ii++)
-    {
-      for (int jj = 1; jj <= lN-2 - ii; jj++)
+      i1 = gcp->pgp->cornersIndex[i][k];
+      i2 = gcp->pgp->cornersIndex[i][(k+1) % npoints];
+
+      foreach_dimension() 
       {
-        foreach_dimension()
-	{
-	  dlm_bd->bp[isb].x = refcorner.x + (double) ii * dir1.x
-		      + (double) jj * dir2.x;
-	  dlm_bd->normal[isb].x = normal.x ;	      
-	}
+        dir1.x = gcp->pgp->cornersCoord[i1].x;
+	pt1.x = dir1.x;
+	dir2.x = gcp->pgp->cornersCoord[i2].x;
+      }
+
+      foreach_dimension()
+      {
+        dir1.x -= refcorner.x;
+        dir2.x -= refcorner.x;
+        dir1.x /= ( lN - 1 );
+        dir2.x /= ( lN - 1 );
+      }
+		
+      if ( !k )
+      {
+        // Compute normal vector of the face
+	VecVecCrossProduct( dir1, dir2, &normal );
+        if ( VecVecDotProduct( gc_to_center_face, normal ) < 0. )
+          foreach_dimension() normal.x *= -1.;
+        norm = 0.;
+        foreach_dimension() norm += sq( normal.x );
+        norm = sqrt( norm );
+        foreach_dimension() normal.x *= 0.25 * gcp->radius / norm;
+	
+	// Set normal vector of the central point
+	foreach_dimension()
+          dlm_bd->normal[isb].x = normal.x;
 	isb++;
+      }		
+
+      // Insert points on the innerface edges
+      distribute_points_edge( gcp, refcorner, pt1, dlm_bd, lN, isb, normal );
+      isb += lN - 2;
+
+      // Insert points on the innerface triangles
+      for (int ii = 1; ii <= lN-2; ii++)
+      {
+        for (int jj = 1; jj <= lN-2 - ii; jj++)
+        {
+          foreach_dimension()
+	  {
+	    dlm_bd->bp[isb].x = refcorner.x + (double) ii * dir1.x
+		      + (double) jj * dir2.x;
+	    dlm_bd->normal[isb].x = normal.x ;	      
+	  }
+          isb++;
+        }
       }
     }
   }
 
-  // We have 4 corner points for the tetrahedron
-  int allindextable[4][4] = {{0}};
-  int j1,jm1;
+  // We have 20 corner points for dodecahedron
+  int allindextable[20][20] = {{0}};
+  int j1, jm1;
 
-
-  /* Add points on the edges without the corners*/
+  /* Add points on the edges without the corners */
   for (int i = 0; i < nfaces; i++)
   {
     npoints = gcp->pgp->numPointsOnFaces[i];
@@ -131,13 +160,13 @@ void create_referenceRB_boundary_geomfeatures_Tetrahedron(
     {
       jm1 = gcp->pgp->cornersIndex[i][j];
       j1 = gcp->pgp->cornersIndex[i][(j+1) % npoints];
-      
+
       foreach_dimension() 
         normal.x = 0.5 * ( corner_normals[jm1].x + corner_normals[j1].x );
       norm = 0.;
       foreach_dimension() norm += sq( normal.x );
       norm = sqrt( norm );
-      foreach_dimension() normal.x *= 0.25 * gcp->radius / norm;	
+      foreach_dimension() normal.x *= 0.25 * gcp->radius / norm;
 
       if ( jm1 > j1 )
       {
@@ -162,7 +191,7 @@ void create_referenceRB_boundary_geomfeatures_Tetrahedron(
     }
   }
 
-  /* Add the final 4 corners points */
+  /* Add the final 20 corners points */
   for (size_t i = 0; i < nc; i++)
   {
     foreach_dimension()
@@ -174,25 +203,25 @@ void create_referenceRB_boundary_geomfeatures_Tetrahedron(
     isb++;
   }
   
-  free( corner_normals ); corner_normals = NULL;  
+  free( corner_normals ); corner_normals = NULL; 
 }
 
 
 
-
-// Reads geometric parameters of the tetrahedron
+/** Reads geometric parameters of the Dodecahedron */
 //----------------------------------------------------------------------------
-void read_reference_Tetrahedron( GeomParameter* gcp, const double RotMat[3][3] )
+void read_reference_Dodecahedron( GeomParameter* gcp, 
+	const double RotMat[3][3] )
 //----------------------------------------------------------------------------
 {
   char* token = NULL;
 
-  // Read number of corners, check that it is 4
+  // Read number of corners, check that it is 20
   size_t nc = 0;
   token = strtok(NULL, " " );
   sscanf( token, "%lu", &nc );
-  if ( nc != 4 )
-    printf ("Error in number of corners in update_Tetrahedron \n");
+  if ( nc != 20 )
+    printf ("Error in number of corners in update_Dodecahedron \n");
 
   // Allocate the PolyGeomParameter structure
   gcp->pgp = (PolyGeomParameter*) malloc( sizeof(PolyGeomParameter) );
@@ -209,12 +238,12 @@ void read_reference_Tetrahedron( GeomParameter* gcp, const double RotMat[3][3] )
       sscanf( token, "%lf", &(gcp->pgp->cornersCoord[i].x) );
     }
 
-  // Read number of faces, check that it is 4
+  // Read number of faces, check that it is 12
   size_t nf = 0;
   token = strtok(NULL, " " );
   sscanf( token, "%lu", &nf );
-  if ( nf != 4 )
-    printf ("Error in number of faces in update_Tetrahedron\n");
+  if ( nf != 12 )
+    printf ("Error in number of faces in update_Dodecahedron\n");
   gcp->pgp->nfaces = nf;
 
   // Allocate the array of number of points/corners on each face
@@ -227,18 +256,18 @@ void read_reference_Tetrahedron( GeomParameter* gcp, const double RotMat[3][3] )
   long int nppf = 0;
   for (size_t i=0;i<nf;++i)
   {
-    // Read the number of points/corners on the face, check that it is 3
+    // Read the number of points/corners on the face, check that it is 5
     token = strtok(NULL, " " );
     sscanf( token, "%ld", &nppf );
-    if ( nppf != 3 )
-      printf ("Error in number of corners per face in update_Tetrahedron\n");
+    if ( nppf != 5 )
+      printf ("Error in number of corners per face in update_Dodecahedron\n");
     gcp->pgp->numPointsOnFaces[i] = nppf;
 
     // Allocate the point/corner index vector on the face
     gcp->pgp->cornersIndex[i] = (long int*) malloc( nppf * sizeof(long int) );
 
-    // Read the point/corner indices
-    for (size_t j=0;j<3;++j)
+    // Read the point/corner indices : attention 5 points on a face
+    for (size_t j=0;j<5;++j)
     {
       token = strtok(NULL, " " );
       sscanf( token, "%ld", &(gcp->pgp->cornersIndex[i][j]));
@@ -258,16 +287,16 @@ void read_reference_Tetrahedron( GeomParameter* gcp, const double RotMat[3][3] )
 
     // Rotation
     matTransposedCoordDotProduct( RotMat, v, &(gcp->pgp->cornersCoord[i]) );
-  }
+  } 
   
 # if LEVELDIFF_FLAG_U
-    // Allocate the array of corner coordinates of the expanded tetrahedron
+    // Allocate the array of corner coordinates of the expanded dodecahedron
     gcp->pgp->cornersCoordExp = (coord*) malloc( nc * sizeof(coord) ); 
     
-    // Compute corner coordinates of the expanded tetrahedron
+    // Compute corner coordinates of the expanded dodecahedron
     double delta = L0 / (double)(1 << MAXLEVEL), 
     	width = BOUNDARY_LAYER_THICKNESS_COEF * delta,
-	ext = 3. * width, norm = 0.;
+	ext = sqrt( 15. / ( 5. + 2. * sqrt( 5. ) ) ) * width, norm = 0.;
     for (size_t i=0;i<nc;++i)
     {	
       norm = sqrt( sq( gcp->pgp->cornersCoord[i].x ) 
@@ -277,5 +306,5 @@ void read_reference_Tetrahedron( GeomParameter* gcp, const double RotMat[3][3] )
         gcp->pgp->cornersCoordExp[i].x = ( 1. + ext / norm )
 		* gcp->pgp->cornersCoord[i].x ;		
     }          
-# endif    
+# endif  
 }

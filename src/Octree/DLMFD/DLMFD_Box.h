@@ -2,7 +2,7 @@
 # Set of functions for a box
 */
 
-# include "Polyhedron.h"
+# include "DLMFD_Polyhedron.h"
 
 
 /** Computes the number of boundary points on the surface of the box */
