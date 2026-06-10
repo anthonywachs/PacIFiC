@@ -978,7 +978,7 @@ event adapt (i++)
 # else	
     // Flag regions around rigid bodies
     flag_rigidbodies_with_boundarylayers( allRigidBodies, nbRigidBodies,
-    	DLM_FlagMaxLev, BOUNDARY_LAYER_THICKNESS_COEF );       
+    	DLM_FlagMaxLev, BOUNDARY_LAYER_THICKNESS_COEF, &local_domain );       
 
     astats s = adapt_wavelet_spatial ( DLM_FlagMaxLev, MAXLEVEL,
 	(scalar *){DLM_FlagMesh, u}, (double[]){FLAG_ADAPT_CRIT, UX_ADAPT_CRIT,

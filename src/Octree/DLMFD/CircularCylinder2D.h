@@ -61,28 +61,48 @@ void compute_nboundary_CircularCylinder2D( GeomParameter const* gcp, int* nb )
 /** Flag boundary layer around the  2D circular cylinder */
 //----------------------------------------------------------------------------
 void flag_boundarylayer_CircularCylinder2D( scalar flag_maxlevel, 
-	double const dcoef, RigidBody const* p )
+	double const dcoef, RigidBody const* p, AABB const* ld )
 //----------------------------------------------------------------------------
 {
   GeomParameter const* gcp = &(p->g); 
-  coord min = gcp->BBox.min, max = gcp->BBox.max;
+  AABB ExpBBox;
   double delta = L0 / (double)(1 << MAXLEVEL) ;
   double ext_radius = gcp->radius + dcoef * delta; 
   
   foreach_dimension()
   {
-    min.x -= dcoef * delta;
-    max.x += dcoef * delta;
-  } 
-      
-  foreach_region_plus_plus( min, max ) 
-    if ( is_leaf(cell) )
-      if ( flag_maxlevel[] == 0. )
-      {    
-        if ( sqrt( sq( x - gcp->center.x ) + sq( y - gcp->center.y ) ) 
+    ExpBBox.min.x = gcp->BBox.min.x - dcoef * delta;
+    ExpBBox.max.x = gcp->BBox.max.x + dcoef * delta;
+  }  
+
+  // Loops over cells in the bounding box of the 2D circular cylinder      
+  if ( intersect( ld, &ExpBBox ) )
+    foreach_region_plus_plus( ExpBBox.min, ExpBBox.max ) 
+      if ( is_leaf(cell) )
+        if ( flag_maxlevel[] == 0. )
+        {    
+          if ( sqrt( sq( x - gcp->center.x ) + sq( y - gcp->center.y ) ) 
 		< ext_radius )
-	  flag_maxlevel[] = 1.;
-      }
+	    flag_maxlevel[] = 1.;
+        }
+	
+  // Loops over cells in the bounding box of its clones
+  AABB cloneBBox;
+  coord shift;
+  for (size_t i = 0; i < gcp->nperclones; i++)
+  {
+    foreach_dimension() shift.x = gcp->perclonecenters[i].x - gcp->center.x; 
+    assign_shifted_BBox( &cloneBBox, &ExpBBox, shift );
+    if ( intersect( ld, &cloneBBox ) )
+      foreach_region_plus_plus(cloneBBox.min, cloneBBox.max) 
+        if ( is_leaf(cell) )     
+          if ( flag_maxlevel[] == 0. )
+          {    
+            if ( sqrt( sq( x - gcp->perclonecenters[i].x ) 
+	    	+ sq( y - gcp->perclonecenters[i].y ) ) < ext_radius )
+	      flag_maxlevel[] = 1.;
+          }
+  }	
 }
 
 
@@ -124,7 +144,7 @@ void create_FD_Interior_CircularCylinder2D( RigidBody* p, vector Index,
   Cache* fd = &(p->Interior);
   Point ppp;
 
-  // Loops over cells in the bounding box of the sphere
+  // Loops over cells in the bounding box of the 2D circular cylinder
   if ( intersect( ld, &(gcp->BBox) ) )  
     foreach_region_plus_plus(gcp->BBox.min, gcp->BBox.max) 
       if ( is_leaf(cell) ) 

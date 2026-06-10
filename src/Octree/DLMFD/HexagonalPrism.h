@@ -1,5 +1,10 @@
 /**
 # Set of functions for a hexagonal prism
+In the reference position:
+* Width is in the z direction
+* Vertices are numbered as follows: 6 vertices with negative z followed by 6
+vertices with positive z
+* Faces are numbered as follows: 0-5 side faces, 6 bottom, 7 top 
 */
 
 # include "Polyhedron.h"
@@ -359,4 +364,25 @@ void read_reference_HexagonalPrism( GeomParameter* gcp,
     // Rotation
     matTransposedCoordDotProduct( RotMat, v, &(gcp->pgp->cornersCoord[i]) );
   }
+  
+# if LEVELDIFF_FLAG_U
+    // Allocate the array of corner coordinates of the expanded hexagonal prism
+    gcp->pgp->cornersCoordExp = (coord*) malloc( nc * sizeof(coord) ); 
+    
+    // Compute corner coordinates of the expanded hexagonal prism
+    double delta = L0 / (double)(1 << MAXLEVEL), 
+    	width = BOUNDARY_LAYER_THICKNESS_COEF * delta,
+	hext = 2. * width / sqrt( 3. ), norm = 0.;
+    for (size_t i=0;i<nc;++i)
+    {	
+      norm = sqrt( sq( gcp->pgp->cornersCoord[i].x ) 
+      		+ sq( gcp->pgp->cornersCoord[i].y ) ); 
+      gcp->pgp->cornersCoordExp[i].x = ( 1. + hext / norm )
+		* gcp->pgp->cornersCoord[i].x ;
+      gcp->pgp->cornersCoordExp[i].y = ( 1. + hext / norm )
+		* gcp->pgp->cornersCoord[i].y ;
+      gcp->pgp->cornersCoordExp[i].z = gcp->pgp->cornersCoord[i].z
+      		+ ( i < 6 ? - width : width ) ;
+    }          
+# endif  
 }

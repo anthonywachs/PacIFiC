@@ -63,13 +63,13 @@ bool is_in_CircularCylinder3D( const double x1, const double y1,
 /** Flag boundary layer around the 3D circular cylinder */
 //----------------------------------------------------------------------------
 void flag_boundarylayer_CircularCylinder3D( scalar flag_maxlevel, 
-	double const dcoef, RigidBody const* p )
+	double const dcoef, RigidBody const* p, AABB const* ld )
 //----------------------------------------------------------------------------
 {
   GeomParameter const* gcp = &(p->g); 
-  coord min = gcp->BBox.min, max = gcp->BBox.max;
+  AABB ExpBBox;
   double delta = L0 / (double)(1 << MAXLEVEL) ;
-  double swellheight = 1. + 2. * dcoef * delta / gcp->cgp->height;
+  double swellheight = 1. + 2. * dcoef * delta / gcp->cgp->height, x2, y2, z2;
   
   coord bottomToTopVec;  
   foreach_dimension()
@@ -86,25 +86,56 @@ void flag_boundarylayer_CircularCylinder3D( scalar flag_maxlevel,
        
   foreach_dimension()
   {
-    min.x -= dcoef * delta;
-    max.x += dcoef * delta;
+    ExpBBox.min.x = gcp->BBox.min.x - dcoef * delta;
+    ExpBBox.max.x = gcp->BBox.max.x + dcoef * delta;
   } 
       
-  foreach_region_plus_plus( min, max ) 
-    if ( is_leaf(cell) )
-      if ( flag_maxlevel[] == 0. )
-      {    
-        double dot = ( ( x - bottomCenter.x ) * bottomToTopVec.x
+  // Loops over cells in the bounding box of the expanded 3D circular cylinder
+  if ( intersect( ld, &ExpBBox ) )  
+    foreach_region_plus_plus( ExpBBox.min, ExpBBox.max ) 
+      if ( is_leaf(cell) )
+        if ( flag_maxlevel[] == 0. )
+        {    
+          double dot = ( ( x - bottomCenter.x ) * bottomToTopVec.x
   		+ ( y - bottomCenter.y ) * bottomToTopVec.y
   		+ ( z - bottomCenter.z ) * bottomToTopVec.z ) / height ;
 
-        if ( dot < height && dot > 0. )
-          if ( ( x - bottomCenter.x ) * ( x - bottomCenter.x )
-  	+ ( y - bottomCenter.y ) * ( y - bottomCenter.y )
-  	+ ( z - bottomCenter.z ) * ( z - bottomCenter.z ) - sq( dot ) 
+          if ( dot < height && dot > 0. )
+            if ( ( x - bottomCenter.x ) * ( x - bottomCenter.x )
+  		+ ( y - bottomCenter.y ) * ( y - bottomCenter.y )
+  		+ ( z - bottomCenter.z ) * ( z - bottomCenter.z ) - sq( dot ) 
 		< sq( radius ) )
-            flag_maxlevel[] = 1.;	  
-      }
+              flag_maxlevel[] = 1.;	  
+        }
+	
+  // Loops over cells in the bounding box of its clones
+  AABB cloneBBox;
+  coord shift;
+  for (size_t i = 0; i < gcp->nperclones; i++)
+  {
+    foreach_dimension() shift.x = gcp->perclonecenters[i].x - gcp->center.x; 
+    assign_shifted_BBox( &cloneBBox, &ExpBBox, shift );
+    if ( intersect( ld, &cloneBBox ) )
+      foreach_region_plus_plus(cloneBBox.min, cloneBBox.max) 
+        if ( is_leaf(cell) )
+	  if ( flag_maxlevel[] == 0. ) 
+          {    
+            x2 = x - shift.x;
+            y2 = y - shift.y;
+            z2 = z - shift.z;        
+
+            double dot = ( ( x2 - bottomCenter.x ) * bottomToTopVec.x
+  		+ ( y2 - bottomCenter.y ) * bottomToTopVec.y
+  		+ ( z2 - bottomCenter.z ) * bottomToTopVec.z ) / height ;
+
+            if ( dot < height && dot > 0. )
+              if ( ( x2 - bottomCenter.x ) * ( x2 - bottomCenter.x )
+  		+ ( y2 - bottomCenter.y ) * ( y2 - bottomCenter.y )
+  		+ ( z2 - bottomCenter.z ) * ( z2 - bottomCenter.z ) - sq( dot ) 
+		< sq( radius ) )
+              flag_maxlevel[] = 1.;
+          }
+  }	
 }
 
 
@@ -284,6 +315,7 @@ void create_FD_Interior_CircularCylinder3D( RigidBody* p, vector Index,
   GeomParameter const* gcp = &(p->g);  
   Cache* fd = &(p->Interior);
   Point ppp;
+  double x2, y2, z2;  
 
   // Loops over cells in the bounding box of the sphere
   if ( intersect( ld, &(gcp->BBox) ) )
@@ -300,8 +332,6 @@ void create_FD_Interior_CircularCylinder3D( RigidBody* p, vector Index,
 	    cache_append( fd, ppp, 0 );
             Index.y[] = p->pnum;
           }
-
-  double x2, y2, z2;
 
   // Loops over cells in the bounding box of its clones
   AABB cloneBBox;

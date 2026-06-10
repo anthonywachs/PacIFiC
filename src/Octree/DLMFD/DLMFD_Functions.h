@@ -33,6 +33,13 @@ in the inter-boundary point distance on the rigid body surface. */
 #   define INTERBPCOEF 2.
 # endif 
 
+/** Define the width of the boundary layer with multiple max levels */
+# if LEVELDIFF_FLAG_U
+#   ifndef BOUNDARY_LAYER_THICKNESS_COEF
+#     define BOUNDARY_LAYER_THICKNESS_COEF 4. 
+#   endif
+# endif  
+
 
 
 
@@ -91,6 +98,9 @@ typedef struct {
 typedef struct {
   int ncorners, nfaces;
   coord* cornersCoord;
+# if LEVELDIFF_FLAG_U
+    coord* cornersCoordExp;  
+# endif  
   long int** cornersIndex;
   long int* numPointsOnFaces;
 } PolyGeomParameter;
@@ -3194,7 +3204,8 @@ astats adapt_wavelet_spatial ( scalar Flag, // Flag field
 /** Flag regions  */
 //----------------------------------------------------------------------------
 void flag_rigidbodies_with_boundarylayers( RigidBody const* allrbs, 
-	const size_t nrb, scalar flag_maxlevel, double const dcoef )
+	const size_t nrb, scalar flag_maxlevel, double const dcoef, 
+	AABB const* ld )
 //----------------------------------------------------------------------------
 {
   // Re-initialize the flag field to 0 
@@ -3210,58 +3221,59 @@ void flag_rigidbodies_with_boundarylayers( RigidBody const* allrbs,
     switch ( allrbs[k].shape )
     {
       case SPHERE:
-        flag_boundarylayer_Sphere( flag_maxlevel, dcoef, &(allrbs[k]) );
+        flag_boundarylayer_Sphere( flag_maxlevel, dcoef, &(allrbs[k]), ld );
 	break;
 	  
       case CIRCULARCYLINDER2D:
         flag_boundarylayer_CircularCylinder2D( flag_maxlevel, dcoef, 
-	  	&(allrbs[k]) );
+	  	&(allrbs[k]), ld );
 	break;
 	  
-//       case CUBE:
-//         flag_boundarylayer_Polyhedron( flag_maxlevel, dcoef, &(allrbs[k]) );
-// 	break;
-// 
-//       case TETRAHEDRON:
-//         flag_boundarylayer_Polyhedron( flag_maxlevel, dcoef, &(allrbs[k]) );
-// 	break;
-// 	
-//       case OCTAHEDRON:
-// 	flag_boundarylayer_Polyhedron( flag_maxlevel, dcoef, &(allrbs[k]) );
-// 	break;
-// 	
-//       case ICOSAHEDRON:
-// 	flag_boundarylayer_Polyhedron( flag_maxlevel, dcoef, &(allrbs[k]) );
-// 	break;
-// 
-//       case DODECAHEDRON:
-// 	flag_boundarylayer_Polyhedron( flag_maxlevel, dcoef, &(allrbs[k]) );
-// 	break;
-// 	  
-//       case BOX:
-// 	flag_boundarylayer_Polyhedron( flag_maxlevel, dcoef, &(allrbs[k]) );
-// 	break;
+      case CUBE:
+        flag_boundarylayer_Polyhedron( flag_maxlevel, dcoef, &(allrbs[k]), ld );
+	break;
+
+      case TETRAHEDRON:
+        flag_boundarylayer_Polyhedron( flag_maxlevel, dcoef, &(allrbs[k]), ld );
+	break;
+	
+      case OCTAHEDRON:
+	flag_boundarylayer_Polyhedron( flag_maxlevel, dcoef, &(allrbs[k]), ld );
+	break;
+	
+      case ICOSAHEDRON:
+	flag_boundarylayer_Polyhedron( flag_maxlevel, dcoef, &(allrbs[k]), ld );
+	break;
+
+      case DODECAHEDRON:
+	flag_boundarylayer_Polyhedron( flag_maxlevel, dcoef, &(allrbs[k]), ld );
+	break;
+	  
+      case BOX:
+	flag_boundarylayer_Polyhedron( flag_maxlevel, dcoef, &(allrbs[k]), ld );
+	break;
 	  
       case CIRCULARCYLINDER3D:
 	flag_boundarylayer_CircularCylinder3D( flag_maxlevel, dcoef, 
-		&(allrbs[k]) );
+		&(allrbs[k]), ld );
 	break;
 
       case CONE:
-	flag_boundarylayer_Cone( flag_maxlevel, dcoef, &(allrbs[k]) );
+	flag_boundarylayer_Cone( flag_maxlevel, dcoef, &(allrbs[k]), ld );
 	break;
 	  
       case TRUNCATEDCONE:
-	flag_boundarylayer_TruncatedCone( flag_maxlevel, dcoef, &(allrbs[k]) );
+	flag_boundarylayer_TruncatedCone( flag_maxlevel, dcoef, &(allrbs[k]),
+		 ld );
 	break;
 	  
       case ELLIPSOID:
-	flag_boundarylayer_Ellipsoid( flag_maxlevel, dcoef, &(allrbs[k]) );
+	flag_boundarylayer_Ellipsoid( flag_maxlevel, dcoef, &(allrbs[k]), ld );
 	break;
 	  	  	  	  	  	
-//       case HEXAGONALPRISM:
-//         flag_boundarylayer_Polyhedron( flag_maxlevel, dcoef, &(allrbs[k]) );
-// 	break;	  
+      case HEXAGONALPRISM:
+        flag_boundarylayer_Polyhedron( flag_maxlevel, dcoef, &(allrbs[k]), ld );
+	break;	  
 		  
       default:
         fprintf( stderr,"Unknown Rigid Body shape !!\n" );

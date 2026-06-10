@@ -78,7 +78,7 @@ int determ_posi_plane( coord* pointOne, coord* pointTwo,
 /** Tests whether a point lies inside the polyhedron */
 //----------------------------------------------------------------------------
 bool is_in_Polyhedron_geomtest( double x1, double y1, double z1,
-	GeomParameter const* gcp )
+	GeomParameter const* gcp, bool const expanded )
 //----------------------------------------------------------------------------
 {
   // Coordinates of the checkpoint, relative to the center of mass
@@ -106,9 +106,20 @@ bool is_in_Polyhedron_geomtest( double x1, double y1, double z1,
     // center of mass
     foreach_dimension()
     {
-      refcorner.x = gcp->pgp->cornersCoord[iref].x - gcp->center.x;
-      cornerTwo.x = gcp->pgp->cornersCoord[i1].x - gcp->center.x;
-      cornerThree.x = gcp->pgp->cornersCoord[i2].x - gcp->center.x;
+#     if LEVELDIFF_FLAG_U
+        if ( expanded )
+	{
+          refcorner.x = gcp->pgp->cornersCoordExp[iref].x - gcp->center.x;
+          cornerTwo.x = gcp->pgp->cornersCoordExp[i1].x - gcp->center.x;
+          cornerThree.x = gcp->pgp->cornersCoordExp[i2].x - gcp->center.x;	
+	}
+	else
+#     endif
+        {	
+          refcorner.x = gcp->pgp->cornersCoord[iref].x - gcp->center.x;
+          cornerTwo.x = gcp->pgp->cornersCoord[i1].x - gcp->center.x;
+          cornerThree.x = gcp->pgp->cornersCoord[i2].x - gcp->center.x;
+	}
     }
 
     // Judge if the point lies at the same side with origin
@@ -141,10 +152,10 @@ bool is_in_Polyhedron( double x1, double y1, double z1,
 	GeomParameter const* gcp )
 //----------------------------------------------------------------------------
 {
-  // Check if it is in the master rigid body
-  bool status = is_in_Polyhedron_geomtest( x1, y1, z1, gcp );
-  
   double x2, y2, z2;
+
+  // Check if it is in the master rigid body
+  bool status = is_in_Polyhedron_geomtest( x1, y1, z1, gcp, false );
 
   // Check if it is in any periodic clone rigid body
   if ( gcp->nperclones && !status )
@@ -155,12 +166,60 @@ bool is_in_Polyhedron( double x1, double y1, double z1,
       x2 = x1 + gcp->center.x - clone.center.x;
       y2 = y1 + gcp->center.y - clone.center.y;
       z2 = z1 + gcp->center.z - clone.center.z;
-      status = is_in_Polyhedron_geomtest( x2, y2, z2, gcp );
+      status = is_in_Polyhedron_geomtest( x2, y2, z2, gcp, false );
     }
 
   return ( status );
 }
 
+
+
+
+/** Flag boundary layer around the polyhedron */
+//----------------------------------------------------------------------------
+void flag_boundarylayer_Polyhedron( scalar flag_maxlevel, 
+	double const dcoef, RigidBody const* p, AABB const* ld )
+//----------------------------------------------------------------------------
+{
+  GeomParameter const* gcp = &(p->g); 
+  AABB ExpBBox;
+  double delta = L0 / (double)(1 << MAXLEVEL), x2, y2, z2 ; 
+
+  foreach_dimension()
+  {
+    ExpBBox.min.x = gcp->BBox.min.x - dcoef * delta;
+    ExpBBox.max.x = gcp->BBox.max.x + dcoef * delta;
+  } 
+      
+  // Loops over cells in the bounding box of the expanded polyhedron
+  if ( intersect( ld, &ExpBBox ) )  
+    foreach_region_plus_plus( ExpBBox.min, ExpBBox.max ) 
+      if ( is_leaf(cell) )
+        if ( flag_maxlevel[] == 0. )
+          if ( is_in_Polyhedron_geomtest( x, y, z, gcp, true ) )
+	    flag_maxlevel[] = 1.;
+	
+  // Loops over cells in the bounding box of its clones
+  AABB cloneBBox;
+  coord shift;
+  for (size_t i = 0; i < gcp->nperclones; i++)
+  {
+    foreach_dimension() shift.x = gcp->perclonecenters[i].x - gcp->center.x; 
+    assign_shifted_BBox( &cloneBBox, &ExpBBox, shift );
+    if ( intersect( ld, &cloneBBox ) )
+      foreach_region_plus_plus(cloneBBox.min, cloneBBox.max) 
+        if ( is_leaf(cell) )
+	  if ( flag_maxlevel[] == 0. ) 
+          {    
+            x2 = x - shift.x;
+            y2 = y - shift.y;
+            z2 = z - shift.z;        
+
+            if ( is_in_Polyhedron_geomtest( x2, y2, z2, gcp, true ) )
+	      flag_maxlevel[] = 1.;
+          }
+  }	
+}
 
 
 
@@ -178,7 +237,7 @@ void create_FD_Interior_Polyhedron( RigidBody* p, vector Index,
   if ( intersect( ld, &(gcp->BBox) ) )
     foreach_region_plus_plus(gcp->BBox.min, gcp->BBox.max) 
       if ( is_leaf(cell) ) 
-        if ( is_in_Polyhedron_geomtest( x, y, z, gcp ) )
+        if ( is_in_Polyhedron_geomtest( x, y, z, gcp, false ) )
           if ( (int)Index.y[] == -1 )
           {
             foreach_dimension() PeriodicRefCenter.x[] = gcp->center.x;
@@ -206,7 +265,7 @@ void create_FD_Interior_Polyhedron( RigidBody* p, vector Index,
           x2 = x - shift.x;
           y2 = y - shift.y;
           z2 = z - shift.z;        
-	  if ( is_in_Polyhedron_geomtest( x2, y2, z2, gcp ) )
+	  if ( is_in_Polyhedron_geomtest( x2, y2, z2, gcp, false ) )
             if ( (int)Index.y[] == -1 )
             {
               foreach_dimension() 
@@ -254,6 +313,23 @@ void update_Polyhedron_from_RBRef( GeomParameter* gcp, RigidBody const* RBRef,
     foreach_dimension()
       gcp->pgp->cornersCoord[i].x += gcp->center.x;     
   }
+
+# if LEVELDIFF_FLAG_U
+    // Allocate the array of corner coordinates of the expanded polyhedron
+    gcp->pgp->cornersCoordExp = (coord*) malloc( nc * sizeof(coord) );    
+
+    // Compute the point/corner coordinates of the expanded polyhedron
+    for (size_t i=0;i<nc;++i)
+    {
+      // Rotation
+      matCoordDotProduct( RotMat, RBRef->g.pgp->cornersCoordExp[i], 
+    	&(gcp->pgp->cornersCoordExp[i]) );	
+
+      // Translation
+      foreach_dimension()
+        gcp->pgp->cornersCoordExp[i].x += gcp->center.x;     
+    }        
+# endif   
 
   // Allocate the array of number of points/corners on each face
   gcp->pgp->nfaces = nf;
@@ -306,7 +382,13 @@ void free_Polyhedron( GeomParameter* gcp )
   gcp->pgp->numPointsOnFaces = NULL;
   gcp->pgp->nfaces = 0;
 
+# if LEVELDIFF_FLAG_U
+    // Free the point/corner coordinate array of the expanded polyhedron
+    free( gcp->pgp->cornersCoordExp );
+    gcp->pgp->cornersCoordExp = NULL;  
+# endif  
+
   // Free the PolyGeomParameter structure
   free( gcp->pgp );
-  gcp->pgp = NULL;
+  gcp->pgp = NULL;  
 }

@@ -257,5 +257,24 @@ void read_reference_Icosahedron( GeomParameter* gcp, const double RotMat[3][3] )
 
     // Rotation
     matTransposedCoordDotProduct( RotMat, v, &(gcp->pgp->cornersCoord[i]) );
-  }  
+  }
+  
+# if LEVELDIFF_FLAG_U
+    // Allocate the array of corner coordinates of the expanded icosahedron
+    gcp->pgp->cornersCoordExp = (coord*) malloc( nc * sizeof(coord) ); 
+    
+    // Compute corner coordinates of the expanded icosahedron
+    double delta = L0 / (double)(1 << MAXLEVEL), 
+    	width = BOUNDARY_LAYER_THICKNESS_COEF * delta,
+	ext = sqrt( 15. / ( 5. + 2. * sqrt( 5. ) ) ) * width, norm = 0.;
+    for (size_t i=0;i<nc;++i)
+    {	
+      norm = sqrt( sq( gcp->pgp->cornersCoord[i].x ) 
+      		+ sq( gcp->pgp->cornersCoord[i].y ) 
+		+ sq( gcp->pgp->cornersCoord[i].z ) ); 
+      foreach_dimension()
+        gcp->pgp->cornersCoordExp[i].x = ( 1. + ext / norm )
+		* gcp->pgp->cornersCoord[i].x ;		
+    }          
+# endif    
 }

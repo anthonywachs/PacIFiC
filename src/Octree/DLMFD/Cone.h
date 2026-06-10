@@ -73,12 +73,13 @@ bool is_in_Cone( const double x1, const double y1,
 /** Flag boundary layer around the cone */
 //----------------------------------------------------------------------------
 void flag_boundarylayer_Cone( scalar flag_maxlevel, double const dcoef, 
-	RigidBody const* p )
+	RigidBody const* p, AABB const* ld )
 //----------------------------------------------------------------------------
 {
   GeomParameter const* gcp = &(p->g); 
-  coord min = gcp->BBox.min, max = gcp->BBox.max, vec;
-  double delta = L0 / (double)(1 << MAXLEVEL) ;
+  AABB ExpBBox;
+  coord vec;
+  double delta = L0 / (double)(1 << MAXLEVEL), x2, y2, z2 ;
   double swell = 1. + dcoef * delta * ( 1. / gcp->tcgp->height
     	+ sqrt( sq( 1. / gcp->tcgp->height ) 
 		+ sq( 1. / gcp->tcgp->BottomRadius) ) );
@@ -98,35 +99,78 @@ void flag_boundarylayer_Cone( scalar flag_maxlevel, double const dcoef,
        
   foreach_dimension()
   {
-    min.x -= dcoef * delta;
-    max.x += dcoef * delta;
+    ExpBBox.min.x = gcp->BBox.min.x - dcoef * delta;
+    ExpBBox.max.x = gcp->BBox.max.x + dcoef * delta;
   } 
       
-  foreach_region_plus_plus( min, max ) 
-    if ( is_leaf(cell) )
-      if ( flag_maxlevel[] == 0. )
-      {    
-        vec.x = x - bottomCenter.x;
-        vec.y = y - bottomCenter.y;
-        vec.z = z - bottomCenter.z; 
+  // Loops over cells in the bounding box of the expanded cone
+  if ( intersect( ld, &ExpBBox ) )  
+    foreach_region_plus_plus( ExpBBox.min, ExpBBox.max ) 
+      if ( is_leaf(cell) )
+        if ( flag_maxlevel[] == 0. )
+        {    
+          vec.x = x - bottomCenter.x;
+          vec.y = y - bottomCenter.y;
+          vec.z = z - bottomCenter.z; 
   
-        double proj = vec.x * bottomToTopVec.x
+          double proj = vec.x * bottomToTopVec.x
 		+ vec.y * bottomToTopVec.y 
 		+ vec.z * bottomToTopVec.z; 
-        proj /= height;
+          proj /= height;
 	
-        if ( proj >= 0. && proj <= height )
-        {
-          foreach_dimension() 
-            vec.x -= proj * bottomToTopVec.x / height;
+          if ( proj >= 0. && proj <= height )
+          {
+            foreach_dimension() 
+              vec.x -= proj * bottomToTopVec.x / height;
       
-          double local_radius = - bottomRadius * proj / height 
+            double local_radius = - bottomRadius * proj / height 
 	  	+ bottomRadius;
 	
-          if ( sqrt( sq( vec.x ) + sq( vec.y ) + sq( vec.z ) ) <= local_radius )
-            flag_maxlevel[] = 1.;	  
+            if ( sqrt( sq( vec.x ) + sq( vec.y ) + sq( vec.z ) ) 
+	    		<= local_radius )
+              flag_maxlevel[] = 1.;	  
+          }
         }
-      }
+	
+  // Loops over cells in the bounding box of its clones
+  AABB cloneBBox;
+  coord shift;
+  for (size_t i = 0; i < gcp->nperclones; i++)
+  {
+    foreach_dimension() shift.x = gcp->perclonecenters[i].x - gcp->center.x; 
+    assign_shifted_BBox( &cloneBBox, &ExpBBox, shift );
+    if ( intersect( ld, &cloneBBox ) )
+      foreach_region_plus_plus(cloneBBox.min, cloneBBox.max) 
+        if ( is_leaf(cell) )
+	  if ( flag_maxlevel[] == 0. ) 
+          {    
+            x2 = x - shift.x;
+            y2 = y - shift.y;
+            z2 = z - shift.z;        
+
+            vec.x = x2 - bottomCenter.x;
+            vec.y = y2 - bottomCenter.y;
+            vec.z = z2 - bottomCenter.z; 
+  
+            double proj = vec.x * bottomToTopVec.x
+		+ vec.y * bottomToTopVec.y 
+		+ vec.z * bottomToTopVec.z; 
+            proj /= height;
+	
+            if ( proj >= 0. && proj <= height )
+            {
+              foreach_dimension() 
+                vec.x -= proj * bottomToTopVec.x / height;
+      
+              double local_radius = - bottomRadius * proj / height 
+	  	+ bottomRadius;
+	
+              if ( sqrt( sq( vec.x ) + sq( vec.y ) + sq( vec.z ) ) 
+	    		<= local_radius )
+                flag_maxlevel[] = 1.;	  
+            }
+          }
+  }	
 }
 
 
@@ -330,6 +374,7 @@ void create_FD_Interior_Cone( RigidBody* p, vector Index,
   GeomParameter const* gcp = &(p->g);  
   Cache* fd = &(p->Interior);
   Point ppp;
+  double x2, y2, z2;  
 
   // Loops over cells in the bounding box of the sphere
   if ( intersect( ld, &(gcp->BBox) ) )
@@ -346,8 +391,6 @@ void create_FD_Interior_Cone( RigidBody* p, vector Index,
 	    cache_append( fd, ppp, 0 );
             Index.y[] = p->pnum;
           }
-
-  double x2, y2, z2;
 
   // Loops over cells in the bounding box of its clones
   AABB cloneBBox;

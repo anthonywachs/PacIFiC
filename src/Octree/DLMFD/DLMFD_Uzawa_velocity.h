@@ -69,9 +69,6 @@ vector DLM_lambda[];
 scalar DLM_Flag[];
 scalar DLM_FlagMesh[];
 # if LEVELDIFF_FLAG_U
-#   ifndef BOUNDARY_LAYER_THICKNESS_COEF
-#     define BOUNDARY_LAYER_THICKNESS_COEF 4. 
-#   endif
     scalar DLM_FlagMaxLev[];
 # endif    
 vector DLM_Index[];
