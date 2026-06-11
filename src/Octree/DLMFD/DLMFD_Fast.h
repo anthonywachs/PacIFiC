@@ -1,37 +1,7 @@
 /** 
-# Set of structures and functions to loop through the boundary point stencils 
+# Set of functions to loop through the boundary point stencils 
 and compute scalar products in a faster way.
 */
-
-# ifndef DLMBLOCK 
-#   define DLMBLOCK 5000
-# endif
-
-# if dimension == 2
-#   define NDOFSTENCIL 9
-# else
-#   define NDOFSTENCIL 27
-# endif
-
-
-/** Structure and routines to store pointers and coefficients from the
-initialization of the Uzawa algorithm and use them over the iterative process
-to compute faster M_u^T*w = <DLM_w, v>_P(t) over the boundary points */
-typedef struct {
-  int n;
-  int nm;
-  double** qux;
-  double** quy;
-  double** dlmwx;
-  double** dlmwy;
-# if dimension == 3  
-    double** quz;
-    double** dlmwz;
-# endif   
-  double* weight; 
-} BPFastLoop_LambdaMom;
-
-
 
 
 //----------------------------------------------------------------------------
@@ -131,33 +101,6 @@ void append_BPFastLoop_LambdaMom_2D( BPFastLoop_LambdaMom* loop,
   loop->weight[n] = weight_;
   loop->n += 1;    
 }
-
-
-
-
-
-
-
-
-/** Structure and routines to store pointers and coefficients from the
-initialization of the Uzawa algorithm and use them over the iterative process
-to compute faster M_u*tu = <alpha, tu>_P(t) over the boundary points */
-typedef struct {
-  int nv;
-  int nvm;
-  double** dlmvx;
-  double** dlmvy;
-  int* ndof;
-  int ntu;
-  int ntum;      
-  double** tux;
-  double** tuy;
-# if dimension == 3 
-    double** dlmvz; 
-    double** tuz;
-# endif 
-  double* weight; 
-} BPFastLoop_ResU;
 
 
 

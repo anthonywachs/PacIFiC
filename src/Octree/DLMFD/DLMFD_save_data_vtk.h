@@ -2,29 +2,7 @@
 # Wrapper for output functions with Paraview
 */
 
-# ifndef PARAVIEW_DATATYPE_DOUBLE
-#   define PARAVIEW_DATATYPE_DOUBLE 0 // 1 for double and 0 for float
-# endif
-# if ( PARAVIEW_DATATYPE_DOUBLE == 1 )
-#   define PARAVIEW_DATATYPE double
-#   define PARAVIEW_DATANAME "Float64"
-# else
-#   define PARAVIEW_DATATYPE float
-#   define PARAVIEW_DATANAME "Float32"
-# endif
-# ifndef PARAVIEW_BINFILE
-#   define PARAVIEW_BINFILE 1
-# endif
-# ifndef PARAVIEW_VTU_MPIIO_WRITER 
-#   define PARAVIEW_VTU_MPIIO_WRITER 0
-# endif
-# if PARAVIEW_VTU_MPIIO_WRITER && !_MPI
-#   undef PARAVIEW_VTU_MPIIO_WRITER
-#   define PARAVIEW_VTU_MPIIO_WRITER 0
-# endif
-
 # include "DLMFD_Output_vtu_foreach.h"
-//# include "vtkXMLHyperTreeGrid.h"
 # include "vtkHDFHyperTreeGrid.h"
 
 

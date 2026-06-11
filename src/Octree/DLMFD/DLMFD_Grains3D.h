@@ -12,12 +12,6 @@
 #   define GRAINS_INPUTFILE "Grains/Simu/simul.xml"
 # endif
 
-/** Split explicit acceleration treatment in case of particles are lighter 
-than the fluid or neutrally buoyant */
-# ifndef B_SPLIT_EXPLICIT_ACCELERATION
-#   define B_SPLIT_EXPLICIT_ACCELERATION 0
-# endif
-
 /** Coupling Interface for Grains3D */
 # include "DLMFD_InterfaceGrains3DBasilisk.h"
 

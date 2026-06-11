@@ -2,128 +2,16 @@
 # Distributed Lagrange Multiplier/Fictitious Domain method for velocity coupling
 */
 
-# define BGHOSTS 2
-# define BSIZE 128
-
-# ifndef TRANSLATION
-#   define TRANSLATION 1
-# endif
-
-# ifndef ROTATION
-#   define ROTATION 1
-# endif
-
-# ifndef DLM_ALPHA_COUPLING
-#   define DLM_ALPHA_COUPLING 0
-# endif
-
-# ifndef DLM_UZAWA_TOL
-#   define DLM_UZAWA_TOL 1.e-5
-# endif
-
-# ifndef DLMFD_BOUNDARYPOINTS
-#   define DLMFD_BOUNDARYPOINTS 1
-# endif
-
-# ifndef DLMFD_INTERIORPOINTS
-#   define DLMFD_INTERIORPOINTS 1
-# endif
-
-# ifndef DLMFD_OPT
-#   define DLMFD_OPT 1     // use optimized version of DLMFD below
-# endif
-
-# ifndef RIGIDBODY_VERBOSE
-#   define RIGIDBODY_VERBOSE 0     // print rigid body features
-# endif
-
-# if ( TRANSLATION && ROTATION )
-#   if dimension == 3
-#     define NRBDATA 6
-#   else
-#     define NRBDATA 3
-#   endif     
-# elif TRANSLATION
-#   if dimension == 3 
-#     define NRBDATA 3
-#   else
-#     define NRBDATA 2
-#   endif 
-# elif ROTATION
-#   if dimension == 3 
-#     define NRBDATA 3
-#   else
-#     define NRBDATA 1
-#   endif 
-# else
-#   define NRBDATA 0  
-# endif
-
-
-/** Functions and structures for the implementation of the DLMFD method. */
+/** Functions and structures for the implementation of the DLMFD method */
 # include "DLMFD_Functions.h"
 
-
-/** Basilisk scalars and vectors for the implementation of the DLMFD method. */
-vector DLM_lambda[];
-scalar DLM_Flag[];
-scalar DLM_FlagMesh[];
-# if LEVELDIFF_FLAG_U
-    scalar DLM_FlagMaxLev[];
-# endif    
-vector DLM_Index[];
-vector DLM_CX_NCX[];
-vector DLM_PeriodicRefCenter[];
-vector DLM_r[];
-vector DLM_w[];
-vector DLM_v[];
-vector DLM_qu[];
-vector DLM_tu[];
-# if DLM_ALPHA_COUPLING
-    vector DLM_explicit[];
-# endif
-
-
-/** Number of rigid body dependent arrays */
-RigidBody* allRigidBodies = NULL;
-RigidBody* ReferenceRigidBodies = NULL;
-size_t* RBnumToIndex;
-double** DLMFDtoGS_vel = NULL;
-double* vpartbuf = NULL;
-FILE** pdata = NULL;
-FILE** fdata = NULL;
-
-FILE* converge = NULL;
-FILE* cellvstime = NULL;
-
-dynUIarray deactivatedBPindices;
-dynPDBarray deactivatedIndexFieldValues;
-
-AABB local_domain;
-
+/** Navier-Stokes algorithm */
 # include "DLMFD_ns-centered.h"
 
-
-/* Adding this small macro because dv() breaks the compability with embed.h */
-# if dimension == 1
-#   define dlmfd_dv() (Delta)
-# elif dimension == 2
-#   define dlmfd_dv() (sq(Delta))
-# else // dimension == 3
-#   define dlmfd_dv() (cube(Delta))
-# endif
-
-
-/* Timings and statistics */
-timing DLMFD_UzawaTiming = {0.};
-timing DLMFD_ConstructionTiming = {0.};
-DLMFDptscells allDLMFDptscells;
-
-# include "DLMFD_Perf.h"
+/** Fast structures and functions for optimized dlmfd algorithm */
 # if DLMFD_OPT
 #   include "DLMFD_Fast.h"
 # endif 
-
 
 
 // Construction of rigid bodies for the DLMFD problem
@@ -288,6 +176,15 @@ void DLMFD_construction()
 
 
 
+
+/* Adding this small macro because dv() breaks the compability with embed.h */
+# if dimension == 1
+#   define dlmfd_dv() (Delta)
+# elif dimension == 2
+#   define dlmfd_dv() (sq(Delta))
+# else // dimension == 3
+#   define dlmfd_dv() (cube(Delta))
+# endif
 
 // Uzawa algorithm for the DLMFD problem
 // Important comments:
@@ -1169,7 +1066,7 @@ void DLMFD_Uzawa_velocity( const int i )
 # if DLMFD_OPT
     foreach_cache( Traversal_rvwlambda )
 # else
-    foreach() 
+    foreach(serial) 
 # endif
   {
     foreach_dimension() DLM_w.x[] = DLM_r.x[];  
@@ -1311,16 +1208,17 @@ void DLMFD_Uzawa_velocity( const int i )
 
             foreach_neighbor() 
 	    {
-	      if ( (int)DLM_Index.x[] > -1 && level == depth() 
+	      indexbp = (int)DLM_Index.x[];
+	      if ( indexbp > -1 && level == depth() 
 		&& is_leaf(cell) && (int)DLM_Index.y[] == pp->pnum ) 
 	      {
 	        lambdacellpos.x = x;
 	        lambdacellpos.y = y;
-	        lambdapos.x = (*sbm[k]).x[(int)DLM_Index.x[]];
-	        lambdapos.y = (*sbm[k]).y[(int)DLM_Index.x[]];
+	        lambdapos.x = (*sbm[k]).bp[indexbp].x;
+	        lambdapos.y = (*sbm[k]).bp[indexbp].y;
 #               if dimension == 3
 	          lambdacellpos.z = z;
-	          lambdapos.z = (*sbm[k]).z[(int)DLM_Index.x[]];
+	          lambdapos.z = (*sbm[k]).bp[indexbp].z;
 #               endif
 	  
 	        weight = reversed_weight( pp, weightcellpos, lambdacellpos, 
@@ -1741,7 +1639,7 @@ void DLMFD_Uzawa_velocity( const int i )
 #   if DLMFD_OPT
       foreach_cache( Traversal_rvwlambda )
 #   else
-      foreach()
+      foreach(serial)
 #   endif
 #     if dimension == 3
         DLM_wv += DLM_w.x[]*DLM_v.x[] + DLM_w.y[]*DLM_v.y[] 
@@ -1804,7 +1702,7 @@ void DLMFD_Uzawa_velocity( const int i )
 #   if DLMFD_OPT
       foreach_cache( Traversal_rvwlambda )
 #   else
-      foreach()
+      foreach(serial)
 #   endif
 #     if dimension == 3
         DLM_nr2 += sq(DLM_r.x[]) + sq(DLM_r.y[]) + sq(DLM_r.z[]);
