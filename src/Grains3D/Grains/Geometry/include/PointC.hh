@@ -56,6 +56,40 @@ class PointC : public Convex
     point on the surface of the Point that satisfies max(P.v)
     @param v direction vector */
     Point3 support( Vector3 const& v ) const;
+
+    /** @brief Returns the number of points to write the point in a
+    Paraview format */
+    int numberOfPoints_PARAVIEW() const;
+  
+    /** @brief Returns the number of elementary polytopes to write the point 
+    in a Paraview format */
+    int numberOfCells_PARAVIEW() const;
+
+    /** @brief Writes a list of points describing the point in a
+    Paraview format 
+    @param f output stream
+    @param transform geometric transformation 
+    @param translation additional center of mass translation */
+    void write_polygonsPts_PARAVIEW( ostream& f, 
+  	Transform const& transform, 
+  	Vector3 const* translation = NULL ) const;
+	
+    /** @brief Returns a list of points describing the point in a
+    Paraview format 
+    @param transform geometric transformation 
+    @param translation additional center of mass translation */
+    list<Point3> get_polygonsPts_PARAVIEW( Transform const& transform,
+  	Vector3 const* translation = NULL ) const; 
+  
+    /** @brief Writes the point in a Paraview format
+    @param connectivity connectivity of Paraview polytopes
+    @param offsets connectivity offsets
+    @param cellstype Paraview polytopes type
+    @param firstpoint_globalnumber global number of the 1st point
+    @param last_offset last offset used for the previous convex shape */
+    void write_polygonsStr_PARAVIEW( list<int>& connectivity,
+    	list<int>& offsets, list<int>& cellstype, int& firstpoint_globalnumber,
+	int& last_offset ) const; 
     
     /** @ brief Returns whether a point lies inside the point (returns false
     by convention)

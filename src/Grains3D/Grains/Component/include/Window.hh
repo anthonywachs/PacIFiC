@@ -16,6 +16,7 @@ enum WindowType
   WINDOW_CYLINDER, /**< Cylinder */
   WINDOW_ANNULUS, /**< Annulus */
   WINDOW_LINE, /**< Line */
+  WINDOW_POINT, /**< Line */  
   WINDOW_NONE /**< unknown */
 };
 

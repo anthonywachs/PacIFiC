@@ -113,6 +113,77 @@ void PointC::readShape( istream& fileIn )
 
 
 // ----------------------------------------------------------------------------
+// Returns the number of points to write the PointC in a Paraview format
+int PointC::numberOfPoints_PARAVIEW() const
+{
+  return ( 1 );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the number of elementary polytopes to write the PointC 
+// in a Paraview format
+int PointC::numberOfCells_PARAVIEW() const
+{
+  return ( 1 );  
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Writes a list of points describing the PointC in a Paraview format
+void PointC::write_polygonsPts_PARAVIEW( ostream& f, 
+  	Transform const& transform, Vector3 const* translation ) const
+{
+  Point3 pp, p;
+  
+  pp = transform( p );
+  if ( translation ) pp += *translation;    
+  f << pp[X] << " " << pp[Y] << " " << pp[Z] << endl;
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns a list of points describing the PointC in a Paraview format 
+list<Point3> PointC::get_polygonsPts_PARAVIEW( Transform const& transform,
+  	Vector3 const* translation ) const
+{
+  list<Point3> ParaviewPoints;
+  Point3 pp, p;
+  
+  pp = transform( p );
+  if ( translation ) pp += *translation;    
+  ParaviewPoints.push_back( pp );
+  
+  return ( ParaviewPoints ); 
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Writes the PointC in a Paraview format
+void PointC::write_polygonsStr_PARAVIEW( list<int>& connectivity,
+    	list<int>& offsets, list<int>& cellstype, int& firstpoint_globalnumber,
+	int& last_offset ) const
+{
+  connectivity.push_back( firstpoint_globalnumber );
+  last_offset += 1;  
+  offsets.push_back( last_offset );
+  cellstype.push_back( 1 );
+  
+  firstpoint_globalnumber += 1;
+}
+
+
+
+
+// ----------------------------------------------------------------------------
 // Returns whether a point lies inside the point (returns false
 // by convention)
 bool PointC::isIn( Point3 const& pt ) const

@@ -4,6 +4,7 @@
 #include "Box.hh"
 #include "Cylinder.hh"
 #include "Segment.hh"
+#include "PointC.hh"
 #include <climits>
 
 // ----------------------------------------------------------------------------
@@ -69,6 +70,8 @@ bool Window::readWindow( DOMNode* nWindow, string const& oshift,
     m_ftype = WINDOW_LINE;
   else if ( iwindow_type == "Box" )
     m_ftype = WINDOW_BOX;
+  else if ( iwindow_type == "Point" )
+    m_ftype = WINDOW_POINT;    
   else m_ftype = WINDOW_NONE;
   
   // Insertion window name
@@ -219,6 +222,21 @@ bool Window::readWindow( DOMNode* nWindow, string const& oshift,
 		m_ptB[Z] << endl;
       }
       break;
+      
+    case WINDOW_POINT:
+      pointA = ReaderXML::getNode( nWindow, "Point" );;
+
+      m_ptA[X] = ReaderXML::getNodeAttr_Double( pointA, "X" );
+      m_ptA[Y] = ReaderXML::getNodeAttr_Double( pointA, "Y" );
+      m_ptA[Z] = ReaderXML::getNodeAttr_Double( pointA, "Z" );
+
+      if ( rank == 0 )
+      {
+	cout << oshift << GrainsExec::m_shift3 << "Point3 = " <<
+		m_ptA[X] << " " << m_ptA[Y] << " " <<
+		m_ptA[Z] << endl;
+      }
+      break;      
 
     default:
       if ( rank == 0 ) cout << "Unknown insertion window "
@@ -310,6 +328,10 @@ Point3 Window::getInsertionPoint() const
     case WINDOW_LINE:
       P = m_ptA + ( double(random()) / double(INT_MAX) ) * ( m_ptB - m_ptA );
       break;
+      
+    case WINDOW_POINT:
+      P = m_ptA;
+      break;      
 
     default:
       break;
@@ -501,6 +523,13 @@ void Window::addAsRigidBody( list<RigidBody*>& iwlist ) const
       gcwindow = Segment::computeTransform( 
             0.5 * ( m_ptB - m_ptA ), 0.5 * ( m_ptA + m_ptB ) );
       ccw = new Segment( Norm( m_ptB - m_ptA ) );
+      ffw = new RigidBody( ccw, gcwindow );
+      iwlist.push_back( ffw );
+      break;
+
+    case WINDOW_POINT:
+      gcwindow.setOrigin( m_ptA );
+      ccw = new PointC();
       ffw = new RigidBody( ccw, gcwindow );
       iwlist.push_back( ffw );
       break;
