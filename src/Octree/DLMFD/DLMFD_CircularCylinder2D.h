@@ -143,6 +143,7 @@ void create_FD_Interior_CircularCylinder2D( RigidBody* p, vector Index,
   GeomParameter const* gcp = &(p->g);
   Cache* fd = &(p->Interior);
   Point ppp;
+  ppp.k = 0;
 
   // Loops over cells in the bounding box of the 2D circular cylinder
   if ( intersect( ld, &(gcp->BBox) ) )  

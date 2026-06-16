@@ -49,6 +49,7 @@
    (min.z <= crd.z && crd.z <= max.z))
 #endif
 
+
 macro2 foreach_region_plus_plus(coord rmin, coord rmax) {
   {
     int ig = 0;
@@ -61,6 +62,8 @@ macro2 foreach_region_plus_plus(coord rmin, coord rmax) {
 
     Point point = {0};
     Point pmin = {0}, pmax = {0};
+
+#   if TREE // Tree version
 
     for (point.level = depth(); point.level >= 0; point.level--) {
       PNT_MIN(pmin, rmin, point.level);
@@ -120,5 +123,96 @@ macro2 foreach_region_plus_plus(coord rmin, coord rmax) {
       // if (no_leaves)
       //   break;
     }
+
+# else // Multigrid version   
+    coord gridmin = {0}, gridmax = {0}, intersectmin = {0}, intersectmax = {0};
+
+#   if  _MPI    
+      // Local grid min/max coordinates
+      gridmin.x = ( (double)mpi_coords[0] / (double)Dimensions.x ) * L0 + X0;
+      gridmax.x = ( (double)( mpi_coords[0] + 1 ) / (double)Dimensions.x ) * L0 
+    		+ X0;      
+#     if dimension >= 2    
+        gridmin.y = ( (double)mpi_coords[1] / (double)Dimensions.y ) * L0 + Y0;
+        gridmax.y = ( (double)( mpi_coords[1] + 1 ) / (double)Dimensions.y ) 
+		* L0 + Y0;
+#     endif
+#     if dimension >= 3  		  	    
+        gridmin.z = ( (double)mpi_coords[2] / (double)Dimensions.z ) * L0 + Z0;
+        gridmax.z = ( (double)( mpi_coords[2] + 1 ) / (double)Dimensions.z ) 
+		* L0 + Z0;
+#     endif		 
+#   else
+      gridmin.x = X0;
+      gridmax.x = X0 + L0;
+#     if dimension >= 2    
+        gridmin.y = Y0;
+        gridmax.y = Y0 + L0;
+#     endif
+#     if dimension >= 3  		  	    
+        gridmin.z = Z0;      
+        gridmax.z = Z0 + L0;
+#     endif	      
+#   endif
+
+    // Do the local grid and region AABB intersect ?
+    // If they do, compute the intersection box min/max coordinates
+#   if dimension == 1
+      if ( rmin.x <= gridmax.x && rmax.x >= gridmin.x ) 
+#   elif dimension == 2
+      if ( ( rmin.x <= gridmax.x && rmax.x >= gridmin.x ) &&
+	( rmin.y <= gridmax.y && rmax.y >= gridmin.y ) ) 
+#   else // dimension == 3 
+      if ( ( rmin.x <= gridmax.x && rmax.x >= gridmin.x ) &&
+	( rmin.y <= gridmax.y && rmax.y >= gridmin.y ) &&
+	( rmin.z <= gridmax.z && rmax.z >= gridmin.z ) )
+#   endif 	 
+      {
+        foreach_dimension() 
+        {
+          // Note the +/- 1.e-8 * L0 avoids round off errors
+	  intersectmin.x = max( rmin.x, gridmin.x ) + 1.e-8 * L0;
+          intersectmax.x = min( rmax.x, gridmax.x ) - 1.e-8 * L0;        
+        }
+      }              
+
+    pmin = locate( intersectmin.x, intersectmin.y, intersectmin.z );
+    pmax = locate( intersectmax.x, intersectmax.y, intersectmax.z );
+    point.level = depth();
+    foreach_dimension() point.n.x = pmin.n.x; // is this really needed ?
+    
+#if dimension == 1
+      for (point.i = pmin.i; point.i <= pmax.i; point.i++) {
+        // clang-format off
+        {...}
+        // clang-format on
+        // if (is_leaf(cell))
+        //   no_leaves = false;
+      }
+#elif dimension == 2
+      for (point.i = pmin.i; point.i <= pmax.i; point.i++) {
+        for (point.j = pmin.j; point.j <= pmax.j; point.j++) {
+          // clang-format off
+          {...}
+          // clang-format on
+          // if (is_leaf(cell))
+          //   no_leaves = false;
+        }
+      }
+#else
+      for (point.i = pmin.i; point.i <= pmax.i; point.i++) {
+        for (point.j = pmin.j; point.j <= pmax.j; point.j++) {
+          for (point.k = pmin.k; point.k <= pmax.k; point.k++) {
+                {...}
+                // clang-format on
+                // if (is_leaf(cell))
+                //   no_leaves = false;
+          }
+        }
+      }
+#endif
+
+#endif // Tree or multigrid    
+
   }
 }

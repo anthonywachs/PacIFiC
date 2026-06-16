@@ -201,7 +201,8 @@ void DLMFD_Uzawa_velocity( const int i )
   double DLM_alpha = 0., DLM_beta = 0.;
   double DLM_tol = DLM_UZAWA_TOL, DLM_nr2 = 0., DLM_nr2_km1 = 0., DLM_wv = 0.;
   int ki = 0, DLM_maxiter = 200, allDLMFDcells = 0, allDLMFDpts = 0, 
-  	total_number_of_cells = 0, indexbp = 0, CX = 0, NCX = 0;
+  	total_number_of_cells = 0, indexbp = 0, CX = 0, NCX = 0,
+	griddepth = depth();
   double rho_f = FLUID_DENSITY;
 
 # if  _MPI
@@ -328,7 +329,7 @@ void DLMFD_Uzawa_velocity( const int i )
 #   endif 
 #   if DLMFD_BOUNDARYPOINTS       
       // Boundary points
-      foreach_level(MAXLEVEL,serial) 
+      foreach_level(griddepth,serial) 
         if ( DLM_Flag[] > 0.5 )
         {
           ppp.i = point.i;

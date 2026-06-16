@@ -1032,10 +1032,12 @@ void fill_FlagMesh( scalar Flag, vector const Index, RigidBody const* allrbs,
 	const size_t nrb, size_t const* rbnumToIndex )
 //----------------------------------------------------------------------------
 {
+  bool goflag = false;
+  int griddepth = depth();  
+
   foreach() Flag[] = 0; 
 
-  bool goflag = false;  
-  foreach_level(MAXLEVEL,serial) 
+  foreach_level(griddepth,serial) 
   {      
     goflag = false;
     if ( (int)Index.x[] > -1 ) goflag = true;
@@ -1121,11 +1123,12 @@ void deactivate_critical_boundary_points( RigidBody* allrbs, const size_t nrb,
   double critical_distance = 2. * L0 / (double)(1 << MAXLEVEL) ;
   bool deactivate = false;
   size_t RBid0 = 0, RBid1 = 0, PTid0 = 0, PTid1 = 0, indexp = 0, indexbp;
-  double x0, y0, z0;  
+  double x0, y0, z0; 
+  int griddepth = depth(); 
 
   // Distance to rigid walls
   if ( domain_has_rigid_walls )
-    foreach_level(MAXLEVEL,serial)
+    foreach_level(griddepth,serial)
     {      
       if ( (int)Index.x[] > -1 )
       {
@@ -1169,7 +1172,7 @@ void deactivate_critical_boundary_points( RigidBody* allrbs, const size_t nrb,
   // Proximity of rigid bodies
   if ( nrb > 1 )
   {
-    foreach_level(MAXLEVEL,serial)
+    foreach_level(griddepth,serial)
       if ( (int)Index.x[] > -1 )
       {
 	RBid0 = rbnumToIndex[(size_t)Index.y[]];
@@ -1300,7 +1303,7 @@ void reverse_fill_DLM_Flag( RigidBody* allrbs, const size_t nrb,
   coord rel = {0., 0., 0.};
   coord relnl = {0., 0., 0.};
   int NCX, CX, weight_id, pindex, nrbID = 0;
-  int rbID[20], bpnum; 
+  int rbID[20], bpnum, griddepth = depth(); 
   size_t goflag = 0;
   coord lambdacellpos = {0., 0., 0.};
   coord lambdapos = {0., 0., 0.};
@@ -1308,9 +1311,8 @@ void reverse_fill_DLM_Flag( RigidBody* allrbs, const size_t nrb,
   coord normal = {0., 0., 0.}; 
   GeomParameter const* gcp = NULL;
 
-
   // Assign values to CX_NCX 
-  foreach_level(MAXLEVEL,serial) 
+  foreach_level(griddepth,serial)
     if ( (int)Index.x[] > -1 )
     {
       bpnum = (int)Index.x[];
@@ -1363,7 +1365,7 @@ void reverse_fill_DLM_Flag( RigidBody* allrbs, const size_t nrb,
 	
 
   // Tag cells that belong to a 3^dim stencil
-  foreach_level(MAXLEVEL,serial) 
+  foreach_level(griddepth,serial) 
   {      
     localcellpos.x = x;
     localcellpos.y = y;
@@ -2664,6 +2666,92 @@ void read_explicit_splitAcceleration( char* dirname, RigidBody* allrbs,
 
 
 
+/** Flag regions  */
+//----------------------------------------------------------------------------
+void flag_rigidbodies_with_boundarylayers( RigidBody const* allrbs, 
+	const size_t nrb, scalar flag_maxlevel, double const dcoef, 
+	AABB const* ld )
+//----------------------------------------------------------------------------
+{
+  // Re-initialize the flag field to 0 
+  foreach() flag_maxlevel[] = 0.;
+
+  for (size_t k = 0; k < nrb; k++)
+  {
+    // Flag cells that are already identified as interior points
+    foreach_cache(allrbs[k].Interior) flag_maxlevel[] = 1.;
+    
+    // Flag additional cells in a halo of width dcoef * min_dx around 
+    // the rigid body
+    switch ( allrbs[k].shape )
+    {
+      case SPHERE:
+        flag_boundarylayer_Sphere( flag_maxlevel, dcoef, &(allrbs[k]), ld );
+	break;
+	  
+      case CIRCULARCYLINDER2D:
+        flag_boundarylayer_CircularCylinder2D( flag_maxlevel, dcoef, 
+	  	&(allrbs[k]), ld );
+	break;
+	  
+      case CUBE:
+        flag_boundarylayer_Polyhedron( flag_maxlevel, dcoef, &(allrbs[k]), ld );
+	break;
+
+      case TETRAHEDRON:
+        flag_boundarylayer_Polyhedron( flag_maxlevel, dcoef, &(allrbs[k]), ld );
+	break;
+	
+      case OCTAHEDRON:
+	flag_boundarylayer_Polyhedron( flag_maxlevel, dcoef, &(allrbs[k]), ld );
+	break;
+	
+      case ICOSAHEDRON:
+	flag_boundarylayer_Polyhedron( flag_maxlevel, dcoef, &(allrbs[k]), ld );
+	break;
+
+      case DODECAHEDRON:
+	flag_boundarylayer_Polyhedron( flag_maxlevel, dcoef, &(allrbs[k]), ld );
+	break;
+	  
+      case BOX:
+	flag_boundarylayer_Polyhedron( flag_maxlevel, dcoef, &(allrbs[k]), ld );
+	break;
+	  
+      case CIRCULARCYLINDER3D:
+	flag_boundarylayer_CircularCylinder3D( flag_maxlevel, dcoef, 
+		&(allrbs[k]), ld );
+	break;
+
+      case CONE:
+	flag_boundarylayer_Cone( flag_maxlevel, dcoef, &(allrbs[k]), ld );
+	break;
+	  
+      case TRUNCATEDCONE:
+	flag_boundarylayer_TruncatedCone( flag_maxlevel, dcoef, &(allrbs[k]),
+		 ld );
+	break;
+	  
+      case ELLIPSOID:
+	flag_boundarylayer_Ellipsoid( flag_maxlevel, dcoef, &(allrbs[k]), ld );
+	break;
+	  	  	  	  	  	
+      case HEXAGONALPRISM:
+        flag_boundarylayer_Polyhedron( flag_maxlevel, dcoef, &(allrbs[k]), ld );
+	break;	  
+		  
+      default:
+        fprintf( stderr,"Unknown Rigid Body shape !!\n" );
+    }    
+  }
+
+  synchronize({flag_maxlevel});  
+}
+
+
+
+# if ADAPTIVE
+
 /** Adapt_wavelet algorithm with a maxlevel per field component */
 //----------------------------------------------------------------------------
 trace
@@ -2781,7 +2869,7 @@ astats adapt_wavelet_multimaxlevel (scalar * slist,       // list of scalars
   mpi_boundary_refine (listc);
   // coarsening
   // the loop below is only necessary to ensure symmetry of 2:1 constraint
-  for (int l = depth (); l >= 0; l--) {
+  for (int l = depth(); l >= 0; l--) {
     foreach_cell () if (!is_boundary (cell)) {
       if (level == l) {
         if (!is_leaf (cell)) {
@@ -2974,87 +3062,4 @@ astats adapt_wavelet_spatial ( scalar Flag, // Flag field
   return st;
 } 
 
-
-
-
-/** Flag regions  */
-//----------------------------------------------------------------------------
-void flag_rigidbodies_with_boundarylayers( RigidBody const* allrbs, 
-	const size_t nrb, scalar flag_maxlevel, double const dcoef, 
-	AABB const* ld )
-//----------------------------------------------------------------------------
-{
-  // Re-initialize the flag field to 0 
-  foreach() flag_maxlevel[] = 0.;
-
-  for (size_t k = 0; k < nrb; k++)
-  {
-    // Flag cells that are already identified as interior points
-    foreach_cache(allrbs[k].Interior) flag_maxlevel[] = 1.;
-    
-    // Flag additional cells in a halo of width dcoef * min_dx around 
-    // the rigid body
-    switch ( allrbs[k].shape )
-    {
-      case SPHERE:
-        flag_boundarylayer_Sphere( flag_maxlevel, dcoef, &(allrbs[k]), ld );
-	break;
-	  
-      case CIRCULARCYLINDER2D:
-        flag_boundarylayer_CircularCylinder2D( flag_maxlevel, dcoef, 
-	  	&(allrbs[k]), ld );
-	break;
-	  
-      case CUBE:
-        flag_boundarylayer_Polyhedron( flag_maxlevel, dcoef, &(allrbs[k]), ld );
-	break;
-
-      case TETRAHEDRON:
-        flag_boundarylayer_Polyhedron( flag_maxlevel, dcoef, &(allrbs[k]), ld );
-	break;
-	
-      case OCTAHEDRON:
-	flag_boundarylayer_Polyhedron( flag_maxlevel, dcoef, &(allrbs[k]), ld );
-	break;
-	
-      case ICOSAHEDRON:
-	flag_boundarylayer_Polyhedron( flag_maxlevel, dcoef, &(allrbs[k]), ld );
-	break;
-
-      case DODECAHEDRON:
-	flag_boundarylayer_Polyhedron( flag_maxlevel, dcoef, &(allrbs[k]), ld );
-	break;
-	  
-      case BOX:
-	flag_boundarylayer_Polyhedron( flag_maxlevel, dcoef, &(allrbs[k]), ld );
-	break;
-	  
-      case CIRCULARCYLINDER3D:
-	flag_boundarylayer_CircularCylinder3D( flag_maxlevel, dcoef, 
-		&(allrbs[k]), ld );
-	break;
-
-      case CONE:
-	flag_boundarylayer_Cone( flag_maxlevel, dcoef, &(allrbs[k]), ld );
-	break;
-	  
-      case TRUNCATEDCONE:
-	flag_boundarylayer_TruncatedCone( flag_maxlevel, dcoef, &(allrbs[k]),
-		 ld );
-	break;
-	  
-      case ELLIPSOID:
-	flag_boundarylayer_Ellipsoid( flag_maxlevel, dcoef, &(allrbs[k]), ld );
-	break;
-	  	  	  	  	  	
-      case HEXAGONALPRISM:
-        flag_boundarylayer_Polyhedron( flag_maxlevel, dcoef, &(allrbs[k]), ld );
-	break;	  
-		  
-      default:
-        fprintf( stderr,"Unknown Rigid Body shape !!\n" );
-    }    
-  }
-
-  synchronize({flag_maxlevel});  
-}
+# endif

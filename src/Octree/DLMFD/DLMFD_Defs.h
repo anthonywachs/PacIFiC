@@ -168,6 +168,9 @@
 # endif
 
 # define BGHOSTS 2
+# ifdef BSIZE
+#   undef BSIZE
+# endif
 # define BSIZE 128
 
 # ifndef TRANSLATION

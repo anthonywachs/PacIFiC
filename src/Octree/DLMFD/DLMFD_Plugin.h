@@ -84,6 +84,9 @@ event init (i = 0)
     printf( "Fluid viscosity = %6.3e\n", FLUID_VISCOSITY );
     printf( "Space dimension = %d\n", dimension );    
     printf( "Domain size = %6.3e\n", L0 );
+#   if !ADAPTIVE 
+      printf( "Number of cells = %d\n", 1 << 3*MAXLEVEL );      
+#   endif   
     printf( "\n" );            
   }  
 
