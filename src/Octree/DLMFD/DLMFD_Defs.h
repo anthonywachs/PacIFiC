@@ -304,6 +304,16 @@ than the fluid or neutrally buoyant */
 #   define B_SPLIT_EXPLICIT_ACCELERATION 0
 # endif
 
+# if ADAPTIVE 
+#   define LX L0
+#   define LY L0
+#   define LZ L0
+# else
+#   define LX L0
+#   define LY (L0 * (double)Dimensions.y / (double)Dimensions.x)
+#   define LZ (L0 * (double)Dimensions.z / (double)Dimensions.x)
+# endif
+
 
 
 

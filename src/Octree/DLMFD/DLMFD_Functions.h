@@ -606,7 +606,7 @@ void free_rigidbodies( RigidBody* allrbs, const size_t nrb, bool full_free )
 	  break;	  
 		  
         default:
-          fprintf( stderr,"Unknown Rigid Body shape !!\n" );
+          fprintf( stderr,"free_rigidbodies: Unknown Rigid Body shape !!\n" );
       }
     }                                      
   }
@@ -681,7 +681,7 @@ void print_rigidbody( RigidBody const* p, char const* poshift )
 	break;	      	  
 	  
       default:
-        fprintf( stderr,"Unknown Rigid Body shape !!\n" );
+        fprintf( stderr,"print_rigidbody: Unknown Rigid Body shape !!\n" );
     }
     printf( "\n" );
     printf( "%sCenter of mass position = %e %e", poshift, p->g.center.x, 
@@ -855,7 +855,8 @@ void print_referencerigidbody( RigidBody const* p, char const* poshift )
 	break;
 			  
       default:
-        fprintf( stderr,"Unknown Rigid Body shape !!\n" );
+        fprintf( stderr,"print_referencerigidbody: Unknown Rigid Body "	
+		"shape !!\n" );
     }
     printf( "\n" );
     printf( "%sRadius = %e\n", poshift, p->g.radius );  
@@ -1017,7 +1018,8 @@ bool is_in_rigidbody( RigidBody const* p, double x, double y, double z )
       break;	                              
 	  
     default:
-      fprintf( stderr,"Unknown Rigid Body shape !!\n" );
+      fprintf( stderr,"is_in_rigidbody: %d unknown Rigid Body shape !!\n",
+      	p->shape );
   }
 
   return ( is_in );
@@ -1037,6 +1039,10 @@ void fill_FlagMesh( scalar Flag, vector const Index, RigidBody const* allrbs,
 
   foreach() Flag[] = 0; 
 
+//   foreach()
+//     if ( (int)Index.x[] > -1 ) 
+//       printf("KKK = %d %d\n",(int)Index.x[],(int)Index.y[]);
+
   foreach_level(griddepth,serial) 
   {      
     goflag = false;
@@ -1054,9 +1060,12 @@ void fill_FlagMesh( scalar Flag, vector const Index, RigidBody const* allrbs,
         if ( !goflag ) 
           if ( is_leaf(cell) )
 	    if ( (int)Index.x[] > -1 )
+	    {
+//	      printf("XXX = %d %d\n",(int)Index.x[],(int)Index.y[]);
 	      if ( !is_in_rigidbody( &(allrbs[rbnumToIndex[(size_t)Index.y[]]]),
 	      	 xc, yc, zc ) ) 
 	        goflag = true;
+	    }
     }
 
     if ( goflag ) Flag[] = 1;
@@ -1591,7 +1600,8 @@ void create_referencerigidbody_boundary_geomfeatures( RigidBody* p )
       break;	                             	
 	  
     default:
-      fprintf( stderr, "Unknown Rigid Body shape !!\n" );
+      fprintf( stderr, "create_referencerigidbody_boundary_geomfeatures"
+      	"Unknown Rigid Body shape !!\n" );
   }
 }
 
@@ -2741,7 +2751,8 @@ void flag_rigidbodies_with_boundarylayers( RigidBody const* allrbs,
 	break;	  
 		  
       default:
-        fprintf( stderr,"Unknown Rigid Body shape !!\n" );
+        fprintf( stderr,"flag_rigidbodies_with_boundarylayers: "
+		"Unknown Rigid Body shape !!\n" );
     }    
   }
 

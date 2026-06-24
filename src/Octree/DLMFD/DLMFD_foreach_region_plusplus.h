@@ -133,13 +133,13 @@ macro2 foreach_region_plus_plus(coord rmin, coord rmax) {
       gridmax.x = ( (double)( mpi_coords[0] + 1 ) / (double)Dimensions.x ) * L0 
     		+ X0;      
 #     if dimension >= 2    
-        gridmin.y = ( (double)mpi_coords[1] / (double)Dimensions.y ) * L0 + Y0;
-        gridmax.y = ( (double)( mpi_coords[1] + 1 ) / (double)Dimensions.y ) 
+        gridmin.y = ( (double)mpi_coords[1] / (double)Dimensions.x ) * L0 + Y0;
+        gridmax.y = ( (double)( mpi_coords[1] + 1 ) / (double)Dimensions.x ) 
 		* L0 + Y0;
 #     endif
 #     if dimension >= 3  		  	    
-        gridmin.z = ( (double)mpi_coords[2] / (double)Dimensions.z ) * L0 + Z0;
-        gridmax.z = ( (double)( mpi_coords[2] + 1 ) / (double)Dimensions.z ) 
+        gridmin.z = ( (double)mpi_coords[2] / (double)Dimensions.x ) * L0 + Z0;
+        gridmax.z = ( (double)( mpi_coords[2] + 1 ) / (double)Dimensions.x ) 
 		* L0 + Z0;
 #     endif		 
 #   else
@@ -147,11 +147,11 @@ macro2 foreach_region_plus_plus(coord rmin, coord rmax) {
       gridmax.x = X0 + L0;
 #     if dimension >= 2    
         gridmin.y = Y0;
-        gridmax.y = Y0 + L0;
+        gridmax.y = Y0 + L0 * (double)Dimensions.y / (double)Dimensions.x;
 #     endif
 #     if dimension >= 3  		  	    
         gridmin.z = Z0;      
-        gridmax.z = Z0 + L0;
+        gridmax.z = Z0 + L0 * (double)Dimensions.z / (double)Dimensions.x;
 #     endif	      
 #   endif
 

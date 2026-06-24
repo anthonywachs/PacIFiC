@@ -83,9 +83,10 @@ event init (i = 0)
     printf( "Fluid density = %6.3e\n", FLUID_DENSITY );
     printf( "Fluid viscosity = %6.3e\n", FLUID_VISCOSITY );
     printf( "Space dimension = %d\n", dimension );    
-    printf( "Domain size = %6.3e\n", L0 );
+    printf( "Domain size = %6.3e x %6.3e x %6.3e\n", LX, LY, LZ );
 #   if !ADAPTIVE 
-      printf( "Number of cells = %d\n", 1 << 3*MAXLEVEL );      
+      printf( "Number of cells = %d\n", (1 << 3*MAXLEVEL) * Dimensions.y
+      	* Dimensions.z / ( Dimensions.x * Dimensions.x ) );      
 #   endif   
     printf( "\n" );            
   }  
@@ -601,13 +602,13 @@ event once_timestep_is_determined (i++)
 # if IMPOSED_PERIODICFLOW
 #   if IMPOSED_PERIODICFLOW_DIRECTION == 0 
       const face vector dp[] = { 
-	- imposed_periodicpressuredrop / ( L0 * FLUID_DENSITY ), 0., 0. };
+	- imposed_periodicpressuredrop / ( LX * FLUID_DENSITY ), 0., 0. };
 #   elif IMPOSED_PERIODICFLOW_DIRECTION == 1
       const face vector dp[] = { 0.,
-	- imposed_periodicpressuredrop / ( L0 * FLUID_DENSITY ), 0. };  	
+	- imposed_periodicpressuredrop / ( LY * FLUID_DENSITY ), 0. };  	
 #   else 
       const face vector dp[] = { 0., 0., 
-		- imposed_periodicpressuredrop / ( L0 * FLUID_DENSITY ) };  
+		- imposed_periodicpressuredrop / ( LZ * FLUID_DENSITY ) };  
 #   endif
     a = dp;
 # endif  
@@ -726,26 +727,29 @@ event end_timestep (i++)
       if ( pid() == 0 )
         printf( "   Periodic flow rate = %8.5e\n", flowrate );           
 #   else
-      double Q1 = - dt / ( L0 * FLUID_DENSITY );
+      double Q1 = 0.;
       double deltaflowrate = 0.;                    
-#     if IMPOSED_PERIODICFLOW_DIRECTION == 0 
+#     if IMPOSED_PERIODICFLOW_DIRECTION == 0
+        Q1 = - dt / ( LX * FLUID_DENSITY ); 
         flowrate = compute_flowrate_xperiodic( u );
 	deltaflowrate = imposed_periodicflowrate - flowrate;
-	imposed_periodicpressuredrop += deltaflowrate / ( Q1 * L0 * L0 );
+	imposed_periodicpressuredrop += deltaflowrate / ( Q1 * LY * LZ );
 	foreach()
-	  u.x[] += deltaflowrate / ( L0 * L0 );  
+	  u.x[] += deltaflowrate / ( LY * LZ );  
 #     elif IMPOSED_PERIODICFLOW_DIRECTION == 1
-        flowrate = compute_flowrate_yperiodic( u );
+        Q1 = - dt / ( LY * FLUID_DENSITY );
+	flowrate = compute_flowrate_yperiodic( u );
 	deltaflowrate = imposed_periodicflowrate - flowrate;
-	imposed_periodicpressuredrop += deltaflowrate / ( Q1 * L0 * L0 );
+	imposed_periodicpressuredrop += deltaflowrate / ( Q1 * LX * LZ );
 	foreach()
-	  u.y[] += deltaflowrate / ( L0 * L0 ); 
+	  u.y[] += deltaflowrate / ( LX * LZ ); 
 #     else 
-        flowrate = compute_flowrate_zperiodic( u );
+        Q1 = - dt / ( LZ * FLUID_DENSITY );
+	flowrate = compute_flowrate_zperiodic( u );
 	deltaflowrate = imposed_periodicflowrate - flowrate;		
-	imposed_periodicpressuredrop += deltaflowrate / ( Q1 * L0 * L0 );
+	imposed_periodicpressuredrop += deltaflowrate / ( Q1 * LX * LY );
 	foreach()
-	  u.z[] += deltaflowrate / ( L0 * L0 );    
+	  u.z[] += deltaflowrate / ( LX * LY );    
 #     endif
       synchronize((scalar *){u});
       if ( pid() == 0 )
