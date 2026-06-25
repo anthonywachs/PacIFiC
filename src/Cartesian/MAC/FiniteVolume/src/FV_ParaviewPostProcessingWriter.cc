@@ -17,6 +17,8 @@
 #include <MAC_Root.hh>
 #include <MAC_String.hh>
 #include <MAC_assertions.hh>
+#include <MAC_Utility.hh>
+
 #include <FV_TimeIterator.hh>
 #include <iomanip>
 #include <iostream>
@@ -730,11 +732,12 @@ FV_ParaviewPostProcessingWriter:: clearResultFiles( void )
      FV::out() << "   CLEAR PARAVIEW RESULTS FILES IN DIRECTORY " << 
      	RES_DIRECTORY << endl;
 
-     char* path = getenv("MAC_HOME");
-     string exe(path);
-     exe = exe+"/tools/ShellScripts/FVParaview_clear_exec "+RES_DIRECTORY;
-     int sys_res = system( exe.c_str() ) ;
-     if( sys_res != 0 )
+   //   char* path = getenv("MAC_HOME");
+   //   string exe(path);
+   //   exe = exe+"/tools/ShellScripts/FVParaview_clear_exec "+RES_DIRECTORY;
+   //   int sys_res = system( exe.c_str() ) ;
+
+     if( FVParaview_clear_exec(RES_DIRECTORY) != 0 )
      {
         ostringstream mesg ;
         mesg << "Unable to clear Paraview result files in directory "

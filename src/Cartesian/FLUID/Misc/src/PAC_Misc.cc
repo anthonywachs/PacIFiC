@@ -3,6 +3,7 @@
 #include <FV_DomainBuilder.hh>
 #include <MAC.hh>
 #include <MAC_Error.hh>
+#include <MAC_Utility.hh>
 #include <cstdlib>
 #include <sstream>
 
@@ -91,12 +92,13 @@ PAC_Misc:: clearAllFiles( string const& resultsDirectory,
      MAC::out() << "    CLEAR ALL FILES IN DIRECTORY " << resultsDirectory 
      	<< " AND " << savingsDirectory << endl << endl;
 
-     char* path = getenv("FLUID_MAC_HOME");
-     string exe(path);
-     exe = exe+"/ExeUtils/Pacific_clear_exec "+resultsDirectory+" "
-     	+savingsDirectory;
-     int sys_res = system( exe.c_str() ) ;
-     if( sys_res != 0 )
+    //  char* path = getenv("FLUID_MAC_HOME");
+    //  string exe(path);
+    //  exe = exe+"/ExeUtils/Pacific_clear_exec "+resultsDirectory+" "+savingsDirectory;
+    //  int sys_res = system( exe.c_str() ) ;
+
+
+    if( pacific_clear_exec(resultsDirectory, savingsDirectory) != 0 )
      {
         ostringstream mesg ;
         mesg << "Unable to clear files in directories "
