@@ -1374,8 +1374,11 @@ void LinkedCell::Link( Obstacle* root_obstacle )
   // i.e. cells expanded by a least the maximum circumscribed radius of the
   // largest particle in the simulation, hence guaranteeing that no collision
   // between particles and the obstacle is missed
-  // If the obstacle shape is RECTANGLE2D, we search intersection of its OBB 
-  // with the cell OBB
+  // Linking is a 2-stage procedure:
+  // 1. first a coarse test using AABB
+  // 2. second a finer test using OBB
+  // Note: we do not use GJK anymore for the fine test as GJK sometimes
+  // returns false negatives when two rigid bodies overlap a lot 
 
   AppCollision::Link( root_obstacle );
   
@@ -1391,8 +1394,7 @@ void LinkedCell::Link( Obstacle* root_obstacle )
   	myObs++)
   {
     RigidBodyWithCrust* obstacleRBWC = (*myObs)->getRigidBody();
-    BBox const* obstacleBBox = (*myObs)->getObstacleBox();
-    OBB obstacleOBB, cellOBB;    
+    BBox const* obstacleBBox = (*myObs)->getObstacleBox(); 
     Vector3 cellBoxExtension( 0.5 * alpha * m_cellsize_X, 
     	0.5 * alpha * m_cellsize_Y,
 	0.5 * alpha * m_cellsize_Z );    
@@ -1401,13 +1403,9 @@ void LinkedCell::Link( Obstacle* root_obstacle )
     	2. * cellBoxExtension[Z] );	
     RigidBodyWithCrust cellBoxRBWC( cellBox, cellPosition, false,
     	(*myObs)->getCrustThickness() );
-	
-    if ( obstacleRBWC->getConvex()->getConvexType() == RECTANGLE2D )
-    {
-      obstacleOBB = *(dynamic_cast<OBB*>(
+    OBB obstacleOBB = *(dynamic_cast<OBB*>(
     	obstacleRBWC->getConvex()->computeBVolume( 1 )));
-      cellOBB = *(dynamic_cast<OBB*>(cellBox->computeBVolume( 1 )));	
-    }
+    OBB cellOBB = *(dynamic_cast<OBB*>(cellBox->computeBVolume( 1 )));	
 
     // Intersection of the cell with the obstacle
     for (int m=0; m<m_nb; m++)
@@ -1421,13 +1419,9 @@ void LinkedCell::Link( Obstacle* root_obstacle )
         if ( (*myObs)->isSTLObstacle() ) add = true; // Temporary, TO DO
 	else 
 	{	  
-	  cellBoxRBWC.setOrigin( (*cg)[X], (*cg)[Y], (*cg)[Z] );
-	  
-	  if ( obstacleRBWC->getConvex()->getConvexType() == RECTANGLE2D )
-	    add = isContactBVolume( cellOBB, obstacleOBB, 
+	  cellBoxRBWC.setOrigin( (*cg)[X], (*cg)[Y], (*cg)[Z] );	    
+	  add = isContactBVolume( cellOBB, obstacleOBB, 
 	  	*cellBoxRBWC.getTransform(), *obstacleRBWC->getTransform() );
-	  else
-	    add = cellBoxRBWC.isContact( *obstacleRBWC );
 	}
 	
 	if ( add )
