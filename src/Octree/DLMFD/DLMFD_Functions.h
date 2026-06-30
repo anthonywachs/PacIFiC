@@ -1146,14 +1146,14 @@ void deactivate_critical_boundary_points( RigidBody* allrbs, const size_t nrb,
 	deactivate = false;
 	if ( !Period.x )
           if ( allrbs[indexp].s.bp[indexbp].x 
-	  		> L0 - critical_distance + X0 
+	  		> FULL_DOMAIN.x - critical_distance + X0 
 		|| allrbs[indexp].s.bp[indexbp].x  
 	  		< critical_distance + X0 )
 	    deactivate = true;
 	    	    	    
         if ( !Period.y )
           if ( allrbs[indexp].s.bp[indexbp].y 
-	  		> L0 - critical_distance + Y0 
+	  		> FULL_DOMAIN.y - critical_distance + Y0 
 		|| allrbs[indexp].s.bp[indexbp].y 
 			< critical_distance + Y0 )
 	    deactivate = true;
@@ -1161,7 +1161,7 @@ void deactivate_critical_boundary_points( RigidBody* allrbs, const size_t nrb,
 #       if dimension == 3
           if ( !Period.z )
             if ( allrbs[indexp].s.bp[indexbp].z 
-	    		> L0 - critical_distance + Z0 
+	    		> FULL_DOMAIN.z - critical_distance + Z0 
 		|| allrbs[indexp].s.bp[indexbp].z 
 			< critical_distance + Z0 )
 	      deactivate = true;
@@ -1348,11 +1348,11 @@ void reverse_fill_DLM_Flag( RigidBody* allrbs, const size_t nrb,
       shifted for each periodic clone. Therefore we may have a case where 
       the cell and the position of the Lagrange multiplier are on opposite 
       side of the domain. The solution is to subtract/add the periodic 
-      domain length L0 when this happens */
+      domain length when this happens */
       foreach_dimension()
       {
-        if ( rel.x > L0/2. ) rel.x = rel.x - L0;
-        else if ( rel.x < -L0/2. ) rel.x = rel.x + L0;
+        if ( rel.x > FULL_DOMAIN.x/2. ) rel.x = rel.x - FULL_DOMAIN.x;
+        else if ( rel.x < -FULL_DOMAIN.x/2. ) rel.x = rel.x + FULL_DOMAIN.x;
       }
       
       /* Reset dial integers */
@@ -1466,15 +1466,15 @@ void create_boundary_points( RigidBody* p, RigidBody const* refrb,
       shift.x = 0.;      
       if ( Period.x )
       {
-	if ( pos.x > L0 + ori.x )
+	if ( pos.x > FULL_DOMAIN.x + ori.x )
 	{  
-	  pos.x -= L0;
-	  shift.x = - L0;
+	  pos.x -= FULL_DOMAIN.x;
+	  shift.x = - FULL_DOMAIN.x;
 	}
         else if ( pos.x < 0. + ori.x )
 	{
-	  pos.x += L0;
-	  shift.x = L0;
+	  pos.x += FULL_DOMAIN.x;
+	  shift.x = FULL_DOMAIN.x;
 	}
       }
     }

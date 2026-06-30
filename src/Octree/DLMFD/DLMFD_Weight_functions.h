@@ -28,11 +28,11 @@
 # define inf1deltaz ( relnl.z < 1.1 * delta ) && ( relnl.z > 0.9 * delta )
 
 /** Compute the 1D distance for stencils in Periodic conditions */
-#define ACROSS_PERIODIC( a, b ) ( a - b > L0/2. || a - b < - L0/2. )
-#define PERIODIC_1DIST( a, b ) ( ( a - L0 - b > L0/2. \
-	|| a - L0 - b < - L0/2. ) ? a + L0 - b : a - L0 - b )
-#define GENERAL_1DIST( a, b ) ( ACROSS_PERIODIC( a, b ) ? \
-	PERIODIC_1DIST( a, b ) : a - b )
+#define ACROSS_PERIODIC( a, b, L ) ( a - b > L/2. || a - b < - L/2. )
+#define PERIODIC_1DIST( a, b, L ) ( ( a - L - b > L/2. \
+	|| a - L - b < - L/2. ) ? a + L - b : a - L - b )
+#define GENERAL_1DIST( a, b, L ) ( ACROSS_PERIODIC( a, b, L ) ? \
+	PERIODIC_1DIST( a, b, L ) : a - b )
 
 
 
@@ -3535,8 +3535,8 @@ double compute_weight_Quad( const int weight_id, const coord posb ,
       break;    
   }
   
-  posref.x = GENERAL_1DIST( posb.x, x1 ) / ( 2. * Delta );
-  posref.y = GENERAL_1DIST( posb.y, y1 ) / ( 2. * Delta );
+  posref.x = GENERAL_1DIST( posb.x, x1, FULL_DOMAIN.x ) / ( 2. * Delta );
+  posref.y = GENERAL_1DIST( posb.y, y1, FULL_DOMAIN.y ) / ( 2. * Delta );
     
   return weight = Q2weighting( weight_id, posref.x, posref.y, 0. );
   
@@ -3970,9 +3970,9 @@ double compute_weight_Quad( const int weight_id, const coord posb ,
       break;
   }
   
-  posref.x = GENERAL_1DIST( posb.x, x1 ) / ( 2. * Delta );
-  posref.y = GENERAL_1DIST( posb.y, y1 ) / ( 2. * Delta );
-  posref.z = GENERAL_1DIST( posb.z, z1 ) / ( 2. * Delta );
+  posref.x = GENERAL_1DIST( posb.x, x1, FULL_DOMAIN.x ) / ( 2. * Delta );
+  posref.y = GENERAL_1DIST( posb.y, y1, FULL_DOMAIN.y ) / ( 2. * Delta );
+  posref.z = GENERAL_1DIST( posb.z, z1, FULL_DOMAIN.z ) / ( 2. * Delta );
   
   return weight = Q2weighting( weight_id, posref.x, posref.y, posref.z ); 
 #endif

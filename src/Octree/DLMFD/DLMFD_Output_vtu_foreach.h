@@ -168,16 +168,16 @@ void output_vtu_ascii_foreach( scalar* list, vector* vlist, FILE* fp )
     foreach(serial, noauto)
     {
       if ( Period.x )
-        if ( x + Delta > X0 + L0 || x - Delta < X0 )
+        if ( x + Delta > X0 + FULL_DOMAIN.x || x - Delta < X0 )
           per_mask[] = 0.;
 #     if dimension > 1
         if ( Period.y )
-          if ( y + Delta > Y0 + L0 ||  y - Delta < Y0 )
+          if ( y + Delta > Y0 + FULL_DOMAIN.y ||  y - Delta < Y0 )
             per_mask[] = 0.;
 #     endif
 #     if dimension > 2
         if ( Period.z )
-          if ( z + Delta > Z0 + L0 || z - Delta < Z0 )
+          if ( z + Delta > Z0 + FULL_DOMAIN.z || z - Delta < Z0 )
             per_mask[] = 0.;
 #     endif
     }
@@ -431,16 +431,16 @@ void output_vtu_bin_foreach( scalar* list, vector* vlist, FILE* fp )
     foreach(serial, noauto)
     {
       if ( Period.x )
-        if ( x + Delta > X0 + L0 || x - Delta < X0 )
+        if ( x + Delta > X0 + FULL_DOMAIN.x || x - Delta < X0 )
           per_mask[] = 0.;
 #     if dimension > 1
         if ( Period.y )
-          if ( y + Delta > Y0 + L0 ||  y - Delta < Y0 )
+          if ( y + Delta > Y0 + FULL_DOMAIN.y ||  y - Delta < Y0 )
             per_mask[] = 0.;
 #     endif
 #     if dimension > 2
         if ( Period.z )
-          if ( z + Delta > Z0 + L0 || z - Delta < Z0 )
+          if ( z + Delta > Z0 + FULL_DOMAIN.z || z - Delta < Z0 )
             per_mask[] = 0.;
 #     endif
     }
@@ -717,16 +717,16 @@ void output_vtu_ascii_foreach_MPIIO( scalar* list, vector* vlist,
     foreach(serial, noauto)
     {
       if ( Period.x )
-        if ( x + Delta > X0 + L0 || x - Delta < X0 )
+        if ( x + Delta > X0 + FULL_DOMAIN.x || x - Delta < X0 )
           per_mask[] = 0.;
 #     if dimension > 1
         if ( Period.y )
-          if ( y + Delta > Y0 + L0 ||  y - Delta < Y0 )
+          if ( y + Delta > Y0 + FULL_DOMAIN.y ||  y - Delta < Y0 )
             per_mask[] = 0.;
 #     endif
 #     if dimension > 2
         if ( Period.z )
-          if ( z + Delta > Z0 + L0 || z - Delta < Z0 )
+          if ( z + Delta > Z0 + FULL_DOMAIN.z || z - Delta < Z0 )
             per_mask[] = 0.;
 #     endif
     }
@@ -1398,16 +1398,16 @@ void output_vtu_bin_foreach_MPIIO( scalar* list, vector* vlist,
     foreach(serial, noauto)
     {
       if ( Period.x )
-        if ( x + Delta > X0 + L0 || x - Delta < X0 )
+        if ( x + Delta > X0 + FULL_DOMAIN.x || x - Delta < X0 )
           per_mask[] = 0.;
 #     if dimension > 1
         if ( Period.y )
-          if ( y + Delta > Y0 + L0 ||  y - Delta < Y0 )
+          if ( y + Delta > Y0 + FULL_DOMAIN.y ||  y - Delta < Y0 )
             per_mask[] = 0.;
 #     endif
 #     if dimension > 2
         if ( Period.z )
-          if ( z + Delta > Z0 + L0 || z - Delta < Z0 )
+          if ( z + Delta > Z0 + FULL_DOMAIN.z || z - Delta < Z0 )
             per_mask[] = 0.;
 #     endif
     }
@@ -1767,18 +1767,23 @@ void output_vtu_domain( char* filename )
   	"format=\"ascii\">\n", PARAVIEW_DATANAME );
 #   if dimension == 2   
       fprintf( fvtk, "%12.5e %12.5e 0.\n", X0, Y0 );
-      fprintf( fvtk, "%12.5e %12.5e 0.\n", X0 + L0, Y0 ); 
-      fprintf( fvtk, "%12.5e %12.5e 0.\n", X0 + L0, Y0 + L0 );
-      fprintf( fvtk, "%12.5e %12.5e 0.\n", X0, Y0 + L0 ); 
+      fprintf( fvtk, "%12.5e %12.5e 0.\n", X0 + FULL_DOMAIN.x, Y0 ); 
+      fprintf( fvtk, "%12.5e %12.5e 0.\n", X0 + FULL_DOMAIN.x, Y0 +
+      	FULL_DOMAIN.y );
+      fprintf( fvtk, "%12.5e %12.5e 0.\n", X0, Y0 + FULL_DOMAIN.y ); 
 #   else
       fprintf( fvtk, "%12.5e %12.5e %12.5e\n", X0, Y0, Z0 );
-      fprintf( fvtk, "%12.5e %12.5e %12.5e\n", X0 + L0, Y0, Z0 ); 
-      fprintf( fvtk, "%12.5e %12.5e %12.5e\n", X0 + L0, Y0 + L0, Z0 );
-      fprintf( fvtk, "%12.5e %12.5e %12.5e\n", X0, Y0 + L0, Z0 );     
-      fprintf( fvtk, "%12.5e %12.5e %12.5e\n", X0, Y0, Z0 + L0 );
-      fprintf( fvtk, "%12.5e %12.5e %12.5e\n", X0 + L0, Y0, Z0 + L0 ); 
-      fprintf( fvtk, "%12.5e %12.5e %12.5e\n", X0 + L0, Y0 + L0, Z0 + L0 );
-      fprintf( fvtk, "%12.5e %12.5e %12.5e\n", X0, Y0 + L0, Z0 + L0 );
+      fprintf( fvtk, "%12.5e %12.5e %12.5e\n", X0 + FULL_DOMAIN.x, Y0, Z0 ); 
+      fprintf( fvtk, "%12.5e %12.5e %12.5e\n", X0 + FULL_DOMAIN.x, 
+      	Y0 + FULL_DOMAIN.y, Z0 );
+      fprintf( fvtk, "%12.5e %12.5e %12.5e\n", X0, Y0 + FULL_DOMAIN.y, Z0 );     
+      fprintf( fvtk, "%12.5e %12.5e %12.5e\n", X0, Y0, Z0 + FULL_DOMAIN.z );
+      fprintf( fvtk, "%12.5e %12.5e %12.5e\n", X0 + FULL_DOMAIN.x, 
+      	Y0, Z0 + FULL_DOMAIN.z ); 
+      fprintf( fvtk, "%12.5e %12.5e %12.5e\n", X0 + FULL_DOMAIN.x, 
+      	Y0 + FULL_DOMAIN.y, Z0 + FULL_DOMAIN.z );
+      fprintf( fvtk, "%12.5e %12.5e %12.5e\n", X0, Y0 + FULL_DOMAIN.y, 
+      	Z0 + FULL_DOMAIN.z );
 #   endif
     fputs( "</DataArray>\n", fvtk );  
     fputs( "</Points>\n", fvtk );

@@ -305,13 +305,19 @@ than the fluid or neutrally buoyant */
 # endif
 
 # if ADAPTIVE 
-#   define LX L0
-#   define LY L0
-#   define LZ L0
+#   if dimension == 2 
+#     define FULL_DOMAIN ((coord){L0,L0})
+#   else
+#     define FULL_DOMAIN ((coord){L0,L0,L0})
+#   endif
 # else
-#   define LX L0
-#   define LY (L0 * (double)Dimensions.y / (double)Dimensions.x)
-#   define LZ (L0 * (double)Dimensions.z / (double)Dimensions.x)
+#   if dimension == 2 
+#     define FULL_DOMAIN ((coord){L0,L0 * (double)Dimensions.y\
+	(double)Dimensions.x})
+#   else
+#     define FULL_DOMAIN ((coord){L0,L0 * (double)Dimensions.y /\
+	(double)Dimensions.x,L0 * (double)Dimensions.z / (double)Dimensions.x})
+#   endif
 # endif
 
 
