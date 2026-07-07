@@ -65,6 +65,26 @@ event Compute_cs (t < -1.)
 
 
 
+/** Generic additional things to do when writing output & restart data: TO BE 
+OVERLOADED BY THE USER */
+//----------------------------------------------------------------------------
+event Additional_user_output_data (t < -1.)
+//----------------------------------------------------------------------------
+{}
+
+
+
+
+/** Generic additional things to do when writing output & restart data: TO BE 
+OVERLOADED BY THE USER */
+//----------------------------------------------------------------------------
+event Additional_user_last_output_data (t < -1.)
+//----------------------------------------------------------------------------
+{}
+
+
+
+
 /** Overloading of the init event: initialize fluid and rigid bodies */
 //----------------------------------------------------------------------------
 event init (i = 0) 
@@ -542,7 +562,8 @@ event output_data (t += TINTERVALOUTPUT;
     DLMFD_construction();  
 # endif  
 
-  do_output( mess );  
+  do_output( mess );
+  event( "Additional_user_output_data" );  
 }
 
 
@@ -567,7 +588,8 @@ event last_output_data (t = end)
 
   do_output( mess );    
   output_dlmfd_perf ( &DLMFD_UzawaTiming, &DLMFD_ConstructionTiming, i, 
-  	&allDLMFDptscells );	       
+  	&allDLMFDptscells );
+  event( "Additional_user_last_output_data" );	       
 }	
 
 
