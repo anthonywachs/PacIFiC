@@ -97,6 +97,17 @@ event init (i = 0)
     printf( "==================================\n" );        
   }   
 
+  // Define domain size
+# if ADAPTIVE 
+    foreach_dimension() FULL_DOMAIN.x = L0 ;
+# else
+    FULL_DOMAIN.x = L0 ;
+    FULL_DOMAIN.y = L0 * (double)Dimensions.y / (double)Dimensions.x ;
+#   if dimension == 3
+      FULL_DOMAIN.z = L0 * (double)Dimensions.z / (double)Dimensions.x ;
+#   endif
+# endif
+
   // Output basic fluid and geometric parameters
   if ( pid() == 0 )
   {

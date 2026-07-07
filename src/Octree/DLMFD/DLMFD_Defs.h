@@ -304,22 +304,6 @@ than the fluid or neutrally buoyant */
 #   define B_SPLIT_EXPLICIT_ACCELERATION 0
 # endif
 
-# if ADAPTIVE 
-#   if dimension == 2 
-#     define FULL_DOMAIN ((coord){L0,L0})
-#   else
-#     define FULL_DOMAIN ((coord){L0,L0,L0})
-#   endif
-# else
-#   if dimension == 2 
-#     define FULL_DOMAIN ((coord){L0,L0 * (double)Dimensions.y\
-	(double)Dimensions.x})
-#   else
-#     define FULL_DOMAIN ((coord){L0,L0 * (double)Dimensions.y /\
-	(double)Dimensions.x,L0 * (double)Dimensions.z / (double)Dimensions.x})
-#   endif
-# endif
-
 
 
 
@@ -593,6 +577,7 @@ FILE* cellvstime = NULL;
 dynUIarray deactivatedBPindices;
 dynPDBarray deactivatedIndexFieldValues;
 AABB local_domain;
+coord FULL_DOMAIN;
 
 
 
