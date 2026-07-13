@@ -10,6 +10,7 @@
 #include "RawDataPostProcessingWriter.hh"
 #include "TrilobeCylinder.hh"
 #include "QuadrilobeCylinder.hh"
+#include "Dendrite.hh"
 #include "Data.hh"
 #include <stdlib.h>
 #include <algorithm>
@@ -918,6 +919,8 @@ void Grains::Construction( DOMElement* rootElement )
 	  particleRef = new TrilobeCylinder( nCompParticle, nbPC+int(i) );
 	else if ( sshape == "QuadrilobeCylinder" )
 	  particleRef = new QuadrilobeCylinder( nCompParticle, nbPC+int(i) );
+	else if ( sshape == "Dendrite" )
+	  particleRef = new Dendrite( nCompParticle, nbPC+int(i) );	
 	else 	
 	  particleRef = new CompositeParticle( nCompParticle, nbPC+int(i) );
         m_allcomponents.AddReferenceParticle( particleRef, nb );

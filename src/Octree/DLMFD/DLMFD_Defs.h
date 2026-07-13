@@ -324,7 +324,8 @@ enum RigidBodyShape {
   CONE,
   TRUNCATEDCONE,
   ELLIPSOID,
-  HEXAGONALPRISM
+  HEXAGONALPRISM,
+  SIXBRANCHSTAR
 };
 
 
@@ -396,6 +397,12 @@ typedef struct {
 } EllipsoidGeomParameter;
 
 
+/** Additional geometric parameters for 6-branch stars */
+typedef struct { 
+  double armWidth, armLength, depth;
+} SixBranchStarGeomParameter;
+
+
 /** Rigid body geometric parameters */
 typedef struct {
   coord center;
@@ -407,7 +414,8 @@ typedef struct {
   PolyGeomParameter* pgp;
   CylGeomParameter* cgp; 
   TruncConeGeomParameter* tcgp;
-  EllipsoidGeomParameter* elgp;  
+  EllipsoidGeomParameter* elgp;
+  SixBranchStarGeomParameter* sbsgp;  
 } GeomParameter;
 
 

@@ -32,7 +32,7 @@ event GranularSolver_init (t < -1.)
   char* pstr = NULL;
   int pstrsize = 0;  
 
-  // Grains runs in sequential 
+  // Grains runs in serial 
   if ( pid() == 0 )
   {
     // Output the call to Grains3D

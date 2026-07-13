@@ -139,6 +139,11 @@ void DLMFD_construction()
           create_FD_Interior_Polyhedron( &allRigidBodies[k], DLM_Index, 
 	  	DLM_PeriodicRefCenter, &local_domain );
           break;	  
+
+        case SIXBRANCHSTAR:
+          create_FD_Interior_Star( &allRigidBodies[k], DLM_Index, 
+	  	DLM_PeriodicRefCenter, &local_domain );
+          break;	
 	  
 	default:
           fprintf( stderr,"Unknown Rigid Body shape !!\n" );

@@ -12,6 +12,7 @@
 #include "GrainsBuilderFactory.hh"
 #include "TrilobeCylinder.hh"
 #include "QuadrilobeCylinder.hh"
+#include "Dendrite.hh"
 #include "Data.hh"
 #include <math.h>
 #include <stdlib.h>
@@ -903,6 +904,8 @@ void AllComponents::read_pre2024( istream& fileSave, string const& filename,
         particle = new TrilobeCylinder( false );  
       else if ( buffer == "QuadrilobeCylinder" )
         particle = new QuadrilobeCylinder( false );        	
+      else if ( buffer == "Dendrite" )
+        particle = new Dendrite( false );  
       else        
         particle = new CompositeParticle( false );
     }
@@ -946,6 +949,9 @@ void AllComponents::read_pre2024( istream& fileSave, string const& filename,
       else if ( m_ReferenceParticles[ParticleGeomType]
       		->getSpecificCompositeShapeName() == "QuadrilobeCylinder" )
         particle = new QuadrilobeCylinder( false );	
+      else if ( m_ReferenceParticles[ParticleGeomType]
+      		->getSpecificCompositeShapeName() == "Dendrite" )
+        particle = new Dendrite( false );
       else   
         particle = new CompositeParticle( false );
     }
@@ -1049,6 +1055,8 @@ size_t AllComponents::read( istream& fileSave, vector<Point3>* known_positions,
         particle = new TrilobeCylinder( false ); 
       else if ( buffer == "QuadrilobeCylinder" )
         particle = new QuadrilobeCylinder( false ); 
+      else if ( buffer == "Dendrite" )
+        particle = new Dendrite( false ); 
       else        
         particle = new CompositeParticle( false );
     }
@@ -1242,6 +1250,9 @@ void AllComponents::read_particles( string const& filename, size_t const& npart,
         else if ( m_ReferenceParticles[ParticleGeomType]
       		->getSpecificCompositeShapeName() == "QuadrilobeCylinder" )
           particle = new QuadrilobeCylinder( false );	  
+        else if ( m_ReferenceParticles[ParticleGeomType]
+      		->getSpecificCompositeShapeName() == "Dendrite" )
+          particle = new Dendrite( false );
         else   
           particle = new CompositeParticle( false );
       }

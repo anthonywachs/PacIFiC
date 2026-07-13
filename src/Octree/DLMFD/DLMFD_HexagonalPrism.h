@@ -286,6 +286,9 @@ void create_referenceRB_boundary_geomfeatures_HexagonalPrism(
 
     isb++;
   }
+  
+  free( corner_normals );
+  corner_normals = NULL;
 }
 
 

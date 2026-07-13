@@ -486,7 +486,11 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
 	
       case HEXAGONALPRISM:
 	update_Polyhedron_from_RBRef( gg, RBRef, allrbs[k].RotMat );
-        break;      	 
+        break;
+	
+      case SIXBRANCHSTAR:
+	update_Star_from_RBRef( gg, RBRef, allrbs[k].RotMat );
+        break;	      	 
 	        
       default:
         printf( "Unknown shape in UpdateParticlesBasilisk!!\n" );
@@ -806,7 +810,12 @@ char* CreateReferenceRBBasilisk( char* pstr, const int pstrsize,
         case 10004: 
           allrefrbs[k].shape = TRUNCATEDCONE;
 	  read_reference_TruncatedCone( gg, allrefrbs[k].RotMat );
-          break;	 	        	  
+          break;
+	 
+        case 1000003: 
+          allrefrbs[k].shape = SIXBRANCHSTAR;
+	  read_reference_Star( gg, allrefrbs[k].RotMat );
+          break;	  	 	        	  
 #     else
         case 2: 
           allrefrbs[k].shape = CIRCULARCYLINDER2D;
