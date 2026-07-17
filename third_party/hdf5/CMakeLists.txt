@@ -50,3 +50,24 @@ endif()
 # ExternalProject_Add_StepDependencies(hdf5_ep configure zlibng_ep)
 
 list(PREPEND CMAKE_PREFIX_PATH "${HDF5_PREFIX}")
+
+file(MAKE_DIRECTORY "${HDF5_PREFIX}/include")
+file(MAKE_DIRECTORY "${HDF5_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+
+add_library(hdf5::hdf5 UNKNOWN IMPORTED GLOBAL)
+set(_hdf5_hdf5 "${HDF5_PREFIX}/${CMAKE_INSTALL_LIBDIR}/libhdf5.so")
+set_target_properties(hdf5::hdf5 PROPERTIES
+  IMPORTED_LOCATION "${_hdf5_hdf5}"
+  INTERFACE_INCLUDE_DIRECTORIES "$<BUILD_INTERFACE:${HDF5_PREFIX}/include>"
+)
+add_dependencies(hdf5::hdf5 hdf5_ep)
+
+add_library(hdf5::hdf5_hl UNKNOWN IMPORTED GLOBAL)
+set(_hdf5_hdf5hl "${HDF5_PREFIX}/${CMAKE_INSTALL_LIBDIR}/libhdf5_hl.so")
+set_target_properties(hdf5::hdf5_hl PROPERTIES
+  IMPORTED_LOCATION "${_hdf5_hdf5hl}"
+  INTERFACE_INCLUDE_DIRECTORIES "$<BUILD_INTERFACE:${HDF5_PREFIX}/include>"
+)
+add_dependencies(hdf5::hdf5_hl hdf5_ep)
+
+list(PREPEND CMAKE_PREFIX_PATH "${HDF5_PREFIX}")
