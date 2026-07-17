@@ -42,6 +42,7 @@ endif
 ifneq ($(filter 1 true TRUE yes YES on ON,$(PACIFIC_HDF5_USE_THIRDPARTY)),)
 SRC_THIRDPARTY_DEPS += third_party-hdf5
 OCTREE_THIRDPARTY_DEPS += third_party-hdf5
+MAC_THIRDPARTY_DEPS += third_party-hdf5
 endif
 
 ifneq ($(filter 1 true TRUE yes YES on ON,$(PACIFIC_XERCESC_USE_THIRDPARTY)),)

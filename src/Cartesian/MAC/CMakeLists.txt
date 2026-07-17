@@ -23,6 +23,12 @@ else()
   find_package(ZLIB REQUIRED)
 endif()
 
+if (BUILD_THIRD_PARTY_HDF5)
+else()
+  set(HDF5_PREFER_PARALLEL TRUE)
+  find_package(HDF5 COMPONENTS C HL REQUIRED)
+endif()
+
 # ================================================================================
 #
 # Source tree targets/projects
@@ -129,6 +135,8 @@ target_link_libraries(MAC
   PUBLIC
     MPI::MPI_C
     ZLIB::ZLIB
+    hdf5::hdf5
+    hdf5::hdf5_hl
 )
 
 include(GNUInstallDirs)
