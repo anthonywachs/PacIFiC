@@ -18,6 +18,26 @@
         "BUILD_THIRD_PARTY_HDF5": "OFF",
         "BUILD_THIRD_PARTY_XERCESC": "OFF",
         "BUILD_THIRD_PARTY_ZLIB": "OFF",
+        "BUILD_THIRD_PARTY_PETSC": "OFF",
+        "PACIFIC_DEV_ENV": "ON"
+      }
+    },
+    {
+      "name": "Mac OS X (ARM)",
+      "displayName": "MacOS (ARM) (Release)",
+      "description": "Release build with system default generator.",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/release",
+      "cacheVariables": {
+        "CMAKE_CXX_COMPILER": "g++-16",
+        "CMAKE_C_COMPILER": "gcc-16",
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/release",
+        "CMAKE_INSTALL_RPATH": "${sourceDir}/install/release/lib",
+        "BUILD_THIRD_PARTY_HDF5": "OFF",
+        "BUILD_THIRD_PARTY_XERCESC": "OFF",
+        "BUILD_THIRD_PARTY_ZLIB": "OFF",
+        "BUILD_THIRD_PARTY_PETSC": "OFF",
         "PACIFIC_DEV_ENV": "ON"
       }
     },
@@ -91,6 +111,12 @@
       "jobs": 16
     },
     {
+      "name": "Mac OS X (ARM)",
+      "configurePreset": "Mac OS X (ARM)",
+      "description": "Build the macOS ARM release configuration",
+      "jobs": 16
+    },
+    {
       "name": "Fir",
       "configurePreset": "Fir",
       "description": "Build the Fir configuration",
@@ -119,6 +145,13 @@
     {
       "name": "Default",
       "configurePreset": "Default",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "Mac OS X (ARM)",
+      "configurePreset": "Mac OS X (ARM)",
       "output": {
         "outputOnFailure": true
       }

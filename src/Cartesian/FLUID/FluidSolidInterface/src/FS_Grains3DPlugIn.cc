@@ -5,7 +5,9 @@
 #include "GrainsCoupledWithFluid.hh"
 #include "ReaderXML.hh"
 #include <MAC_Error.hh>
+#include <filesystem>
 #include <sstream>
+#include <system_error>
 
 using std::ostringstream ;
 
@@ -63,13 +65,13 @@ FS_Grains3DPlugIn::FS_Grains3DPlugIn( string const& insertion_file_,
     // Delete input file with XML requirements, done by master process only
     if ( m_my_rank == m_is_master ) 
     { 
-      string cmd = "/bin/rm " + simulation_file_exe;
-      int sys_res = system( cmd.c_str() ) ;
-      if( sys_res != 0 )
+      std::error_code ec;
+      std::filesystem::remove(std::filesystem::path(simulation_file_exe), ec);
+      if( ec )
       {
          ostringstream mesg ;
          mesg << "Unable to remove temporary file "
-              << simulation_file_exe << "." << endl ;
+              << simulation_file_exe << ": " << ec.message() << "." << endl ;
          MAC_Error::object()->raise_plain( mesg.str() ) ;
       }
     }

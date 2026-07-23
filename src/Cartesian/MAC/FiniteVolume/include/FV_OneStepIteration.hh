@@ -5,6 +5,22 @@
 #include <map>
 #include <set>
 
+// macOS/GCC's <cmath> defines these legacy matherr() constants as bare
+// macros, which collide with member names declared below (e.g. DOMAIN).
+#ifdef DOMAIN
+#undef DOMAIN
+#endif
+#ifdef SING
+#undef SING
+#endif
+#ifdef OVERFLOW
+#undef OVERFLOW
+#endif
+#ifdef UNDERFLOW
+#undef UNDERFLOW
+#endif
+
+
 class MAC_Communicator ;
 class MAC_ModuleExplorer ;
 class MAC_ObjectRegister ;

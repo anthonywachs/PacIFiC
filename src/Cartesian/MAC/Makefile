@@ -38,8 +38,9 @@ INCDIRS += $(INCDIRMPI)
 ALLINC += $(wildcard $(INCDIRMPI)/*.hh)
 ALLINC += $(wildcard $(INCDIRMPI)/*.icc)
 
-SRCDIRPETSC := ExternalAPI/PETSc_3.24.3/src
-INCDIRPETSC := ExternalAPI/PETSc_3.24.3/include
+MAC_PETSC_API_VERSION ?= 3.25.3
+SRCDIRPETSC := ExternalAPI/PETSc_$(MAC_PETSC_API_VERSION)/src
+INCDIRPETSC := ExternalAPI/PETSc_$(MAC_PETSC_API_VERSION)/include
 INCDIRS += $(INCDIRPETSC)
 ALLINC += $(wildcard $(INCDIRPETSC)/*.hh)
 ALLINC += $(wildcard $(INCDIRPETSC)/*.icc)

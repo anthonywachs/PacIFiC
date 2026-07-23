@@ -39,13 +39,15 @@ FS_RigidBody* FS_RigidBody_BuilderFactory:: create( size_t& dimens,
         prb = new FS_Sphere( in, id_ );
 		  break;
 
+      case 10002:
       case 777:
-        prb = new FS_3Dcylinder( in, id_ );
-		  break;
+	        prb = new FS_3Dcylinder( in, id_ );
+			  break;
 
-	   case 666:
-		  prb = new FS_3Dbox( in, id_ );
-		  break;
+		   case 10001:
+		   case 666:
+			  prb = new FS_3Dbox( in, id_ );
+			  break;
 
 	   case 4:
 		  prb = new FS_GeneralPolyhedron( in, id_ );
@@ -67,10 +69,14 @@ FS_RigidBody* FS_RigidBody_BuilderFactory:: create( size_t& dimens,
  	     prb = new FS_GeneralPolyhedron( in, id_ );
  	     break;
 
-      default:
-        MAC::out() << "Unknown rigid body shape" << endl;
-    }
-  }
+	      default:
+	        if ( ncorners_ >= 100 && ncorners_ < 10000 &&
+			ncorners_ / 100 < 100 && ncorners_ % 100 > 0 )
+	          prb = new FS_GeneralPolyhedron( in, id_ );
+	        else
+	          MAC::out() << "Unknown rigid body shape" << endl;
+	    }
+	  }
 
   return ( prb );
 
