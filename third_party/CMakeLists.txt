@@ -20,4 +20,6 @@ endif()
 
 option(BUILD_THIRD_PARTY_PETSC "Build PETSc" OFF)
 if(BUILD_THIRD_PARTY_PETSC)
+    set(PETSC_PREFIX "${CMAKE_INSTALL_PREFIX}" CACHE PATH "PETSc install prefix")
+    add_subdirectory(petsc)
 endif()

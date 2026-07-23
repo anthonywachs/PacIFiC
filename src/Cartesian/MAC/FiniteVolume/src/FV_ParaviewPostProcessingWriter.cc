@@ -24,7 +24,9 @@
 #include <iostream>
 #include <sstream>
 #include <fstream>
+#include <filesystem>
 #include <cstdlib>
+#include <system_error>
 #include <zlib.h>
 #include <cmath>
 using std::cout ; 
@@ -164,6 +166,15 @@ FV_ParaviewPostProcessingWriter:: FV_ParaviewPostProcessingWriter(
    if ( exp->has_entry( "files_rootname" ) )
      BASE_FILENAME = exp->string_data( "files_rootname" );         
    PVD_FILENAME = RES_DIRECTORY + "/" + BASE_FILENAME + ".pvd" ;
+
+   std::error_code ec;
+   std::filesystem::create_directories(std::filesystem::path(RES_DIRECTORY), ec);
+   if( ec )
+   {
+      MAC_Error::object()->raise_plain(
+         "unable to create results directory : " + RES_DIRECTORY + ": " +
+         ec.message() ) ;
+   }
 }
 
 

@@ -29,6 +29,57 @@ else()
   find_package(HDF5 COMPONENTS C HL REQUIRED)
 endif()
 
+set(MAC_PETSC_API_VERSION "AUTO" CACHE STRING
+  "MAC PETSc ExternalAPI version. Use AUTO to select from the PETSc package version.")
+set_property(CACHE MAC_PETSC_API_VERSION PROPERTY STRINGS
+  AUTO 3.25.3 3.24.3 3.17.5 3.11.4 3.2.0)
+
+function(mac_select_petsc_api_version petsc_version output_variable)
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/ExternalAPI/PETSc_${petsc_version}/include/EXT_PETScAPI.hh")
+    set(${output_variable} "${petsc_version}" PARENT_SCOPE)
+  elseif(petsc_version VERSION_GREATER_EQUAL "3.25" AND petsc_version VERSION_LESS "3.26")
+    set(${output_variable} "3.25.3" PARENT_SCOPE)
+  elseif(petsc_version VERSION_GREATER_EQUAL "3.24" AND petsc_version VERSION_LESS "3.25")
+    set(${output_variable} "3.24.3" PARENT_SCOPE)
+  elseif(petsc_version VERSION_GREATER_EQUAL "3.17" AND petsc_version VERSION_LESS "3.18")
+    set(${output_variable} "3.17.5" PARENT_SCOPE)
+  elseif(petsc_version VERSION_GREATER_EQUAL "3.11" AND petsc_version VERSION_LESS "3.12")
+    set(${output_variable} "3.11.4" PARENT_SCOPE)
+  elseif(petsc_version VERSION_GREATER_EQUAL "3.2" AND petsc_version VERSION_LESS "3.3")
+    set(${output_variable} "3.2.0" PARENT_SCOPE)
+  else()
+    message(FATAL_ERROR
+      "No MAC PETSc ExternalAPI adapter is available for PETSc ${petsc_version}. "
+      "Set -DMAC_PETSC_API_VERSION=<version> to force a compatible adapter.")
+  endif()
+endfunction()
+
+set(MAC_PETSC_API_VERSION_RESOLVED "${MAC_PETSC_API_VERSION}")
+
+if(BUILD_THIRD_PARTY_PETSC)
+  if(MAC_PETSC_API_VERSION STREQUAL "AUTO" OR MAC_PETSC_API_VERSION STREQUAL "")
+    set(MAC_PETSC_API_VERSION_RESOLVED "3.25.3")
+  endif()
+else()
+  find_package(PkgConfig REQUIRED)
+  pkg_check_modules(PETSC REQUIRED PETSc)
+
+  if(NOT PETSC_VERSION)
+    message(FATAL_ERROR
+      "PETSc was found via pkg-config, but no version was reported. "
+      "Set -DMAC_PETSC_API_VERSION=<version> to force a compatible adapter.")
+  endif()
+
+  if(MAC_PETSC_API_VERSION STREQUAL "AUTO" OR MAC_PETSC_API_VERSION STREQUAL "")
+    mac_select_petsc_api_version("${PETSC_VERSION}" MAC_PETSC_API_VERSION_RESOLVED)
+    message(STATUS
+      "Detected PETSc ${PETSC_VERSION}; using MAC PETSc ExternalAPI ${MAC_PETSC_API_VERSION_RESOLVED}")
+  else()
+    message(STATUS
+      "Using MAC PETSc ExternalAPI ${MAC_PETSC_API_VERSION_RESOLVED} with PETSc ${PETSC_VERSION}")
+  endif()
+endif()
+
 # ================================================================================
 #
 # Source tree targets/projects
@@ -68,10 +119,17 @@ list(APPEND MAC_SOURCES
   ${MAC_MPI_SOURCES}
 )
 
-# ExternalAPI/PETSc_3.24.3
-list(APPEND MAC_INCLUDE_DIRS "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/ExternalAPI/PETSc_3.24.3/include>")
+set(MAC_PETSC_API_DIR "${CMAKE_CURRENT_SOURCE_DIR}/ExternalAPI/PETSc_${MAC_PETSC_API_VERSION_RESOLVED}")
+
+if(NOT EXISTS "${MAC_PETSC_API_DIR}/include/EXT_PETScAPI.hh")
+  message(FATAL_ERROR
+    "MAC PETSc API '${MAC_PETSC_API_VERSION_RESOLVED}' was not found at '${MAC_PETSC_API_DIR}'")
+endif()
+
+# ExternalAPI/PETSc_${MAC_PETSC_API_VERSION_RESOLVED}
+list(APPEND MAC_INCLUDE_DIRS "$<BUILD_INTERFACE:${MAC_PETSC_API_DIR}/include>")
 file(GLOB MAC_PETSC_SOURCES CONFIGURE_DEPENDS
-  "${CMAKE_CURRENT_SOURCE_DIR}/ExternalAPI/PETSc_3.24.3/src/*.cc"
+  "${MAC_PETSC_API_DIR}/src/*.cc"
 )
 list(SORT MAC_PETSC_SOURCES)
 list(APPEND MAC_SOURCES
@@ -103,10 +161,8 @@ add_library(MAC SHARED ${MAC_SOURCES})
 add_library(PacIFiC::MAC ALIAS MAC)
 
 if(BUILD_THIRD_PARTY_PETSC)
+  target_link_libraries(MAC PRIVATE PETSc::PETSc)
 else()
-  find_package(PkgConfig REQUIRED)
-  pkg_check_modules(PETSC REQUIRED PETSc)
-
   target_include_directories(MAC PRIVATE ${PETSC_INCLUDE_DIRS})
   target_link_directories(MAC PRIVATE ${PETSC_LIBRARY_DIRS})
   target_link_libraries(MAC PRIVATE ${PETSC_LIBRARIES})
