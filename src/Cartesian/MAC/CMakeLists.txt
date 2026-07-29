@@ -32,7 +32,7 @@ endif()
 set(MAC_PETSC_API_VERSION "AUTO" CACHE STRING
   "MAC PETSc ExternalAPI version. Use AUTO to select from the PETSc package version.")
 set_property(CACHE MAC_PETSC_API_VERSION PROPERTY STRINGS
-  AUTO 3.25.3 3.24.3 3.17.5 3.11.4 3.2.0)
+  AUTO 3.25.3 3.24.3 3.19.6 3.17.5 3.11.4 3.2.0)
 
 function(mac_select_petsc_api_version petsc_version output_variable)
   if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/ExternalAPI/PETSc_${petsc_version}/include/EXT_PETScAPI.hh")
@@ -58,7 +58,9 @@ set(MAC_PETSC_API_VERSION_RESOLVED "${MAC_PETSC_API_VERSION}")
 
 if(BUILD_THIRD_PARTY_PETSC)
   if(MAC_PETSC_API_VERSION STREQUAL "AUTO" OR MAC_PETSC_API_VERSION STREQUAL "")
-    set(MAC_PETSC_API_VERSION_RESOLVED "3.25.3")
+    mac_select_petsc_api_version("${PETSC_VERSION}" MAC_PETSC_API_VERSION_RESOLVED)
+    message(STATUS
+      "Using third-party PETSc ${PETSC_VERSION}; using MAC PETSc ExternalAPI ${MAC_PETSC_API_VERSION_RESOLVED}")
   endif()
 else()
   find_package(PkgConfig REQUIRED)
