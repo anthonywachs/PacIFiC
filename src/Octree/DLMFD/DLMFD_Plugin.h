@@ -170,7 +170,7 @@ event init (i = 0)
     // Read restart time
     if ( pid() == 0 ) printf( "Read t and dt from time restart file\n" );
     read_t_restart( DUMP_DIR, &trestart, &dtrestart, 
-    	&imposed_periodicpressuredrop );  
+    	&imposed_periodicpressuredrop );
 
     // Re-initialize the VTK writer
 #   if PARAVIEW
@@ -412,11 +412,12 @@ event init (i = 0)
   
   
   // By default:
-  // * do NOT DUMP the work fields used in the DLMFD sub-problem, the 
-  // field u_previoustime and the pressure field
+  // * u, p and pf are dumped (contrary to Basilisk, p and pf are dumped
+  // to guarantee arithmetic exact restart)
+  // * do NOT DUMP the work fields used in the DLMFD sub-problem and the 
+  // field u_previoustime
   // * DUMP the DLM_explicit field in the DLMFD sub-problem
   u_previoustime.nodump = true ;
-  p.nodump = true ;
   DLM_Flag.nodump = true;
   DLM_FlagMesh.nodump = true ;
   foreach_dimension()
@@ -531,9 +532,9 @@ void do_output( char const* mess )
 
   // Basilisk output for restart
 # if DLM_ALPHA_COUPLING
-    dump_list = (scalar *){u, g, DLM_explicit};
+    dump_list = (scalar *){u, g, p, pf, DLM_explicit};
 # else
-    dump_list = (scalar *){u, g};    
+    dump_list = (scalar *){u, g, p, pf};    
 # endif     
   dump( FLUID_DUMP_FILENAME, dump_list );
       
@@ -727,7 +728,7 @@ event after_viscous_term (i++)
 { 
 # if !DLMFD_PROB_AFTER_NAVIERSTOKES 
     do_DLMFD( i );
-# endif 
+# endif  
 }
 
 
@@ -740,7 +741,8 @@ event end_timestep (i++)
 //----------------------------------------------------------------------------
 {
   if ( pid() == 0 )
-    printf( "   NS solver: MGu_niter = %d, MGp_niter = %d\n", mgu.i, mgp.i );
+    printf( "   NS solver: MGu_niter = %d, MGpf_niter = %d, MGp_niter = %d\n", 
+    	mgu.i, mgpf.i, mgp.i );
 
 # if DLMFD_PROB_AFTER_NAVIERSTOKES 
     do_DLMFD( i );

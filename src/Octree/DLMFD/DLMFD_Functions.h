@@ -2790,6 +2790,29 @@ void flag_rigidbodies_with_boundarylayers( RigidBody const* allrbs,
 
 
 
+
+/** Computes the L2 norm of a vector field */
+//----------------------------------------------------------------------------
+double compute_L2_norm( const vector u ) 
+//----------------------------------------------------------------------------
+{
+  double L2 = 0.;
+  
+  foreach(reduction(+:L2))
+  {
+    double nn = 0.;
+    foreach_dimension() nn += sq( u.x[] );
+    L2 += sqrt( nn ) * pow( Delta, dimension );
+  }
+  
+  L2 = sqrt( L2 );     
+ 
+  return L2;
+}
+
+
+
+
 # if ADAPTIVE
 
 /** Adapt_wavelet algorithm with a maxlevel per field component */

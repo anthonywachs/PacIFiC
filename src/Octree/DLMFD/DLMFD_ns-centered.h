@@ -129,9 +129,8 @@ event defaults (i = 0)
   CFL = 0.8;
 
   /**
-  The pressures are never dumped. */
-
-  p.nodump = pf.nodump = true;
+  The pressures are dumped to guarantee arithmetic exact restart. */
+  p.nodump = pf.nodump = false;
   
   /**
   The default density field is set to unity (times the metric and the
