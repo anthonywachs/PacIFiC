@@ -1,0 +1,200 @@
+Constant:
+  DomainOrigin:
+    X: -0.05
+    Y: -0.05
+    Z: 0
+  CollisionDetection:
+    NeighborListType: BruteForce
+    LinkedCellType: Host
+    CellSizeFactor: 1.0
+    UpdateFrequency: 0
+    SortingFrequency: 0
+    BoundingVolumeType: OBB
+  ContactModel:
+    ContactModelType: Hooke
+    MaterialA: matP
+    MaterialB: matP
+    Parameters: 'kn="1.e5" en="0.85" etat="1.e5" muc="0" kr="0"'
+  Temporal:
+    TStart: 0.0
+    TEnd: 1e-2
+    DT: 1e-7
+    TimeIntegrationType: FirstOrderExplicit
+  ParticlesList:
+    - Number: 1
+      Density: 1163
+      Material: matP
+      CrustThickness: 1e-5
+      ParticleShape: '<Cylinder Radius="0.004" Height="0.006"/>'
+      AngularPosition:
+        aX: 0
+        aY: 0
+        aZ: 0
+  ObstaclesList:
+    - Name: Rectangle
+      Material: matP
+      CrustThickness: 1e-5
+      ObstacleShape: '<Rectangle LX="0.1" LY="0.1"/>'
+      ObstaclePosition:
+        X: 0
+        Y: 0
+        Z: 0
+      ObstacleAngularPosition:
+        aX: 0
+        aY: 0
+        aZ: 0
+  Forces:
+    Gravity:
+      GX: 0.0
+      GY: 0.0
+      GZ: 0.0
+  Insertion:
+    ForceInsertion: 1
+    InitialPosition:
+      Type: Random
+      Seed:
+        Mode: Default
+      Windows:
+        - Type: Box
+          MinPoint:
+            X: 0
+            Y: 0
+            Z: 0.01
+          MaxPoint:
+            X: 0
+            Y: 0
+            Z: 0.01
+    InitialVelocity:
+      Type: Constant
+      X: 0
+      Y: 0
+      Z: -1.0
+    InitialOrientation:
+      Type: Zero
+  PostProcessing:
+    TimeSave:
+      Start: 0.0
+      End: 1e-2
+      DT: 1e-7
+
+Fork:
+  - name: aX_0
+    overrides:
+      Particles:
+        AngularPosition:
+          aX: 0
+          aY: 0
+          aZ: 0
+      SimulationSettings:
+        WritersSection:
+          - Type: Raw
+            Directory: ./results/cylinderWall
+            RootName: cylinderWall0
+  - name: aX_10
+    overrides:
+      Particles:
+        AngularPosition:
+          aX: 10
+          aY: 0
+          aZ: 0
+      SimulationSettings:
+        WritersSection:
+          - Type: Raw
+            Directory: ./results/cylinderWall
+            RootName: cylinderWall10
+  - name: aX_20
+    overrides:
+      Particles:
+        AngularPosition:
+          aX: 20
+          aY: 0
+          aZ: 0
+      SimulationSettings:
+        WritersSection:
+          - Type: Raw
+            Directory: ./results/cylinderWall
+            RootName: cylinderWall20
+  - name: aX_30
+    overrides:
+      Particles:
+        AngularPosition:
+          aX: 30
+          aY: 0
+          aZ: 0
+      SimulationSettings:
+        WritersSection:
+          - Type: Raw
+            Directory: ./results/cylinderWall
+            RootName: cylinderWall30
+  - name: aX_40
+    overrides:
+      Particles:
+        AngularPosition:
+          aX: 40
+          aY: 0
+          aZ: 0
+      SimulationSettings:
+        WritersSection:
+          - Type: Raw
+            Directory: ./results/cylinderWall
+            RootName: cylinderWall40
+  - name: aX_50
+    overrides:
+      Particles:
+        AngularPosition:
+          aX: 50
+          aY: 0
+          aZ: 0
+      SimulationSettings:
+        WritersSection:
+          - Type: Raw
+            Directory: ./results/cylinderWall
+            RootName: cylinderWall50
+  - name: aX_60
+    overrides:
+      Particles:
+        AngularPosition:
+          aX: 60
+          aY: 0
+          aZ: 0
+      SimulationSettings:
+        WritersSection:
+          - Type: Raw
+            Directory: ./results/cylinderWall
+            RootName: cylinderWall60
+  - name: aX_70
+    overrides:
+      Particles:
+        AngularPosition:
+          aX: 70
+          aY: 0
+          aZ: 0
+      SimulationSettings:
+        WritersSection:
+          - Type: Raw
+            Directory: ./results/cylinderWall
+            RootName: cylinderWall70
+  - name: aX_80
+    overrides:
+      Particles:
+        AngularPosition:
+          aX: 80
+          aY: 0
+          aZ: 0
+      SimulationSettings:
+        WritersSection:
+          - Type: Raw
+            Directory: ./results/cylinderWall
+            RootName: cylinderWall80
+  - name: aX_90
+    overrides:
+      Particles:
+        AngularPosition:
+          aX: 90
+          aY: 0
+          aZ: 0
+      SimulationSettings:
+        WritersSection:
+          - Type: Raw
+            Directory: ./results/cylinderWall
+            RootName: cylinderWall90

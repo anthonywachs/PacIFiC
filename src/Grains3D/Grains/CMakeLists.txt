@@ -147,7 +147,7 @@ target_include_directories(Grains3D
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
-if (PACIFIC_ENABLE_MPI)
+if (PACIFIC_USE_MPI)
   target_link_libraries(Grains3D 
     PUBLIC
       MPI::MPI_C

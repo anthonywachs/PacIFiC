@@ -1,0 +1,21 @@
+<!-- Contact Definition DTD -->
+
+<!ELEMENT ContactForceModel (Material, Parameters)>
+<!ATTLIST ContactForceModel Type (Hooke|HookeMemory) "Hooke">
+
+<!ELEMENT Material EMPTY>
+<!ATTLIST Material materialA CDATA #REQUIRED>
+<!ATTLIST Material materialB CDATA #REQUIRED>
+
+<!-- Shared required parameters (both models) -->
+<!-- Hooke-only:       kr                         (required for Hooke)    -->
+<!-- HookeMemory-only: kt, mur, etarpf            (kt required; mur/etarpf optional) -->
+<!ELEMENT Parameters EMPTY>
+<!ATTLIST Parameters kn     CDATA #REQUIRED>
+<!ATTLIST Parameters en     CDATA #REQUIRED>
+<!ATTLIST Parameters etat   CDATA #REQUIRED>
+<!ATTLIST Parameters muc    CDATA #REQUIRED>
+<!ATTLIST Parameters kr     CDATA #IMPLIED>
+<!ATTLIST Parameters kt     CDATA #IMPLIED>
+<!ATTLIST Parameters mur    CDATA #IMPLIED>
+<!ATTLIST Parameters etarpf CDATA #IMPLIED>

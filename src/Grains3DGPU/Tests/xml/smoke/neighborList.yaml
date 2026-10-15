@@ -1,0 +1,184 @@
+Constant:
+  DomainOrigin:
+    X: 0.0
+    Y: 0.0
+    Z: 0.0
+  DomainSize:
+    X: 1.152
+    Y: 1.152
+    Z: 1.152
+  Temporal:
+    TStart: 0.0
+    DT: 1e-05
+    TEnd: 0.0001
+  CollisionDetection:
+    CellSizeFactor: 1.0
+  ContactModelsList:
+    - Type: Hooke
+      MaterialA: mat1
+      MaterialB: mat1
+      Parameters: 'kn="120000000.0" en="0.1" etat="100.0" muc="0.5" kr="0.0"'
+  ParticlesList:
+    - Number: 2
+      Density: 1000
+      Material: mat1
+      CrustThickness: 0.0002
+      ParticleShape: '<Sphere Radius="0.08"/>'
+    - Number: 2
+      Density: 1000
+      Material: mat1
+      CrustThickness: 0.0002
+      ParticleShape: '<Box LX="0.0924" LY="0.0924" LZ="0.0924"/>'
+    - Number: 2
+      Density: 1000
+      Material: mat1
+      CrustThickness: 0.0002
+      ParticleShape: '<Cylinder Radius="0.0566" Height="0.1131"/>'
+    - Number: 2
+      Density: 1000
+      Material: mat1
+      CrustThickness: 0.0002
+      ParticleShape: '<Superquadric a="0.01" b="0.01" c="0.08" n1="2.0" n2="2.0"/>'
+  ObstaclesList:
+    - Material: mat1
+      CrustThickness: 1e-5
+      ObstacleShape: '<Rectangle LX="1.152" LY="1.152" LZ="0.0"/>'
+      ObstaclePosition:
+        X: 0.576
+        Y: 0.576
+        Z: 0.0
+      ObstacleAngularPosition:
+        aX: 0.0
+        aY: 0.0
+        aZ: 0.0
+    - Material: mat1
+      CrustThickness: 1e-5
+      ObstacleShape: '<Rectangle LX="1.152" LY="1.152" LZ="0.001"/>'
+      ObstaclePosition:
+        X: 1.152
+        Y: 0.576
+        Z: 0.576
+      ObstacleAngularPosition:
+        aX: 0.0
+        aY: -90.0
+        aZ: 0.0
+    - Material: mat1
+      CrustThickness: 1e-5
+      ObstacleShape: '<Rectangle LX="1.152" LY="1.152" LZ="0.001"/>'
+      ObstaclePosition:
+        X: 0.0
+        Y: 0.576
+        Z: 0.576
+      ObstacleAngularPosition:
+        aX: 0.0
+        aY: 90.0
+        aZ: 0.0
+    - Material: mat1
+      CrustThickness: 1e-5
+      ObstacleShape: '<Rectangle LX="1.152" LY="1.152" LZ="0.001"/>'
+      ObstaclePosition:
+        X: 0.576
+        Y: 1.152
+        Z: 0.576
+      ObstacleAngularPosition:
+        aX: 0.0
+        aY: 90.0
+        aZ: 0.0
+    - Material: mat1
+      CrustThickness: 1e-5
+      ObstacleShape: '<Rectangle LX="1.152" LY="1.152" LZ="0.001"/>'
+      ObstaclePosition:
+        X: 0.576
+        Y: 0.0
+        Z: 0.576
+      ObstacleAngularPosition:
+        aX: -90.0
+        aY: 0.0
+        aZ: 0.0
+  Forces:
+    Gravity:
+      GX: 0.0
+      GY: 0.0
+      GZ: -9.81
+  Insertion:
+    ForceInsertion: 0
+    InitialPosition:
+      Type: Random
+      Seed:
+        Mode: UserDefined
+        Value: 1
+      Windows:
+        - Type: Box
+          MinPoint:
+            X: 0.0
+            Y: 0.0
+            Z: 0.0
+          MaxPoint:
+            X: 1.152
+            Y: 1.152
+            Z: 1.152
+    InitialOrientation:
+      Type: Random
+      Seed:
+        Mode: UserDefined
+        Value: 1
+      Windows:
+        - Type: Box
+          MinPoint:
+            X: 0.0
+            Y: 0.0
+            Z: 0.0
+          MaxPoint:
+            X: 6.28
+            Y: 6.28
+            Z: 6.28
+
+Groups:
+  CPU-BruteForce:
+    Simulation:
+      SimType: Standard
+      Precision: Double
+    CollisionDetection:
+      NeighborListType: BruteForce
+  CPU-LinkedCell:
+    Simulation:
+      SimType: Standard
+      Precision: Double
+    CollisionDetection:
+      NeighborListType: LinkedCell
+  GPU-BruteForce:
+    Simulation:
+      SimType: GPU
+      Precision: Double
+    CollisionDetection:
+      NeighborListType: BruteForce
+  GPU-LinkedCell-DeviceSort:
+    Simulation:
+      SimType: GPU
+      Precision: Double
+    CollisionDetection:
+      NeighborListType: LinkedCell
+      LinkedCellType: Device_SortBased
+  GPU-LinkedCell-Atomic:
+    Simulation:
+      SimType: GPU
+      Precision: Double
+    CollisionDetection:
+      NeighborListType: LinkedCell
+      LinkedCellType: Device_Atomic
+
+Fork:
+  - name: BruteForce
+    groups: [CPU-BruteForce, GPU-BruteForce]
+  - name: LinkedCell-Update
+    groups: [CPU-LinkedCell, GPU-LinkedCell-Atomic, GPU-LinkedCell-DeviceSort]
+    overrides:
+      CollisionDetection:
+        UpdateFrequency:
+          range: [0, 5]
+  - name: LinkedCell-Sort
+    groups: [CPU-LinkedCell, GPU-LinkedCell-Atomic, GPU-LinkedCell-DeviceSort]
+    overrides:
+      CollisionDetection:
+        SortingFrequency:
+          range: [0, 5]

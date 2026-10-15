@@ -1,0 +1,131 @@
+# Sliding Ramp Test
+# A single sphere (R=0.1 m, rho=1000 kg/m^3) rests on a flat horizontal surface.
+# Gravity is tilted by theta=20 deg to simulate an inclined plane:
+#   GX =  g*sin(20 deg) ~  3.3552 m/s^2  (tangential / driving)
+#   GZ = -g*cos(20 deg) ~ -9.2183 m/s^2  (normal / pressing)
+#
+# Two contact models are compared:
+#
+#  Hooke (no tangential memory, etat=0):
+#    F_t = etat * v_t = 0  ->  zero tangential resistance
+#    The sphere slides freely:  x(t) = 0.5 * g*sin(20 deg) * t^2
+#
+#  HookeMemory (tangential spring, kt=2e4, etat=0, muc=0.8, mur=5.0):
+#    F_t = -kt * x_rel  ->  static friction possible when tan(theta) <= muc
+#    tan(20 deg) ~ 0.364 < 0.8 = muc  ->  sphere held near x=0
+#    Analytical:  x(t) = x_eq * (1 - cos(omega_t * t))
+#    where  x_eq = m*g*sin(20 deg)/kt ~ 0.703 mm,  omega_t = sqrt(kt/m) ~ 69.1 rad/s
+#    (sub-mm oscillation; Coulomb limit is never exceeded because
+#     2*tan(20 deg)=0.728 < 0.8=muc)
+#    Note: mur=5.0 rolling resistance prevents the sphere from rolling.
+#    Without it the tangential spring torques the sphere into rolling
+#    (5/7 effect), so the CM drifts instead of oscillating.
+#    mur=5 -> omega_y_max < 3e-5 rad/s (omega_y ~ 1/mur^2 with kr=3*kn*mur^2),
+#    so the spring tracks x_CM to better than 0.1% and the simulation
+#    matches the analytical solution to within 0.1%.
+#
+# Parameters:  R=0.1 m, rho=1000, kn=5e4, en=0.9, muc=0.8, mur=5.0 (HookeMemory only)
+#              theta=20 deg, dt=1e-4 s, TEnd=0.3 s
+#              m = rho*(4/3)*pi*R^3 ~ 4.189 kg,  omega_t = sqrt(kt/m) ~ 69.1 rad/s
+#              Sphere inserted at z_eq=R-m*G_NOR/kn~0.09923m so F_N is constant from the start.
+
+_sphere_template: &sphere_particle
+  Density: 1000
+  Material: matP
+  CrustThickness: 1.0e-4
+  ParticleShape: '<Sphere Radius="0.1"/>'
+
+Constant:
+  Simulation:
+    SimType: Standard
+    Precision: Double
+  DomainOrigin:
+    X: -0.25
+    Y: -0.25
+    Z: -0.01
+  DomainSize:
+    X: 0.40
+    Y: 0.25
+    Z: 0.40
+  CollisionDetection:
+    NeighborListType: BruteForce
+    LinkedCellType: Host
+    CellSizeFactor: 1.0
+    UpdateFrequency: 0
+    SortingFrequency: 0
+    BoundingVolumeType: OBB
+    NarrowPhaseType: GJK
+  Temporal:
+    TStart: 0.0
+    TEnd: 0.3
+    DT: 1.0e-4
+    TimeIntegrationType: SecondOrderLeapFrog
+  ParticlesList:
+    - <<: *sphere_particle
+      Number: 1
+  ObstaclesList:
+    - Material: matP
+      CrustThickness: 1.0e-4
+      ObstacleShape: '<Rectangle LX="2.0" LY="2.0"/>'
+      ObstaclePosition:
+        X: 0
+        Y: 0
+        Z: 0
+      ObstacleAngularPosition:
+        aX: 0
+        aY: 0
+        aZ: 0
+  Forces:
+    Gravity:
+      GX: 3.3552   # g*sin(20 deg) -- drives sphere along floor
+      GY: 0.0
+      GZ: -9.2183  # -g*cos(20 deg) -- presses sphere against floor
+  Insertion:
+    ForceInsertion: 1
+    InitialPosition:
+      Type: Constant
+      X: 0.0
+      Y: 0.0
+      Z: 0.09922772   # z_eq = R - m*G_NOR/kn (sphere at normal-overlap equilibrium, no z-bounce)
+    InitialOrientation:
+      Type: Zero
+    InitialVelocity:
+      Type: Zero
+    InitialAngularVelocity:
+      Type: Zero
+  PostProcessing:
+    TimeSave:
+      Start: 0.0
+      End: 0.3
+      DT: 1.0e-4
+  SimulationSettings:
+    OutputPrecision: 15
+
+Fork:
+  # --- Hooke: no tangential memory -> particle slides freely -----------------
+  - name: Hooke
+    overrides:
+      ContactModelsList:
+        - Type: Hooke
+          MaterialA: matP
+          MaterialB: matP
+          Parameters: 'kn="5.0e4" en="0.9" etat="0" muc="0.8" kr="0"'
+      SimulationSettings:
+        WritersSection:
+          - Type: Raw
+            Directory: ./results/slidingRamp
+            RootName: slidingRamp_Hooke
+
+  # --- HookeMemory: tangential spring -> static friction holds ---------------
+  - name: HookeMemory
+    overrides:
+      ContactModelsList:
+        - Type: HookeMemory
+          MaterialA: matP
+          MaterialB: matP
+          Parameters: 'kn="5.0e4" en="0.9" kt="2.0e4" etat="0" muc="0.8" mur="5.0"'
+      SimulationSettings:
+        WritersSection:
+          - Type: Raw
+            Directory: ./results/slidingRamp
+            RootName: slidingRamp_HookeMemory

@@ -1,0 +1,163 @@
+# Moving Box Test Configuration
+# A single box launched upward under gravity.
+#   Initial position : z0 = 0.0 m
+#   Initial velocity : v0 = 5.0
+#   Gravity          : gz = -9.81
+#
+# Test matrix (6 cases total):
+#   - 3 timesteps : dt = 1e-2, 1e-3, 1e-4 s
+#   - 2 integrators: FirstOrderExplicit, SecondOrderLeapFrog
+# Results are used for convergence-order analysis.
+
+_particle_template: &box_particle
+  Density: 1000
+  Material: matP
+  CrustThickness: 1.0e-4
+  ParticleShape: '<Box LX="0.1" LY="0.1" LZ="0.1"/>'
+
+Constant:
+  Simulation:
+    SimType: Standard
+    Precision: Double
+  DomainOrigin:
+    X: -1.0
+    Y: -1.0
+    Z: -5.0
+  DomainSize:
+    X: 2.0
+    Y: 2.0
+    Z: 10.0
+  CollisionDetection:
+    NeighborListType: BruteForce
+    BoundingVolumeType: OBB
+    NarrowPhaseType: GJK
+  ContactModelsList:
+    - Type: Hooke
+      MaterialA: matP
+      MaterialB: matP
+      Parameters: 'kn="5.e4" en="0.8" etat="0" muc="0" kr="0"'
+  Temporal:
+    TStart: 0.0
+    TEnd: 1.0
+  ParticlesList:
+    - <<: *box_particle
+      Number: 1
+  Forces:
+    Gravity:
+      GX: 0.0
+      GY: 0.0
+      GZ: -9.81
+  Insertion:
+    ForceInsertion: 1
+    InitialPosition:
+      Type: Constant
+      X: 0.0
+      Y: 0.0
+      Z: 0.0
+    InitialOrientation:
+      Type: Zero
+    InitialVelocity:
+      Type: Constant
+      X: 0.0
+      Y: 0.0
+      Z: 5.0
+    InitialAngularVelocity:
+      Type: Zero
+  PostProcessing:
+    TimeSave:
+      Start: 0.0
+      End: 1.0
+      DT: 1.0e-2
+  SimulationSettings:
+    OutputPrecision: 15
+
+Fork:
+  # FirstOrderExplicit
+  - name: dt1e-1_FirstOrder
+    overrides:
+      Temporal:
+        DT: 1.0e-1
+        TimeIntegrationType: FirstOrderExplicit
+      SimulationSettings:
+        WritersSection:
+          - Type: Raw
+            Directory: ./results/movingBox
+            RootName: movingBox_dt1e-1_FirstOrder
+
+  - name: dt1e-2_FirstOrder
+    overrides:
+      Temporal:
+        DT: 1.0e-2
+        TimeIntegrationType: FirstOrderExplicit
+      SimulationSettings:
+        WritersSection:
+          - Type: Raw
+            Directory: ./results/movingBox
+            RootName: movingBox_dt1e-2_FirstOrder
+
+  - name: dt1e-3_FirstOrder
+    overrides:
+      Temporal:
+        DT: 1.0e-3
+        TimeIntegrationType: FirstOrderExplicit
+      SimulationSettings:
+        WritersSection:
+          - Type: Raw
+            Directory: ./results/movingBox
+            RootName: movingBox_dt1e-3_FirstOrder
+
+  - name: dt1e-4_FirstOrder
+    overrides:
+      Temporal:
+        DT: 1.0e-4
+        TimeIntegrationType: FirstOrderExplicit
+      SimulationSettings:
+        WritersSection:
+          - Type: Raw
+            Directory: ./results/movingBox
+            RootName: movingBox_dt1e-4_FirstOrder
+
+  # SecondOrderLeapFrog
+  - name: dt1e-1_SecondOrder
+    overrides:
+      Temporal:
+        DT: 1.0e-1
+        TimeIntegrationType: SecondOrderLeapFrog
+      SimulationSettings:
+        WritersSection:
+          - Type: Raw
+            Directory: ./results/movingBox
+            RootName: movingBox_dt1e-1_SecondOrder
+
+  - name: dt1e-2_SecondOrder
+    overrides:
+      Temporal:
+        DT: 1.0e-2
+        TimeIntegrationType: SecondOrderLeapFrog
+      SimulationSettings:
+        WritersSection:
+          - Type: Raw
+            Directory: ./results/movingBox
+            RootName: movingBox_dt1e-2_SecondOrder
+
+  - name: dt1e-3_SecondOrder
+    overrides:
+      Temporal:
+        DT: 1.0e-3
+        TimeIntegrationType: SecondOrderLeapFrog
+      SimulationSettings:
+        WritersSection:
+          - Type: Raw
+            Directory: ./results/movingBox
+            RootName: movingBox_dt1e-3_SecondOrder
+
+  - name: dt1e-4_SecondOrder
+    overrides:
+      Temporal:
+        DT: 1.0e-4
+        TimeIntegrationType: SecondOrderLeapFrog
+      SimulationSettings:
+        WritersSection:
+          - Type: Raw
+            Directory: ./results/movingBox
+            RootName: movingBox_dt1e-4_SecondOrder

@@ -5,7 +5,8 @@
 # ================================================================================
 
 cmake_minimum_required(VERSION 3.12.0...4.0.0)
-
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+include(defaults)
 
 # ================================================================================
 #
@@ -20,7 +21,6 @@ set(PACIFIC_FALLBACK_VERSION "0.0.1")
 # User-facing overrides (set via -D...=... or cmake-gui)
 set(PACIFIC_VERSION_FULL_OVERRIDE   "" CACHE STRING "Override full version string (highest priority).")
 set(PACIFIC_VERSION_SEMVER_OVERRIDE "" CACHE STRING "Override SemVer (e.g. 1.2.3). Used if FULL override is empty.")
-option(PACIFIC_VERSION_USE_GIT "If no user override, compute version from git when available" ON)
 
 # Defaults
 set(PACIFIC_VERSION_SEMVER "${PACIFIC_FALLBACK_VERSION}")
@@ -90,8 +90,6 @@ project(PacIFiC
   VERSION ${PACIFIC_VERSION_SEMVER}
   LANGUAGES C CXX
 )
- 
-option(PACIFIC_ENABLE_MPI "Enable MPI-dependent targets" ON)
 
 # Avoid deprecated MPI C++ bindings in mpi.h across all targets.
 add_compile_definitions(
@@ -181,13 +179,16 @@ endif()
 # Build and install third-party dependencies as part of CMake build
 #
 # By default, these are OFF. They can be enabled by setting the corresponding
-# BUILD_THIRD_PARTY_<LIBRARY> option to ON in ccmake or using 
-# -DBUILD_THIRD_PARTY_<LIBRARY>=ON
+# PACIFIC_BUILD_THIRD_PARTY_<LIBRARY> option to ON in ccmake or using 
+# -DPACIFIC_BUILD_THIRD_PARTY_<LIBRARY>=ON
 # 
 # ================================================================================
 
-option(USE_SUBMODULES "Use git submodules for third-party dependencies where available" OFF)
 add_subdirectory(third_party)  
+
+if(PACIFIC_BUILD_TESTS)
+  enable_testing()
+endif()
 
 # ================================================================================
 #
@@ -203,9 +204,7 @@ add_subdirectory(src)
 #
 # ================================================================================
 
-option(PACIFIC_DOCS "Enable docs" OFF)
-
-if(PACIFIC_DOCS)
+if(PACIFIC_BUILD_DOCS)
   add_subdirectory(docs)
 endif()
 
@@ -215,10 +214,8 @@ endif()
 #
 # ================================================================================
 
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 include(PacificEnv)
-
-option(PACIFIC_DEV_ENV "Create environment file" OFF) 
+ 
 
 if (PACIFIC_DEV_ENV) 
   if (OCTREE_BASILISK_PROVIDER STREQUAL "SYSTEM")

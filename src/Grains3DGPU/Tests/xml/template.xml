@@ -1,0 +1,73 @@
+<Grains3D Type="{sim_type}" Precision="{precision}">
+
+<Construction>
+    <Origin X="{domain_origin_X}" Y="{domain_origin_Y}" Z="{domain_origin_Z}"/>
+    <MaxCoordinate X="{domain_size_X}" Y="{domain_size_Y}" Z="{domain_size_Z}"/>
+    <Periodicity PX="0" PY="0" PZ="0"/>
+
+    <CollisionDetection EnableTimings="{cd_enable_timings}" UseRelativeTransformations="{cd_use_relative_transformations}">
+        <NeighborList Type="{neighbor_list_type}" UpdateFrequency="{update_frequency}"/>
+        <LinkedCell Type="{linked_cell_type}" CellSizeFactor="{cell_size_factor}" UpdatingFrequency="{update_frequency}" SortingFrequency="{sorting_frequency}"/>
+        <BoundingVolume Type="{bounding_volume_type}"/>
+        <NarrowPhase Type="{narrow_phase_type}" Acceleration="{narrow_phase_acceleration}"/>
+    </CollisionDetection>
+
+    <ContactForceModels EnableTimings="{cfm_enable_timings}" Compaction="{cfm_compaction}">
+		<ContactForceModel Type='{contact_model_type}'>
+			<Material materialA="{contact_model_materialA}" materialB="{contact_model_materialB}"/>
+			<Parameters {contact_model_parameters}/>
+		</ContactForceModel>
+	</ContactForceModels>
+
+    <TemporalSetting>
+        <TimeInterval Start="{t_start}" End="{t_end}" dt="{dt}"/>
+        <TimeIntegration Type="{time_integration_type}"/>
+    </TemporalSetting>
+
+    <Particles>
+        <Particle Number="{num_particles}" Density="{particle_density}" Material="{particle_material}">
+			<Convex CrustThickness="{crust_thickness}">
+                {particle_shape}
+			</Convex>
+            <Transformation>
+                <Centre X="{particle_position_X}" Y="{particle_position_Y}" Z="{particle_position_Z}"/>
+                <AngularPosition Type="Angles" aX="{particle_angular_position_aX}" aY="{particle_angular_position_aY}" aZ="{particle_angular_position_aZ}"/>
+            </Transformation>
+		</Particle>
+    </Particles>
+
+    <Obstacles>
+        <Obstacle Material="{obstacle_material}">
+            <Convex CrustThickness="{crust_thickness}">
+                {obstacle_shape}
+            </Convex>
+            <Transformation>
+                <Centre X="{obstacle_position_X}" Y="{obstacle_position_Y}" Z="{obstacle_position_Z}"/>
+                <AngularPosition Type="Angles" aX="{obstacle_angular_position_aX}" aY="{obstacle_angular_position_aY}" aZ="{obstacle_angular_position_aZ}"/>
+            </Transformation>
+        </Obstacle>
+    </Obstacles>
+</Construction>
+
+<Forces>
+    <Gravity GX="{gravity_GX}" GY="{gravity_GY}" GZ="{gravity_GZ}"/>
+</Forces>
+
+<Simulation>
+    <Verbosity Frequency="{verbosity_frequency}"/>
+    <Timings Enable="{simulation_timings_enable}"/>
+    <ParticleInsertion ForceInsertion="{force_insertion}">
+{position_section}
+{orientation_section}
+{velocity_section}
+{angular_velocity_section}
+    </ParticleInsertion>
+    <PostProcessing>
+        <TimeSave dt="{time_save_dt}"/>
+        <Writers>
+{writers_section}
+        </Writers>
+    </PostProcessing>
+</Simulation>
+
+</Grains3D>

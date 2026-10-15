@@ -15,10 +15,10 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/release",
-        "BUILD_THIRD_PARTY_HDF5": "OFF",
-        "BUILD_THIRD_PARTY_XERCESC": "OFF",
-        "BUILD_THIRD_PARTY_ZLIB": "OFF",
-        "BUILD_THIRD_PARTY_PETSC": "OFF",
+        "PACIFIC_BUILD_THIRD_PARTY_HDF5": "OFF",
+        "PACIFIC_BUILD_THIRD_PARTY_XERCESC": "OFF",
+        "PACIFIC_BUILD_THIRD_PARTY_ZLIB": "OFF",
+        "PACIFIC_BUILD_THIRD_PARTY_PETSC": "OFF",
         "PACIFIC_DEV_ENV": "ON"
       }
     },
@@ -34,11 +34,22 @@
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/release",
         "CMAKE_INSTALL_RPATH": "${sourceDir}/install/release/lib",
-        "BUILD_THIRD_PARTY_HDF5": "OFF",
-        "BUILD_THIRD_PARTY_XERCESC": "OFF",
-        "BUILD_THIRD_PARTY_ZLIB": "OFF",
+        "PACIFIC_BUILD_THIRD_PARTY_HDF5": "OFF",
+        "PACIFIC_BUILD_THIRD_PARTY_XERCESC": "OFF",
+        "PACIFIC_BUILD_THIRD_PARTY_ZLIB": "OFF",
         "BUILD_THIRD_PARTY_PETSC": "OFF",
         "PACIFIC_DEV_ENV": "ON"
+      }
+    },
+    {
+      "name": "GPU",
+      "displayName": "GPU",
+      "description": "Default GPU Configuration",
+      "inherits": "Default",
+      "binaryDir": "${sourceDir}/build/release_gpu",
+      "cacheVariables": {
+        "PACIFIC_USE_CUDA": "ON",
+        "GRAINS3D_GPU_CUDA_ARCHITECTURES": "75"
       }
     },
     {
@@ -50,11 +61,11 @@
       "cacheVariables": {
       	"CMAKE_INSTALL_PREFIX": "${sourceDir}/install/fir_release",
         "CMAKE_INSTALL_RPATH": "${sourceDir}/install/fir_release/lib64",
-        "USE_SUBMODULES": "ON",
+        "PACIFIC_USE_SUBMODULES": "ON",
         "OCTREE_BASILISK_PROVIDER": "VENDORED",
-        "BUILD_THIRD_PARTY_HDF5": "OFF",
-        "BUILD_THIRD_PARTY_XERCESC": "OFF",
-        "BUILD_THIRD_PARTY_ZLIB": "OFF"
+        "PACIFIC_BUILD_THIRD_PARTY_HDF5": "OFF",
+        "PACIFIC_BUILD_THIRD_PARTY_XERCESC": "OFF",
+        "PACIFIC_BUILD_THIRD_PARTY_ZLIB": "OFF"
       }
     },
     {
@@ -95,11 +106,11 @@
         "CMAKE_BUILD_RPATH": "/cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/lib64:/cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/lib/gcc/x86_64-pc-linux-gnu/12/",
         "CMAKE_INSTALL_RPATH": "/cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/lib64:/cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/lib/gcc/x86_64-pc-linux-gnu/12/",
         "CMAKE_SKIP_INSTALL_RPATH": "FALSE",
-        "USE_SUBMODULES": "ON",
+        "PACIFIC_USE_SUBMODULES": "ON",
         "OCTREE_BASILISK_PROVIDER": "VENDORED",
-        "BUILD_THIRD_PARTY_HDF5": "OFF",
-        "BUILD_THIRD_PARTY_XERCESC": "OFF",
-        "BUILD_THIRD_PARTY_ZLIB": "OFF"
+        "PACIFIC_BUILD_THIRD_PARTY_HDF5": "OFF",
+        "PACIFIC_BUILD_THIRD_PARTY_XERCESC": "OFF",
+        "PACIFIC_BUILD_THIRD_PARTY_ZLIB": "OFF"
       }
     }
   ],
@@ -108,43 +119,56 @@
       "name": "Default",
       "configurePreset": "Default",
       "description": "Build the release configuration",
-      "jobs": 16
+      "jobs": 4
     },
     {
       "name": "Mac OS X (ARM)",
       "configurePreset": "Mac OS X (ARM)",
       "description": "Build the macOS ARM release configuration",
-      "jobs": 16
+      "jobs": 4
+    },
+    {
+      "name": "GPU",
+      "configurePreset": "GPU",
+      "description": "Build the GPU configuration",
+      "jobs": 4
     },
     {
       "name": "Fir",
       "configurePreset": "Fir",
       "description": "Build the Fir configuration",
-      "jobs": 1
+      "jobs": 4
     },
     {
       "name": "Debug",
       "configurePreset": "Debug",
       "description": "Build the debug configuration",
-      "jobs": 16
+      "jobs": 4
     },
     {
       "name": "RelWithWarnings",
       "configurePreset": "RelWithWarnings",
       "description": "Build the RelWithWarnings configuration",
-      "jobs": 16
+      "jobs": 4
     },
     {
       "name": "Sockeye",
       "configurePreset": "Sockeye",
       "description": "Build on Sockeye",
-      "jobs": 1
+      "jobs": 4
     }
   ],
   "testPresets": [
     {
       "name": "Default",
       "configurePreset": "Default",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "Mac OS X (ARM)",
+      "configurePreset": "Mac OS X (ARM)",
       "output": {
         "outputOnFailure": true
       }

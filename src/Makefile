@@ -23,6 +23,15 @@ GRAINS_MAKE = @$(MAKE) -C $(GRAINS_SRCDIR_ABS) \
 grains: 
 	$(GRAINS_MAKE) all	
 
+
+#
+# Grains3DGPU
+#
+ 
+grainsgpu: 
+	@$(MAKE) -C $(PACIFIC_SRCDIR_ABS)/Grains3DGPU all	
+
+
 #
 # Cartesian/MAC
 #

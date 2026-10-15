@@ -1,0 +1,25 @@
+#!/bin/bash
+# Paraview files
+for file in $1/$2*.pvd
+  do
+    if [ -f $file ]
+      then
+        rm -f $file
+    fi
+  done
+
+for file in $1/$2*.vtu
+  do
+    if [ -f $file ]
+      then
+        rm -f $file
+    fi
+  done
+
+for file in $1/$2*.pvtu
+  do
+    if [ -f $file ]
+      then
+        rm -f $file
+    fi
+  done

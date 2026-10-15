@@ -1,0 +1,5 @@
+#!/bin/bash
+if [ -f $1/ForceStats.res ]
+  then
+    rm -f $1/ForceStats.res
+fi

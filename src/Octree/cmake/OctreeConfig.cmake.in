@@ -2,7 +2,7 @@
 
 include(CMakeFindDependencyMacro)
 
-if(@PACIFIC_ENABLE_MPI@)
+if(@PACIFIC_USE_MPI@)
   find_dependency(MPI COMPONENTS C)
   set(HDF5_PREFER_PARALLEL TRUE)
 endif()

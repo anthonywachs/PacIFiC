@@ -15,22 +15,21 @@ project(Grains3D
 #
 # ================================================================================
 
-if (PACIFIC_ENABLE_MPI)
+if (PACIFIC_USE_MPI)
   find_package(MPI REQUIRED COMPONENTS C)
 endif()
 
-if (BUILD_THIRD_PARTY_ZLIB)
+if (PACIFIC_BUILD_THIRD_PARTY_ZLIB)
   # find_package(ZLIB REQUIRED)
 else()
   find_package(ZLIB REQUIRED)
 endif()
 
-if (BUILD_THIRD_PARTY_XERCESC)
+if (PACIFIC_BUILD_THIRD_PARTY_XERCESC)
   # find_package(XercesC REQUIRED)
 else()
   find_package(XercesC REQUIRED)
 endif()
-
 
 # ================================================================================
 #
@@ -40,15 +39,6 @@ endif()
 
 add_subdirectory(Grains)
 add_subdirectory(Main) 
-
-option(GRAINS3D_BUILD_TESTS "Build Grains3D tests" OFF)
-
-if(GRAINS3D_BUILD_TESTS)
-  set(GRAINS3D_SOURCE_ROOT_DIR "${PROJECT_SOURCE_DIR}")
-  set(GRAINS3D_BINARY_ROOT_DIR "${PROJECT_BINARY_DIR}")
-  enable_testing()
-  add_subdirectory(Tests)
-endif()
 
 # ================================================================================
 #
