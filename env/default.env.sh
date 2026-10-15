@@ -30,6 +30,28 @@ export PACIFIC_MPICXX_CFLAGS=$(pkg-config --cflags ompi-cxx)
 export PACIFIC_MPICXX_LFLAGS=$(pkg-config --libs ompi-cxx)
 export PACIFIC_MPICXX_VER=$(pkg-config --modversion ompi-cxx)
 
+#
+# NVCC/NVCXX
+#
+
+export PACIFIC_NVCC_DISTRIB="NVIDIA"
+export PACIFIC_NVCC=$(which nvcc)
+export PACIFIC_NVCC_ARCH="75"
+
+#
+# CUDA Runtime API
+#
+
+export PACIFIC_CUDART_CFLAGS=$(pkg-config --cflags cudart)
+export PACIFIC_CUDART_LFLAGS=$(pkg-config --libs cudart)
+
+#
+# cuRAND: https://developer.nvidia.com/curand
+#
+
+export PACIFIC_CURAND_CFLAGS=$(pkg-config --cflags curand)
+export PACIFIC_CURAND_LFLAGS=$(pkg-config --libs curand)
+
 
 #
 # Pacific Directories
@@ -51,14 +73,33 @@ export PACIFIC_INSTALLDIR_ABS="${PACIFIC_ROOT_ABS}/${PACIFIC_INSTALLDIR}"
 export PACIFIC_THIRDPARTY_BUILDDIR_ABS="${PACIFIC_BUILDDIR_ABS}/third_party/build"
 export PACIFIC_THIRDPARTY_INSTALLDIR_ABS="${PACIFIC_BUILDDIR_ABS}/third_party"
 
-# Export Grains binary path
+#
+# Python Virtual Environment
+#
+
+export PACIFIC_VENV_ABS="${PACIFIC_BUILDDIR_ABS}/.venv"
+export PACIFIC_VENV_PY_ABS="${PACIFIC_BUILDDIR_ABS}/.venv/bin/python"
+
+#
+# Grains3D
+#
 export PATH="$PATH:$PACIFIC_BUILDDIR_ABS/Grains3D/bin"
+
+#
+# Grains3DGPU
+#
+export PATH="$PATH:$PACIFIC_BUILDDIR_ABS/Grains3DGPU/bin"
+export PATH="$PATH:$PACIFIC_BUILDDIR_ABS/Grains3DGPU/Tests/bin"
+export PATH="$PATH:$PACIFIC_BUILDDIR_ABS/Grains3DGPU/Validations/bin"
+
+#
+# FLUID
+#
 export PATH="$PATH:$PACIFIC_BUILDDIR_ABS/FLUID/bin"
 
 #
 # MAC
 #
-
 export MAC_LEVEL=0
 
 #
@@ -136,7 +177,7 @@ fi
 # PETSc
 #
 
-export PACIFIC_PETSC_USE_THIRDPARTY=1
+export PACIFIC_PETSC_USE_THIRDPARTY=0
 
 if [ $PACIFIC_PETSC_USE_THIRDPARTY = 0 ]
 then
@@ -149,6 +190,34 @@ export PACIFIC_PETSC_CFLAGS="-I${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}/include"
 export PACIFIC_PETSC_LFLAGS="-L${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}/lib -Wl,-rpath,${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}/lib -lpetsc"
 export PACIFIC_PETSC_PREFIX="${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}"
 export PACIFIC_PETSC_VER="3.24.3"
+fi
+
+#
+# GTEST
+#
+
+export PACIFIC_GTEST_USE_THIRDPARTY=0
+if [ $PACIFIC_GTEST_USE_THIRDPARTY = 0 ]
+then
+export PACIFIC_GTEST_CFLAGS=$(pkg-config --cflags gtest)
+export PACIFIC_GTEST_LFLAGS=$(pkg-config --libs gtest)
+export PACIFIC_GTEST_PREFIX=$(pkg-config --variable=prefix gtest)
+export PACIFIC_GTEST_VER=$(pkg-config --modversion gtest)
+
+export PACIFIC_GTEST_MAIN_CFLAGS=$(pkg-config --cflags gtest_main)
+export PACIFIC_GTEST_MAIN_LFLAGS=$(pkg-config --libs gtest_main)
+export PACIFIC_GTEST_MAIN_PREFIX=$(pkg-config --variable=prefix gtest_main)
+export PACIFIC_GTEST_MAIN_VER=$(pkg-config --modversion gtest_main)
+else 
+export PACIFIC_GTEST_CFLAGS="-I${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}/include"
+export PACIFIC_GTEST_LFLAGS="-L${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}/lib -Wl,-rpath,${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}/lib64 -lgtest"
+export PACIFIC_GTEST_PREFIX="${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}"
+export PACIFIC_GTEST_VER="1.17.0"
+
+export PACIFIC_GTEST_MAIN_CFLAGS="-I${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}/include"
+export PACIFIC_GTEST_MAIN_LFLAGS="-L${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}/lib -Wl,-rpath,${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}/lib64 -lgtest_main"
+export PACIFIC_GTEST_MAIN_PREFIX="${PACIFIC_THIRDPARTY_INSTALLDIR_ABS}"
+export PACIFIC_GTEST_MAIN_VER="1.17.0"
 fi
 
 
@@ -231,6 +300,10 @@ echo -e "${C_CYAN}PACIFIC_MPICXX_CFLAGS${C_RESET} = ${PACIFIC_MPICXX_CFLAGS}"
 echo -e "${C_CYAN}PACIFIC_MPICXX_LFLAGS${C_RESET} = ${PACIFIC_MPICXX_LFLAGS}"
 echo -e "${C_CYAN}PACIFIC_MPICXX_VER   ${C_RESET} = ${PACIFIC_MPICXX_VER}"
 echo -e ""
+echo -e "${C_CYAN}${C_BOLD}NVCC${C_RESET}"
+echo -e "${C_CYAN}PACIFIC_NVCC       ${C_RESET} = ${PACIFIC_NVCC}"
+echo -e "${C_CYAN}PACIFIC_NVCC_ARCH  ${C_RESET} = ${PACIFIC_NVCC_ARCH}"
+echo -e ""
 echo -e "${C_GREEN}${C_BOLD}Xerces${C_RESET}"
 echo -e "${C_GREEN}PACIFIC_XERCESC_USE_THIRDPARTY${C_RESET} = ${PACIFIC_XERCESC_USE_THIRDPARTY}"
 echo -e "${C_GREEN}PACIFIC_XERCESC_CFLAGS        ${C_RESET} = ${PACIFIC_XERCESC_CFLAGS}"
@@ -258,6 +331,13 @@ echo -e "${C_GREEN}PACIFIC_PETSC_CFLAGS${C_RESET} = ${PACIFIC_PETSC_CFLAGS}"
 echo -e "${C_GREEN}PACIFIC_PETSC_LFLAGS${C_RESET} = ${PACIFIC_PETSC_LFLAGS}"
 echo -e "${C_GREEN}PACIFIC_PETSC_PREFIX${C_RESET} = ${PACIFIC_PETSC_PREFIX}"
 echo -e "${C_GREEN}PACIFIC_PETSC_VER   ${C_RESET} = ${PACIFIC_PETSC_VER}"
+echo -e ""
+echo -e "${C_GREEN}${C_BOLD}GTEST${C_RESET}"
+echo -e "${C_GREEN}PACIFIC_GTEST_USE_THIRDPARTY${C_RESET} = ${PACIFIC_GTEST_USE_THIRDPARTY}"
+echo -e "${C_GREEN}PACIFIC_GTEST_CFLAGS${C_RESET} = ${PACIFIC_GTEST_CFLAGS}"
+echo -e "${C_GREEN}PACIFIC_GTEST_LFLAGS${C_RESET} = ${PACIFIC_GTEST_LFLAGS}"
+echo -e "${C_GREEN}PACIFIC_GTEST_PREFIX${C_RESET} = ${PACIFIC_GTEST_PREFIX}"
+echo -e "${C_GREEN}PACIFIC_GTEST_VER   ${C_RESET} = ${PACIFIC_GTEST_VER}"
 echo -e ""
 echo -e "${C_GREEN}${C_BOLD}Basilisk${C_RESET}"
 echo -e "${C_GREEN}PACIFIC_BASILISK_USE_THIRDPARTY${C_RESET} = ${PACIFIC_BASILISK_USE_THIRDPARTY}"

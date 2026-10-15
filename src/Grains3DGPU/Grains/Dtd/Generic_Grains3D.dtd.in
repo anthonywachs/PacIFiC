@@ -1,0 +1,177 @@
+<!-- Grains3D DTD -->
+
+<!ENTITY % Convex.dtd SYSTEM "Convex.dtd">
+%Convex.dtd;
+
+<!ENTITY % Contact.dtd SYSTEM "Contact.dtd">
+%Contact.dtd;
+
+<!-- ============================================================ -->
+<!-- Shared primitive elements                                     -->
+<!-- ============================================================ -->
+
+<!ELEMENT Centre EMPTY>
+<!ATTLIST Centre X CDATA #REQUIRED>
+<!ATTLIST Centre Y CDATA #REQUIRED>
+<!ATTLIST Centre Z CDATA #REQUIRED>
+
+<!ELEMENT MinPoint EMPTY>
+<!ATTLIST MinPoint X CDATA #REQUIRED>
+<!ATTLIST MinPoint Y CDATA #REQUIRED>
+<!ATTLIST MinPoint Z CDATA #REQUIRED>
+
+<!ELEMENT MaxPoint EMPTY>
+<!ATTLIST MaxPoint X CDATA #REQUIRED>
+<!ATTLIST MaxPoint Y CDATA #REQUIRED>
+<!ATTLIST MaxPoint Z CDATA #REQUIRED>
+
+<!ELEMENT Periodicity EMPTY>
+<!ATTLIST Periodicity PX CDATA #REQUIRED>
+<!ATTLIST Periodicity PY CDATA #REQUIRED>
+<!ATTLIST Periodicity PZ CDATA #REQUIRED>
+
+<!-- Convex wrapper (children defined in Convex.dtd) -->
+<!ELEMENT Convex (Sphere|Box|Rectangle|Cylinder|Disc|Polyhedron|Superquadric)>
+<!ATTLIST Convex CrustThickness CDATA #REQUIRED>
+
+<!-- ============================================================ -->
+<!-- Root element                                                  -->
+<!-- ============================================================ -->
+
+<!ELEMENT Grains3D (Construction, Forces, Simulation)>
+<!ATTLIST Grains3D Type      (GPU|Standard|MPI) "GPU">
+<!ATTLIST Grains3D Precision (Single|Double)    "Double">
+
+<!-- ============================================================ -->
+<!-- Construction                                                  -->
+<!-- ============================================================ -->
+
+  <!ELEMENT Construction (Origin?, MaxCoordinate?, Periodicity?, CollisionDetection, ContactForceModels, TemporalSetting, Particles?, Obstacles?, Reload?)>
+
+    <!ELEMENT Origin EMPTY>
+    <!ATTLIST Origin X CDATA #REQUIRED>
+    <!ATTLIST Origin Y CDATA #REQUIRED>
+    <!ATTLIST Origin Z CDATA #REQUIRED>
+
+    <!ELEMENT MaxCoordinate EMPTY>
+    <!ATTLIST MaxCoordinate X CDATA #REQUIRED>
+    <!ATTLIST MaxCoordinate Y CDATA #REQUIRED>
+    <!ATTLIST MaxCoordinate Z CDATA #REQUIRED>
+
+    <!ELEMENT CollisionDetection (NeighborList, LinkedCell, BoundingVolume, NarrowPhase)>
+    <!ATTLIST CollisionDetection EnableTimings             (true|false) "false">
+    <!ATTLIST CollisionDetection UseRelativeTransformations (true|false) "false">
+
+      <!ELEMENT NeighborList EMPTY>
+      <!ATTLIST NeighborList Type (LinkedCell) "LinkedCell">
+
+      <!ELEMENT LinkedCell EMPTY>
+      <!ATTLIST LinkedCell Type              (Device_Atomic|Device_AtomicFixed|Device_SortBased|Host) "Device_Atomic">
+      <!ATTLIST LinkedCell CellSizeFactor    CDATA "1.0">
+      <!ATTLIST LinkedCell UpdatingFrequency CDATA #REQUIRED>
+      <!ATTLIST LinkedCell SortingFrequency  CDATA "0">
+
+      <!ELEMENT BoundingVolume EMPTY>
+      <!ATTLIST BoundingVolume Type (OFF|OBB|OBC) "OFF">
+
+      <!ELEMENT NarrowPhase EMPTY>
+      <!ATTLIST NarrowPhase Type          (GJK) "GJK">
+      <!ATTLIST NarrowPhase Acceleration  (true|false) "false">
+      <!ATTLIST NarrowPhase PrebuiltShapes (true|false) "true">
+
+    <!ELEMENT ContactForceModels (ContactForceModel*)>
+    <!ATTLIST ContactForceModels EnableTimings (true|false) "false">
+    <!ATTLIST ContactForceModels Compaction    (true|false) "false">
+
+    <!ELEMENT TemporalSetting (TimeInterval, TimeIntegration)>
+
+      <!ELEMENT TimeInterval EMPTY>
+      <!ATTLIST TimeInterval Start CDATA #REQUIRED>
+      <!ATTLIST TimeInterval End   CDATA #REQUIRED>
+      <!ATTLIST TimeInterval dt    CDATA #REQUIRED>
+
+      <!ELEMENT TimeIntegration EMPTY>
+      <!ATTLIST TimeIntegration Type (FirstOrderExplicit|SecondOrderExplicit|SecondOrderLeapFrog|SecondOrderAdamsBashforth) "SecondOrderLeapFrog">
+
+    <!ELEMENT Particles (Particle+)>
+      <!ELEMENT Particle (Convex)>
+      <!ATTLIST Particle Number   CDATA #REQUIRED>
+      <!ATTLIST Particle Density  CDATA #REQUIRED>
+      <!ATTLIST Particle Material CDATA #REQUIRED>
+
+    <!ELEMENT Obstacles (Obstacle+)>
+      <!ELEMENT Obstacle (Convex, Transformation)>
+      <!ATTLIST Obstacle Material CDATA #REQUIRED>
+
+        <!ELEMENT Transformation (Centre, AngularPosition)>
+
+          <!ELEMENT AngularPosition EMPTY>
+          <!ATTLIST AngularPosition Type (Angles|Matrix) "Angles">
+          <!ATTLIST AngularPosition aX   CDATA #REQUIRED>
+          <!ATTLIST AngularPosition aY   CDATA #REQUIRED>
+          <!ATTLIST AngularPosition aZ   CDATA #REQUIRED>
+
+    <!ELEMENT Reload EMPTY>
+    <!ATTLIST Reload File     CDATA #REQUIRED>
+    <!ATTLIST Reload Velocity (Reset|NoReset) "NoReset">
+    <!ATTLIST Reload Type     (new|same)      "new">
+
+<!-- ============================================================ -->
+<!-- Forces                                                        -->
+<!-- ============================================================ -->
+
+  <!ELEMENT Forces (Gravity?)>
+    <!ELEMENT Gravity EMPTY>
+    <!ATTLIST Gravity GX CDATA #REQUIRED>
+    <!ATTLIST Gravity GY CDATA #REQUIRED>
+    <!ATTLIST Gravity GZ CDATA #REQUIRED>
+
+<!-- ============================================================ -->
+<!-- Simulation                                                    -->
+<!-- ============================================================ -->
+
+  <!ELEMENT Simulation (Verbosity?, Timings?, ParticleInsertion, PostProcessing)>
+
+    <!ELEMENT Verbosity EMPTY>
+    <!ATTLIST Verbosity Frequency CDATA #REQUIRED>
+
+    <!ELEMENT Timings EMPTY>
+    <!ATTLIST Timings Enable (true|false) "false">
+
+    <!ELEMENT ParticleInsertion (InitialPosition, InitialOrientation, InitialVelocity)>
+    <!ATTLIST ParticleInsertion ForceInsertion CDATA "0">
+
+      <!ELEMENT InitialPosition (Windows?)>
+      <!ATTLIST InitialPosition Type  (Random|Structured|File) "Random">
+      <!ATTLIST InitialPosition Seed  (UserDefined|Default)    "Default">
+      <!ATTLIST InitialPosition Value CDATA #IMPLIED>
+
+      <!ELEMENT InitialOrientation (Windows?)>
+      <!ATTLIST InitialOrientation Type  (Random|Fixed)     "Random">
+      <!ATTLIST InitialOrientation Seed  (UserDefined|Default) "Default">
+      <!ATTLIST InitialOrientation Value CDATA #IMPLIED>
+
+      <!ELEMENT Windows (Window+)>
+        <!ELEMENT Window (MinPoint, MaxPoint)>
+        <!ATTLIST Window Type (Box|Cylinder|Annulus) "Box">
+
+      <!ELEMENT InitialVelocity EMPTY>
+      <!ATTLIST InitialVelocity Type (Constant|Random|Zero) "Zero">
+      <!ATTLIST InitialVelocity X    CDATA "0.0">
+      <!ATTLIST InitialVelocity Y    CDATA "0.0">
+      <!ATTLIST InitialVelocity Z    CDATA "0.0">
+
+    <!ELEMENT PostProcessing (TimeSave, Writers)>
+
+      <!ELEMENT TimeSave EMPTY>
+      <!ATTLIST TimeSave dt CDATA #REQUIRED>
+
+      <!ELEMENT Writers (Paraview?, RawData?)>
+
+        <!ELEMENT Paraview EMPTY>
+        <!ATTLIST Paraview Directory CDATA #REQUIRED>
+        <!ATTLIST Paraview RootName  CDATA #REQUIRED>
+
+        <!ELEMENT RawData EMPTY>
+        <!ATTLIST RawData Directory CDATA #REQUIRED>
+        <!ATTLIST RawData RootName  CDATA #REQUIRED>

@@ -1,0 +1,216 @@
+# Spring Wall Test Configuration
+# A sphere launched toward a flat wall under gravity using an elastic Hooke spring contact
+# (en=1).  Because en=1 the sphere departs each contact at z=r with speed |V0| (energy
+# conservation), so the trajectory is periodic.
+#
+# Initial position: sphere centre at Z = r = 0.1 m (just touching the wall face at Z = 0).
+# Initial velocity: V0 = -1.0 m/s (moving toward wall).
+# Gravity         : GZ = -9.81 m/s^2
+#
+# Analytical solution per cycle:
+#   z_eq   = r - m*g/kn                (shifted equilibrium during contact)
+#   T_c    = 2*arctan(|V0|*omega/g) / omega
+#   Contact (0 <= t <= T_c):
+#     z(t) = z_eq + (m*g/kn)*cos(omega*t) + (V0/omega)*sin(omega*t)
+#   Free    (t > T_c, tau = t - T_c):
+#     z(t) = r + |V0|*tau - g/2*tau^2
+# Period: T = T_c + 2*|V0|/g ~ 0.231 s
+# where r = 0.1 m, V0 = -1.0 m/s, kn = 5e4 N/m, g = 9.81 m/s^2.
+#
+# Test matrix (8 cases total):
+#   - 4 timesteps  : dt = 1e-3, 1e-4, 1e-5, 1e-6 s
+#   - 2 integrators: FirstOrderExplicit, SecondOrderLeapFrog
+
+_sphere_template: &sphere_particle
+  Density: 1000
+  Material: matP
+  CrustThickness: 1.0e-4
+  ParticleShape: '<Sphere Radius="0.1"/>'
+
+Constant:
+  Simulation:
+    SimType: Standard
+    Precision: Double
+  DomainOrigin:
+    X: -0.2
+    Y: -0.2
+    Z: -0.15
+  DomainSize:
+    X: 0.4
+    Y: 0.4
+    Z: 0.6
+  CollisionDetection:
+    NeighborListType: BruteForce
+    LinkedCellType: Host
+    CellSizeFactor: 1.0
+    UpdateFrequency: 0
+    SortingFrequency: 0
+    BoundingVolumeType: OBB
+    NarrowPhaseType: GJK
+  ContactModelsList:
+    - Type: Hooke
+      MaterialA: matP
+      MaterialB: matP
+      Parameters: 'kn="5.0e4" en="1.0" etat="0" muc="0" kr="0"'
+  Temporal:
+    TStart: 0.0
+    TEnd: 0.25
+  ParticlesList:
+    - <<: *sphere_particle
+      Number: 1
+  ObstaclesList:
+    - Name: Rectangle
+      Material: matP
+      CrustThickness: 1.0e-4
+      ObstacleShape: '<Rectangle LX="1.0" LY="1.0"/>'
+      ObstaclePosition:
+        X: 0
+        Y: 0
+        Z: 0
+      ObstacleAngularPosition:
+        aX: 0
+        aY: 0
+        aZ: 0
+  Forces:
+    Gravity:
+      GX: 0.0
+      GY: 0.0
+      GZ: -9.81
+  Insertion:
+    ForceInsertion: 1
+    InitialPosition:
+      Type: Constant
+      X: 0.0
+      Y: 0.0
+      Z: 0.1
+    InitialOrientation:
+      Type: Zero
+    InitialVelocity:
+      Type: Constant
+      X: 0.0
+      Y: 0.0
+      Z: -1.0
+    InitialAngularVelocity:
+      Type: Zero
+  PostProcessing:
+    TimeSave:
+      Start: 0.0
+      End: 0.25
+      DT: 1.0e-3   # default; overridden per Fork case
+  SimulationSettings:
+    OutputPrecision: 15
+
+Fork:
+  # --- FirstOrderExplicit ----------------------------------------------------
+  - name: dt1e-3_FirstOrder
+    overrides:
+      Temporal:
+        DT: 1.0e-3
+        TimeIntegrationType: FirstOrderExplicit
+      PostProcessing:
+        TimeSave:
+          DT: 1.0e-3
+      SimulationSettings:
+        WritersSection:
+          - Type: Raw
+            Directory: ./results/springWall
+            RootName: springWall_dt1e-3_FirstOrder
+
+  - name: dt1e-4_FirstOrder
+    overrides:
+      Temporal:
+        DT: 1.0e-4
+        TimeIntegrationType: FirstOrderExplicit
+      PostProcessing:
+        TimeSave:
+          DT: 1.0e-4
+      SimulationSettings:
+        WritersSection:
+          - Type: Raw
+            Directory: ./results/springWall
+            RootName: springWall_dt1e-4_FirstOrder
+
+  - name: dt1e-5_FirstOrder
+    overrides:
+      Temporal:
+        DT: 1.0e-5
+        TimeIntegrationType: FirstOrderExplicit
+      PostProcessing:
+        TimeSave:
+          DT: 1.0e-5
+      SimulationSettings:
+        WritersSection:
+          - Type: Raw
+            Directory: ./results/springWall
+            RootName: springWall_dt1e-5_FirstOrder
+
+  # --- SecondOrderLeapFrog ---------------------------------------------------
+  - name: dt1e-3_SecondOrder
+    overrides:
+      Temporal:
+        DT: 1.0e-3
+        TimeIntegrationType: SecondOrderLeapFrog
+      PostProcessing:
+        TimeSave:
+          DT: 1.0e-3
+      SimulationSettings:
+        WritersSection:
+          - Type: Raw
+            Directory: ./results/springWall
+            RootName: springWall_dt1e-3_SecondOrder
+
+  - name: dt1e-4_SecondOrder
+    overrides:
+      Temporal:
+        DT: 1.0e-4
+        TimeIntegrationType: SecondOrderLeapFrog
+      PostProcessing:
+        TimeSave:
+          DT: 1.0e-4
+      SimulationSettings:
+        WritersSection:
+          - Type: Raw
+            Directory: ./results/springWall
+            RootName: springWall_dt1e-4_SecondOrder
+
+  - name: dt1e-5_SecondOrder
+    overrides:
+      Temporal:
+        DT: 1.0e-5
+        TimeIntegrationType: SecondOrderLeapFrog
+      PostProcessing:
+        TimeSave:
+          DT: 1.0e-5
+      SimulationSettings:
+        WritersSection:
+          - Type: Raw
+            Directory: ./results/springWall
+            RootName: springWall_dt1e-5_SecondOrder
+
+  - name: dt1e-6_FirstOrder
+    overrides:
+      Temporal:
+        DT: 1.0e-6
+        TimeIntegrationType: FirstOrderExplicit
+      PostProcessing:
+        TimeSave:
+          DT: 1.0e-6
+      SimulationSettings:
+        WritersSection:
+          - Type: Raw
+            Directory: ./results/springWall
+            RootName: springWall_dt1e-6_FirstOrder
+
+  - name: dt1e-6_SecondOrder
+    overrides:
+      Temporal:
+        DT: 1.0e-6
+        TimeIntegrationType: SecondOrderLeapFrog
+      PostProcessing:
+        TimeSave:
+          DT: 1.0e-6
+      SimulationSettings:
+        WritersSection:
+          - Type: Raw
+            Directory: ./results/springWall
+            RootName: springWall_dt1e-6_SecondOrder

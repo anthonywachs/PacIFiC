@@ -1,0 +1,16 @@
+# Input file
+if [ $1 ]
+  then
+    ROOT_FILE=$1
+  else
+    ROOT_FILE=Grains/Init/insert
+fi
+INPUT_FILE=$ROOT_FILE.xml
+
+#Execute Grains
+if [ -f $INPUT_FILE ]
+  then
+    time grains3dgpu $INPUT_FILE
+  else
+    echo 'Input file' $INPUT_FILE 'does not exist'
+fi

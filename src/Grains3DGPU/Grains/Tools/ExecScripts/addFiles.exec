@@ -1,0 +1,22 @@
+#!/bin/bash
+if [ -d ___AddFiles__ ]
+  then 
+    for file in ___AddFiles__/*
+      do
+        if [ -f $file ]
+          then
+            rm -f $file
+        fi
+      done 
+else
+  mkdir ___AddFiles__
+fi
+
+args=("$@")
+for ((i=0; i < $#; i=i+3)) 
+{
+   cp ${args[$i]} ___AddFiles__/
+   cp ___AddFiles__/${args[$i+1]} ${args[$i+2]}/${args[$i+1]}      
+}
+
+rm -rf ___AddFiles__

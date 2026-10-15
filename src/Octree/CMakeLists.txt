@@ -5,11 +5,11 @@ project(Octree LANGUAGES C)
 # Core deps
 # ------------------------------------------------------------------------------
 
-if (PACIFIC_ENABLE_MPI)
+if (PACIFIC_USE_MPI)
   find_package(MPI REQUIRED)
 endif()
 
-if (BUILD_THIRD_PARTY_HDF5)
+if (PACIFIC_BUILD_THIRD_PARTY_HDF5)
 else()
   set(HDF5_PREFER_PARALLEL TRUE)
   find_package(HDF5 REQUIRED COMPONENTS C HL)
@@ -48,9 +48,9 @@ elseif(OCTREE_BASILISK_PROVIDER STREQUAL "VENDORED")
   # Compute effective directory
   set(_basilisk_dir "${BASILISK_DIR}")
 
-  if(USE_SUBMODULES AND _basilisk_dir STREQUAL "")
+  if(PACIFIC_USE_SUBMODULES AND _basilisk_dir STREQUAL "")
     set(_basilisk_dir "${CMAKE_SOURCE_DIR}/third_party/basilisk/basilisk_submodule")
-    message(STATUS "USE_SUBMODULES=ON: using Basilisk submodule at ${_basilisk_dir}")
+    message(STATUS "PACIFIC_USE_SUBMODULES=ON: using Basilisk submodule at ${_basilisk_dir}")
   endif()
 
   if(_basilisk_dir STREQUAL "")

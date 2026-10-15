@@ -17,7 +17,7 @@ project(MAC
 
 find_package(MPI REQUIRED COMPONENTS C)
 
-if (BUILD_THIRD_PARTY_ZLIB)
+if (PACIFIC_BUILD_THIRD_PARTY_ZLIB)
   # find_package(ZLIB REQUIRED)
 else()
   find_package(ZLIB REQUIRED)

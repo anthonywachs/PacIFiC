@@ -1,0 +1,21 @@
+
+set_source_files_properties(src/main.cpp PROPERTIES LANGUAGE CUDA)
+
+add_executable(Grains3DGPU_main src/main.cpp)
+
+set_target_properties(Grains3DGPU_main PROPERTIES
+  CUDA_STANDARD ${GRAINS3D_GPU_CUDA_STANDARD}
+  CUDA_STANDARD_REQUIRED ${GRAINS3D_GPU_CUDA_STANDARD_REQUIRED}
+  CUDA_ARCHITECTURES ${GRAINS3D_GPU_CUDA_ARCHITECTURES}
+  CUDA_SEPARABLE_COMPILATION ${GRAINS3D_GPU_CUDA_SEPARABLE_COMPILATION}
+  CUDA_RESOLVE_DEVICE_SYMBOLS ${GRAINS3D_GPU_CUDA_RESOLVE_DEVICE_SYMBOLS}
+)
+
+foreach(cuda_opt IN LISTS GRAINS3D_GPU_CUDA_COMPILE_OPTIONS_LIST)
+  target_compile_options(Grains3DGPU_main PRIVATE
+    $<$<COMPILE_LANGUAGE:CUDA>:${cuda_opt}>
+  )
+endforeach()
+
+target_link_libraries(Grains3DGPU_main PRIVATE Grains3DGPU)
+set_target_properties(Grains3DGPU_main PROPERTIES OUTPUT_NAME grains3dgpu)

@@ -1,7 +1,7 @@
 include(ExternalProject)
 include(GNUInstallDirs)
 
-if (USE_SUBMODULES)
+if (PACIFIC_USE_SUBMODULES)
   ExternalProject_Add(zlibng_ep
     UPDATE_COMMAND ""
     SOURCE_DIR     "${CMAKE_SOURCE_DIR}/third_party/zlib/zlib_submodule"

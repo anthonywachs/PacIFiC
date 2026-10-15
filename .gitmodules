@@ -13,3 +13,6 @@
 [submodule "third_party/petsc/petsc_submodule"]
 	path = third_party/petsc/petsc_submodule
 	url = https://gitlab.com/petsc/petsc.git
+[submodule "third_party/gtest/gtest_submodule"]
+	path = third_party/gtest/gtest_submodule
+	url = https://github.com/google/googletest.git

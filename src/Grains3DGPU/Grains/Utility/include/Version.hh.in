@@ -1,0 +1,14 @@
+#pragma once
+
+namespace Version {
+
+// Numeric semantic version (CMake project version)
+inline constexpr const char *semver = "@PROJECT_VERSION@";
+
+// Full version string (tag + commit + dirty)
+inline constexpr const char *full = "@PACIFIC_VERSION_FULL@";
+
+// CMake build type (Debug / Release / RelWithDebInfo)
+inline constexpr const char *build_type = "@CMAKE_BUILD_TYPE@";
+
+}

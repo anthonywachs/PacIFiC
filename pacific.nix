@@ -13,6 +13,9 @@
   hypre,
   xercesc,
   makeWrapper,
+  gtest,
+  cudaToolkit ? null,
+  cudaNvcc ? null,
 }:
 
 stdenv.mkDerivation {
@@ -20,13 +23,7 @@ stdenv.mkDerivation {
   version = "0.0.1";
 
   # Build the current source tree (this repo checkout)
-  src = fetchFromGitHub {
-    owner = "tortotubus";
-    repo = "PacIFiC";
-    rev = "2f26363b1f18bb4ca6bca9964b6d679b6fb0a777";
-    hash = "sha256-aRdoKZGOr+nhRwuUHFytxhNSJo6QTKObnVwUqReCBYo=";
-    fetchSubmodules = true;
-  };
+  src = ./.;
 
   nativeBuildInputs = [
     gcc
@@ -34,39 +31,32 @@ stdenv.mkDerivation {
     gnumake
     pkg-config
     makeWrapper
-  ];
+  ]
+  ++ lib.optionals (cudaNvcc != null) [ cudaNvcc ];
 
   buildInputs = [
+    gtest
     xercesc
     zlib
     (hdf5-mpi.override { mpi = openmpi; })
     openmpi
     petsc
-    hypre
-  ];
+  ]
+  ++ lib.optionals (cudaToolkit != null) [ cudaToolkit ];
 
   propagatedBuildInputs = [
+    gtest
     xercesc
     zlib
     (hdf5-mpi.override { mpi = openmpi; })
     openmpi
   ];
 
-  cmakeFlags = [
-    # "-DCMAKE_C_COMPILER=${openmpi}/bin/mpicc"
-    # "-DCMAKE_CXX_COMPILER=${openmpi}/bin/mpicxx"
+  cmakeFlags = [ 
     "-DCMAKE_BUILD_TYPE=Release"
     "-DUSE_SUBMODULES=ON"
     "-DOCTREE_BASILISK_PROVIDER=VENDORED"
-  ];
-
-  # Optional: ensure mpirun is available when running the installed executables
-  # postFixup = ''
-  #   for p in $out/bin/*; do
-  #     [ -x "$p" ] || continue
-  #     wrapProgram "$p" --prefix PATH : ${lib.makeBinPath [ openmpi ]}
-  #   done
-  # '';
+  ]; 
 
   meta = with lib; {
     description = "PacIFiC multiphysics toolkit";

@@ -1,0 +1,205 @@
+# Colliding Spheres Convergence Test
+# Sphere 1 at Z=0.4 m, Vz=-1.0 m/s approaches stationary Sphere 2 at Z=0.0 m.
+# No gravity. Elastic Hooke contact (en=1, kn=5e4 N/m).
+# The spheres approach, collide, and bounce apart.
+#
+# Physical parameters:
+#   R   = 0.1 m,  rho = 1000 kg/m^3  =>  m = rho*(4/3)*pi*R^3 ~ 4.18879 kg
+#   kn  = 5.0e4 N/m,  en = 1.0 (elastic)
+#
+# Analytical solution (all motion in Z):
+#   Phase 1 -- free approach  [0, t0 = 0.2 s]:
+#     z1(t) = 0.4 + (-1)*t = 0.4 - t,   z2(t) = 0
+#
+#   Phase 2 -- contact  [t0, t0 + Tc]:
+#     omega = sqrt(2*kn/m) ~ 154.53 rad/s,   Tc = pi/omega ~ 0.0203 s
+#     Relative coordinate: x(tau) = (-1/omega)*sin(omega*tau)   [tau = t - t0]
+#     Centre of mass:       z_cm(tau) = 0.1 - 0.5*tau
+#     z1 = z_cm + R + x/2,   z2 = z_cm - R - x/2
+#
+#   Phase 3 -- post-contact  [t0 + Tc, Tend = 0.3 s]:
+#     Elastic equal-mass collision => sphere 1 stops, sphere 2 takes -1 m/s
+#     z1 = z1_end ~ 0.1898  (stationary)
+#     z2 = z2_end + (-1)*(t - t0 - Tc)   where z2_end ~ -0.0102
+#
+# Fork matrix (8 cases):
+#   dt in {1e-3, 1e-4, 1e-5, 1e-6}  x  integrator in {FirstOrderExplicit, SecondOrderLeapFrog}
+
+_sphere_template: &sphere_particle
+  Density: 1000
+  Material: matP
+  CrustThickness: 1.0e-4
+  ParticleShape: '<Sphere Radius="0.1"/>'
+
+Constant:
+  Simulation:
+    SimType: Standard
+    Precision: Double
+  DomainOrigin:
+    X: -0.25
+    Y: -0.25
+    Z: -0.75
+  DomainSize:
+    X: 0.25
+    Y: 0.25
+    Z: 0.65
+  CollisionDetection:
+    NeighborListType: BruteForce
+    LinkedCellType: Host
+    CellSizeFactor: 1.0
+    UpdateFrequency: 0
+    SortingFrequency: 0
+    BoundingVolumeType: OBB
+    NarrowPhaseType: GJK
+  ContactModelsList:
+    - Type: Hooke
+      MaterialA: matP
+      MaterialB: matP
+      Parameters: 'kn="5.0e4" en="1.0" etat="0" muc="0" kr="0"'
+  Temporal:
+    TStart: 0.0
+    TEnd: 0.3
+  ParticlesList:
+    - <<: *sphere_particle
+      Number: 1
+    - <<: *sphere_particle
+      Number: 1
+  Forces:
+    Gravity:
+      GX: 0.0
+      GY: 0.0
+      GZ: -9.81
+  Insertion:
+    ForceInsertion: 1
+    InitialPosition:
+      Type: File
+      Name: ./collidingSpheresConv/collidingSpheresConv_position.dat
+    InitialOrientation:
+      Type: Zero
+    InitialVelocity:
+      Type: File
+      Name: ./collidingSpheresConv/collidingSpheresConv_velocity.dat
+    InitialAngularVelocity:
+      Type: Zero
+  PostProcessing:
+    TimeSave:
+      Start: 0.0
+      End: 0.3
+      DT: 1.0e-3   # default; overridden per Fork case
+  SimulationSettings:
+    OutputPrecision: 15
+
+Fork:
+  # --- FirstOrderExplicit ----------------------------------------------------
+  - name: dt1e-3_FirstOrder
+    overrides:
+      Temporal:
+        DT: 1.0e-3
+        TimeIntegrationType: FirstOrderExplicit
+      PostProcessing:
+        TimeSave:
+          DT: 1.0e-3
+      SimulationSettings:
+        WritersSection:
+          - Type: Raw
+            Directory: ./results/collidingSpheresConv
+            RootName: collidingSpheresConv_dt1e-3_FirstOrder
+
+  - name: dt1e-4_FirstOrder
+    overrides:
+      Temporal:
+        DT: 1.0e-4
+        TimeIntegrationType: FirstOrderExplicit
+      PostProcessing:
+        TimeSave:
+          DT: 1.0e-4
+      SimulationSettings:
+        WritersSection:
+          - Type: Raw
+            Directory: ./results/collidingSpheresConv
+            RootName: collidingSpheresConv_dt1e-4_FirstOrder
+
+  - name: dt1e-5_FirstOrder
+    overrides:
+      Temporal:
+        DT: 1.0e-5
+        TimeIntegrationType: FirstOrderExplicit
+      PostProcessing:
+        TimeSave:
+          DT: 1.0e-5
+      SimulationSettings:
+        WritersSection:
+          - Type: Raw
+            Directory: ./results/collidingSpheresConv
+            RootName: collidingSpheresConv_dt1e-5_FirstOrder
+
+  - name: dt1e-6_FirstOrder
+    overrides:
+      Temporal:
+        DT: 1.0e-6
+        TimeIntegrationType: FirstOrderExplicit
+      PostProcessing:
+        TimeSave:
+          DT: 1.0e-6
+      SimulationSettings:
+        WritersSection:
+          - Type: Raw
+            Directory: ./results/collidingSpheresConv
+            RootName: collidingSpheresConv_dt1e-6_FirstOrder
+
+  # --- SecondOrderLeapFrog ---------------------------------------------------
+  - name: dt1e-3_SecondOrder
+    overrides:
+      Temporal:
+        DT: 1.0e-3
+        TimeIntegrationType: SecondOrderLeapFrog
+      PostProcessing:
+        TimeSave:
+          DT: 1.0e-3
+      SimulationSettings:
+        WritersSection:
+          - Type: Raw
+            Directory: ./results/collidingSpheresConv
+            RootName: collidingSpheresConv_dt1e-3_SecondOrder
+
+  - name: dt1e-4_SecondOrder
+    overrides:
+      Temporal:
+        DT: 1.0e-4
+        TimeIntegrationType: SecondOrderLeapFrog
+      PostProcessing:
+        TimeSave:
+          DT: 1.0e-4
+      SimulationSettings:
+        WritersSection:
+          - Type: Raw
+            Directory: ./results/collidingSpheresConv
+            RootName: collidingSpheresConv_dt1e-4_SecondOrder
+
+  - name: dt1e-5_SecondOrder
+    overrides:
+      Temporal:
+        DT: 1.0e-5
+        TimeIntegrationType: SecondOrderLeapFrog
+      PostProcessing:
+        TimeSave:
+          DT: 1.0e-5
+      SimulationSettings:
+        WritersSection:
+          - Type: Raw
+            Directory: ./results/collidingSpheresConv
+            RootName: collidingSpheresConv_dt1e-5_SecondOrder
+
+  - name: dt1e-6_SecondOrder
+    overrides:
+      Temporal:
+        DT: 1.0e-6
+        TimeIntegrationType: SecondOrderLeapFrog
+      PostProcessing:
+        TimeSave:
+          DT: 1.0e-6
+      SimulationSettings:
+        WritersSection:
+          - Type: Raw
+            Directory: ./results/collidingSpheresConv
+            RootName: collidingSpheresConv_dt1e-6_SecondOrder
