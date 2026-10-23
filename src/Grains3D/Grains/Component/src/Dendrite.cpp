@@ -77,23 +77,22 @@ Dendrite::Dendrite( DOMNode* root, int const& pc )
   // Angular position of the composite particle
   m_geoRBWC->getTransform()->load( root );
 
-  // Moment of inertia tensor of the Dendrite
-  double global_ixx = 0., global_iyy = 0., global_izz = 0.;
+  // Moment of inertia tensor of the Dendrite  
   vector<double> hex_inertia = Dendrite::hex_moment( m_armWidth, m_depth );
-  vector<double> straight_arm_inertia = Dendrite::straight_arm_moment(
-  	m_armWidth, m_armLength, m_depth );
-  vector<double> angled_arm_inertia = Dendrite::angled_arm_moment( m_armWidth, 
-  	m_armLength, m_depth );
-  global_ixx += hex_inertia[0] + 2. * straight_arm_inertia[0] + 
-  	4. * angled_arm_inertia[0];
-  global_iyy += hex_inertia[1] + 2. * straight_arm_inertia[1] + 
-  	4. * angled_arm_inertia[1];
-  global_izz += hex_inertia[2] + 2. * straight_arm_inertia[2] + 
-  	4. * angled_arm_inertia[2];
+  double branch_vol = m_armWidth * m_armLength * m_depth;
+  double d = 0.5 * ( pow( 3., 0.5 ) * m_armWidth + m_armLength );	
+  double ixx = ( 1./12. ) * branch_vol 
+  	* ( pow( m_armWidth, 2. ) + pow( m_depth, 2. ) );
+  double iyy = ( 1./12. ) * branch_vol 
+  	* ( pow( m_armLength, 2. ) + pow( m_depth, 2. ) );
+  double izz = ( 1./12. ) * branch_vol 
+  	* ( pow( m_armWidth, 2. ) + pow( m_armLength, 2. ) );			
   m_inertia[1] = m_inertia[2] = m_inertia[4] = 0.;
-  m_inertia[0] = global_ixx;
-  m_inertia[3] = global_iyy;
-  m_inertia[5] = global_izz;
+  m_inertia[0] = hex_inertia[0] 
+  	+ 3. * ( ixx + iyy + branch_vol * pow( d, 2. ) );
+  m_inertia[3] = hex_inertia[1] 
+  	+ 3. * ( ixx + iyy + branch_vol * pow( d, 2. ) );
+  m_inertia[5] = hex_inertia[2] + 6. * ( izz + branch_vol * pow( d, 2. ) );
   BuildInertia();
 
   // Number of elementary particles
@@ -113,12 +112,12 @@ Dendrite::Dendrite( DOMNode* root, int const& pc )
   }
 
   // Create the 3 rectangular spines
-  double spine_length = 2. * m_armLength + 2. * m_armWidth*sin( M_PI / 3. );
-  double ang[] = { PI / 6., PI / 2., 5. * PI / 6. };
+  double spine_length = 2. * m_armLength + pow( 3., 0.5 ) * m_armWidth;
+  double ang[] = { 0., PI / 3., 2. * PI / 3. };
 
-  Box* spine_1 = new Box( m_armWidth, spine_length, m_depth );
-  Box* spine_2 = new Box( m_armWidth, spine_length, m_depth );
-  Box* spine_3 = new Box( m_armWidth, spine_length, m_depth );
+  Box* spine_1 = new Box( spine_length, m_armWidth, m_depth );
+  Box* spine_2 = new Box( spine_length, m_armWidth, m_depth );
+  Box* spine_3 = new Box( spine_length, m_armWidth, m_depth );
 
   RigidBodyWithCrust* geoRBWC_box1 = new RigidBodyWithCrust( spine_1, 
   	Transform(), false, crust_thickness );
@@ -384,54 +383,4 @@ vector<double> Dendrite::hex_moment( double sideLength, double depth )
   double izz = 5. * volume * pow( sideLength, 2. ) / 12.;	 	
 
   return {ixx, iyy, izz};
-}
-
-vector<double> Dendrite::straight_arm_moment( double width, double height, 
-	double depth ) 
-{
-  double mass_branch = width * height * depth; // not including density 
-  double dist_com = height / 2. + width * sin( M_PI / 3. ); // dist to center 
-  	// of mass
-
-  double local_ixx = ( 1./12. ) * mass_branch 
-  	* ( pow( height, 2. ) + pow( depth, 2. ) );
-  double local_iyy = ( 1./12. ) * mass_branch 
-  	* ( pow( depth, 2. ) + pow( width, 2. ) );
-  double local_izz = ( 1./12. ) * mass_branch 
-  	* ( pow( height, 2. ) + pow( width, 2. ) );
-
-  double ixx = local_ixx;
-  double iyy = local_iyy;
-  double izz = local_izz;
-
-  ixx += mass_branch * pow( dist_com, 2. );
-  izz += mass_branch * pow( dist_com, 2. );
-
-  return {ixx, iyy, izz};
-}
-
-vector<double> Dendrite::angled_arm_moment( double width, double height, 
-	double depth ) 
-{
-  double mass_branch = width * height * depth; // not including density 
-  double dist_com = height / 2. + width * sin( M_PI / 3.); // dist to center 
-  	// of mass
-
-  double ixx = ( 1./12. ) * mass_branch 
-  	* ( pow( height, 2. ) + pow( depth, 2. ) );
-  double iyy = ( 1./12. ) * mass_branch 
-  	* ( pow( depth, 2. ) + pow( width, 2. ) );
-  double izz = ( 1./12. ) * mass_branch 
-  	* ( pow( height, 2. ) + pow( width, 2. ) );
-
-  double ang = M_PI / 3.;
-  double dist_x = dist_com * cos( ang );
-  double dist_y = dist_com * sin( ang );
-
-  ixx += mass_branch * pow( dist_com, 2. );
-  izz += mass_branch * pow( dist_com, 2. );
-
-  // return inertia tensor with applied change of basis
-  return {iyy * pow( sin( ang ), 2. ) + ixx * pow( cos( ang ), 2. ), 
-  	ixx * pow( sin( ang ), 2. ) + iyy * pow( cos( ang ), 2. ), izz};
 }
