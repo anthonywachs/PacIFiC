@@ -41,7 +41,8 @@ extern "C" {
     // GrainsExec::m_return_syscmd = system( cmd.c_str() );
     
     std::error_code ec;
-    const bool removed = std::filesystem::remove(std::filesystem::path(simulation_file_exe), ec);
+    const bool removed = std::filesystem::remove( 
+    	std::filesystem::path(simulation_file_exe), ec);
     
     if ( !b_fluidcorrectedacc )
       grains->setFluidCorrectedAcceleration( b_fluidcorrectedacc ); 
@@ -94,7 +95,16 @@ extern "C" {
     else
       grains->doPostProcessing( 6 );
     ++ppcounter; 
-  }  
+  }
+  
+  
+  
+    
+  void SetParaviewPostProcessingTranslationVector( 
+      	const double tvx, const double tvy, const double tvz )
+  {
+    grains->setParaviewPostProcessingTranslationVector( tvx, tvy, tvz );
+  }
 
 
 

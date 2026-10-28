@@ -107,6 +107,7 @@ event init (i = 0)
       FULL_DOMAIN.z = L0 * (double)Dimensions.z / (double)Dimensions.x ;
 #   endif
 # endif
+  foreach_dimension() vtk_shift_to_zero.x = 0.;
 
   // Output basic fluid and geometric parameters
   if ( pid() == 0 )
@@ -493,6 +494,10 @@ void do_output( char const* mess )
   moves. */
 # if SINGLE_SETTLING_STATIONARY_Z
     foreach() u.z[] -= uback;    
+# endif
+
+# if SINGLE_SETTLING_SHIFT_TO_ZERO_Z
+    vtk_shift_to_zero.z = - allRigidBodies[0].g.center.z;
 # endif  
 
 # if LAMBDA2
@@ -781,7 +786,7 @@ event end_timestep (i++)
 {
   if ( pid() == 0 )
 #   if !PRODUCTION_LOG  
-      printf( "   NS solver: MGu_niter = %d, MGpf_niter = %d, MGp_niter = %d\n", 
+      printf( "   NS solver: MGu_niter = %d, MGpf_niter = %d, MGp_niter = %d\n",
     	mgu.i, mgpf.i, mgp.i );
 #   else
       printf( "NS(%d/%d/%d) - ", mgu.i, mgpf.i, mgp.i );

@@ -1750,7 +1750,7 @@ void output_vtu_bin_foreach_MPIIO( scalar* list, vector* vlist,
 This function writes the cubic computational domain as a single XML VTK file. 
 Results are written in ASCII format.
 */
-void output_vtu_domain( char* filename )
+void output_vtu_domain( char* filename, coord transform = {0} )
 {
   if ( pid() == 0 ) 
   { 
@@ -1766,24 +1766,35 @@ void output_vtu_domain( char* filename )
     fprintf( fvtk, "<DataArray type=\"%s\" NumberOfComponents=\"3\" "
   	"format=\"ascii\">\n", PARAVIEW_DATANAME );
 #   if dimension == 2   
-      fprintf( fvtk, "%12.5e %12.5e 0.\n", X0, Y0 );
-      fprintf( fvtk, "%12.5e %12.5e 0.\n", X0 + FULL_DOMAIN.x, Y0 ); 
-      fprintf( fvtk, "%12.5e %12.5e 0.\n", X0 + FULL_DOMAIN.x, Y0 +
-      	FULL_DOMAIN.y );
-      fprintf( fvtk, "%12.5e %12.5e 0.\n", X0, Y0 + FULL_DOMAIN.y ); 
+      fprintf( fvtk, "%12.5e %12.5e 0.\n", X0 + transform.x, 
+      	Y0 + transform.y );
+      fprintf( fvtk, "%12.5e %12.5e 0.\n", X0 + transform.x 
+      	+ FULL_DOMAIN.x, Y0 + transform.y ); 
+      fprintf( fvtk, "%12.5e %12.5e 0.\n", X0 + + transform.x +
+      	FULL_DOMAIN.x, Y0 + transform.y + FULL_DOMAIN.y );
+      fprintf( fvtk, "%12.5e %12.5e 0.\n", X0 + transform.x, 
+      	Y0 + transform.y + FULL_DOMAIN.y ); 
 #   else
-      fprintf( fvtk, "%12.5e %12.5e %12.5e\n", X0, Y0, Z0 );
-      fprintf( fvtk, "%12.5e %12.5e %12.5e\n", X0 + FULL_DOMAIN.x, Y0, Z0 ); 
-      fprintf( fvtk, "%12.5e %12.5e %12.5e\n", X0 + FULL_DOMAIN.x, 
-      	Y0 + FULL_DOMAIN.y, Z0 );
-      fprintf( fvtk, "%12.5e %12.5e %12.5e\n", X0, Y0 + FULL_DOMAIN.y, Z0 );     
-      fprintf( fvtk, "%12.5e %12.5e %12.5e\n", X0, Y0, Z0 + FULL_DOMAIN.z );
-      fprintf( fvtk, "%12.5e %12.5e %12.5e\n", X0 + FULL_DOMAIN.x, 
-      	Y0, Z0 + FULL_DOMAIN.z ); 
-      fprintf( fvtk, "%12.5e %12.5e %12.5e\n", X0 + FULL_DOMAIN.x, 
-      	Y0 + FULL_DOMAIN.y, Z0 + FULL_DOMAIN.z );
-      fprintf( fvtk, "%12.5e %12.5e %12.5e\n", X0, Y0 + FULL_DOMAIN.y, 
-      	Z0 + FULL_DOMAIN.z );
+      fprintf( fvtk, "%12.5e %12.5e %12.5e\n", X0 + transform.x, 
+      	Y0 + transform.y, Z0 + transform.z );
+      fprintf( fvtk, "%12.5e %12.5e %12.5e\n", X0 + transform.x 
+      	+ FULL_DOMAIN.x, Y0 + transform.y, Z0 + transform.z );
+      fprintf( fvtk, "%12.5e %12.5e %12.5e\n", X0 + transform.x
+      	+ FULL_DOMAIN.x, Y0 + transform.y + FULL_DOMAIN.y, 
+	Z0 + transform.z );
+      fprintf( fvtk, "%12.5e %12.5e %12.5e\n", X0 + transform.x, 
+      	Y0 + transform.y + FULL_DOMAIN.y, Z0 + transform.z );
+      fprintf( fvtk, "%12.5e %12.5e %12.5e\n", X0 + transform.x, 
+      	Y0 + transform.y, Z0 + transform.z + FULL_DOMAIN.z );
+      fprintf( fvtk, "%12.5e %12.5e %12.5e\n", X0 + transform.x 
+      	+ FULL_DOMAIN.x, Y0 + transform.y, Z0 + transform.z 
+	+ FULL_DOMAIN.z ); 
+      fprintf( fvtk, "%12.5e %12.5e %12.5e\n", X0 + transform.x 
+      	+ FULL_DOMAIN.x, Y0 + transform.y + FULL_DOMAIN.y, 
+	Z0 + transform.z + FULL_DOMAIN.z );
+      fprintf( fvtk, "%12.5e %12.5e %12.5e\n", X0 + transform.x, 
+      	Y0 + transform.y + FULL_DOMAIN.y, Z0 + transform.z 
+	+ FULL_DOMAIN.z );
 #   endif
     fputs( "</DataArray>\n", fvtk );  
     fputs( "</Points>\n", fvtk );
