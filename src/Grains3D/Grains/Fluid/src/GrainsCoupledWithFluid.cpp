@@ -7,6 +7,11 @@
 #include "RawDataPostProcessingWriter.hh"
 #include "Sphere.hh"
 #include "Disc.hh"
+#include "Cylinder.hh"
+#include "Cone.hh"
+#include "Superquadric.hh"
+#include "SpheroCylinder.hh"
+#include "SpheroCylindricalPrism.hh"
 
 
 // ----------------------------------------------------------------------------
@@ -833,9 +838,12 @@ void GrainsCoupledWithFluid::checkParaviewPostProcessing( string const& name_,
 	string const& root_,
 	bool const& isBinary )
 {
-  if ( m_processorIsActive ) 
+  if ( m_processorIsActive )
+  { 
     m_allcomponents.checkParaviewPostProcessing( m_rank, m_nprocs, name_,
     	root_, isBinary );
+    increaseParaviewResolution();
+  }	
 }
 
 void GrainsCoupledWithFluid::checkParaviewPostProcessing( char const* name_, 
@@ -847,8 +855,29 @@ void GrainsCoupledWithFluid::checkParaviewPostProcessing( char const* name_,
     string str_name_( name_ );
     string str_root_( root_ );
     m_allcomponents.checkParaviewPostProcessing( m_rank, m_nprocs, str_name_,
-    	str_root_, isBinary );	
+    	str_root_, isBinary );
+    increaseParaviewResolution();		
   }
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Increase spatial resolution of rigid bodies in Paraview
+void GrainsCoupledWithFluid::increaseParaviewResolution() const
+{
+  size_t nn = m_allcomponents.getTotalNumberPhysicalParticles();
+  size_t mm = nn < 10 ? 5 : ( nn < 100 ? 4 : ( nn < 1000 ? 3 : 
+  	( nn < 10000 ? 2 : 1 ) ) );
+  
+  Sphere::SetvisuNodeNbPerQar( mm * 4 );
+  Disc::SetvisuNodeNbOverPer( mm * 16 );
+  Cylinder::SetvisuNodeNbOverPer( mm * 16 );
+  Cone::SetvisuNodeNbOverPer( mm * 16 );
+  Superquadric::SetvisuNodeNbPerQar( mm * 6 );
+  SpheroCylinder::SetvisuNodeNbPerQar( mm * 4 );
+  SpheroCylindricalPrism::SetvisuNodeNbOverHalfPer( mm * 8 );
 }
 
 

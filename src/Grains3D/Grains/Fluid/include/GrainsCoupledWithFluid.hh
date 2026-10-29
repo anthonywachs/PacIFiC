@@ -184,6 +184,11 @@ class GrainsCoupledWithFluid : virtual public Grains
     
     
   private:
+    /**@name Methods */
+    //@{
+    /** @brief Increase spatial resolution of rigid bodies in Paraview */
+    void increaseParaviewResolution() const;
+    //@}  
 };
 
 #endif
