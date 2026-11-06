@@ -2856,6 +2856,50 @@ double compute_L2_norm( const vector u )
 
 
 
+/** Computes the total used RSS memory */
+//----------------------------------------------------------------------------
+size_t compute_used_memory( void ) 
+//----------------------------------------------------------------------------
+{
+  char line[256] = "";
+  size_t procpid = getpid(), mem;
+  char sprocpid[16] = "";
+  char procpidfilename[80] = "/proc/";
+  char keyword[256] = "";
+  char refkeyword[16] = "VmRSS:"; 
+  char unit[16] = ""; 
+  char refunit[16] = "kB";
+  bool found = false;    
+  
+  sprintf( sprocpid, "%lu", procpid );
+  strcat( procpidfilename, sprocpid );
+  strcat( procpidfilename, "/status" );
+  
+  FILE* ft = fopen( procpidfilename, "r" ); 
+  if ( ft )
+    while ( fgets( line, sizeof(line), ft ) && !found )
+    {
+      sscanf( line, "%s", keyword );
+      if ( ! strcmp( keyword, refkeyword ) )
+      {
+	sscanf( line, "%s %lu %s", keyword, &mem, unit );
+	if ( strcmp( unit, refunit ) )
+	  printf( "Compute_used_memory: Unit is %s\n", unit ); 
+	found = true;	
+      }    
+    }
+    
+# if _MPI
+    mpi_all_reduce( mem, MPI_UNSIGNED_LONG, MPI_SUM );
+# endif
+
+  mem *= 1000.;
+
+  return mem;          	         
+}
+
+
+
 # if ADAPTIVE
 
 /** Adapt_wavelet algorithm with a maxlevel per field component */

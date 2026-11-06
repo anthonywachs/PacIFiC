@@ -796,6 +796,7 @@ event end_timestep (i++)
     do_DLMFD( i );
 # endif
 
+
   /* Compute periodic flow rate or adjust periodic pressure drop if 
   imposed periodic flow rate */
 # if IMPOSED_PERIODICFLOW
@@ -869,7 +870,7 @@ event end_timestep (i++)
 #   if !PRODUCTION_LOG      
       printf( "   Velocity change = %8.5e\n", deltau );
 #   else
-      printf( "Dv = %8.5e\n", deltau );
+      printf( "Dv = %8.5e", deltau );
 #   endif 
     
 # if COMPUTE_AVGL2NORM_DIVU && !PRODUCTION_LOG
@@ -891,6 +892,7 @@ event end_timestep (i++)
 	) ) );
 # endif 
 
+
   /* Save all rigid body data 
   In case of single settling particle kept stationary in the z direction through
   adjusting the incoming z velocity component denoted uback at the back boundary
@@ -908,7 +910,34 @@ event end_timestep (i++)
 # if SINGLE_SETTLING_STATIONARY_Z
     allRigidBodies[0].U.z = 0.;
     allRigidBodies[0].g.center.z = zzz;
-# endif       
+# endif
+
+
+  /* Display the total RSS memory used by the simulation */
+  if ( !used_mem_counter )
+  {
+    size_t memory = compute_used_memory();
+    if ( pid() == 0 )
+    {   
+#     if !PRODUCTION_LOG      
+        printf( "   Used memory = " );
+#     else
+        printf( " - Mem = " );
+#     endif 
+      if ( memory > mem_go )
+        printf( "%.2f Go\n", ( (double)memory ) / mem_go );
+      else if ( memory > mem_mo )
+        printf( "%.2f Mo\n", ( (double)memory ) / mem_mo );      
+      else printf( "%lu octets\n", memory );
+    }
+    ++used_mem_counter;
+  }
+  else
+  {
+    if ( pid() == 0 ) printf( "\n" );
+    ++used_mem_counter;
+    if ( used_mem_counter == DISPLAY_USED_MEMORY_EVERY ) used_mem_counter = 0;
+  }        
 }
 
 

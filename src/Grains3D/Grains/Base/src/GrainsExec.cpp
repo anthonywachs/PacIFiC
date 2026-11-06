@@ -285,9 +285,9 @@ void GrainsExec::display_memory( ostream& os, size_t memory )
   static size_t const mo = 1024*1024 ;
   static size_t const go = 1024*1024*1024 ;
 
-  if( memory > go )
+  if ( memory > go )
     os << ( (double) memory )/go << " Go" << std::flush;
-  else if( memory > mo )
+  else if ( memory > mo )
     os << ( (double) memory )/mo << " Mo" << std::flush ;
   else os << memory << " octets" << std::flush ;
 }
