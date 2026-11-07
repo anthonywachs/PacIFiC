@@ -39,7 +39,7 @@ void output_series( FILE* fp, char const* times_series )
 
 //----------------------------------------------------------------------------
 void output_vtu_dlmfd_bndpts( RigidBody const* allrb, const int np,
-	char const* fname )
+	char const* fname, coord transform = {0} )
 //----------------------------------------------------------------------------
 {
 # if DLMFD_BOUNDARYPOINTS
@@ -71,9 +71,10 @@ void output_vtu_dlmfd_bndpts( RigidBody const* allrb, const int np,
 	for (size_t j = 0; j < m; j++)
 	  if ( sbb->deactivated[j] == 0 )
 	  {  
-	    fprintf( fdlm, "%12.5e %12.5e", sbb->bp[j].x, sbb->bp[j].y );
+	    fprintf( fdlm, "%12.5e %12.5e", sbb->bp[j].x + transform.x,
+		sbb->bp[j].y + transform.y );
 #           if dimension == 3  
-              fprintf( fdlm, " %12.5e\n", sbb->bp[j].z );
+              fprintf( fdlm, " %12.5e\n", sbb->bp[j].z + transform.z );
 #           else
               fprintf( fdlm, " 0.\n" );
 #           endif	
@@ -136,7 +137,7 @@ void output_vtu_dlmfd_bndpts( RigidBody const* allrb, const int np,
 
 //----------------------------------------------------------------------------
 void output_vtu_dlmfd_intpts( RigidBody const* allrb, const int np,
-	char const* fname )
+	char const* fname, coord transform = {0} )
 //----------------------------------------------------------------------------
 {
 # if DLMFD_INTERIORPOINTS
@@ -234,10 +235,11 @@ void output_vtu_dlmfd_intpts( RigidBody const* allrb, const int np,
       	
       for(int i = 0; i < total_interior_points; i++)
       {
-        fprintf( fdlm, "%12.5e %12.5e", All_interior_coordx[i], 
-	  	All_interior_coordy[i] );
+        fprintf( fdlm, "%12.5e %12.5e", All_interior_coordx[i] 
+	+ transform.x, All_interior_coordy[i] + transform.y );
 #       if dimension == 3  
-          fprintf( fdlm, " %12.5e\n", All_interior_coordz[i] );
+          fprintf( fdlm, " %12.5e\n", All_interior_coordz[i] 
+	  	+ transform.z);
 #       else
           fprintf( fdlm, " 0.\n" );
 #       endif	
@@ -413,7 +415,7 @@ void save_data_vtk( scalar* list, vector* vlist, RigidBody const* allrb,
       strcat( filename_domain, RESULT_FLUID_ROOTFILENAME ); 
       sprintf( suffix, "_domain.vtu" );
       strcat( filename_domain, suffix );
-      output_vtu_domain( filename_domain );   
+      output_vtu_domain( filename_domain, vtk_shift_to_zero );   
     }
 
     
@@ -428,11 +430,12 @@ void save_data_vtk( scalar* list, vector* vlist, RigidBody const* allrb,
     /*
      *   coord transform = {0};
      *   transform.z = ...?;
-     *   vtkHDFHyperTreeGrid vtk_hdf = vtk_HDF_hypertreegrid_init( list, vlist, filename_htg, transform = transform);
+     *   vtkHDFHyperTreeGrid vtk_hdf = vtk_HDF_hypertreegrid_init( list, 
+     *		vlist, filename_htg, transform = transform);
      */
 
     vtkHDFHyperTreeGrid vtk_hdf = vtk_HDF_hypertreegrid_init( list, vlist, 
-    	filename_htg );
+    	filename_htg, vtk_shift_to_zero );
     vtk_HDF_hypertreegrid_close( &vtk_hdf );
 
     // Write our vtkhdf.series file
@@ -478,7 +481,7 @@ void save_data_vtk( scalar* list, vector* vlist, RigidBody const* allrb,
     sprintf( suffix, "_T%d.vtu", cycle_number );
     strcat( filename_bnd_vtu, suffix );
         
-    output_vtu_dlmfd_bndpts( allrb, np, filename_bnd_vtu );
+    output_vtu_dlmfd_bndpts( allrb, np, filename_bnd_vtu, vtk_shift_to_zero );
   
     if ( pid() == 0 ) 
     {  
@@ -514,7 +517,7 @@ void save_data_vtk( scalar* list, vector* vlist, RigidBody const* allrb,
     sprintf( suffix, "_T%d.vtu", cycle_number );
     strcat( filename_int_vtu, suffix );
         
-    output_vtu_dlmfd_intpts( allrb, np, filename_int_vtu );
+    output_vtu_dlmfd_intpts( allrb, np, filename_int_vtu, vtk_shift_to_zero );
   
     if ( pid() == 0 ) 
     {  

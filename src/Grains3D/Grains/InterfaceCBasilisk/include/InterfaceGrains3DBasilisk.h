@@ -20,6 +20,9 @@ extern "C" {
   void SetInitialTime( double tinit );
 
   void SaveResults_Grains();
+  
+  void SetParaviewPostProcessingTranslationVector( 
+      	const double tvx, const double tvy, const double tvz );
 
   void checkParaviewPostProcessing_Grains( char* solid_resDir );
 

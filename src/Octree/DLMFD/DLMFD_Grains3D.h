@@ -195,5 +195,13 @@ event GranularSolver_updateVelocity (t < -1.)
 event GranularSolver_saveResults (t < -1.)
 //----------------------------------------------------------------------------
 {
-  if ( pid() == 0 ) SaveResults_Grains();  
+  if ( pid() == 0 ) 
+  {
+#   if SINGLE_SETTLING_SHIFT_TO_ZERO_Z
+      SetParaviewPostProcessingTranslationVector( vtk_shift_to_zero.x,
+      	vtk_shift_to_zero.y, vtk_shift_to_zero.z );
+#   endif  
+  
+    SaveResults_Grains();
+  }  
 }

@@ -209,8 +209,16 @@
 #   define PRODUCTION_LOG 0
 # endif
 
+# ifndef DISPLAY_USED_MEMORY_EVERY
+#   define DISPLAY_USED_MEMORY_EVERY 10
+# endif
+
 # ifndef SINGLE_SETTLING_STATIONARY_Z
 #   define SINGLE_SETTLING_STATIONARY_Z 0
+# endif
+
+# ifndef SINGLE_SETTLING_SHIFT_TO_ZERO_Z
+#   define SINGLE_SETTLING_SHIFT_TO_ZERO_Z 0
 # endif
 
 # ifndef DLMFD_OPT
@@ -605,6 +613,10 @@ coord FULL_DOMAIN;
 # if SINGLE_SETTLING_STATIONARY_Z
     double uback = 0., actualzpos = 0.;
 # endif
+coord vtk_shift_to_zero;
+size_t const mem_mo = 1024 * 1024 ;
+size_t const mem_go = 1024 * 1024 * 1024 ;
+size_t used_mem_counter = 0;
 
 
 

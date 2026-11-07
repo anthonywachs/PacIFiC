@@ -21,6 +21,9 @@ extern "C" {
 
   void SaveResults_Grains();
 
+  void SetParaviewPostProcessingTranslationVector( 
+      	const double tvx, const double tvy, const double tvz );
+
   void checkParaviewPostProcessing_Grains( char* solid_resDir );
 
   void UpdateVelocityGrains( double** arrayv, const int m );
