@@ -934,7 +934,9 @@ event end_timestep (i++)
   }
   else
   {
-    if ( pid() == 0 ) printf( "\n" );
+#   if PRODUCTION_LOG      
+      if ( pid() == 0 ) printf( "\n" );
+#   endif      
     ++used_mem_counter;
     if ( used_mem_counter == DISPLAY_USED_MEMORY_EVERY ) used_mem_counter = 0;
   }        

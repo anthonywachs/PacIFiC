@@ -95,7 +95,7 @@ trace void synchronize( scalar* list )
 //----------------------------------------------------------------------------
 {
   for (scalar s in list)
-    s.dirty = true;
+    set_dirty_stencil (s);
   boundary(list);
 }
 
