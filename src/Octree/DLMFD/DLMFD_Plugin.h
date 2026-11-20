@@ -235,7 +235,9 @@ event init (i = 0)
 #   if B_SPLIT_EXPLICIT_ACCELERATION
       read_explicit_splitAcceleration( DUMP_DIR, allRigidBodies, 
       	nbRigidBodies );
-#   endif    
+#   endif
+    
+    if ( WRITE_FLUID_DATA_EVERY != 1 ) write_fluid_data_counter = 1;    
   }
   else // Simulation from t=0
   {
@@ -404,7 +406,7 @@ event init (i = 0)
   // Simulation time interval
   maxtime = trestart + SIMUTIMEINTERVAL;
   if ( pid() == 0 ) 
-    printf( "Simulation time interval: t_start = %f to t_end = %f\n\n", 
+    printf( "Simulation time interval: t_start = %f to t_end = %f\n", 
     	trestart, maxtime ); 
 
 	
@@ -464,11 +466,7 @@ event logfile ( i=0; i++ )
   {
     // Close all DLMFD files
     close_file_pointers( nbRigidBodies, pdata, !RIGIDBODIES_AS_FIXED_OBSTACLES,
-    	fdata, converge, cellvstime ); 
-
-    // Write the dump time and time step for restart
-    if ( pid() == 0 ) printf( "Write t and dt in time restart file\n" );
-    save_t_dt_restart( DUMP_DIR, t, dt, imposed_periodicpressuredrop );  
+    	fdata, converge, cellvstime );  
  
     // Stop simulation
     return 1; 
@@ -482,113 +480,125 @@ event logfile ( i=0; i++ )
 //----------------------------------------------------------------------------
 void do_output( char const* mess )
 //----------------------------------------------------------------------------
-{
-  if ( pid() == 0 ) printf ( "Output data at %s %8.6f START\n", mess, t ); 
+{  
+  if ( pid() == 0 ) printf ( "\n--------- Output data at %s %8.5e: START "
+  	"---------\n", mess, t );
+  output_data = true; 
 
-  scalar* dump_list = NULL;
+  if ( !write_fluid_data_counter )
+  {
+    if ( pid() == 0 ) printf ( "   Fluid data\n"
+    	"      Post-processing files: START" ); 
+    scalar* dump_list = NULL;
 
-  /* In case of single settling particle kept stationary in the z direction 
-  through adjusting the incoming z velocity component denoted uback at the back
-  boundary condition, we shift the fluid and particle z velocity component by 
-  - uback such that at the post processing level all looks as if the particle 
-  moves. */
-# if SINGLE_SETTLING_STATIONARY_Z
-    foreach() u.z[] -= uback;    
-# endif
-
-# if SINGLE_SETTLING_SHIFT_TO_ZERO_Z
-    vtk_shift_to_zero.z = - allRigidBodies[0].g.center.z;
-# endif  
-
-# if LAMBDA2
-    scalar l2[];
-    lambda2( u, l2 );        
-# endif
-
-# if VORTICITY
-#   if dimension == 2
-      scalar omega[];
-      vorticity( u, omega );
-#   else
-      vector omega[];      
-      vorticity_3D( u, omega ); 
-#   endif            
-# endif
-
-  // Paraview output for post-processing
-# if PARAVIEW
-    scalar* paraview_scalarlist = {PARAVIEW_SCALAR_LIST
-#   if LAMBDA2
-      , l2
+    /* In case of single settling particle kept stationary in the z direction 
+    through adjusting the incoming z velocity component denoted uback at the back
+    boundary condition, we shift the fluid and particle z velocity component by 
+    - uback such that at the post processing level all looks as if the particle 
+    moves. */
+#   if SINGLE_SETTLING_STATIONARY_Z
+      foreach() u.z[] -= uback;    
 #   endif
+
+#   if SINGLE_SETTLING_SHIFT_TO_ZERO_Z
+      vtk_shift_to_zero.z = - allRigidBodies[0].g.center.z;
+#   endif  
+
+#   if LAMBDA2
+      scalar l2[];
+      lambda2( u, l2 );        
+#   endif
+
 #   if VORTICITY
 #     if dimension == 2
-        , omega
+        scalar omega[];
+        vorticity( u, omega );
+#     else
+        vector omega[];      
+        vorticity_3D( u, omega ); 
 #     endif            
-#   endif         
-    };
-    vector* paraview_vectorlist = {PARAVIEW_VECTOR_LIST
-#   if VORTICITY
-      , omega
-#   endif         
-    };    
-    save_data_vtk( paraview_scalarlist, paraview_vectorlist, allRigidBodies, 
+#   endif
+
+    // Paraview output for post-processing
+#   if PARAVIEW
+      scalar* paraview_scalarlist = {PARAVIEW_SCALAR_LIST
+#     if LAMBDA2
+        , l2
+#     endif
+#     if VORTICITY
+#       if dimension == 2
+          , omega
+#       endif            
+#     endif         
+      };
+      vector* paraview_vectorlist = {PARAVIEW_VECTOR_LIST
+#     if VORTICITY
+        , omega
+#     endif         
+      };    
+      save_data_vtk( paraview_scalarlist, paraview_vectorlist, allRigidBodies, 
     	nbRigidBodies, t );
-# endif  
+#   endif  
   
-  // Bview output for post-processing   
-# if BVIEW
-    char dump_name[80] = "";
-    char stime[80] = ""; 
-    strcpy( dump_name, FLUID_DUMP_FILENAME );
-    sprintf( stime, "%6f", t );
-    strcat( dump_name, "_t" );
-    strcat( dump_name, stime );     
+    // Bview output for post-processing   
+#   if BVIEW
+      char dump_name[80] = "";
+      char stime[80] = ""; 
+      strcpy( dump_name, FLUID_DUMP_FILENAME );
+      sprintf( stime, "%6f", t );
+      strcat( dump_name, "_t" );
+      strcat( dump_name, stime );     
 
-    dump_list = (scalar *){BVIEW_LIST
-#   if LAMBDA2
-      , l2
+      dump_list = (scalar *){BVIEW_LIST
+#     if LAMBDA2
+        , l2
+#     endif     
+#     if VORTICITY
+        , omega
+#     endif        
+      };
+      dump( dump_name, dump_list );  
+#   endif
+
+    if ( pid() == 0 ) printf ( " - END\n" ); 
+
+    // Basilisk output for restart
+    if ( pid() == 0 ) printf ( "      Restart files: START" );    
+    // Reset fluid velocity to its value in the simulation
+#   if SINGLE_SETTLING_STATIONARY_Z
+      foreach() u.z[] += uback;    
+#   endif 
+
+#   if DLM_ALPHA_COUPLING
+      dump_list = (scalar *){u, g, p, pf, DLM_explicit};
+#   else
+      dump_list = (scalar *){u, g, p, pf};    
 #   endif     
-#   if VORTICITY
-      , omega
-#   endif        
-    };
-    dump( dump_name, dump_list );  
-# endif
-
-  // Basilisk output for restart
-  // Reset fluid velocity to its value in the simulation
-# if SINGLE_SETTLING_STATIONARY_Z
-    foreach() u.z[] += uback;    
-# endif 
-
-# if DLM_ALPHA_COUPLING
-    dump_list = (scalar *){u, g, p, pf, DLM_explicit};
-# else
-    dump_list = (scalar *){u, g, p, pf};    
-# endif     
-  dump( FLUID_DUMP_FILENAME, dump_list );
+    dump( FLUID_DUMP_FILENAME, dump_list );
       
-  // If particles are lighter or neutrally buoyant and the flag 
-  // B_SPLIT_EXPLICIT_ACCELERATION is on, we save the explication part of the 
-  // particle split acceleration for restart purposes
-# if B_SPLIT_EXPLICIT_ACCELERATION
-    save_explicit_splitAcceleration( DUMP_DIR, allRigidBodies, 
+    // If particles are lighter or neutrally buoyant and the flag 
+    // B_SPLIT_EXPLICIT_ACCELERATION is on, we save the explication part of the 
+    // particle split acceleration for restart purposes
+#   if B_SPLIT_EXPLICIT_ACCELERATION
+      save_explicit_splitAcceleration( DUMP_DIR, allRigidBodies, 
       	nbRigidBodies );
-# endif
+#   endif
 
-  /* In case of single settling particle kept stationary in the z direction 
-  through adjusting the incoming z velocity component denoted uback at the back
-  boundary condition, we save the value of uback and the actual z position of
-  the particle */
-# if SINGLE_SETTLING_STATIONARY_Z
-    save_single_settling_stationary_restart( DUMP_DIR, uback, actualzpos );
-# endif         
+    /* In case of single settling particle kept stationary in the z direction 
+    through adjusting the incoming z velocity component denoted uback at the back
+    boundary condition, we save the value of uback and the actual z position of
+    the particle */
+#   if SINGLE_SETTLING_STATIONARY_Z
+      save_single_settling_stationary_restart( DUMP_DIR, uback, actualzpos );
+#   endif 
 
+    if ( pid() == 0 ) printf ( " - END\n" );     
+
+    save_data_restart = true;        
+  }
+  
   // Granular solver output for both post-processing & restart
   event( "GranularSolver_saveResults" );
-     
-  if ( pid() == 0 ) printf ( "Output data at %s %8.6f END\n", mess, t );
 }
 
 
@@ -602,7 +612,7 @@ event output_data (t += TINTERVALOUTPUT;
 //----------------------------------------------------------------------------	
 {
   char mess[5] = "TIME";
-  save_data_restart = true;
+  save_data_restart = false;
 
   // Freeing and reconstructing RB is required here as the remeshing step
   // might have induced some interpolation errors on the integer fields
@@ -636,10 +646,19 @@ event last_output_data (t = end)
     DLMFD_construction();  
 # endif 
 
-  do_output( mess );    
+  do_output( mess );
+  
+  // Write the dump time and time step for restart
+  if ( pid() == 0 ) printf( "   Write t and dt in time restart file\n" );
+  save_t_dt_restart( DUMP_DIR, t, dt, imposed_periodicpressuredrop );
+  
+  event( "Additional_user_last_output_data" );
+  
+  if ( pid() == 0 ) printf ( "-------- Output data at %s %8.5e: END "
+  	"----------\n", mess, t );  	 
+           
   output_dlmfd_perf( &DLMFD_UzawaTiming, &DLMFD_ConstructionTiming, i, 
-  	&allDLMFDptscells );
-  event( "Additional_user_last_output_data" );	       
+  	&allDLMFDptscells );       
 }	
 
 
@@ -651,13 +670,28 @@ of rigid bodies and predict the position & velocity of rigid bodies */
 event once_timestep_is_determined (i++)
 //----------------------------------------------------------------------------
 {
+  char mess[5] = "TIME";
+  
   if ( save_data_restart && i )
   {
-    if ( pid() == 0 ) printf( "Write t and dt in time restart file\n" );
+    if ( pid() == 0 ) printf( "   Write t and dt in time restart file\n" );
     save_t_dt_restart( DUMP_DIR, t, dt, imposed_periodicpressuredrop );        
-    save_data_restart = false;   
+    save_data_restart = false;  
   } 
   if ( i == 0 ) save_data_restart = false;
+  // Rem: This block of instructions is here instead of in do_output because
+  // of the Basilisk event sequence
+  if ( output_data )
+  {
+    if ( pid() == 0 ) printf ( "--------- Output data at %s %8.5e: END "
+    	"-----------\n", mess, t );
+  
+    ++write_fluid_data_counter;
+    if ( write_fluid_data_counter == WRITE_FLUID_DATA_EVERY ) 
+      write_fluid_data_counter = 0; 
+      
+    output_data = false;   
+  }
 
   if ( pid() == 0 )
   {

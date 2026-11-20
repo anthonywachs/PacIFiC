@@ -134,11 +134,17 @@ class AllComponents
     @param insert_windows insertion windows
     @param rank process rank
     @param nprocs number of processes
-    @param wrapper MPI wrapper */
+    @param wrapper MPI wrapper 
+    @param externalllyControlledPPwrite whether externally controlled post-
+    processing writers write data
+    @param premess piece of text to output to display before the standard
+    message */
     void PostProcessing_start( double time, double dt,
 	LinkedCell const* LC, AllInsertionWindows const& insert_windows,
 	int rank = 0, int nprocs = 1,
-  	GrainsMPIWrapper const* wrapper = NULL );
+  	GrainsMPIWrapper const* wrapper = NULL,
+	bool externalllyControlledPPwrite = false,
+	string const& premess="" );
 
     /** @brief Writes components for Post-Processing over the simulation
     @param time physical time
@@ -147,11 +153,17 @@ class AllComponents
     @param insert_windows insertion windows    
     @param rank process rank
     @param nprocs number of processes
-    @param wrapper MPI wrapper */
+    @param wrapper MPI wrapper
+    @param externalllyControlledPPwrite whether externally controlled post-
+    processing writers write data
+    @param premess piece of text to output to display before the standard
+    message */        
     void PostProcessing( double time, double dt,
 	LinkedCell const* LC, AllInsertionWindows const& insert_windows,
 	int rank = 0, int nprocs = 1,
-	GrainsMPIWrapper const* wrapper = NULL );
+	GrainsMPIWrapper const* wrapper = NULL,
+	bool externalllyControlledPPwrite = false,
+	string const& premess="" );
 
     /** @brief Finalizes Post-Processing at the end of the simulation */
     void PostProcessing_end();
@@ -441,8 +453,9 @@ class AllComponents
     void addPostProcessingWriter( PostProcessingWriter* ppw );
 
     /** @brief Sets the initial post-processing cycle number
-    @param cycle0 initial cycle number */
-    void setInitialCycleNumber( int const& cycle0 );
+    @param cycle0 initial cycle number 
+    @param time physical time */
+    void setInitialCycleNumber( int const& cycle0, double const& time );
 
     /** @brief Checks that the Paraview post-processing writer exists, and if
     not creates it
@@ -450,12 +463,15 @@ class AllComponents
     @param nprocs number of processes
     @param name_ files name
     @param root_ root file name
-    @param isBinary whether to write in binary mode */
+    @param isBinary whether to write in binary mode 
+    @param deleteIfExists if true, delete the existing Paraview post-processing
+    writer if it exists and replace it by the created one*/
     void checkParaviewPostProcessing( int const& rank,
   	int const& nprocs,
   	string const& name_,
 	string const& root_,
-  	const bool& isBinary );
+  	bool const& isBinary,
+	bool const& deleteIfExists );
 
     /** @brief Writes load on obstacles in a file
     @param time physical time

@@ -19,7 +19,7 @@ extern "C" {
 
   void SetInitialTime( double tinit );
 
-  void SaveResults_Grains();
+  void SaveResults_Grains( bool writeSyncWithFluid );
 
   void SetParaviewPostProcessingTranslationVector( 
       	const double tvx, const double tvy, const double tvz );

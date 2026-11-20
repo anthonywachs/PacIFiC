@@ -825,7 +825,8 @@ void GrainsCoupledWithFluid::setInitialTime( double const& time0 )
 // Sets the initial postprocessing cycle number
 void GrainsCoupledWithFluid::setInitialCycleNumber( int const& cycle0 )
 {
-  if ( m_processorIsActive ) m_allcomponents.setInitialCycleNumber( cycle0 );
+  if ( m_processorIsActive ) 
+    m_allcomponents.setInitialCycleNumber( cycle0, m_tstart );
 }
 
 
@@ -841,7 +842,7 @@ void GrainsCoupledWithFluid::checkParaviewPostProcessing( string const& name_,
   if ( m_processorIsActive )
   { 
     m_allcomponents.checkParaviewPostProcessing( m_rank, m_nprocs, name_,
-    	root_, isBinary );
+    	root_, isBinary, false );
     increaseParaviewResolution();
   }	
 }
@@ -855,7 +856,7 @@ void GrainsCoupledWithFluid::checkParaviewPostProcessing( char const* name_,
     string str_name_( name_ );
     string str_root_( root_ );
     m_allcomponents.checkParaviewPostProcessing( m_rank, m_nprocs, str_name_,
-    	str_root_, isBinary );
+    	str_root_, isBinary, false );
     increaseParaviewResolution();		
   }
 }
@@ -896,11 +897,13 @@ void GrainsCoupledWithFluid::setReloadSame()
 
 // ----------------------------------------------------------------------------
 // Initially writes postprocessing files    
-void GrainsCoupledWithFluid::InitialPostProcessing( size_t indent_width )
+void GrainsCoupledWithFluid::InitialPostProcessing( size_t indent_width, 
+    	bool writeExtControlledPPandRestart, string const& premess )
 {
   if ( m_processorIsActive )
     m_allcomponents.PostProcessing_start( m_time, m_dt, m_collision, 
-    	m_insertion_windows );
+    	m_insertion_windows, 0, 1, NULL, writeExtControlledPPandRestart, 
+	premess );
 }
 
 
@@ -908,16 +911,18 @@ void GrainsCoupledWithFluid::InitialPostProcessing( size_t indent_width )
 
 // ----------------------------------------------------------------------------
 // Writes postprocessing files    
-void GrainsCoupledWithFluid::doPostProcessing( size_t indent_width )
+void GrainsCoupledWithFluid::doPostProcessing( size_t indent_width, 
+    	bool writeExtControlledPPandRestart, string const& premess )
 {
   if ( m_processorIsActive )
   {
     // Write postprocessing files    
     m_allcomponents.PostProcessing( m_time, m_dt, m_collision, 
-    	m_insertion_windows );
+    	m_insertion_windows, 0, 1, NULL, writeExtControlledPPandRestart,
+	premess );
 
     // Write reload files
-    saveReload( m_time );
+    if ( writeExtControlledPPandRestart) saveReload( m_time, premess );
   }
 }
 

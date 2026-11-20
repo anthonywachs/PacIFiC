@@ -265,7 +265,7 @@ class Grains : public ComputingTime, public SolverComputingTime
   
     /** @brief Writes reload files 
     @param time physical time */
-    virtual void saveReload( double const& time );	
+    virtual void saveReload( double const& time, string const& premess="" );	
   
     /** @brief Returns the maximum particle ID number */
     virtual int getMaxParticleIDnumber() const; 

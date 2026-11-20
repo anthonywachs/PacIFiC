@@ -87,13 +87,14 @@ extern "C" {
 
 
 
-  void SaveResults_Grains() 
+  void SaveResults_Grains( bool writeSyncWithFluid ) 
   {
     static unsigned int ppcounter = 0;
+    string premess = "      ";
     if ( !ppcounter ) 
-      grains->InitialPostProcessing( 6 );
+      grains->InitialPostProcessing( 6, writeSyncWithFluid, premess );
     else
-      grains->doPostProcessing( 6 );
+      grains->doPostProcessing( 6, writeSyncWithFluid, premess );
     ++ppcounter; 
   }
   

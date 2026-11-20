@@ -310,6 +310,10 @@ in the inter-boundary point distance on the rigid body surface. */
 #   define PARAVIEW_VTU_MPIIO_WRITER 0
 # endif
 
+# ifndef WRITE_FLUID_DATA_EVERY
+#   define WRITE_FLUID_DATA_EVERY 1
+# endif
+
 # define DYNARRAYBLOCK 128
 
 # ifndef DLMBLOCK 
@@ -590,6 +594,7 @@ double maxtime = 0.;
 double trestart = 0.;
 double dtrestart = 0.;
 bool save_data_restart = false;
+bool output_data = false;
 scalar u_previoustime[];
 double imposed_periodicpressuredrop = 0.;
 double imposed_periodicflowrate = 0.;
@@ -617,6 +622,7 @@ coord vtk_shift_to_zero;
 size_t const mem_mo = 1024 * 1024 ;
 size_t const mem_go = 1024 * 1024 * 1024 ;
 size_t used_mem_counter = 0;
+size_t write_fluid_data_counter = 0;
 
 
 

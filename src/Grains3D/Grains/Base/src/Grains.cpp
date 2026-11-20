@@ -2560,13 +2560,17 @@ void Grains::grainsAbort() const
 
 // ----------------------------------------------------------------------------
 // Writes reload files
-void Grains::saveReload( double const& time )
+void Grains::saveReload( double const& time, string const& premess )
 {
   static size_t reload_counter =
   	GrainsExec::m_reloadFile_suffix == "A" ? 1 : 0 ;
   string reload_suffix = reload_counter ? "B" : "A" ;
   string reload = m_fileSave + reload_suffix ;
   reload = GrainsExec::fullResultFileName( reload, false );
+
+  // Message on display
+  if ( m_rank == 0 )
+    cout << premess << "Output data in restart files: START";
 
   // Save current reload file
   ofstream result;
@@ -2598,6 +2602,10 @@ void Grains::saveReload( double const& time )
 
   ++reload_counter;
   if ( reload_counter == 2 ) reload_counter = 0;
+  
+  // Message on display
+  if ( m_rank == 0 )
+    cout << " - END" << endl;  
 }
 
 

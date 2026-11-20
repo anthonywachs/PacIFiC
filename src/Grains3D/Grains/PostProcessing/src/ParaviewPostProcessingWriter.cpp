@@ -221,9 +221,11 @@ void ParaviewPostProcessingWriter::PostProcessing_start(
 	AllInsertionWindows const& insert_windows )
 {
   size_t nbParticleTypes = referenceParticles->size();
-  size_t nbPPTypes = m_pertype ? nbParticleTypes : 1;  
+  size_t nbPPTypes = m_pertype ? nbParticleTypes : 1;
+  ifstream fileIN( (m_ParaviewFilename_dir + "/" + m_ParaviewFilename
+       	+ "_Obstacles.pvd" ).c_str(), ios::in );    
 
-  if ( GrainsExec::m_ReloadType == "new" ) 
+  if ( GrainsExec::m_ReloadType == "new" || !fileIN ) 
   {
     clearResultFiles();
     if ( GrainsExec::m_MPI )
@@ -461,7 +463,7 @@ void ParaviewPostProcessingWriter::readPVDFile( string const& filename,
 {
   string tline, buffer, part, keyword;
   bool keep = true ;
-  int cyleNumber = 0;
+  int cycleNumber = 0;
     
   ifstream fileIN( filename.c_str(), ios::in );
   getline( fileIN, tline );
@@ -483,8 +485,8 @@ void ParaviewPostProcessingWriter::readPVDFile( string const& filename,
 	  pos = sub.rfind( "." );
           sub.erase( sub.begin() + pos, sub.end() );	  
           istringstream issNum( sub );
-          issNum >> cyleNumber; 
-          if ( cyleNumber > m_ParaviewCycleNumber ) keep = false ;
+          issNum >> cycleNumber; 
+          if ( cycleNumber > m_ParaviewCycleNumber ) keep = false ;
         }
       }       
     }
@@ -502,7 +504,7 @@ void ParaviewPostProcessingWriter::readPVDFile( string const& filename,
 // Gets the last cycle number in case of reload
 int ParaviewPostProcessingWriter::getPreviousCycleNumber() const
 {
-  int cyleNumber = 0;
+  int cycleNumber = 0;
   string tline, previous_tline, buffer, part;
 
   // Read the obstacles pvd file
@@ -513,6 +515,7 @@ int ParaviewPostProcessingWriter::getPreviousCycleNumber() const
     previous_tline = tline;
     getline( fileIN, tline );
   }
+  fileIN.close();
   
   // Process the penultimate line to extract the cycle number
   istringstream iss( previous_tline ); 
@@ -522,9 +525,58 @@ int ParaviewPostProcessingWriter::getPreviousCycleNumber() const
   sub.erase( sub.begin(), sub.begin() + 2 );
   sub.erase( sub.end() - 7, sub.end() ); 
   istringstream issNum( sub );
-  issNum >> cyleNumber; 
+  issNum >> cycleNumber; 
 
-  return cyleNumber;
+  return ( cycleNumber );
+}
+
+
+
+
+// ---------------------------------------------------------------------------
+// Gets the cycle number corresponding to time in case of reload
+int ParaviewPostProcessingWriter::getCycleNumberAtTime( double const& time ) 
+	const
+{
+  int cycleNumber = -1;
+  string tline, stt, scycle, buffer, keyword;
+  bool found = false;
+  double tt = 0., ttprev = 0.;
+
+  // Read the obstacles pvd file
+  // If the file does not exist, returns -1
+  // If the time does not exist, returnr the last cycle number
+  ifstream fileIN( (m_ParaviewFilename_dir + "/" + m_ParaviewFilename
+       	+ "_Obstacles.pvd" ).c_str(), ios::in );
+  if ( fileIN )
+  {
+    while ( tline != "</Collection>" && !found )
+    { 
+      getline( fileIN, tline );
+      istringstream iss( tline );
+      iss >> keyword;
+      if ( keyword == "<DataSet" )
+      {
+        iss >> stt >> buffer >> buffer >> scycle;
+        stt.erase( stt.begin(), stt.begin() + 10 );
+        stt.erase( stt.end() - 1, stt.end() ); 
+        istringstream issT( stt );
+        issT >> tt;
+	size_t pos = scycle.find( "_T" );
+	string sub = scycle.substr( pos );
+	sub.erase( sub.begin(), sub.begin() + 2 );
+	sub.erase( sub.end() - 7, sub.end() ); 
+	istringstream issNum( sub );
+	issNum >> cycleNumber;	         
+        if ( fabs( tt - time ) < 1.e-4 * fabs( tt - ttprev ) )
+          found = true;              
+        ttprev = tt;
+      } 
+    }
+    fileIN.close();
+  } 
+
+  return ( cycleNumber );
 }
 
 
@@ -1960,11 +2012,8 @@ void ParaviewPostProcessingWriter::clearResultFiles() const
 {
   if ( m_rank == 0 ) 
   {
-    // REPLACED_EXEC_SCRIPTS
-    // string cmd = "bash " + GrainsExec::m_GRAINS_HOME + "/Tools/ExecScripts/Paraview_clear.exec " + m_ParaviewFilename_dir + " " + m_ParaviewFilename;
-    // GrainsExec::m_return_syscmd = system( cmd.c_str() );
-
-    std::size_t num_removed = PacIFiC::Grains::cleanup_paraview_outputs(m_ParaviewFilename_dir, m_ParaviewFilename);
+    std::size_t num_removed = PacIFiC::Grains::cleanup_paraview_outputs(
+    	m_ParaviewFilename_dir, m_ParaviewFilename );
   }   
 }
 
@@ -1972,10 +2021,16 @@ void ParaviewPostProcessingWriter::clearResultFiles() const
 
 // ---------------------------------------------------------------------------
 // Sets the initial cycle number
-void ParaviewPostProcessingWriter::setInitialCycleNumber( const int& cycle0 ) 
+void ParaviewPostProcessingWriter::setInitialCycleNumber( const int& cycle0,
+	double const& time ) 
 { 
-  m_ParaviewCycleNumber = cycle0; 
   m_initialCycleNumber_forced = true ; 
+  if ( m_externallyControlled ) m_ParaviewCycleNumber = cycle0;
+  else 
+  { 
+    m_ParaviewCycleNumber = getCycleNumberAtTime( time );
+    if ( m_ParaviewCycleNumber == -1 ) m_ParaviewCycleNumber = cycle0;
+  }  
 }
 
 

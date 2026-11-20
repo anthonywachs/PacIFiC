@@ -17,6 +17,7 @@ PostProcessingWriter::PostProcessingWriter( int const& rank_,
 	int const& nbranks_ )
   : m_rank( rank_ )
   , m_nprocs( nbranks_ )
+  , m_externallyControlled( false )
 {}
 
 
@@ -28,6 +29,7 @@ PostProcessingWriter::PostProcessingWriter( DOMNode* dn, int const& rank_,
 	int const& nbranks_ )
   : m_rank( rank_ )
   , m_nprocs( nbranks_ )
+  , m_externallyControlled( false )  
 {}
 
 
@@ -43,7 +45,8 @@ PostProcessingWriter::~PostProcessingWriter()
 
 // ----------------------------------------------------------------------------
 // Sets the initial cycle number
-void PostProcessingWriter::setInitialCycleNumber( int const& cycle0 )
+void PostProcessingWriter::setInitialCycleNumber( int const& cycle0, 
+	double const& time )
 {}
 
 
@@ -86,3 +89,23 @@ vector<bool> PostProcessingWriter::get_PostProcessingWindow( )
 {
   return ( PostProcessingWriter::m_bPPWindow );
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets the externally controlled boolean
+void PostProcessingWriter::setExternallyControlled( bool const& ext )
+{
+  m_externallyControlled = ext;
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns whether the post-processing writer is externally controlled
+bool PostProcessingWriter::getExternallyControlled() const
+{
+  return ( m_externallyControlled );
+} 

@@ -100,8 +100,9 @@ class ParaviewPostProcessingWriter : public PostProcessingWriter
     string getPostProcessingWriterType() const;
 	
     /** @brief Sets the initial cycle number
-    @param cycle0 initial cycle number */
-    void setInitialCycleNumber( const int& cycle0 );
+    @param cycle0 initial cycle number 
+    @param time physical time */
+    void setInitialCycleNumber( const int& cycle0, double const& time );
 
     /** @brief Writes components involved in a motion or a contact error
     @param filename file root name
@@ -296,6 +297,10 @@ class ParaviewPostProcessingWriter : public PostProcessingWriter
   
     /** @brief Gets the last cycle number in case of reload */
     int getPreviousCycleNumber() const;
+    
+    /** @brief Gets the cycle number corresponding to time in case of reload
+    @param time time of output */
+    int getCycleNumberAtTime( double const& time ) const;    
   
     /** @brief Writes a long ostringstream character by character (in case the
     classical fileOUT << oss.str() crashes)

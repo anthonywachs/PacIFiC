@@ -130,12 +130,24 @@ class GrainsCoupledWithFluid : virtual public Grains
   	bool const& isBinary ); 
 	
     /** @brief Initially writes postprocessing files    
-    @param indent_width output message indentation width */
-    void InitialPostProcessing( size_t indent_width = 0 );
+    @param indent_width output message indentation width 
+    @param writeExtControlledPPandRestart write post-processing and restart data
+    synchronized with the fluid 
+    @param premess piece of text to output to display before the standard
+    message */
+    void InitialPostProcessing( size_t indent_width = 0, 
+    	bool writeExtControlledPPandRestart = false,
+	string const& premess="" );
 
     /** @brief Writes postprocessing files    
-    @param indent_width output message indentation width */
-    void doPostProcessing( size_t indent_width = 0 );
+    @param indent_width output message indentation width
+    @param writeExtControlledPPandRestart write post-processing and restart data
+    synchronized with the fluid    
+    @param premess piece of text to output to display before the standard
+    message */
+    void doPostProcessing( size_t indent_width = 0, 
+    	bool writeExtControlledPPandRestart = false,
+	string const& premess="" );
     
     /** @brief Sets the Paraview post-processing translation vector in case of
     projection-translation

@@ -1627,21 +1627,17 @@ ostream& operator << ( ostream& f, AllComponents const& EC )
 void AllComponents::PostProcessing_start( double time, double dt,
 	LinkedCell const* LC, AllInsertionWindows const& insert_windows,
 	int rank, int nprocs,
-	GrainsMPIWrapper const* wrapper )
+	GrainsMPIWrapper const* wrapper,
+	bool externalllyControlledPPwrite,
+	string const& premess )
 {
   list<Particle*>* postProcessingPeriodic = NULL;
   list<PostProcessingWriter*>::iterator pp;
-  bool written = false;
+  bool write = false;
 
   // Message on display
-  if ( rank == 0 )
-    for (pp=m_postProcessors.begin();pp!=m_postProcessors.end() && !written;
-    	pp++)
-    {
-      cout << "Writing results in post-processing files: START" << endl 
-      	<< std::flush;
-      written = true;
-    }
+  if ( rank == 0 && !m_postProcessors.empty() )
+    cout << premess << "Output data in post-processing files: START";
 
   // Periodic clones
   if ( GrainsExec::m_periodic )
@@ -1666,9 +1662,15 @@ void AllComponents::PostProcessing_start( double time, double dt,
 
   // Post processing writers
   for (pp=m_postProcessors.begin();pp!=m_postProcessors.end();pp++)
-    (*pp)->PostProcessing_start( time, dt, &m_ActiveParticles,
+  {
+    write = false;
+    if ( !(*pp)->getExternallyControlled() ) write = true;
+    else if ( externalllyControlledPPwrite ) write = true;
+    if ( write ) 
+      (*pp)->PostProcessing_start( time, dt, &m_ActiveParticles,
 	&m_RemovedParticles, postProcessingPeriodic,
 	&m_ReferenceParticles, m_obstacle, LC, insert_windows );
+  }
 
   // Destruction of local containers
   if ( GrainsExec::m_periodic )
@@ -1678,15 +1680,8 @@ void AllComponents::PostProcessing_start( double time, double dt,
   }
 
   // Message on display
-  written = false ;
-  if ( rank == 0 )
-    for (pp=m_postProcessors.begin();pp!=m_postProcessors.end() && !written;
-    	pp++)
-    {
-      cout << "Writing results in post-processing files: COMPLETED" << endl
-      	<< std::flush;
-      written = true;
-    }
+  if ( rank == 0 && !m_postProcessors.empty() )
+    cout << " - END" << endl;
 }
 
 
@@ -1696,20 +1691,17 @@ void AllComponents::PostProcessing_start( double time, double dt,
 // Writes components for Post-Processing over the simulation
 void AllComponents::PostProcessing( double time, double dt,
 	LinkedCell const* LC, AllInsertionWindows const& insert_windows,
-	int rank, int nprocs, GrainsMPIWrapper const* wrapper )
+	int rank, int nprocs, GrainsMPIWrapper const* wrapper,
+	bool externalllyControlledPPwrite,
+	string const& premess )
 {
   list<Particle*>* postProcessingPeriodic = NULL;
   list<PostProcessingWriter*>::iterator pp;
-  bool written = false;
+  bool write = false;
 
   // Message on display
-  if ( rank == 0 )
-    for (pp=m_postProcessors.begin();pp!=m_postProcessors.end() && !written;
-    	pp++)
-    {
-      cout << "Writing results in post-processing files: START" << endl;
-      written = true;
-    }
+  if ( rank == 0 && !m_postProcessors.empty() )
+    cout << premess << "Output data in post-processing files: START";
 
   // Periodic clones
   if ( GrainsExec::m_periodic )
@@ -1734,9 +1726,15 @@ void AllComponents::PostProcessing( double time, double dt,
 
   // Post processing writers
   for (pp=m_postProcessors.begin();pp!=m_postProcessors.end();pp++)
-    (*pp)->PostProcessing( time, dt, &m_ActiveParticles,
+  {
+    write = false;
+    if ( !(*pp)->getExternallyControlled() ) write = true;
+    else if ( externalllyControlledPPwrite ) write = true;
+    if ( write )   
+      (*pp)->PostProcessing( time, dt, &m_ActiveParticles,
 	&m_RemovedParticles, postProcessingPeriodic,
 	&m_ReferenceParticles, m_obstacle, LC, insert_windows );
+  }
 
   // Destruction of local containers
   if ( GrainsExec::m_periodic )
@@ -1746,14 +1744,8 @@ void AllComponents::PostProcessing( double time, double dt,
   }
 
   // Message on display
-  written = false ;
-  if ( rank == 0 )
-    for (pp=m_postProcessors.begin();pp!=m_postProcessors.end() && !written;
-    	pp++)
-    {
-      cout << "Writing results in post-processing files: COMPLETED" << endl;
-      written = true;
-    }
+  if ( rank == 0 && !m_postProcessors.empty() )
+    cout << " - END" << endl;
 }
 
 
@@ -1899,11 +1891,12 @@ void AllComponents::addPostProcessingWriter( PostProcessingWriter* ppw )
 
 // ----------------------------------------------------------------------------
 // Sets the initial post-processing cycle number
-void AllComponents::setInitialCycleNumber( int const& cycle0)
+void AllComponents::setInitialCycleNumber( int const& cycle0, 
+	double const& time )
 {
   list<PostProcessingWriter*>::iterator pp;
   for (pp=m_postProcessors.begin();pp!=m_postProcessors.end();pp++)
-    (*pp)->setInitialCycleNumber( cycle0 );
+    (*pp)->setInitialCycleNumber( cycle0, time );
 }
 
 
@@ -1916,31 +1909,35 @@ void AllComponents::checkParaviewPostProcessing( int const& rank,
   	int const& nprocs,
   	string const& name_,
 	string const& root_,
-  	const bool& isBinary )
+  	const bool& isBinary,
+	bool const& deleteIfExists )
 {
-  PostProcessingWriter *ParaviewPP = NULL;
-  list<PostProcessingWriter*>::iterator pp;
-  for (pp=m_postProcessors.begin();pp!=m_postProcessors.end();pp++)
-    if ( (*pp)->getPostProcessingWriterType() == "Paraview" )
-      ParaviewPP = *pp;
+  if ( deleteIfExists )
+  {
+    PostProcessingWriter *ParaviewPP = NULL;  
+    list<PostProcessingWriter*>::iterator pp;
+    for (pp=m_postProcessors.begin();pp!=m_postProcessors.end();pp++)
+      if ( (*pp)->getPostProcessingWriterType() == "Paraview" )
+        ParaviewPP = *pp;
+
+    // If a Paraview post-processing writer already exists, it is destroyed and
+    // recreated with the proper parameters
+    if ( ParaviewPP )
+    {
+      for (pp=m_postProcessors.begin();pp!=m_postProcessors.end();pp++)
+        if ( (*pp) == ParaviewPP )
+        {
+          delete *pp;
+	  pp = m_postProcessors.erase( pp );
+        }
+        else pp++;
+      ParaviewPP = NULL;
+    }
+  }
 
   // If no post-processing writer, all processors write data  
   if ( m_postProcessors.empty() )
     PostProcessingWriter::allocate_PostProcessingWindow( nprocs );
-
-  // If a Paraview post-processing writer already exists, it is destroyed and
-  // recreated with the proper parameters
-  if ( ParaviewPP )
-  {
-    for (pp=m_postProcessors.begin();pp!=m_postProcessors.end();pp++)
-      if ( (*pp) == ParaviewPP )
-      {
-        delete *pp;
-	pp = m_postProcessors.erase( pp );
-      }
-      else pp++;
-    ParaviewPP = NULL;
-  }
 
   // Creation of the Paraview post-processing writer with the proper parameters
   if ( rank == 0 )
@@ -1949,9 +1946,10 @@ void AllComponents::checkParaviewPostProcessing( int const& rank,
     	" post-processing writer with the proper parameters" << endl;
     cout << GrainsExec::m_shift6 << "Postprocessing" << endl;	
   }  
-  ParaviewPP = new ParaviewPostProcessingWriter( rank, nprocs, name_, root_,
-  	isBinary );
-  m_postProcessors.push_back( ParaviewPP );
+  PostProcessingWriter *newParaviewPP = new ParaviewPostProcessingWriter( rank, 
+  	nprocs, name_, root_, isBinary );
+  newParaviewPP->setExternallyControlled( true );
+  m_postProcessors.push_back( newParaviewPP );
 }
 
 
@@ -2088,7 +2086,9 @@ void AllComponents::initialiseOutputObstaclesLoadFiles( int rank,
   {
     if ( GrainsExec::m_ReloadType == "new" )
     {
-      string cmd = "bash " + get_tools_dir().string() + "/ExecScripts/ObstaclesLoadFiles_clear.exec " + m_outputTorsorObstacles_dir;
+      string cmd = "bash " + get_tools_dir().string() 
+      	+ "/ExecScripts/ObstaclesLoadFiles_clear.exec " 
+      	+ m_outputTorsorObstacles_dir;
       GrainsExec::m_return_syscmd = system( cmd.c_str() );
     }
     else

@@ -6,7 +6,7 @@
 
 /** File names definition */
 # ifndef GRAINS_RESULT_DIR
-#   define GRAINS_RESULT_DIR "Grains/Simu"
+#   define GRAINS_RESULT_DIR "Res"
 # endif
 # ifndef GRAINS_INPUTFILE
 #   define GRAINS_INPUTFILE "Grains/Simu/simul.xml"
@@ -63,7 +63,7 @@ event GranularSolver_init (t < -1.)
       // In Grains in reload mode the initial post-processing does not
       // output any result but simply open existing files and recover the 
       // initial cycle number
-      SaveResults_Grains();
+      SaveResults_Grains( !write_fluid_data_counter );
     }
     else SetInitialCycleNumber( init_cycle_number );   
   }
@@ -201,7 +201,9 @@ event GranularSolver_saveResults (t < -1.)
       SetParaviewPostProcessingTranslationVector( vtk_shift_to_zero.x,
       	vtk_shift_to_zero.y, vtk_shift_to_zero.z );
 #   endif  
+
+    printf ( "   Rigid body data\n" );
   
-    SaveResults_Grains();
+    SaveResults_Grains( !write_fluid_data_counter );
   }  
 }

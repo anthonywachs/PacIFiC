@@ -89,8 +89,9 @@ class PostProcessingWriter
     virtual void PostProcessing_end() = 0;
   
     /** @brief Sets the initial cycle number
-    @param cycle0 initial cycle number */
-    virtual void setInitialCycleNumber( int const& cycle0 );
+    @param cycle0 initial cycle number 
+    @param time physical time */
+    virtual void setInitialCycleNumber( int const& cycle0, double const& time );
   
     /** @brief Gets the post-processing writer type */
     virtual string getPostProcessingWriterType() const = 0;
@@ -99,7 +100,16 @@ class PostProcessingWriter
     @param filename file root name
     @param errcomposants list of the 2 components invovled */
     virtual void writeErreurComponents_Paraview( string const& filename,
-  	list<Component*> const& errcomposants );  
+  	list<Component*> const& errcomposants );
+	
+    /** @brief Sets the externally controlled boolean
+    @param ext externally controlled boolean */
+    void setExternallyControlled( bool const& ext );
+    
+    /** @brief Returns whether the post-processing writer is externally 
+    controlled
+    @param ext externally controlled boolean */
+    bool getExternallyControlled() const;    	  
     //@}
 
   
@@ -126,6 +136,8 @@ class PostProcessingWriter
     //@{  
     int m_rank; /**< process rank */
     int m_nprocs; /**< number of processes */
+    bool m_externallyControlled; /** is this writer controlled by an external
+    	program (e.g. when coupled to a fluid solver)
     //@}
 
     /**@name Static Parameters */
