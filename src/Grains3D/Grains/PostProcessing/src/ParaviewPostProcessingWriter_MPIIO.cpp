@@ -98,9 +98,12 @@ void ParaviewPostProcessingWriter::
       ppp = (*particle)->get_polygonsPts_PARAVIEW( PPTranslation );
       for (ilpp=ppp.begin();ilpp!=ppp.end();ilpp++,counter++)
       {
-        snprintf( &pts_coord[3*counter*charspernum], charspernum + 1, "%+13.5e ", (*ilpp)[X] );
-	snprintf( &pts_coord[(3*counter+1)*charspernum], charspernum + 1, "%+13.5e ", (*ilpp)[Y] );
-	snprintf( &pts_coord[(3*counter+2)*charspernum], charspernum + 1, "%+13.5e\n", (*ilpp)[Z] );
+        snprintf( &pts_coord[3*counter*charspernum], charspernum + 1, 
+		"%+13.5e ", (*ilpp)[X] );
+	snprintf( &pts_coord[(3*counter+1)*charspernum], charspernum + 1, 
+		"%+13.5e ", (*ilpp)[Y] );
+	snprintf( &pts_coord[(3*counter+2)*charspernum], charspernum + 1, 
+		"%+13.5e\n", (*ilpp)[Z] );
       }
     }    
 
@@ -267,7 +270,8 @@ void ParaviewPostProcessingWriter::
       nu = Norm( *(*particle)->getTranslationalVelocity() );
       for (j=0;j<nc;++j)
       {
-        snprintf( &normU[counter*charspernum], charspernum + 1, "%+13.5e ", nu );
+        snprintf( &normU[counter*charspernum], charspernum + 1, 
+		"%+13.5e ", nu );
         ++counter;	
       }
     }
@@ -306,7 +310,8 @@ void ParaviewPostProcessingWriter::
       nom = Norm( *(*particle)->getAngularVelocity() );
       for (j=0;j<nc;++j)
       {
-        snprintf( &normOm[counter*charspernum], charspernum + 1, "%+13.5e ", nom );
+        snprintf( &normOm[counter*charspernum], charspernum + 1, 
+		"%+13.5e ", nom );
         ++counter;	
       }
     }
@@ -690,9 +695,12 @@ void ParaviewPostProcessingWriter::
     {
       gc = *(*particle)->getPosition();
       if ( PPTranslation ) gc += *PPTranslation ;
-      snprintf( &coord[3*counter*charspernum], charspernum + 1, "%+13.5e ", gc[X] );
-      snprintf( &coord[(3*counter+1)*charspernum], charspernum + 1, "%+13.5e ", gc[Y] );
-      snprintf( &coord[(3*counter+2)*charspernum], charspernum + 1, "%+13.5e\n", gc[Z] );
+      snprintf( &coord[3*counter*charspernum], charspernum + 1, 
+      	"%+13.5e ", gc[X] );
+      snprintf( &coord[(3*counter+1)*charspernum], charspernum + 1, 
+      	"%+13.5e ", gc[Y] );
+      snprintf( &coord[(3*counter+2)*charspernum], charspernum + 1, 
+      	"%+13.5e\n", gc[Z] );
       ++counter;
     }    
 
@@ -739,10 +747,14 @@ void ParaviewPostProcessingWriter::
 	( (*particle)->getTag() != 2 || forceForAllTag ) )
     {
       qrot = *(*particle)->getQuaternionRotation();
-      snprintf( &coord[4*counter*charspernum], charspernum + 1, "%+13.5e ", qrot[W] );      
-      snprintf( &coord[(4*counter+1)*charspernum], charspernum + 1, "%+13.5e ", qrot[X] );
-      snprintf( &coord[(4*counter+2)*charspernum], charspernum + 1, "%+13.5e ", qrot[Y] );
-      snprintf( &coord[(4*counter+3)*charspernum], charspernum + 1, "%+13.5e\n", qrot[Z] );
+      snprintf( &coord[4*counter*charspernum], charspernum + 1, 
+      	"%+13.5e ", qrot[W] );      
+      snprintf( &coord[(4*counter+1)*charspernum], charspernum + 1, 
+      	"%+13.5e ", qrot[X] );
+      snprintf( &coord[(4*counter+2)*charspernum], charspernum + 1, 
+      	"%+13.5e ", qrot[Y] );
+      snprintf( &coord[(4*counter+3)*charspernum], charspernum + 1, 
+      	"%+13.5e\n", qrot[Z] );
       ++counter;
     }    
 
@@ -805,7 +817,8 @@ void ParaviewPostProcessingWriter::
        ( (*particle)->getTag() != 2 || forceForAllTag ) )
     {
       nom = Norm( *(*particle)->getAngularVelocity() );
-      snprintf( &scalar[counter*charspernum], charspernum + 1, "%+13.5e ", nom );
+      snprintf( &scalar[counter*charspernum], charspernum + 1, 
+      	"%+13.5e ", nom );
       ++counter;	
     }
 
@@ -1152,9 +1165,12 @@ void ParaviewPostProcessingWriter::
     {
       gc = *(*particle)->getPosition();
       if ( PPTranslation ) gc += *PPTranslation ;
-      snprintf( &coord[3*counter*charspernum], charspernum + 1, "%+13.5e ", gc[X] );
-      snprintf( &coord[(3*counter+1)*charspernum], charspernum + 1, "%+13.5e ", gc[Y] );
-      snprintf( &coord[(3*counter+2)*charspernum], charspernum + 1, "%+13.5e\n", gc[Z] );
+      snprintf( &coord[3*counter*charspernum], charspernum + 1, 
+      	"%+13.5e ", gc[X] );
+      snprintf( &coord[(3*counter+1)*charspernum], charspernum + 1, 
+      	"%+13.5e ", gc[Y] );
+      snprintf( &coord[(3*counter+2)*charspernum], charspernum + 1, 
+      	"%+13.5e\n", gc[Z] );
       ++counter;
     }    
 
@@ -1198,9 +1214,12 @@ void ParaviewPostProcessingWriter::
 	( (*particle)->getTag() != 2 || forceForAllTag ) )
     {
       vec = (*particle)->getTranslationalVelocity();
-      snprintf( &coord[3*counter*charspernum], charspernum + 1, "%+13.5e ", (*vec)[X] );
-      snprintf( &coord[(3*counter+1)*charspernum], charspernum + 1, "%+13.5e ", (*vec)[Y] );
-      snprintf( &coord[(3*counter+2)*charspernum], charspernum + 1, "%+13.5e\n", (*vec)[Z] );
+      snprintf( &coord[3*counter*charspernum], charspernum + 1, 
+      	"%+13.5e ", (*vec)[X] );
+      snprintf( &coord[(3*counter+1)*charspernum], charspernum + 1, 
+      	"%+13.5e ", (*vec)[Y] );
+      snprintf( &coord[(3*counter+2)*charspernum], charspernum + 1, 
+      	"%+13.5e\n", (*vec)[Z] );
       ++counter;
     }    
 
@@ -1231,9 +1250,12 @@ void ParaviewPostProcessingWriter::
 	( (*particle)->getTag() != 2 || forceForAllTag ) )
     {
       vec = (*particle)->getAngularVelocity();
-      snprintf( &coord[3*counter*charspernum], charspernum + 1, "%+13.5e ", (*vec)[X] );
-      snprintf( &coord[(3*counter+1)*charspernum], charspernum + 1, "%+13.5e ", (*vec)[Y] );
-      snprintf( &coord[(3*counter+2)*charspernum], charspernum + 1, "%+13.5e\n", (*vec)[Z] );
+      snprintf( &coord[3*counter*charspernum], charspernum + 1, 
+      	"%+13.5e ", (*vec)[X] );
+      snprintf( &coord[(3*counter+1)*charspernum], charspernum + 1, 
+      	"%+13.5e ", (*vec)[Y] );
+      snprintf( &coord[(3*counter+2)*charspernum], charspernum + 1, 
+      	"%+13.5e\n", (*vec)[Z] );
       ++counter;
     }    
 
@@ -1508,9 +1530,12 @@ void ParaviewPostProcessingWriter::
   {
     pt = (*pallContacts)[i].geometricPointOfContact;
     if ( PPTranslation ) pt += *PPTranslation ;
-    snprintf( &coord[3*counter*charspernum], charspernum + 1, "%+13.5e ", pt[X] );
-    snprintf( &coord[(3*counter+1)*charspernum], charspernum + 1, "%+13.5e ", pt[Y] );
-    snprintf( &coord[(3*counter+2)*charspernum], charspernum + 1, "%+13.5e\n", pt[Z] );
+    snprintf( &coord[3*counter*charspernum], charspernum + 1, 
+    	"%+13.5e ", pt[X] );
+    snprintf( &coord[(3*counter+1)*charspernum], charspernum + 1, 
+    	"%+13.5e ", pt[Y] );
+    snprintf( &coord[(3*counter+2)*charspernum], charspernum + 1, 
+    	"%+13.5e\n", pt[Z] );
     ++counter;
   }         
 
@@ -1810,16 +1835,22 @@ void ParaviewPostProcessingWriter::
     // Point 0
     pt0 = (*pallContacts)[i].PPptComp0;
     if ( PPTranslation ) pt0 += *PPTranslation ;
-    snprintf( &pts_coord[6*counter*charspernum], charspernum + 1, "%+13.5e ", pt0[X] );
-    snprintf( &pts_coord[(6*counter+1)*charspernum], charspernum + 1, "%+13.5e ", pt0[Y] );
-    snprintf( &pts_coord[(6*counter+2)*charspernum], charspernum + 1, "%+13.5e\n", pt0[Z] );     
+    snprintf( &pts_coord[6*counter*charspernum], charspernum + 1, 
+    	"%+13.5e ", pt0[X] );
+    snprintf( &pts_coord[(6*counter+1)*charspernum], charspernum + 1, 
+    	"%+13.5e ", pt0[Y] );
+    snprintf( &pts_coord[(6*counter+2)*charspernum], charspernum + 1, 
+    	"%+13.5e\n", pt0[Z] );     
 
     // Point 1
     pt1 = (*pallContacts)[i].PPptComp1;
     if ( PPTranslation ) pt1 += *PPTranslation ; 
-    snprintf( &pts_coord[(6*counter+3)*charspernum], charspernum + 1, "%+13.5e ", pt1[X] );
-    snprintf( &pts_coord[(6*counter+4)*charspernum], charspernum + 1, "%+13.5e ", pt1[Y] );
-    snprintf( &pts_coord[(6*counter+5)*charspernum], charspernum + 1, "%+13.5e\n", pt1[Z] );
+    snprintf( &pts_coord[(6*counter+3)*charspernum], charspernum + 1, 
+    	"%+13.5e ", pt1[X] );
+    snprintf( &pts_coord[(6*counter+4)*charspernum], charspernum + 1, 
+    	"%+13.5e ", pt1[Y] );
+    snprintf( &pts_coord[(6*counter+5)*charspernum], charspernum + 1, 
+    	"%+13.5e\n", pt1[Z] );
   }
 
   vector<int> mpifile_offsets( m_nprocs, 0 );
@@ -1853,8 +1884,10 @@ void ParaviewPostProcessingWriter::
   for (i=0;i<nPPF;++i)
   {
     norm = Norm( (*pallContacts)[i].contactForceComp0 );
-    snprintf( &normF[counter*charspernum], charspernum + 1, "%+13.5e ", norm );
-    snprintf( &normF[(counter+1)*charspernum], charspernum + 1, "%+13.5e ", norm );    
+    snprintf( &normF[counter*charspernum], charspernum + 1, 
+    	"%+13.5e ", norm );
+    snprintf( &normF[(counter+1)*charspernum], charspernum + 1, 
+    	"%+13.5e ", norm );    
     counter += 2;    
   }
 

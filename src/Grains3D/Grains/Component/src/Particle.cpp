@@ -1947,10 +1947,17 @@ double Particle::getPositionDir_nm1() const
 // ----------------------------------------------------------------------------
 // Writes the particle in an OBJ format
 void Particle::write_OBJ( ostream& f, size_t const& group_number,
-    	size_t& firstpoint_number ) const
+    	size_t& firstpoint_number )
 {
   f << "g Object" << GrainsExec::intToString( int( group_number ) ) << endl;
-  m_geoRBWC->write_OBJ( f, firstpoint_number ); 
+
+  // We must write the reference OBJ particle in its neutral orientation
+  // Otherwise rotations would be applied twice if the reference particle has
+  // a non-identity orientation  
+  Transform tt = *(m_geoRBWC->getTransform());
+  m_geoRBWC->setTransform( Transform() ); 
+  m_geoRBWC->write_OBJ( f, firstpoint_number );  
+  m_geoRBWC->setTransform( tt );      
 }
 
 

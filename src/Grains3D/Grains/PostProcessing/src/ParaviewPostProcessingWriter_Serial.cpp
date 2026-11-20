@@ -29,6 +29,11 @@ void ParaviewPostProcessingWriter::writeParticles_Paraview(
 
   ofstream f( ( m_ParaviewFilename_dir + "/" + partFilename ).c_str(), 
   	ios::out );
+  if ( !m_binary )
+  {	
+    f.setf( ios::scientific, ios::floatfield );
+    f.precision( FORMAT6DIGITS );	
+  }
   
   f << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" "
     	<< "byte_order=\"LittleEndian\" ";
@@ -228,6 +233,11 @@ void ParaviewPostProcessingWriter:: writeParticlesAsGlyph_Paraview(
 
   ofstream f( ( m_ParaviewFilename_dir + "/" + partFilename ).c_str(), 
   	ios::out );
+  if ( !m_binary )
+  {	
+    f.setf( ios::scientific, ios::floatfield );
+    f.precision( FORMAT6DIGITS );	
+  }	
   
   f << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" "
     	<< "byte_order=\"LittleEndian\" ";
@@ -465,6 +475,11 @@ void ParaviewPostProcessingWriter::
 
   ofstream f( ( m_ParaviewFilename_dir + "/" + partFilename ).c_str(), 
   	ios::out );
+  if ( !m_binary )
+  {	
+    f.setf( ios::scientific, ios::floatfield );
+    f.precision( FORMAT6DIGITS );	
+  }	
   
   f << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" "
     << "byte_order=\"LittleEndian\" ";
@@ -666,6 +681,11 @@ void ParaviewPostProcessingWriter::
           
   ofstream f( ( m_ParaviewFilename_dir + "/" + partFilename ).c_str(), 
   	ios::out );
+  if ( !m_binary )
+  {	
+    f.setf( ios::scientific, ios::floatfield );
+    f.precision( FORMAT6DIGITS );	
+  }
   
   f << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" "
     	<< "byte_order=\"LittleEndian\" ";
@@ -813,6 +833,12 @@ void ParaviewPostProcessingWriter::writeContactForceChains_Paraview(
 
   ofstream f( ( m_ParaviewFilename_dir + "/" + filename ).c_str(), 
   	ios::out );
+  if ( !m_binary )
+  {	
+    f.setf( ios::scientific, ios::floatfield );
+    f.precision( FORMAT6DIGITS );	
+  }	
+	
   f << "<VTKFile type=\"PolyData\" version=\"0.1\" "
     	<< "byte_order=\"LittleEndian\" ";
   if ( m_binary ) f << "compressor=\"vtkZLibDataCompressor\"";

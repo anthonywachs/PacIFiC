@@ -1327,11 +1327,17 @@ void CompositeParticle::createBoundingVolume()
 // ----------------------------------------------------------------------------
 // Writes the particle in an OBJ format
 void CompositeParticle::write_OBJ( ostream& f, size_t const& group_number,
-    	size_t& firstpoint_number ) const
+    	size_t& firstpoint_number )
 {
+  // We must write the reference OBJ particle in its neutral orientation
+  // Otherwise rotations would be applied twice if the reference particle has
+  // a non-identity orientation
+  Transform tt = *(m_geoRBWC->getTransform());
+  setTransform( Transform() ); 
   for ( size_t i=0; i<m_nbElemPart; ++i )
   {
     m_elementaryParticles[i]->write_OBJ( f, i, firstpoint_number );
     f << endl;
-  } 
+  }  
+  setTransform( tt );    
 }

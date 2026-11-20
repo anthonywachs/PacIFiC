@@ -673,7 +673,7 @@ class Particle : public Component
     particle 
     @param firstpoint_number number of the 1st point */
     virtual void write_OBJ( ostream& f, size_t const& group_number,
-    	size_t& firstpoint_number ) const;
+    	size_t& firstpoint_number );
     //@}
 
 
