@@ -3,7 +3,7 @@
 #
 
 module reset
-module load StdEnv/2023 gcc/12.3 openmpi/4.1.5 hdf5-mpi/1.14.2 petsc/3.23.4
+module load StdEnv/2026 gcc/15.3.0 openmpi/5.0.10 hdf5-mpi/2.2.0 petsc/3.25.5
 
 #
 # CC/CXX
